@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792885925607454000,
+  "created_ns": 1792886321195873000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -38385,11 +38385,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "e8ee45a585efbe51b12fe9d35f323fa1b2baa53bdedb6ade87c80f1623becec9"
+      "sha256": "39844dd8f1baa2958e761ac432a5f3ed2556fadb239c81b61dd80f8dc4997c84"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "037a47637a5d2194d43bcaaa6e1ac25000bc054ba01222da7bf10d025beb1fce"
+      "sha256": "82d0e61a83009d13a44dc6c4247bffd20f1495a980a9472603014da1c9e8e550"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38453,7 +38453,7 @@
     },
     {
       "path": "docs/native-game-image-diagnostic.zh-CN.md",
-      "sha256": "5037d6d7d63dd63a6e14d4bf8e05995a925439fd0e63442994393751babdaece"
+      "sha256": "924137a2a456ed2a9e1cbf722556342e82446abf7f8bd2d467c463f26ea8d024"
     }
   ],
   "excluded": [
