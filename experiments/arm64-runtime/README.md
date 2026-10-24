@@ -28,6 +28,12 @@ These are diagnostic findings, not a combat-white-model fix or measured FPS gain
 The default-off unaligned signal probe uses pre-bound thread state; its first game
 window measured 47 repairs in 0.318 ms, separate from the observed long frames.
 See docs/unaligned-signal-audit.zh-CN.md for scope and test limitations.
+Native game-frame diagnostics reuse the existing completed-present readback, with
+18 actual Metal format/orientation controls and bounded private input actions.
+They are separate from FPS tests. A real Old Yharnam enemy contact was observed,
+but the intermittent combat white model remains unreproduced; one 140 ms frame
+overlapped image readback and is explicitly not performance evidence.
+See docs/native-game-image-diagnostic.zh-CN.md.
 
 ## Development build limitations
 

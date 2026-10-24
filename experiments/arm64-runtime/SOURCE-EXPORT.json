@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792882479695472000,
+  "created_ns": 1792885925607454000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -253,7 +253,7 @@
     },
     {
       "path": "tools/analyze_stutter.py",
-      "sha256": "7f9fb930d39466aa3519242620c85c3a8f687b54c44b49ce777134428ca55433"
+      "sha256": "35755f713a99b8ad9778afcbcb9adc96438ed1ca83e986ffa656b06e9988ceb4"
     },
     {
       "path": "tools/analyze_texture_bindings.py",
@@ -312,6 +312,10 @@
       "sha256": "d376b2965e974258c9b459cce7a821cca4f999084aec4d67a421cbf188c94bef"
     },
     {
+      "path": "tools/build_present_image_candidate.py",
+      "sha256": "8a9a1b03917a70402e146d7767235ad2c4235d904337407a497661b6a1f3b4a6"
+    },
+    {
       "path": "tools/build_submit_diagnostic.py",
       "sha256": "1051a858ae5bdcc03d49602b10819966d48a91c18a0a740a0aec42fd4b996679"
     },
@@ -338,6 +342,10 @@
     {
       "path": "tools/death_pad_action.py",
       "sha256": "d05609b1a614ebb8e632cf8b987df99b78156d19a0c6b57cf2040fc666dd0054"
+    },
+    {
+      "path": "tools/decode_present_image.py",
+      "sha256": "53fe65063f5447d56a526f867983c945a669f7b653f5ece04ad71f5b143e5b60"
     },
     {
       "path": "tools/diagnostic_frame_tail.py",
@@ -456,6 +464,10 @@
       "sha256": "1d8e76fcc17de1376a614894509701d2557d2ad57547fecebb46c34ff13bfe9f"
     },
     {
+      "path": "tools/qa_image_action.py",
+      "sha256": "8cad53da9afbfd4768fae92852d8787576cc976eb5683b219c0ffda299602d2e"
+    },
+    {
       "path": "tools/qa_memory_policy.py",
       "sha256": "6d19b79b29ca5c821d85a291407d52ad85fecb9fa538cbc529b142d8ccd2b91c"
     },
@@ -553,7 +565,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "9cdf21936836aef62e204b1bedaecd6ff912ed972cfd297d80311194342a8d30"
+      "sha256": "9028c10191b54bbab8f9bc8c8f4e9a4bfdf0277f50740ee6b92635aab0fd88e9"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -670,6 +682,10 @@
     {
       "path": "tests/metal/test_mapping_rasterizer.h",
       "sha256": "523db481e20cb3577ad266d9a7752120f7b3f7e8efa388b5ef300ef461523bd9"
+    },
+    {
+      "path": "tests/metal/test_present_dump.mm",
+      "sha256": "ead977c358f2c90f282485475233813fc2380b631fd26089398dfcc4dc5a87ae"
     },
     {
       "path": "tests/metal/test_texture_expansion.mm",
@@ -948,6 +964,10 @@
       "sha256": "12bdfea7385673d520b37b7850691b21d9ca4f99aedfdbe8ec65b71b6d074e1e"
     },
     {
+      "path": "tests/test_present_dump.py",
+      "sha256": "ec1b3b180c8d10c073fb816b14a438440d1cf9ce3d34d76ccaebb9ed6474f9e8"
+    },
+    {
       "path": "tests/test_private_net_module_path.py",
       "sha256": "f7ccf3c97f325d71aa6c973febcde610ec7a49760aae5bdc01f504b39a5c01e2"
     },
@@ -970,6 +990,10 @@
     {
       "path": "tests/test_qa_cpu_qos.py",
       "sha256": "256d0d05ace9b4d810d66c774a490d84c55ea1470d8a66560e00455008d74c26"
+    },
+    {
+      "path": "tests/test_qa_image_action.py",
+      "sha256": "0f41455e98f6e85476932c205a8eae2dd4fde8d59bcb336118584e01d407f9c5"
     },
     {
       "path": "tests/test_qa_memory_policy.py",
@@ -32264,12 +32288,16 @@
       "sha256": "ac10ee49f656a322d887a9a25d83a30d8b9b9a32b8626ddaceae37c687e10c45"
     },
     {
+      "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_present_dump.h",
+      "sha256": "d5a993f0389ef20a750f2b8ec15c7a5234c3ff458431f4901136c7b28de99a34"
+    },
+    {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_presenter.h",
       "sha256": "78d410bbaa16de685b03c348d42d5fa83c77fd323eca8fbc28f7c6cf586ad781"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_presenter.mm",
-      "sha256": "9ab092f29207ea1881ea55e0c8a525418feb286f01e7dfb39e86b6f79f32d726"
+      "sha256": "85160933ea5402b269ab758b63719ac1ab5e0c5ec018c2c5b25648eb7f11943f"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pso_cache.h",
@@ -38357,11 +38385,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "49a2282142652bd1456f7a95722c1a95f4ff08eb58492f99c3328bba182582dd"
+      "sha256": "e8ee45a585efbe51b12fe9d35f323fa1b2baa53bdedb6ade87c80f1623becec9"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "096f72b4d50fcf16a69ba89528e970b1c4737bb50cc7192c1f6873c7b069b17a"
+      "sha256": "037a47637a5d2194d43bcaaa6e1ac25000bc054ba01222da7bf10d025beb1fce"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38422,6 +38450,10 @@
     {
       "path": "docs/unaligned-signal-audit.zh-CN.md",
       "sha256": "54f3ca68789851be6f9bbc0f68f7705bdbe636fbab2ddc1f36b00914cfe6a1de"
+    },
+    {
+      "path": "docs/native-game-image-diagnostic.zh-CN.md",
+      "sha256": "5037d6d7d63dd63a6e14d4bf8e05995a925439fd0e63442994393751babdaece"
     }
   ],
   "excluded": [

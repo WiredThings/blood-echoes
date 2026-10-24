@@ -10,6 +10,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include "video_core/renderer_metal/mtl_present_dump.h"
 
 #include "common/assert.h"
 #include "common/logging/log.h"
@@ -44,46 +45,9 @@ namespace {
 /// of a scaled session) is written raw (4 bytes per pixel, the texture's byte order) to
 /// <BB_DUMP_DIR or out/dump>/fNNN_present_WxH_rgba.raw, for comparing the backends' images
 /// without the window scaling.
-void DumpPresented(id<MTLDevice> device, id<MTLCommandQueue> queue, id<MTLTexture> texture,
-                   int index) {
-    static const std::string dir = [] {
-        const char* env = std::getenv("BB_DUMP_DIR");
-        return std::string{env && env[0] ? env : "out/dump"};
-    }();
-    // The presenter thread drains no pool of its own: without this one every dump's command
-    // buffer and its 8 MB buffer stayed alive.
-    @autoreleasepool {
-        const NSUInteger width = texture.width, height = texture.height, row = width * 4;
-        constexpr NSUInteger MaxPixels=8*1024*1024; // one <=32 MiB diagnostic display readback
-        if(!width || !height || width>MaxPixels/height) {
-            std::fprintf(stderr,"Metal: display dump exceeds the 32 MiB diagnostic bound\n");return;
-        }
-        id<MTLBuffer> buffer = [device newBufferWithLength:row * height
-                                                   options:MTLResourceStorageModeShared];
-        id<MTLCommandBuffer> cmdbuf = [queue commandBuffer];
-        id<MTLBlitCommandEncoder> blit = [cmdbuf blitCommandEncoder];
-        [blit copyFromTexture:texture
-                         sourceSlice:0
-                         sourceLevel:0
-                        sourceOrigin:MTLOriginMake(0, 0, 0)
-                          sourceSize:MTLSizeMake(width, height, 1)
-                            toBuffer:buffer
-                   destinationOffset:0
-              destinationBytesPerRow:row
-            destinationBytesPerImage:row * height];
-        [blit endEncoding];
-        [cmdbuf commit];
-        [cmdbuf waitUntilCompleted];
-        const bool bgra = texture.pixelFormat == MTLPixelFormatBGRA8Unorm ||
-                          texture.pixelFormat == MTLPixelFormatBGRA8Unorm_sRGB;
-        const std::string path = fmt::format("{}/f{:03d}_present_{}x{}_{}.raw", dir, index, width,
-                                             height, bgra ? "bgra" : "rgba");
-        if (FILE* f = std::fopen(path.c_str(), "wb")) {
-            std::fwrite(buffer.contents, 1, row * height, f);
-            std::fclose(f);
-            std::printf("Metal: display buffer dumped to %s\n", path.c_str());
-        }
-    }
+void DumpPresented(id<MTLDevice> device,id<MTLCommandQueue> queue,id<MTLTexture> texture,int index,bool flip_vertical=false){
+    static const std::string dir=[] {const char* e=std::getenv("BB_DUMP_DIR");return std::string{e&&*e?e:"out/dump"};}();
+    BbQaPresentDump::Write(device,queue,texture,dir,index,flip_vertical);
 }
 
 /// The pixel format of the frame textures and of the layer. No HDR, so the post process pass
@@ -559,7 +523,11 @@ VideoCore::PresentFrame* Presenter::PrepareFrame(
         BbFlushReason::Scope reason{BbFlushReason::Reason::PresenterWait};
         static int dump_index = 0;
         scheduler->Wait(frame->tick.load());
-        DumpPresented(device->GetImpl().device, device->GetImpl().queue, dump, dump_index++);
+        static const bool final_image=[] {const char* e=std::getenv("BB_PRESENT_DUMP_FINAL");return e&&e[0]=='1';}();
+        // Diagnostic preview of the already completed post-process target preserves
+        // the actual present view's swizzle/gamma. Its rows are flipped by Present.
+        DumpPresented(device->GetImpl().device,device->GetImpl().queue,
+                      final_image?impl->textures[frame->index]:dump,dump_index++,final_image);
     }
     // The BB_FRAMES_AHEAD bound (video_core/frames_ahead.h), on the committed tick.
     frames_ahead.Throttle(frame->tick.load(std::memory_order_relaxed),
