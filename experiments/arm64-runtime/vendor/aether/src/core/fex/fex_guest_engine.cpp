@@ -3,6 +3,7 @@
 #include "git_version.h"
 #include "bb_hardware_tso.h"
 #include "bb_stutter_audit.h"
+#include "bb_signal_audit.h"
 #include "darwin_fault.h"
 // SPDX-License-Identifier: MIT
 
@@ -220,6 +221,7 @@ public:
                           FEXCore::SignalDelegator* signalDelegator,
                           BridgeSyscallHandler* syscalls = nullptr)
     : Previous {ActiveFexExecution} {
+    BbSignalAudit::PrepareThread(); // ordinary execution, never lazy-initialize from SIGBUS
     ActiveFexExecution = {&context, thread, signalDelegator, syscalls};
   }
 
@@ -1599,16 +1601,19 @@ bool HandleGuestSignal(int signal, siginfo_t* info, void* rawContext) noexcept {
   const auto pc = static_cast<std::uintptr_t>(context->uc_mcontext.pc);
 #endif
   SetHgsCheckpoint(HgsCheckpoint::HavePc);
+  BbSignalAudit::Scope alignment_audit{BbAudit::UnalignedSignal,pc};
   const bool in_code_buffer =
       ActiveFexExecution.Context->IsAddressInCodeBuffer(ActiveFexExecution.Thread, pc);
   SetHgsCheckpoint(HgsCheckpoint::CheckedCodeBuffer);
   if (!in_code_buffer) {
     SetHgsCheckpoint(HgsCheckpoint::NotInCodeBufferReturn);
+    alignment_audit.Rejected();
     return false;
   }
 
   if (info->si_code != BUS_ADRALN) {
     SetHgsCheckpoint(HgsCheckpoint::NotAlignmentFaultReturn);
+    alignment_audit.Rejected();
     return false;
   }
   SetHgsCheckpoint(HgsCheckpoint::IsAlignmentFault);
@@ -1646,17 +1651,21 @@ bool HandleGuestSignal(int signal, siginfo_t* info, void* rawContext) noexcept {
   // unrelated fault. writable_pc is known-readable since HandleUnalignedAccess writes
   // through it below.
   const uint32_t instr_before = *reinterpret_cast<volatile uint32_t*>(writable_pc);
+  BbSignalAudit::Scope repair_audit{BbAudit::UnalignedRepair,pc,100000};
   const auto adjustment = FEXCore::ArchHelpers::Arm64::HandleUnalignedAccess(
       ActiveFexExecution.Thread,
       FEXCore::ArchHelpers::Arm64::UnalignedHandlerType::HalfBarrier, writable_pc, regs.data());
+  repair_audit.End();
   SetHgsCheckpoint(HgsCheckpoint::AfterHandleUnaligned);
   if (!adjustment.has_value()) {
     SetHgsCheckpoint(HgsCheckpoint::AdjustmentFailedReturn);
+    alignment_audit.Rejected();
     SignalSafeLog("BACHATA_UNALIGNED_FAIL: pc=%p writable_pc=%p instr_before=%#x\n",
                   reinterpret_cast<void*>(pc), reinterpret_cast<void*>(writable_pc), instr_before);
     return false;
   }
   {
+    BbSignalAudit::Scope log_audit{BbAudit::UnalignedLog,pc,100000};
     const uint32_t instr_after = *reinterpret_cast<volatile uint32_t*>(writable_pc);
     SignalSafeLog("BACHATA_UNALIGNED_FIX: pc=%p writable_pc=%p adj=%d instr_before=%#x "
                   "instr_after=%#x resume_pc=%p\n",
@@ -1673,11 +1682,13 @@ bool HandleGuestSignal(int signal, siginfo_t* info, void* rawContext) noexcept {
   // instructions -- and silently run off into garbage with no crash and no further syscalls,
   // rather than the freshly-patched code. Cover PC[-1] through PC[1] (3 instructions) since
   // that's the widest range HandleUnalignedAccess's backpatch touches.
+  BbSignalAudit::Scope publish_audit{BbAudit::UnalignedPublish,pc,100000};
   __builtin___clear_cache(reinterpret_cast<char*>(pc - 4), reinterpret_cast<char*>(pc + 8));
   std::memcpy(ts.__x, regs.data(), sizeof(ts.__x));
   arm_thread_state64_set_fp(ts, regs[29]);
   arm_thread_state64_set_lr_fptr(ts, reinterpret_cast<void*>(regs[30]));
   arm_thread_state64_set_pc_fptr(ts, reinterpret_cast<void*>(pc + *adjustment));
+  publish_audit.End();
 #else
   auto* registers = reinterpret_cast<std::uint64_t*>(context->uc_mcontext.regs);
   const auto adjustment = FEXCore::ArchHelpers::Arm64::HandleUnalignedAccess(

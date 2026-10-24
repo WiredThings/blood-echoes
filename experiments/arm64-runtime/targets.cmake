@@ -372,3 +372,8 @@ add_executable(test_producer_wait_policy ${BB_ARM64_PROTOTYPE_DIR}/tests/test_pr
 target_include_directories(test_producer_wait_policy PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src)
 target_compile_features(test_producer_wait_policy PRIVATE cxx_std_20)
 target_compile_options(test_producer_wait_policy PRIVATE -UNDEBUG)
+
+add_executable(test_signal_audit ${BB_ARM64_PROTOTYPE_DIR}/tests/test_signal_audit.cpp)
+target_include_directories(test_signal_audit PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src)
+target_compile_features(test_signal_audit PRIVATE cxx_std_20)
+target_compile_options(test_signal_audit PRIVATE -UNDEBUG)

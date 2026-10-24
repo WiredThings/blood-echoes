@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792879830690795000,
+  "created_ns": 1792882479695472000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -76,6 +76,10 @@
       "sha256": "6136c2410ea0c8f19a36e9e3641fb4c94bc97142da06751c55ebddeb54eb1ff8"
     },
     {
+      "path": "src/bb_signal_audit.h",
+      "sha256": "6eb1fdcf8df10e0fcea563e1c41c6d56a21be516668b83474808b75aa6c29424"
+    },
+    {
       "path": "src/bb_sparse_packet.h",
       "sha256": "6fce56111a1bc5bc812ced455584b777f376521e5d385fe1a6629e0654746994"
     },
@@ -89,7 +93,7 @@
     },
     {
       "path": "src/bb_stutter_audit.h",
-      "sha256": "311d14d535da65e44acc9e79b944577475233aa0df815428973eba0f5b870321"
+      "sha256": "faa474bf64a1e746225cca11870c50fadbe58326def2af1c6c950ced55d823dc"
     },
     {
       "path": "src/boot_image.h",
@@ -249,7 +253,7 @@
     },
     {
       "path": "tools/analyze_stutter.py",
-      "sha256": "1756de44db7328be453af0c83e49657811f1f9615ed76151c710b476356b428f"
+      "sha256": "7f9fb930d39466aa3519242620c85c3a8f687b54c44b49ce777134428ca55433"
     },
     {
       "path": "tools/analyze_texture_bindings.py",
@@ -501,7 +505,7 @@
     },
     {
       "path": "tools/run_current_regressions.py",
-      "sha256": "2a590975b0ea833cd8552aa5f6e8553080b2eaaec587af4cfab480a6550c76d7"
+      "sha256": "dfa9f7e0d1e7d646045f91e853c32549ec369ca8932bcb7ee5b419d2058685fa"
     },
     {
       "path": "tools/run_death_observation.py",
@@ -514,6 +518,10 @@
     {
       "path": "tools/run_extra_heaps_abba.py",
       "sha256": "fd13e2951fa30d66e220f3da33b02c348177794bfe12e08bbf1935f1eabd897e"
+    },
+    {
+      "path": "tools/run_frozen_component_abba.py",
+      "sha256": "e7e39da7c63d70da71ca59c08d30a32a2606c88e95785fc9a0532db07ba79214"
     },
     {
       "path": "tools/run_game.py",
@@ -545,7 +553,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "2906b5e7c9a70902f5cc28b9036cdeecb825f55edabfbe811cd758f332c18521"
+      "sha256": "9cdf21936836aef62e204b1bedaecd6ff912ed972cfd297d80311194342a8d30"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -705,7 +713,7 @@
     },
     {
       "path": "tests/run_prototype.py",
-      "sha256": "5ae89e1ab00b9636244d4b5548a642b3052bf906306f2c71edf36ce2066d8c43"
+      "sha256": "83164cf52073e3f25d6d47941ecfe18a4639986a6f8f7a081d083f4a58323098"
     },
     {
       "path": "tests/run_resource_hooks.py",
@@ -996,6 +1004,10 @@
       "sha256": "abf1d23a0a66f9c73814546a856e809f8619133ce789f2a86ca59cb7b695f964"
     },
     {
+      "path": "tests/test_signal_audit.cpp",
+      "sha256": "f9269a6cf8dcc29292bf772c991daa88b9d6618dd70cacb19b4ad5b612a75c85"
+    },
+    {
       "path": "tests/test_sleep_audit.cpp",
       "sha256": "97a524f207174ee6d90589d0fc2e8bb496448f696a61098f12e7a5ccb2038fb7"
     },
@@ -1054,6 +1066,10 @@
     {
       "path": "tests/test_trace_writer_clock.py",
       "sha256": "96fea97ceae9e1a0f8df3430d3095419894f1e4d3afdfbd05665451e346d865b"
+    },
+    {
+      "path": "tests/test_unaligned_audit_fex.py",
+      "sha256": "58cba13724778f3c17a3fc9161e7464ef6e5f5071718506fc4dd262b6ecfbba6"
     },
     {
       "path": "tests/test_writer_handoff.cpp",
@@ -28981,7 +28997,7 @@
     },
     {
       "path": "vendor/aether/src/core/fex/fex_guest_engine.cpp",
-      "sha256": "d164f2ddb2f27e66096d9b0c8cefc09877c9991ae534b6a7d950cd1d2a400b58"
+      "sha256": "0bfef5d4c81dd5fed7e194fe35d6da6c11d3a5589bbd5a48ad8d175e98be03c0"
     },
     {
       "path": "vendor/aether/src/core/fex/fex_guest_engine.h",
@@ -38333,7 +38349,7 @@
     },
     {
       "path": "targets.cmake",
-      "sha256": "327cbed9ffb7c95ff96011bff0cda8192b90a192b71517ddc3a7df059e644e3d"
+      "sha256": "266afb5ff2f35a110da062a8adefa9d70e5b17cb9d053bc854c9237c9e6982d2"
     },
     {
       "path": "configure.py",
@@ -38341,11 +38357,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "acfeaf9b8aa813ae122daa613103098f38f31d451cfc49f5eb3859acbe4cd610"
+      "sha256": "49a2282142652bd1456f7a95722c1a95f4ff08eb58492f99c3328bba182582dd"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "a80a7ba9689de350d54f64ce612886dcd5353c57bf867d8d2e244a98a8ac3fe4"
+      "sha256": "096f72b4d50fcf16a69ba89528e970b1c4737bb50cc7192c1f6873c7b069b17a"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38402,6 +38418,10 @@
     {
       "path": "docs/producer-wait-and-range-audit.zh-CN.md",
       "sha256": "3261541038ab6f011280e833f8497510fa5af45deab436a116b1facf42de2db4"
+    },
+    {
+      "path": "docs/unaligned-signal-audit.zh-CN.md",
+      "sha256": "54f3ca68789851be6f9bbc0f68f7705bdbe636fbab2ddc1f36b00914cfe6a1de"
     }
   ],
   "excluded": [

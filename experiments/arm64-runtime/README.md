@@ -25,6 +25,9 @@ limited game observations and process-wide scheduling counter qualifications.
 See docs/producer-wait-and-range-audit.zh-CN.md for the producer-condition blind spot,
 candidate CSChrThread2 notification and complete-range texture intent controls.
 These are diagnostic findings, not a combat-white-model fix or measured FPS gain.
+The default-off unaligned signal probe uses pre-bound thread state; its first game
+window measured 47 repairs in 0.318 ms, separate from the observed long frames.
+See docs/unaligned-signal-audit.zh-CN.md for scope and test limitations.
 
 ## Development build limitations
 
@@ -40,7 +43,7 @@ On the prepared isolated development host:
 python3 tools/generate_native.py
 ninja -C build/fex -j1
 python3 tools/run_current_regressions.py
-# rebuilds all 55 binaries used by the 119-case authored suite before testing
+# rebuilds all 56 binaries used by the 121-case authored suite before testing
 python3 tests/test_runtime_exit_contract.py
 python3 tests/test_libc_spans.py
 python3 tests/test_native_abi_declarations.py

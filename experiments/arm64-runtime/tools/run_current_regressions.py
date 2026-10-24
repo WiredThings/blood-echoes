@@ -21,5 +21,5 @@ def run(name,cmd):
  if r.returncode:raise SystemExit(str(e))
 run('rebuild-suite',['ninja','-C',str(P/'build/fex'),'-j1',*targets])
 report['binaries']={n:hashlib.file_digest((P/'build/fex/Bin'/n).open('rb'),'sha256').hexdigest()for n in targets}
-for name,args in [('suite',['tests/run_prototype.py','--packed-veneers','--fast-hle-lookup']),('data',['tests/test_missing_data_imports.py']),('spans',['tests/test_libc_spans.py']),('exit',['tests/test_runtime_exit_contract.py']),('producer-analysis',['tests/test_producer_wait_analysis.py']),('writer-clock',['tests/test_trace_writer_clock.py']),('reader-clock',['tests/test_trace_clock_rejection.py']),('ABI-marker',['tests/test_native_abi_declarations.py'])]:run(name,[sys.executable,*args])
+for name,args in [('suite',['tests/run_prototype.py','--packed-veneers','--fast-hle-lookup']),('data',['tests/test_missing_data_imports.py']),('spans',['tests/test_libc_spans.py']),('exit',['tests/test_runtime_exit_contract.py']),('producer-analysis',['tests/test_producer_wait_analysis.py']),('signal-FEX',['tests/test_unaligned_audit_fex.py']),('writer-clock',['tests/test_trace_writer_clock.py']),('reader-clock',['tests/test_trace_clock_rejection.py']),('ABI-marker',['tests/test_native_abi_declarations.py'])]:run(name,[sys.executable,*args])
 report['passed']=True;(e/'result.json').write_text(json.dumps(report,indent=2)+'\n')

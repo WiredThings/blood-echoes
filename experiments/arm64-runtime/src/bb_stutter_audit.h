@@ -16,7 +16,7 @@
 namespace BbAudit {
 enum Kind : uint32_t { FexBlock=1, FexInvalidationLock, FexIR, FexCodegen, FexPublish, FexCodeBufferLock, FexMappingLock, FexCodePagesLock,
  MetalLibrary=10, MetalLibraryBuild, MetalPSO, MetalReplayWait, MetalGPUWait, MetalSubmitWait, MetalSpirvToMsl, MetalSlowPacket=17, MetalPacketCpuWindow=18, MetalPacketStatus=19,
- IPC=20, IPCWrite, IPCReply, IPCHandler, IPCWriterLock, IPCSpaceWait, IPCQueueWrite, HLE=30, GuestSleep=31, HleLookup=32, FrameInterval=40, LifetimeCollect=41, MemoryReport=42, MetalPacketIdentity=43, MetalTaskTarget=44, GuestFlipMarker=45, GuestSubmit=46, GuestFrameStatus=47, GuestFrameAccounting=48, GuestFrameCpuWindow=49, GuestConditionWait=50, GuestConditionIdentity=51, GuestConditionMutex=52, GuestConditionResult=53, GuestConditionWake=54, GuestConditionOperation=55, GuestConditionStatus=56, GuestConditionErrors=57, GuestProducerCpuWindow=58, ProducerConditionWait=65,ProducerConditionIdentity,ProducerConditionMutex,ProducerConditionResult,ProducerConditionToken,ProducerNotification,ProducerNotificationIdentity,ProducerNotificationOperation };
+ IPC=20, IPCWrite, IPCReply, IPCHandler, IPCWriterLock, IPCSpaceWait, IPCQueueWrite, HLE=30, GuestSleep=31, HleLookup=32, FrameInterval=40, LifetimeCollect=41, MemoryReport=42, MetalPacketIdentity=43, MetalTaskTarget=44, GuestFlipMarker=45, GuestSubmit=46, GuestFrameStatus=47, GuestFrameAccounting=48, GuestFrameCpuWindow=49, GuestConditionWait=50, GuestConditionIdentity=51, GuestConditionMutex=52, GuestConditionResult=53, GuestConditionWake=54, GuestConditionOperation=55, GuestConditionStatus=56, GuestConditionErrors=57, GuestProducerCpuWindow=58, ProducerConditionWait=65,ProducerConditionIdentity,ProducerConditionMutex,ProducerConditionResult,ProducerConditionToken,ProducerNotification,ProducerNotificationIdentity,ProducerNotificationOperation,UnalignedSignal=73,UnalignedRepair,UnalignedLog,UnalignedPublish,UnalignedRejected };
 constexpr unsigned Capacity=16384;
 inline uint64_t Now(clockid_t c=CLOCK_MONOTONIC) { timespec t{}; if(clock_gettime(c,&t))return 0; return uint64_t(t.tv_sec)*1000000000ULL+t.tv_nsec; }
 struct alignas(64) Row {
@@ -70,14 +70,18 @@ struct Store {
 inline Store& Get(){static Store s;return s;}
 inline bool Enabled(){auto& s=Get();return s.data && (!s.gate || s.gate->load(std::memory_order_relaxed)==1);}
 inline bool EnabledFor(uint32_t kind){return kind && Enabled() && Get().Allows(kind);}
-inline void Record(uint32_t kind,uint64_t start,uint64_t wall,uint64_t cpu,uint64_t arg=0){
- auto& store=Get();auto* b=store.data;if(!b || !store.Allows(kind))return;
+inline void RecordPrepared(Buffer* b,uint32_t kind,uint64_t tid,uint64_t start,uint64_t wall,uint64_t cpu,uint64_t arg=0)noexcept{
+ if(!b)return;
  const uint64_t i=b->h.issued.fetch_add(1,std::memory_order_relaxed);auto& r=b->rows[i%Capacity];
  if(r.busy.exchange(1,std::memory_order_acquire)){b->h.dropped.fetch_add(1,std::memory_order_relaxed);return;}
  if(r.sequence.load(std::memory_order_relaxed)>i+1){b->h.dropped.fetch_add(1,std::memory_order_relaxed);r.busy.store(0,std::memory_order_release);return;}
- r.sequence.store(0,std::memory_order_relaxed);r.kind=kind;pthread_threadid_np(nullptr,&r.tid);
+ r.sequence.store(0,std::memory_order_relaxed);r.kind=kind;r.tid=tid;
  r.start=start;r.wall=wall;r.cpu=cpu;r.arg=arg;r.reserved=0;
  r.sequence.store(i+1,std::memory_order_release);r.busy.store(0,std::memory_order_release);
+}
+inline void Record(uint32_t kind,uint64_t start,uint64_t wall,uint64_t cpu,uint64_t arg=0){
+ auto& store=Get();auto* b=store.data;if(!b || !store.Allows(kind))return;
+ uint64_t tid{};pthread_threadid_np(nullptr,&tid);RecordPrepared(b,kind,tid,start,wall,cpu,arg);
 }
 struct Scope {
  uint32_t kind;uint64_t arg,start{},cpu{},minimum;

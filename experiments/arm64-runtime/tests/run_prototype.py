@@ -133,6 +133,8 @@ def main():
     run('guest-condition-slot-lifecycle-and-real-wake',[binary/'test_guest_sync'])
     run('guest-condition-disabled-original-calls',[binary/'test_guest_sync','--disabled'])
     run('producer-wait-policy-bounds-and-ABA',[binary/'test_producer_wait_policy'])
+    run('native-signal-audit-prepared-lock-free',[binary/'test_signal_audit'])
+    run('native-signal-audit-default-off',[binary/'test_signal_audit','--disabled'])
     run('producer-wait-real-notification',[binary/'test_guest_sync','--producer'])
     run('fex-mapping-audit-disabled-original-mapping',[binary/'test_fex_map_audit'])
     run('fex-mapping-audit-events-bounds-and-limit',[binary/'test_fex_map_audit','enabled'])
