@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792876692130562000,
+  "created_ns": 1792879830690795000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -53,11 +53,11 @@
     },
     {
       "path": "src/bb_guest_sync_audit.h",
-      "sha256": "8a5ec678c0de445e5dfbf18c85a3cdf799807d372e6a7ffae09503619b77a897"
+      "sha256": "9f13bfef2c25059ea098c220b2558af255125a73f3822b0ca3d058faaf9976ee"
     },
     {
       "path": "src/bb_guest_sync_policy.h",
-      "sha256": "7642badcc34e3324e80e40c2feb17dfa93850d26aa852f855cc28da603b21d3c"
+      "sha256": "737a409b0f8e2d9ad3da6c7d9abc3928e967e199d37ce8c4ee29dbebf7f2db55"
     },
     {
       "path": "src/bb_hardware_tso.h",
@@ -70,6 +70,10 @@
     {
       "path": "src/bb_private_net_module_path.h",
       "sha256": "a9e36d675211ff617bbdce084a52ef9da4a7edae4d4dfafa1a5482bb16f6a9ba"
+    },
+    {
+      "path": "src/bb_producer_wait_policy.h",
+      "sha256": "6136c2410ea0c8f19a36e9e3641fb4c94bc97142da06751c55ebddeb54eb1ff8"
     },
     {
       "path": "src/bb_sparse_packet.h",
@@ -85,7 +89,7 @@
     },
     {
       "path": "src/bb_stutter_audit.h",
-      "sha256": "f39e814259eb2e3f4b016410f6aea6b67cc385c46b0ce1f808e0f0562b43843a"
+      "sha256": "311d14d535da65e44acc9e79b944577475233aa0df815428973eba0f5b870321"
     },
     {
       "path": "src/boot_image.h",
@@ -245,7 +249,7 @@
     },
     {
       "path": "tools/analyze_stutter.py",
-      "sha256": "5ad60b98def9efa9b9fe96d2a0dceca80520fcb5d3d79d2e440e4379fa83ec15"
+      "sha256": "1756de44db7328be453af0c83e49657811f1f9615ed76151c710b476356b428f"
     },
     {
       "path": "tools/analyze_texture_bindings.py",
@@ -297,7 +301,7 @@
     },
     {
       "path": "tools/build_partial_audit.py",
-      "sha256": "8a9cb45b3eb6c56934837962c956e8ee7282efce05358990e09a9ed52bab0b81"
+      "sha256": "d8a6941ebb09ad7ff39cb643ee3b6c6e680fbe7aa669d9e00fd411f662a6c124"
     },
     {
       "path": "tools/build_partial_range_candidate.py",
@@ -322,6 +326,10 @@
     {
       "path": "tools/cpu_code_map.py",
       "sha256": "8af65a87a236af04f5675b15016957a83fd5a5db7be47d2037b4ae5ae00c55b9"
+    },
+    {
+      "path": "tools/cpu_stack_sample.py",
+      "sha256": "7ea0c7f6e4bc4535d6912aec500286c796f47158336f70ae8c91c307013121c6"
     },
     {
       "path": "tools/death_pad_action.py",
@@ -401,7 +409,7 @@
     },
     {
       "path": "tools/package_local_arm64_qa.py",
-      "sha256": "68db85fd9aa0e4e9e61775d4bfd67585446820b29b3545acd4cbbd26847985cb"
+      "sha256": "7e0d0d8ee2872b90925085aa7c965c10ad59432fb99b3b4b303337fe97a98355"
     },
     {
       "path": "tools/patch_adapter.py",
@@ -492,6 +500,10 @@
       "sha256": "19228b6092017bc0d84d72b6613948dc6e45d042a405084523a51a102ec4e8c9"
     },
     {
+      "path": "tools/run_current_regressions.py",
+      "sha256": "2a590975b0ea833cd8552aa5f6e8553080b2eaaec587af4cfab480a6550c76d7"
+    },
+    {
       "path": "tools/run_death_observation.py",
       "sha256": "84701b72a55601926331711cfbc2e1762197688e1e482c764e2945f8ed69ad2c"
     },
@@ -533,7 +545,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "ebc84d10ff1b79771bc7767374ec30f0fa4d05d7a75cec635e1050b257ea5c9f"
+      "sha256": "2906b5e7c9a70902f5cc28b9036cdeecb825f55edabfbe811cd758f332c18521"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -661,7 +673,7 @@
     },
     {
       "path": "tests/metal/test_texture_inplace_gpu.mm",
-      "sha256": "481411b370026940a2740dea5285808c2b601f7395f8a3a92baf7e4699119872"
+      "sha256": "0c7f2f0ab8429cd005a851fa5e4944905712d5b617db3b67d51777c659dbf3ae"
     },
     {
       "path": "tests/metal/test_texture_partial_gpu.mm",
@@ -693,7 +705,7 @@
     },
     {
       "path": "tests/run_prototype.py",
-      "sha256": "7e426b1335ffce8b489e355218985653e88f1ee596eb9de5c8cd6f6c3ab55cbe"
+      "sha256": "5ae89e1ab00b9636244d4b5548a642b3052bf906306f2c71edf36ce2066d8c43"
     },
     {
       "path": "tests/run_resource_hooks.py",
@@ -768,6 +780,10 @@
       "sha256": "6694c67aed308f29d38f123f2121200fc5060a796d96d4517f70f0d48fdd1c91"
     },
     {
+      "path": "tests/test_cpu_stack_sample.py",
+      "sha256": "6a1d07b878d2a040ba277ef8504b862cef30af78b8f7c02e13d30d80f2208e06"
+    },
+    {
       "path": "tests/test_darwin_fault.cpp",
       "sha256": "bae8d65f3bc2c64787a1786d378f2847e0621718a955174329a5828b64b33f34"
     },
@@ -809,7 +825,7 @@
     },
     {
       "path": "tests/test_guest_sync.cpp",
-      "sha256": "ec1b7c2c9f9e6199451dd1082c0fc8e2928e11e2d99d50b8122d5df14d61ff3c"
+      "sha256": "7669af4f1883ce4df0de857ceadf554372ab1996918cd1371867aeb9b320092e"
     },
     {
       "path": "tests/test_hardware_tso.cpp",
@@ -916,6 +932,10 @@
       "sha256": "db8fb8ac77174aa810e1678015e70749bb262ff1af1f689bef3745c002e6dcbf"
     },
     {
+      "path": "tests/test_partial_audit_controls.py",
+      "sha256": "eca2b9606d8b18cee9ad7ddd1fd7d6331fcbb07f8b017d338c9e200a4167d5fc"
+    },
+    {
       "path": "tests/test_pmr_lifetime.cpp",
       "sha256": "12bdfea7385673d520b37b7850691b21d9ca4f99aedfdbe8ec65b71b6d074e1e"
     },
@@ -926,6 +946,14 @@
     {
       "path": "tests/test_process_schedule_audit.py",
       "sha256": "315c9d13b97d43595fb8983951108382969808086c285d1196edfcb06474c605"
+    },
+    {
+      "path": "tests/test_producer_wait_analysis.py",
+      "sha256": "9b4a9b403db69f837ad806476d0a087ce1111c96544dbc3350c053a193250ea3"
+    },
+    {
+      "path": "tests/test_producer_wait_policy.cpp",
+      "sha256": "8da3a44f62ac3ea118d203c275a7348b52d8c09b767d0b8a5ac712a38fded72e"
     },
     {
       "path": "tests/test_published_ranges.cpp",
@@ -28969,7 +28997,7 @@
     },
     {
       "path": "vendor/aether/src/core/guest_cpu/fex_hle_bridge.cpp",
-      "sha256": "041c3e676a93d294d52f4dae823bc343e3d37cc574367a9e60a23a014de91c20"
+      "sha256": "a9cd8801ea883d5e17ef632218059f22b1959e7c020283929bf8e93bcafae385"
     },
     {
       "path": "vendor/aether/src/core/guest_cpu/fex_hle_bridge.h",
@@ -38305,7 +38333,7 @@
     },
     {
       "path": "targets.cmake",
-      "sha256": "565eddf7130adacf3e7f1ae3113137d37e70a2ffafbe251fa1a788b6917a2f8c"
+      "sha256": "327cbed9ffb7c95ff96011bff0cda8192b90a192b71517ddc3a7df059e644e3d"
     },
     {
       "path": "configure.py",
@@ -38313,11 +38341,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "2ed71bf628bbf4454d5b214951b802661344f30f83eac502ced2e2b14e06f2c2"
+      "sha256": "acfeaf9b8aa813ae122daa613103098f38f31d451cfc49f5eb3859acbe4cd610"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "edb44610e2ecbfa1f15ab7bc47204de8ff60485e235db38adc1b47b6e8de44ab"
+      "sha256": "a80a7ba9689de350d54f64ce612886dcd5353c57bf867d8d2e244a98a8ac3fe4"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38370,6 +38398,10 @@
     {
       "path": "docs/inplace-texture-and-cpu-scheduling.zh-CN.md",
       "sha256": "d036428e43d4bd7e2c09dfbaa171e6738f64294a6d5e3416755d0ab608e8253a"
+    },
+    {
+      "path": "docs/producer-wait-and-range-audit.zh-CN.md",
+      "sha256": "3261541038ab6f011280e833f8497510fa5af45deab436a116b1facf42de2db4"
     }
   ],
   "excluded": [

@@ -22,6 +22,9 @@ Existing AvPlayer implementations still need a proper guest callback/handle brid
 The private CPU QoS option remains OFF: its measured static ABBA did not show a benefit.
 See docs/inplace-texture-and-cpu-scheduling.zh-CN.md for actual in-place pixel controls,
 limited game observations and process-wide scheduling counter qualifications.
+See docs/producer-wait-and-range-audit.zh-CN.md for the producer-condition blind spot,
+candidate CSChrThread2 notification and complete-range texture intent controls.
+These are diagnostic findings, not a combat-white-model fix or measured FPS gain.
 
 ## Development build limitations
 
@@ -36,7 +39,8 @@ On the prepared isolated development host:
 ```sh
 python3 tools/generate_native.py
 ninja -C build/fex -j1
-python3 tests/run_prototype.py --packed-veneers --fast-hle-lookup
+python3 tools/run_current_regressions.py
+# rebuilds all 55 binaries used by the 119-case authored suite before testing
 python3 tests/test_runtime_exit_contract.py
 python3 tests/test_libc_spans.py
 python3 tests/test_native_abi_declarations.py

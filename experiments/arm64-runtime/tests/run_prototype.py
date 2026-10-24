@@ -132,6 +132,8 @@ def main():
     run('guest-submit-disabled-original-result',[binary/'test_guest_frame','--disabled'])
     run('guest-condition-slot-lifecycle-and-real-wake',[binary/'test_guest_sync'])
     run('guest-condition-disabled-original-calls',[binary/'test_guest_sync','--disabled'])
+    run('producer-wait-policy-bounds-and-ABA',[binary/'test_producer_wait_policy'])
+    run('producer-wait-real-notification',[binary/'test_guest_sync','--producer'])
     run('fex-mapping-audit-disabled-original-mapping',[binary/'test_fex_map_audit'])
     run('fex-mapping-audit-events-bounds-and-limit',[binary/'test_fex_map_audit','enabled'])
     run('static-code-file-identity-and-exclusions',[binary/'test_static_code_files',evidence/'static-code-fixture'])

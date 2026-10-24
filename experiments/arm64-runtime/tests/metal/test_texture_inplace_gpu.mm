@@ -44,7 +44,7 @@ static bool Pattern(Fixture& f,Image& image,size_t changed_begin,size_t changed_
 }
 int main(int argc,char**argv){
  signal(SIGABRT,[](int){void* frames[32];int n=backtrace(frames,32);backtrace_symbols_fd(frames,n,2);_Exit(99);});
- assert(argc==2);std::string_view kind=argv[1];assert(kind=="zero"||kind=="potential"||kind=="real-partial"||kind=="real-full"||kind=="real-interior");
+ assert(argc==2);std::string_view kind=argv[1];assert(kind=="zero"||kind=="potential"||kind=="real-partial"||kind=="real-full"||kind=="real-interior"||kind=="real-prefix");
  setenv("BB_IMAGE_TRAPS","0",1);setenv("BB_GUEST_IN_PLACE","1",1);setenv("BB_LAYER_MEMORY","1",1);setenv("BB_GUEST_HOOKS","0",1);setenv("BB_GPU_WRITES_IN_PLACE","1",1);void* backing=MAP_FAILED;
  for(uintptr_t a=0x800000000ull;a<0x10000000000ull;a+=0x100000000ull){backing=mmap((void*)a,0x800000,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON|MAP_FIXED_NOREPLACE,-1,0);if(backing!=MAP_FAILED)break;}
  assert(backing!=MAP_FAILED);test_base=(uintptr_t)backing;bool pass=false;
@@ -53,11 +53,12 @@ int main(int argc,char**argv){
   memset((void*)desc.info.guest_address,0x11,desc.info.guest_size);auto image_id=f.textures.FindImage(desc);(void)f.textures.FindTexture(image_id,desc);f.runtime.Finish();auto& image=f.textures.GetImage(image_id);
   vk::ClearValue red{};red.color.float32[0]=1;red.color.float32[3]=1;f.runtime.ClearImage(&image,{.base={0,0},.extent={1,1}},red);f.runtime.Finish();assert(Pattern(f,image,0,0));
   const size_t offset=kind=="real-interior"?4:0;
-  const size_t bytes=kind=="zero"?0:kind=="real-full"?desc.info.guest_size:4;
-  f.textures.InvalidateMemoryFromGPU(desc.info.guest_address+offset,bytes);
+  const uintptr_t write_address=desc.info.guest_address+offset-(kind=="real-prefix"?4:0);
+  const size_t bytes=kind=="zero"?0:kind=="real-full"?desc.info.guest_size:kind=="real-prefix"?8:4;
+  f.textures.InvalidateMemoryFromGPU(write_address,bytes);
   const bool actual=kind.starts_with("real-");
   if(bytes){
-   const auto bound=f.buffers.ObtainBuffer(desc.info.guest_address+offset,bytes,true);f.runtime.Finish();
+   const auto bound=f.buffers.ObtainBuffer(write_address,bytes,true);f.runtime.Finish();
    assert(bound.first && bound.first->buffer.native);
    assert(bound.first->buffer.native==Metal::GuestMemory::Find(0)->buffer);
    if(actual){
@@ -65,11 +66,11 @@ int main(int argc,char**argv){
     id<MTLCommandBuffer> c=[q commandBuffer];id<MTLBlitCommandEncoder> e=[c blitCommandEncoder];
     [e fillBuffer:(__bridge id<MTLBuffer>)bound.first->buffer.native range:NSMakeRange(bound.second,bytes) value:0x77];
     [e endEncoding];[c commit];[c waitUntilCompleted];assert(c.status==MTLCommandBufferStatusCompleted);
-    assert(((unsigned char*)desc.info.guest_address)[offset]==0x77);
+    assert(((unsigned char*)write_address)[0]==0x77);
    }
   }
   desc.type=TextureCache::BindingType::Texture;(void)f.textures.FindTexture(image_id,desc);f.runtime.Finish();
-  pass=Pattern(f,image,actual?offset:0,actual?offset+bytes:0);
+  pass=Pattern(f,image,actual?offset:0,actual?offset+bytes-(kind=="real-prefix"?4:0):0);
   printf("PARTIAL kind=%s pixels=%s flags=%#x\n",argv[1],pass?"PASS":"FAIL",u32(image.flags));
  }
  munmap(backing,0x800000);return pass?0:7;

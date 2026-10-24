@@ -74,7 +74,21 @@ HleGuestBridge::HleGuestBridge(HleCallRegistry& registry_, RangeValidator valida
 [[gnu::noinline]] static HleCallResult InvokeSelectedCondition(const HleCallAdapter& adapter,HleCallFrame& frame) {
     BbGuestFrame::Clock clock;BbGuestSync::Sink sink;
     BbGuestSync::Call scope(BbGuestSync::Get(),clock,sink,BbGuestSync::ThreadState(),adapter.guest_sync_stage,frame.gpr[detail::SysVIntegerArgs[0]],frame.gpr[detail::SysVIntegerArgs[1]],frame.operation,BbAudit::EnabledFor(BbAudit::GuestConditionWait),BbGuestFrame::ThreadState().markers!=0);
-    auto result=adapter.Invoke(frame);const auto* ok=std::get_if<bool>(&result);scope.End(uint32_t(frame.gpr[0]),ok&&*ok);return result;
+    // Cold diagnostic helper only: producer waits used to disappear when the
+    // generic condition scopes were suppressed in explicit render-wait mode.
+    BbProducerWait::Sink producer_sink;
+    BbProducerWait::Call producer_scope(clock,producer_sink,frame.operation,
+        frame.gpr[detail::SysVIntegerArgs[0]],frame.gpr[detail::SysVIntegerArgs[1]],
+        BbProducerWait::Requested()&&BbAudit::EnabledFor(BbAudit::ProducerConditionWait),
+        BbGuestSync::ThreadState().known_producer,adapter.guest_sync_stage==BbGuestSync::Wait);
+    BbProducerWait::Link producer_link(BbProducerWait::Get(),clock,producer_sink,
+        adapter.guest_sync_stage,frame.gpr[detail::SysVIntegerArgs[0]],frame.operation,
+        BbProducerWait::Requested()&&BbAudit::EnabledFor(BbAudit::ProducerConditionWait),
+        BbGuestSync::ThreadState().known_producer,producer_scope.Start());
+    auto result=adapter.Invoke(frame);const auto* ok=std::get_if<bool>(&result);
+    const bool producer_recorded=producer_scope.End(uint32_t(frame.gpr[0]),ok&&*ok);
+    producer_link.End(uint32_t(frame.gpr[0]),ok&&*ok,producer_recorded);
+    scope.End(uint32_t(frame.gpr[0]),ok&&*ok);return result;
 }
 
 AetherPS4::Fex::EngineResult<bool> HleGuestBridge::Invoke(HleCallFrame& frame) {

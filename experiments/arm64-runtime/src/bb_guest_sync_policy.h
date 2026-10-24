@@ -39,14 +39,14 @@ struct Registry {
   return r;
  }
 };
-struct State{BbGuestFrame::Limiter status{1000000000},producer{40000000};U calls{},completed{},slow{},invalid{},producer_mono{},producer_cpu{},producer_key{};bool producer_anchor{};};
+struct State{BbGuestFrame::Limiter status{1000000000},producer{40000000};U calls{},completed{},slow{},invalid{},producer_mono{},producer_cpu{},producer_key{};bool producer_anchor{},known_producer{};};
 inline bool SuppressGeneric(Stage stage,bool requested){return stage!=None&&requested;}
 inline U WakeArg(U token,Stage stage,uint32_t result){return token|(U(stage)<<30)|(U(result)<<32);}
 template<class Clock,class Sink>class Call {
  Registry&registry;Clock&clock;Sink&sink;State&state;std::optional<Registry::Lease>lease;std::array<U,Registry::Capacity>tokens{};Stage stage{};U key{},mutex{},op{},start{},cpu{};bool active{};
 public:
  Call(Registry&r,Clock&c,Sink&s,State&t,Stage k,U condition,U m,U operation,bool enabled,bool render):registry(r),clock(c),sink(s),state(t),stage(k),key(condition),mutex(m),op(operation){
-  if(!enabled){state.producer_anchor=false;state.producer.Reset();return;}
+  if(!enabled){state.producer_anchor=false;state.known_producer=false;state.producer.Reset();return;}
   if(!stage)return;
   if(stage==Wait){if(!render)return;++state.calls;lease=registry.Acquire(key);if(!lease){++state.invalid;++state.completed;return;}}
   else {tokens=registry.Match(key);bool any=false;for(auto x:tokens)any|=x!=0;if(!any)return;}
@@ -59,6 +59,7 @@ public:
   if(!valid){++state.invalid;++registry.rejected;state.producer_anchor=false;state.producer.Reset();}
   else if(lease){if(end-start>=20000000){++state.slow;sink.WaitSpan(start,end-start,used-cpu,lease->token,key,mutex,result,op);}}
   else {
+   state.known_producer=true; // this thread just notified an admitted render wait
    for(auto token:tokens)if(token)sink.WakeSpan(start,end-start,used-cpu,WakeArg(token,stage,result));
    if(state.producer_key!=key){state.producer_anchor=false;state.producer.Reset();state.producer_key=key;}
    if(state.producer.Due(end)){

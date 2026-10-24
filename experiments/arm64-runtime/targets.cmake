@@ -367,3 +367,8 @@ target_compile_definitions(test_game_menu_fex PRIVATE BB_MENU_REAL_FEX)
 target_include_directories(test_game_menu_fex PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src ${BB_ARM64_PROTOTYPE_DIR}/vendor/metal_api/shim)
 target_compile_options(test_game_menu_fex PRIVATE -UNDEBUG -include ${BB_ARM64_PROTOTYPE_DIR}/vendor/metal_api/shim/bbport_platform.h)
 target_link_libraries(test_game_menu_fex PRIVATE bb_fex_embedding)
+
+add_executable(test_producer_wait_policy ${BB_ARM64_PROTOTYPE_DIR}/tests/test_producer_wait_policy.cpp)
+target_include_directories(test_producer_wait_policy PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src)
+target_compile_features(test_producer_wait_policy PRIVATE cxx_std_20)
+target_compile_options(test_producer_wait_policy PRIVATE -UNDEBUG)

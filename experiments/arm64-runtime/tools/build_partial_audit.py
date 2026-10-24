@@ -11,14 +11,32 @@ def sha(f):return hashlib.file_digest(Path(f).open('rb'),'sha256').hexdigest()
 assert sha(library)==base['sha256']
 source=Path(base['evidence'])/'texture_cache.cpp';before=source.read_text()
 old='void TextureCache::InvalidateMemoryFromGPU(VAddr address, size_t max_size) {\n    std::scoped_lock lock{mutex};'
-new=old+'\n    const bool partial_audit = BbAudit::Enabled();\n    if(partial_audit){\n        static std::atomic<bool> announced{false};\n        if(!announced.exchange(true))std::fputs("PARTIAL_IMAGE_AUDIT_ACTIVE limit=64 render_behavior_changed=0\\n",stderr);\n    }'
+# Diagnostic full-range walk is deliberately separate from the unchanged first-byte
+# behavior below. A binding is only potential GPU write intent, never a completion.
+new=old+"\n"+r'''    if(BbAudit::Enabled()){
+        static std::atomic<bool> announced{false};
+        if(!announced.exchange(true))std::fputs("PARTIAL_IMAGE_AUDIT_ACTIVE limit=64 full_range=1 render_behavior_changed=0\n",stderr);
+        // Refuse overflow; a zero-sized declaration is observed at its address only.
+        if(address && (!max_size || max_size<=UINT64_MAX-address)){
+            ForEachImageInRegion(address,max_size?max_size:1,[&](ImageId,Image& image){
+                if(!True(image.flags & ImageFlagBits::GpuModified))return;
+                const bool full=max_size && address<=image.info.guest_address &&
+                    image.info.guest_size<=max_size && image.info.guest_address-address<=max_size-image.info.guest_size;
+                if(full)return;
+                static std::atomic<unsigned> printed{0};
+                unsigned n=printed.load(std::memory_order_relaxed);
+                while(n<64 && !printed.compare_exchange_weak(n,n+1,std::memory_order_relaxed)){}
+                if(n>=64)return;
+                std::fprintf(stderr,"PARTIAL_IMAGE_AUDIT address=%llu bytes=%llu image=%llu image_bytes=%llu flags=%u tile=%u format=%u width=%u height=%u intent_only=1\n",
+                    (unsigned long long)address,(unsigned long long)max_size,
+                    (unsigned long long)image.info.guest_address,(unsigned long long)image.info.guest_size,
+                    u32(image.flags),u32(image.info.tile_mode),u32(image.info.pixel_format),image.info.size.width,image.info.size.height);
+            });
+        }
+    }'''
 assert before.count(old)==1
 fixed=e/'texture_cache.cpp'
-text=before.replace(old,new)
-needle='    ForEachImageInRegion(address, 1, [&](ImageId image_id, Image& image) {'
-insert=needle+'\n        if(partial_audit && True(image.flags & ImageFlagBits::GpuModified) &&\n           ((max_size && image.Overlaps(address,max_size) &&\n             (image.info.guest_address!=address || max_size<image.info.guest_size)) ||\n            (!max_size && image.info.guest_address==address))){\n            static std::atomic<unsigned> printed{0};\n            if(printed.fetch_add(1)<64)std::fprintf(stderr,\n                "PARTIAL_IMAGE_AUDIT address=%llu bytes=%llu image=%llu image_bytes=%llu flags=%u tile=%u format=%u width=%u height=%u\\n",\n                (unsigned long long)address,(unsigned long long)max_size,\n                (unsigned long long)image.info.guest_address,(unsigned long long)image.info.guest_size,\n                u32(image.flags),u32(image.info.tile_mode),u32(image.info.pixel_format),image.info.size.width,image.info.size.height);\n        }'
-assert text.count(needle)==1
-fixed.write_text('#include "bb_stutter_audit.h"\n'+text.replace(needle,insert))
+fixed.write_text('#include "bb_stutter_audit.h"\n'+before.replace(old,new))
 commands=subprocess.check_output(['ninja','-C',str(B),'-t','commands'],text=True).splitlines()
 rel='shadps4/video_core/texture_cache/texture_cache.cpp'
 cmd=next(shlex.split(x)for x in commands if x.startswith(('/usr/bin/c++','/usr/bin/clang++'))and x.endswith('/'+rel))
