@@ -1,0 +1,2 @@
+# Unified-diff context blank lines require a leading space.
+layout-selection-diagnostic.patch whitespace=-blank-at-eol

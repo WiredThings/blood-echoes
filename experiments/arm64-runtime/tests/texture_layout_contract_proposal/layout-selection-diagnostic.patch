@@ -1,0 +1,52 @@
+--- a/vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp
++++ b/vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp
+@@ -70,6 +70,20 @@
+ 
+ static bool CompatibleDimensionalLayout(const ImageInfo& a, const ImageInfo& b) {
+     return !IsCrossDimensionalAlias(a, b) || SameDimensionalLayout(a, b);
++}
++
++static bool SameGuestByteLayout(const ImageInfo& a,const ImageInfo& b) {
++ if(a.guest_size!=b.guest_size || a.size!=b.size || a.resources!=b.resources ||
++    a.pitch!=b.pitch || a.num_bits!=b.num_bits || a.num_samples!=b.num_samples ||
++    a.tile_mode!=b.tile_mode || a.array_mode!=b.array_mode ||
++    a.bank_swizzle!=b.bank_swizzle || a.alt_tile!=b.alt_tile ||
++    a.props.is_volume!=b.props.is_volume || a.props.is_block!=b.props.is_block ||
++    a.props.is_tiled!=b.props.is_tiled || a.props.is_pow2!=b.props.is_pow2 ||
++    a.micro_tiled_mips!=b.micro_tiled_mips || a.resources.levels>a.mips_layout.size())return false;
++ for(unsigned m=0;m<a.resources.levels;++m) {
++  const auto& x=a.mips_layout[m];const auto& y=b.mips_layout[m];
++  if(x.size!=y.size || x.pitch!=y.pitch || x.height!=y.height || x.offset!=y.offset)return false;
++ }return true;
+ }
+ 
+ TextureCache::TextureCache(CacheBackend& backend_, AmdGpu::Liverpool* liverpool_,
+@@ -681,6 +695,28 @@
+ 
+     const auto trace_selection = [&](ImageId id, const char* path) {
+         const auto& selected = slot_images[id].info;
++        // Review-only, opt-in, bounded diagnostic. Does not change selection or contents.
++        static const bool layout_audit = [] {
++            const char* value = std::getenv("BB_ARM_LAYOUT_AUDIT");
++            return value && value[0] == '1';
++        }();
++        if (layout_audit && info.guest_address == selected.guest_address &&
++            info.guest_size == selected.guest_size && info.size == selected.size &&
++            info.resources == selected.resources && !SameGuestByteLayout(info, selected)) {
++            static std::atomic<u32> mismatches{0};
++            if (mismatches.fetch_add(1, std::memory_order_relaxed) < 64) {
++                LOG_WARNING(Render_Vulkan,
++                    "Texture byte-layout mismatch: path={} uid={} address={:#x} bytes={} "
++                    "tile={}/{} array={}/{} pitch={}/{} bank={}/{} alt={}/{} "
++                    "bits={}/{} samples={}/{} binding={} flags={:#x}",
++                    path, slot_images[id].image_uid, info.guest_address, info.guest_size,
++                    u32(info.tile_mode), u32(selected.tile_mode), u32(info.array_mode),
++                    u32(selected.array_mode), info.pitch, selected.pitch, info.bank_swizzle,
++                    selected.bank_swizzle, info.alt_tile, selected.alt_tile,
++                    info.num_bits, selected.num_bits, info.num_samples, selected.num_samples,
++                    u32(desc.type), u32(slot_images[id].flags));
++            }
++        }
+         if (!IsViewTypeCompatible(desc.view_info.type, selected.type)) {
+             LOG_ERROR(Render_Vulkan,
+                       "Texture cache incompatible selection: path={} address={:#x} "

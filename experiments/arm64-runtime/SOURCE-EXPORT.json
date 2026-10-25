@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792904841375140000,
+  "created_ns": 1792905667290865000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -464,6 +464,10 @@
       "sha256": "2c803e44302cbfcdb38782eaaa8bd151c30d77eaaac9657946c487bc9a4cf86d"
     },
     {
+      "path": "tools/material_inventory.py",
+      "sha256": "a1875aa41d694fd0884d6e18794cb24bb465c804d22172c32f407b12916e5b5e"
+    },
+    {
       "path": "tools/memory_categories.py",
       "sha256": "35bdba8cb3d798c4f19f9ff9170c4d30ecc01d381bbecdf6a158757333fb4d09"
     },
@@ -816,6 +820,26 @@
       "sha256": "eb50ef4e0b63c85c775a622e5347cfcb5a0c7e98f780f28434637c2db4925974"
     },
     {
+      "path": "tests/mlock_contract_proposal/README.md",
+      "sha256": "cec0b3ab3abdec69a6cff2b092dceb38d5af0456a35eeee371f173b2827ba505"
+    },
+    {
+      "path": "tests/mlock_contract_proposal/analyze_mlock.py",
+      "sha256": "684f9dff6aee3c2bf6ece1f72315381e4aa588c65656c97f5e49e9480da77cf7"
+    },
+    {
+      "path": "tests/mlock_contract_proposal/bounded_mlock_model.py",
+      "sha256": "df2ac48db07a8f517eb712f46b3e1c32ed30c1eb4f807046b0ac9ccfb10ef1d3"
+    },
+    {
+      "path": "tests/mlock_contract_proposal/native_one_page.c",
+      "sha256": "18d2802011772ac2dcb160845465feed6c3791dc84bcdd0f422fdca2fcc7334b"
+    },
+    {
+      "path": "tests/mlock_contract_proposal/test_bounded_mlock_model.py",
+      "sha256": "5c71a8c75100b8cff4f9b1e883cdb135723b5928389f2370b2b51f35c3ebc5a6"
+    },
+    {
       "path": "tests/module_info_fixture.py",
       "sha256": "d163f2155885bafc4c32428d576a832be5efb728463359571b7d332561b2b79a"
     },
@@ -1072,6 +1096,10 @@
       "sha256": "a47204008e4d5ac3fc73fa81cde51bbe906481d1fa7ac8b826c0f1b55d6c8a49"
     },
     {
+      "path": "tests/test_material_inventory.py",
+      "sha256": "d311c90599039afa45b264348e9f1abffcd2f81af05adc266d8d073f19d44a75"
+    },
+    {
       "path": "tests/test_memory_categories.py",
       "sha256": "cc68b40c654d3f0c573c845705a2bf729d766f36010729ef553cbcaf7b84428a"
     },
@@ -1302,6 +1330,38 @@
     {
       "path": "tests/test_writer_handoff.cpp",
       "sha256": "cbda35391c2327b0d409520e2067372756b1ed5f86411fb3231b3dedc9032004"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/.gitattributes",
+      "sha256": "9ef40cb54bc4be9263edad185640ed23868c7f4b99a3a5b9a4d7f9909d31c808"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/README.md",
+      "sha256": "6aa97bac23bed56432b70213157113f459f5a482fe58ecb976a97145d7ac569b"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/layout-selection-diagnostic.patch",
+      "sha256": "d85210a4d5f9da16f962c938e6e2132399328c0b91d59f154befcc8b7f7724b5"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/layout_candidate.h",
+      "sha256": "43c050a28525459ee1be0418d9e9d357aa30d0aa2e04d4416d541084b74cb443"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/layout_identity.mm",
+      "sha256": "e08bd3794240940d132586d18c227895a1eb9ef6a0c9ba9cc3db4407674d05b6"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/layout_predicate_tests.cpp",
+      "sha256": "3b809869bfd887949d1385d194d5f402d5fecda3b3d22b78741dbaf9c3a42772"
+    },
+    {
+      "path": "tests/thread_signal_contract_review/README.md",
+      "sha256": "06fd05c2ca0929add3c5d987f97b97180f0ce0ff0ec2773cc51dc1db2d6181e1"
+    },
+    {
+      "path": "tests/thread_signal_contract_review/context_layout_controls.cpp",
+      "sha256": "e9173e8ade0eb09e52fd785df6cb446559c6d79bde729fc3ca3471cf7261843c"
     },
     {
       "path": "tests/writer_mutex_original.h",
@@ -38597,15 +38657,15 @@
     },
     {
       "path": "GOAL.zh-CN.md",
-      "sha256": "26bcd2eb173efc877faa8d8cdfe6df011ac4654117391303966e0908e81038f0"
+      "sha256": "0131b36bebab8c52ea6048216aa333f9b97f696c6777dfebf85b5158000d3b0f"
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "957d3f96714357a19765f58ffa06e4db455509c58e22b62463db0f9a9c5c9408"
+      "sha256": "0591d567f60341a7482978055f6fa14b9c36feaae92b8a40419b19f94a0dbe38"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "9d2a98f07da94e3b320812eb36e2acbd0b9acb65308de6598016f19059c990ae"
+      "sha256": "5ee1707a5ac6736ff568b70ab7a2d30ccafe52765d9bdb0e73e0f12711523150"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38706,6 +38766,26 @@
     {
       "path": "docs/msync-and-vm-address-contracts.zh-CN.md",
       "sha256": "e01b2b443f2b5a6577b84a83b509d8309912d0795c4bd0b81330696939f51770"
+    },
+    {
+      "path": "docs/mlock-contract-review.zh-CN.md",
+      "sha256": "8309f837cda4ecf76e29f513b715de637ebea8b4fca1b2cb8f5ab014f7db4297"
+    },
+    {
+      "path": "docs/shader-material-inventory.zh-CN.md",
+      "sha256": "cce77294eca72b57234813429fc4ee4b6ba946dcb0c78303f58232f01b2f8561"
+    },
+    {
+      "path": "docs/white-model-resource-audit.zh-CN.md",
+      "sha256": "5899de5255e61bf31ad33815da801010127b76eb0bdeced9745755016930edfa"
+    },
+    {
+      "path": "docs/texture-layout-candidate.zh-CN.md",
+      "sha256": "7d57632fa6852420f6c5ad84aa22953981c6c867a4e222768ad268c1f056f6c9"
+    },
+    {
+      "path": "docs/thread-signal-contracts.zh-CN.md",
+      "sha256": "352a6baa378b47caeb979f7f77dcdcc427aa1266ac308bc49e96c1400a3b10f1"
     }
   ],
   "excluded": [

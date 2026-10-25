@@ -73,6 +73,31 @@ A source-suffix-copy reduction retains byte-identical generated text on 367
 inputs and 24 actual Metal sampling pixel cases. Its host microbenchmark is
 not a measured game FPS improvement; normal QA packaging remains frozen.
 
+## Parallel contract reviews
+
+Mlock remains UNIMPLEMENTED. Its finite accounting model has 22 authored controls,
+and a separate actual one-page Darwin test demonstrates duplicate wiring. The
+16 MiB per-call / 64 MiB total limits are candidate ceilings, not measured title
+requirements. See docs/mlock-contract-review.zh-CN.md and
+tests/mlock_contract_proposal/. No page-locking path was enabled.
+
+Seven existing-library Metal controls expose wrong same-address byte-layout reuse,
+while preserving lawful sRGB and normalized 1D/2D alias controls. The 26-case
+classification predicate and observation patch remain UNAPPLIED: preserving
+GPU-only raw bytes across retile/detile is an explicit gate. This is not proof of
+the reported combat white-model cause. See docs/white-model-resource-audit.zh-CN.md,
+docs/texture-layout-candidate.zh-CN.md and tests/texture_layout_contract_proposal/.
+
+The bounded material parser now decodes 304 MTD files and has 10 authored tests.
+Name-family candidates and stored-code associations are not actual live bindings.
+Complete local material/identity ledgers are excluded. See
+docs/shader-material-inventory.zh-CN.md and tools/material_inventory.py.
+
+The four remaining finalizer/context contracts have a separate review and 12
+dual-architecture structural assertions. None is implemented by that review.
+Module cleanup must not be confused with thread TLS cleanup; guest context
+restoration cannot call Darwin sigreturn. See docs/thread-signal-contracts.zh-CN.md.
+
 ## Development build limitations
 
 This is a source checkpoint of an active local prototype, **not yet a clean-checkout
@@ -92,6 +117,8 @@ python3 tests/test_runtime_exit_contract.py
 python3 tests/test_libc_spans.py
 python3 tests/test_native_abi_declarations.py
 python3 tests/test_msync_fex.py
+python3 tests/mlock_contract_proposal/test_bounded_mlock_model.py
+python3 tests/test_material_inventory.py
 python3 tests/test_manual_qa_policy.py
 ```
 
