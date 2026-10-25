@@ -1,0 +1,46 @@
+{"progress": 0, "total": 1, "seconds": 0.0, "errors": 1, "models": 0}
+{
+  "full_pso_recipes_from_static_scan": 0,
+  "metadata_budget_policy": {
+    "flver": {
+      "records": 32768,
+      "layout_members": 16384,
+      "mesh_vertex_refs": 8192,
+      "mesh_face_refs": 8192,
+      "expanded_members": 65536,
+      "string_bytes": 1048576,
+      "estimated_bytes": 33554432
+    },
+    "bhf": {
+      "records": 100000,
+      "string_bytes": 16777216,
+      "estimated_bytes": 67108864
+    }
+  },
+  "files": 1,
+  "bytes": 5446,
+  "suffix_counts": {
+    ".flver": 1
+  },
+  "counts": {
+    "decoded_payloads": 1,
+    "metadata_budget_exceeded": 1
+  },
+  "reused_prior_packages": 0,
+  "unique_nondebug_program_hashes": 0,
+  "unique_nondebug_code_sha256": 0,
+  "binary_info_type_counts": {},
+  "distinct_referenced_materials": 0,
+  "material_names": [],
+  "distinct_partial_pipeline_signatures": 0,
+  "partial_pipeline_occurrences": 0,
+  "errors": 1,
+  "gaps": 1,
+  "elapsed_seconds": 0.00032700004521757364,
+  "peak_rss_native_units": 25575424
+}
+.......................
+----------------------------------------------------------------------
+Ran 23 tests in 0.166s
+
+OK

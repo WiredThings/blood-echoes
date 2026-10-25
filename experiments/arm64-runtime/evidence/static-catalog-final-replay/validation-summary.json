@@ -1,0 +1,63 @@
+{
+  "scan_finished": true,
+  "process_exit": 0,
+  "guard_stop": null,
+  "physical_files": 28852,
+  "physical_bytes": 31438478315,
+  "input_hash_comparison": {
+    "previous": 28852,
+    "current": 28852,
+    "new": 0,
+    "missing": 0,
+    "changed": 0
+  },
+  "parsed_models": 15371,
+  "split_headers": 133,
+  "split_entries": 120726,
+  "new_budget_rejections": 0,
+  "program_hashes": 8853,
+  "code_digests": 8311,
+  "mesh_material_references": 80451,
+  "exact_material_references": 80296,
+  "missing_material_references": 155,
+  "asset_draw_schemas": 350,
+  "stage_family_candidates": 3442,
+  "full_pso_recipes_from_static_scan": 0,
+  "unresolved_inputs": [
+    {
+      "path": "sce_sys/about/right.sprx",
+      "error": "sce_sys/about/right.sprx: encrypted/compressed SELF segment is unsupported (an undecrypted dump?)"
+    }
+  ],
+  "resource_identity_conflicts": [],
+  "new_programs": 0,
+  "missing_old_programs": 0,
+  "elapsed_seconds": 184.42781641695183,
+  "peak_rss_mib": 642.90625,
+  "max_pressure": 1,
+  "swap_change_mib": 0.8125,
+  "budget_policy": {
+    "flver": {
+      "records": 32768,
+      "layout_members": 16384,
+      "mesh_vertex_refs": 8192,
+      "mesh_face_refs": 8192,
+      "expanded_members": 65536,
+      "string_bytes": 1048576,
+      "estimated_bytes": 33554432
+    },
+    "bhf": {
+      "records": 100000,
+      "string_bytes": 16777216,
+      "estimated_bytes": 67108864
+    }
+  },
+  "source_sha256": {
+    "tools/full_game_catalog.py": "6cd19d73373aa9460ac6ae4b1344e93d87a40b430982f2b9965054c88a05d42e",
+    "tools/game_shader_catalog.py": "574445533da311f5feab21511dd1bad6c34bc5b6224e09fb56fcd22af3fcdad5"
+  },
+  "private_evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/static-catalog-final-1792950773155770000",
+  "game_started": false,
+  "formal_data_modified": false,
+  "qualification": "Complete physical hash pass and supported metadata parsing, with explicit unsupported about/right.sprx and 155 material references. No full PSO catalogue, compilation, game FPS or runtime RAM claim."
+}

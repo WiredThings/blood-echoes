@@ -222,3 +222,7 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 ### 派生key原生回归续进
 
 上述新cohort完整230TU已重建为d2389413；真实Metal/Storage/原WarmUp在seed及独立warm进程分别通过260/192项断言，strict archive命中2/2，native无深度附件与原VS/FS的RGBA16Float像素/速度值读回正确。重复16次不登记、不新建、不重写key；失败/motion拒录保留。详见docs/derived-pipeline-warmup.zh-CN.md。两处12行持久化成功分支已纳入开发源码，未更新QA/正式应用；整场景命中率、启动/卡顿和内存对照仍待。其它helper草稿只在私有目录修复，尚未合入。
+
+### 全目录工具已公开并完成有界实现的实际重扫
+
+四个静态工具及两份作者测试已整理进tools/tests，默认当前源码树vendor，独立最小树入口与23项作者控制通过。FLVER/BHF增加逻辑引用累计预算、共享offset收费及结构化budget缺口，输出逐块编码。重新读完28,852文件/31.4GB，全部SHA与旧台账一致；15,371模型及120,726拆包条目完整，新增预算拒绝0，旧8853/8311程序/代码集合完全一致。184.4秒，独立扫描进程峰值642.9MiB、最高压力1，完整数据只留新Shared目录。唯一right.sprx格式缺口及155材质引用未解决，静态完整PSO仍0，不把目录交付说成所有组合已预编译。见docs/full-game-static-catalog.zh-CN.md与evidence/static-catalog-final-replay/validation-summary.json。

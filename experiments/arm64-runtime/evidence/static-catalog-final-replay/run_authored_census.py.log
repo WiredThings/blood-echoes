@@ -1,0 +1,58 @@
+{"progress": 0, "total": 4, "seconds": 0.0, "errors": 0, "models": 0}
+{
+  "full_pso_recipes_from_static_scan": 0,
+  "metadata_budget_policy": {
+    "flver": {
+      "records": 32768,
+      "layout_members": 16384,
+      "mesh_vertex_refs": 8192,
+      "mesh_face_refs": 8192,
+      "expanded_members": 65536,
+      "string_bytes": 1048576,
+      "estimated_bytes": 33554432
+    },
+    "bhf": {
+      "records": 100000,
+      "string_bytes": 16777216,
+      "estimated_bytes": 67108864
+    }
+  },
+  "files": 4,
+  "bytes": 631,
+  "suffix_counts": {
+    ".tpfbdt": 1,
+    ".tpfbhd": 1,
+    ".flver.dcx": 1,
+    ".bnd.dcx": 1
+  },
+  "counts": {
+    "split_headers_parsed": 1,
+    "binary_info_records": 2,
+    "decoded_payloads": 4,
+    "split_entries": 1,
+    "dcx_decoded": 2,
+    "flver_parsed": 1,
+    "mesh_records": 1,
+    "material_references": 1,
+    "partial_pipeline_occurrences": 1,
+    "binders_parsed": 1,
+    "binder_entries": 1
+  },
+  "reused_prior_packages": 0,
+  "unique_nondebug_program_hashes": 1,
+  "unique_nondebug_code_sha256": 1,
+  "binary_info_type_counts": {
+    "4": 2
+  },
+  "distinct_referenced_materials": 1,
+  "material_names": [
+    "a.mtd"
+  ],
+  "distinct_partial_pipeline_signatures": 1,
+  "partial_pipeline_occurrences": 1,
+  "errors": 0,
+  "gaps": 0,
+  "elapsed_seconds": 0.0006819159025326371,
+  "peak_rss_native_units": 23773184
+}
+AUTHORED CENSUS full dispatch: DCX + FLVER links + BND4 shader + BHF/BDF inner DCX + unchanged inputs passed
