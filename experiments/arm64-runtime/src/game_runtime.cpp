@@ -254,6 +254,22 @@ extern "C" void bb_arm_guest_sites(uint64_t out[3]){
  for(size_t i=0;i<400&&found<3;++i){uintptr_t at=current_guest_frame->rsp+i*8;if(!active->valid(at,8,false))break;uint64_t v;memcpy(&v,(void*)at,8);if(v>=active->image&&v<active->text_end&&executable(active,v))out[found++]=v-active->image;}
 }
 extern "C" int bb_arm_range(uintptr_t at,size_t bytes,int writable){return active&&active->valid(at,bytes,writable);}
+extern "C" int bb_arm_msync_native(uintptr_t address,uint64_t size,int host_flags){
+ if(!active||address>UINTPTR_MAX-size)return EINVAL;
+ // This path never takes the VMA lock. Keep mutable stack ranges alive through
+ // the syscall; every other range is an immutable, explicitly published guest
+ // view. Do not treat an arbitrary mapped Mach-O/native address as guest memory.
+ std::shared_lock lock(active->mutex);
+ if(!size){
+  bool found=false;for(const auto&r:active->ranges)if(address>=r.Begin&&address-r.Begin<r.Size){address=r.Begin;size=r.Size;found=true;break;}
+  if(!found)return EINVAL;
+ }else{
+  const auto end=address+size;auto at=address;
+  while(at<end){uintptr_t next=at;for(const auto&r:active->ranges)if(at>=r.Begin&&at-r.Begin<r.Size)next=std::max(next,std::min<uintptr_t>(end,r.Begin+r.Size));if(next==at)return EINVAL;at=next;}
+ }
+ return msync(reinterpret_cast<void*>(address),size,host_flags) ? errno : 0;
+}
+
 extern "C" void bb_arm_require_callback(const char* name,uintptr_t at){
  if(!active||!executable(active,at)){std::fprintf(stderr,"ARM ABI STOP %s non-executable callback=%#lx\n",name,at);_Exit(BB_ARM_EXIT_HLE_FAULT);}
 }

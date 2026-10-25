@@ -20,6 +20,11 @@ opaque_slots={('runtime_services','http_wait'):{0},
  ('runtime_ajm','job_control'):{3,5,7},
  ('runtime_ajm','job_run'):{3,5,7,9},
  ('runtime_ajm','job_run_split'):{7,9}}
+# VM addresses are not C data buffers: PROT_NONE/readonly/reserved mappings
+# must reach the real VM operation and its ownership/errno checks. In/out and
+# query result pointers remain fully validated as data.
+opaque_slots.update({('runtime_memory',n):{0} for n in [
+ 'direct_unmap','release_flexible','posix_mmap','kernel_mprotect','query_protection','virtual_query']})
 callback_slots={('runtime_services',n):{0} for n in ['netctl_register','np_register','np_register_void']}
 # These scalar pointer words are proved by explicit count-aware wrapper checks.
 # Avoid repeating the generic one-byte check before proving the full span.

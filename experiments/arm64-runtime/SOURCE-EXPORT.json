@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792902934652492000,
+  "created_ns": 1792904841375140000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -141,7 +141,7 @@
     },
     {
       "path": "src/game_runtime.cpp",
-      "sha256": "a82283824be98385599b69d5e6ed59507f83371753b2d16f1123aaa060d35ae0"
+      "sha256": "aafc9bb47bc39eec9ed8c2c4ada00235dff705080025ad1add3e8b14edf9a582"
     },
     {
       "path": "src/guest_module_info.h",
@@ -417,7 +417,7 @@
     },
     {
       "path": "tools/generate_native.py",
-      "sha256": "5217e9450a6bd50243b712603b94955d79ebbd98b4481c8a56584148902e5c92"
+      "sha256": "9da9a54ef4838b24a213fe0f91059b339eb720b679de1632d88abdc1a6bd1e43"
     },
     {
       "path": "tools/gpu_candidate_identity.py",
@@ -753,7 +753,7 @@
     },
     {
       "path": "tests/game_fixture.py",
-      "sha256": "7c1c986b0068663056bb86cdcebfd5514cdece933fd714fce2264c63cf5fdebd"
+      "sha256": "aba2d94c009b1c734691905fcefd3d5e8c2bb5ce006c261892c428cb8fa33911"
     },
     {
       "path": "tests/heap_sites_original.cpp",
@@ -1080,6 +1080,10 @@
       "sha256": "a7f5effdf30dde7857656f62cf8e87d091d36f4e8b9ce96ce3eea550dd9194cd"
     },
     {
+      "path": "tests/test_memory_msync.c",
+      "sha256": "a10c7a2567563176a6504e3f9f9b7a228059cd6d53393b185e81c3b1dd8f47b8"
+    },
+    {
       "path": "tests/test_missing_data_imports.py",
       "sha256": "248dc4992e5798a53a66c49da9b1c60dbe0dc698f2ce5a4c27e4d95649606c4c"
     },
@@ -1090,6 +1094,10 @@
     {
       "path": "tests/test_module_metadata.py",
       "sha256": "0cac2b298798f92be3a98536bf22bd76d57d9923c141e412680892329f7844a0"
+    },
+    {
+      "path": "tests/test_msync_fex.py",
+      "sha256": "2d47d3451def5a45aa2c76986638f7de2f40067671bb16a50cc98238c0cf09ea"
     },
     {
       "path": "tests/test_native_abi_declarations.py",
@@ -1309,11 +1317,11 @@
     },
     {
       "path": "generated/native-signatures.json",
-      "sha256": "6d741d128992ef0081d4f129188ea69f39bcf4632d3987d503adfc398043e73c"
+      "sha256": "9c01a3474cff3b7d5cc5abf693bb63065758f1bdcff860b26cf0e9baaa03e10d"
     },
     {
       "path": "generated/native_adapters.inc",
-      "sha256": "0f0c0a21cc05842dc9f061d004bea8b002cc7c65907774c8d5481bb84847726e"
+      "sha256": "ef532236d0f6de7f8418b5b6f63b1778b82f81b16f80930d024baa1de7122272"
     },
     {
       "path": "generated/native_registry.c",
@@ -1345,7 +1353,7 @@
     },
     {
       "path": "generated/runtime_memory_bridge.c",
-      "sha256": "828717f477118ac9ac69b35d0bad97ac4123a59066eb674bd4102d81cef724e2"
+      "sha256": "4165abd371bada44fd863ffe34bc63deb03dd7fc426405e18a2d593841b91cb5"
     },
     {
       "path": "generated/runtime_mutex_bridge.c",
@@ -29277,7 +29285,7 @@
     },
     {
       "path": "vendor/bb_runtime/src/arm_bridge.h",
-      "sha256": "30993c7afa6d017aa8503000e86460a8d6784e571146effdf518b9269e412b6c"
+      "sha256": "4a6093dbd2cfa01dc4e8cfbbb94577cd0cd1711eccf7fbd4acbb3c2f9ba2a753"
     },
     {
       "path": "vendor/bb_runtime/src/import_names.inc",
@@ -29333,7 +29341,7 @@
     },
     {
       "path": "vendor/bb_runtime/src/runtime_memory.c",
-      "sha256": "b25e0df81adc756eb70aefcf60d06ad848d6c30ffd9496a2d30f8fe7c45583e2"
+      "sha256": "25ae4d121ae6712eff2eddc358e673b714ca6632565a8f5e11e81e63905fa066"
     },
     {
       "path": "vendor/bb_runtime/src/runtime_mutex.c",
@@ -38589,15 +38597,15 @@
     },
     {
       "path": "GOAL.zh-CN.md",
-      "sha256": "ab905aa7ee6fb39891701c1528882856f2812af65f6d0f92efe7be726ddad1a1"
+      "sha256": "26bcd2eb173efc877faa8d8cdfe6df011ac4654117391303966e0908e81038f0"
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "df2cfaede262fe78f6201e726b0d308099d28267e8e4be201355caa6209e8843"
+      "sha256": "957d3f96714357a19765f58ffa06e4db455509c58e22b62463db0f9a9c5c9408"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "b391f04eda183279a51cc21c8df4fc750cbcaf0a5cc088b6d2c26d451d841311"
+      "sha256": "9d2a98f07da94e3b320812eb36e2acbd0b9acb65308de6598016f19059c990ae"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38694,6 +38702,10 @@
     {
       "path": "docs/module-info-contracts.zh-CN.md",
       "sha256": "a769646f3865034be3548ed8cea12819363e58dbb0872b7385a49089db59d30d"
+    },
+    {
+      "path": "docs/msync-and-vm-address-contracts.zh-CN.md",
+      "sha256": "e01b2b443f2b5a6577b84a83b509d8309912d0795c4bd0b81330696939f51770"
     }
   ],
   "excluded": [

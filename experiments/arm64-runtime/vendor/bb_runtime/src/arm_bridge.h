@@ -19,6 +19,10 @@ void bb_arm_runtime_register(void);
 void bb_arm_add_native(const char* name,void* original,void* wrapper,const char* signature);
 void bb_arm_low_heap_range(uintptr_t* begin,uint64_t* size);
 int bb_arm_host_owned(uintptr_t address,uint64_t size);
+/* Numeric VM operation over published native-owned guest ranges. Called only
+ * outside the VMA lock; returns a host errno, not a guest pointer or status. */
+int bb_arm_msync_native(uintptr_t address,uint64_t size,int host_flags);
+
 #ifdef __cplusplus
 }
 #endif

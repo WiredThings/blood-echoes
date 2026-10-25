@@ -669,6 +669,46 @@ static ABI void *posix_mmap(void *addr, uint64_t size, int prot, int flags, int 
     if (result) { *runtime_errno()=result==NO_MEMORY ? POSIX_ENOMEM : POSIX_EINVAL; return (void *)-1; }
     return out;
 }
+/* FreeBSD 9 / ps4sdk MS_SYNC=0, ASYNC=1, INVALIDATE=2. Unknown bits are
+ * ignored as in that kernel; never pass them through (Darwin bit4 kills pages).
+ * The address is a numeric VM operation, not a C buffer to dereference. */
+static int32_t msync_error(int error) {
+    *runtime_errno()=error==ENOMEM ? 22 : runtime_guest_errno(error);
+    return -1;
+}
+static ABI int32_t posix_msync(uintptr_t address,uint64_t size,int flags) {
+    const uint64_t limit=UINT64_C(1)<<40;
+    if (address>=limit || size>limit-address) return msync_error(EINVAL);
+    const uint64_t offset=address&(PAGE-1);
+    uintptr_t start=address-offset;
+    uint64_t bytes=align_up(size+offset,PAGE);
+    if (bytes>limit-start || (flags&3)==3) return msync_error(EINVAL);
+    const int host_flags=((flags&1)?MS_ASYNC:MS_SYNC)|((flags&2)?MS_INVALIDATE:0);
+    if (start<USER_MIN || start>=USER_MAX) {
+        const int error=bb_arm_msync_native(start,bytes,host_flags);
+        return error ? msync_error(error) : 0;
+    }
+    if (bytes>USER_MAX-start) return msync_error(EINVAL);
+    read_lock();
+    if (!bytes) {
+        const size_t i=vma_index(start);
+        if (i==vma_count || vmas[i].start>start || vmas[i].kind==KIND_RESERVED) {
+            read_unlock(); return msync_error(EINVAL);
+        }
+        /* Legacy len=0 flushes the current whole VM entry, not zero pages. */
+        start=vmas[i].start;bytes=vmas[i].end-start;
+    }
+    if (!covered(start,start+bytes,0) || host_exclusion(start,start+bytes)) {
+        read_unlock(); return msync_error(EINVAL);
+    }
+    /* Hold the read lease across the syscall. A concurrent unmap/remap cannot
+     * replace a validated mapping before the kernel follows its backing. No GPU
+     * dirty notification: this syncs VM backing, not CPU/GPU rendering work. */
+    const int result=msync((void*)start,(size_t)bytes,host_flags);
+    const int error=result ? errno : 0;
+    read_unlock();
+    return error ? msync_error(error) : 0;
+}
 static ABI int32_t reserve_range(void **inout, uint64_t size, int flags, uint64_t alignment) {
     if (!alignment) alignment=PAGE;
     if (!inout || !size || size%PAGE || !valid_alignment(alignment)) return INVALID;
@@ -780,7 +820,7 @@ static const RuntimeExport exports[]={
     {"sceKernelMprotect",kernel_mprotect}, {"sceKernelQueryMemoryProtection",query_protection},
     {"sceKernelVirtualQuery",virtual_query}, {"sceKernelGetDirectMemoryType",direct_memory_type},
     {"sceKernelBatchMap",batch_map}, {"sceKernelBatchMap2",batch_map2},
-    {"mmap",posix_mmap},
+    {"mmap",posix_mmap}, {"msync",posix_msync},
 };
 uintptr_t runtime_memory_resolve(const char *name) {
     /* Direct-memory NIDs are exercised by test_runtime.c before names are loaded. */

@@ -4,7 +4,7 @@
 
 这两项纳入现有目标，不替代白模、长编译、性能和原启动器无缝兼容要求；目标仍为 active。
 
-1. **收口剩余 9 个导入接口。** 对 sceKernelMlock、sceKernelGetModuleInfoFromAddr、__elf_phdr_match_addr、__pthread_cxa_finalize、msync、_is_signal_return、sigreturn、__Ux86_64_setcontext、__progname 逐项对照正式 Rosetta 路径的原实现、NID 和真实 resolver；区分原版缺失与 ARM 桥接遗漏，查客体调用路径和 FEX 专属语义，能复用的接回原实现，确需适配的补定向正负例。不能因为未被当前测试调用就跳过，也不能用空壳返回成功或删除导入凑齐数字。初始审计为八个函数错误陷阱、一个数据导入不可读 guard；目前 __progname、sceKernelGetModuleInfoFromAddr 和 __elf_phdr_match_addr 已接入并经实际 FEX 正负控制验证，后两项复用原解析器准备完整模块元数据；其余六项仍未完成，不能算成已实现。
+1. **收口剩余 9 个导入接口。** 对 sceKernelMlock、sceKernelGetModuleInfoFromAddr、__elf_phdr_match_addr、__pthread_cxa_finalize、msync、_is_signal_return、sigreturn、__Ux86_64_setcontext、__progname 逐项对照正式 Rosetta 路径的原实现、NID 和真实 resolver；区分原版缺失与 ARM 桥接遗漏，查客体调用路径和 FEX 专属语义，能复用的接回原实现，确需适配的补定向正负例。不能因为未被当前测试调用就跳过，也不能用空壳返回成功或删除导入凑齐数字。初始审计为八个函数错误陷阱、一个数据导入不可读 guard；目前 __progname、sceKernelGetModuleInfoFromAddr、__elf_phdr_match_addr 和 msync 已接入并经实际 FEX 正负控制验证，模块两项复用原解析器准备完整元数据；msync 使用真实同步和受保护的映射生命周期，另修复六类 VM 地址参数误校验。其余五项仍未完成，不能算成已实现。
 2. **建立固定《血源》1.09 的着色器与特化目录。** 枚举本地 shaderbnd/DCX 与关联材质、效果和已有编译缓存，按游戏版本、基础程序、阶段和完整特化/管线键建立可复用清单；区分静态可枚举、已观察和未覆盖的组合，避免只靠不断跑图发现新项。评估能安全提前准备的部分，并验证画面、首次进入卡顿、启动时长、内存和缓存失效。只存可复用元数据或合法的本地缓存，不把游戏资源、反编译内容或私有缓存上传 GitHub；不把所有理论组合常驻内存，不以 hash 相同代替完整特化身份。
 
 保持静音、画质、分辨率、缓存容量及现有内存/速度图/遮挡剔除/二级页表/联网补丁兼容。全部开发在隔离路径，正式应用、存档、设置、缓存不动。死亡、联网和菜单实测暂缓，待用户统一验收。代码和文档同步开发分支，不更新 Release；相关剩余额度低于 15% 时停止开发测试，整理交接及最新本机 QA 包。此前仅允许测试前操作 Cua，性能采样不得持续视觉自动化或桌面录屏。
@@ -41,3 +41,7 @@
 ### 当前功能验收
 
 隔离 QA 原启动器已更新，当前构建中文标题画面、主线程原事件循环及 Xbox 枚举有实机证据；尚不代表按钮或 System 页验收。用户接管全部游戏输入，后台仅日志与保护，先完成物理手柄、System 页和 F2/F3。首轮保护中止的原因、独立手动 QA 证据及未完成项详见 `evidence/game-menu-bridge-status.json`。仍未进入新构建性能测试，不更改目标完成条件。
+
+## 2026-10-25 并行审查安排
+
+用户授权专项 subagent：sceKernelMlock 的真实调用、锁定量、解锁/释放及有界实现和定向测试；另外并行白模纹理资源路径及材质/完整特化清单。候选各自放独立证据目录，公共运行时由根代理统一整合。锁页既不能空成功，也不能无限锁页；不启动多份游戏，不改正式版和正式数据。

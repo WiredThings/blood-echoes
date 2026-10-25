@@ -1003,7 +1003,7 @@
   {
     "source": "runtime_memory",
     "function": "direct_unmap",
-    "signature": "iPQ",
+    "signature": "iQQ",
     "parameters": [
       "void *",
       "uint64_t"
@@ -1052,7 +1052,7 @@
   {
     "source": "runtime_memory",
     "function": "release_flexible",
-    "signature": "iPQ",
+    "signature": "iQQ",
     "parameters": [
       "void *",
       "uint64_t"
@@ -1063,7 +1063,7 @@
   {
     "source": "runtime_memory",
     "function": "posix_mmap",
-    "signature": "PPQiiiq",
+    "signature": "PQQiiiq",
     "parameters": [
       "void *",
       "uint64_t",
@@ -1073,6 +1073,18 @@
       "int64_t"
     ],
     "returns": "void *",
+    "full_span_pointer_slots": []
+  },
+  {
+    "source": "runtime_memory",
+    "function": "posix_msync",
+    "signature": "iLQi",
+    "parameters": [
+      "uintptr_t",
+      "uint64_t",
+      "int"
+    ],
+    "returns": "int32_t",
     "full_span_pointer_slots": []
   },
   {
@@ -1091,7 +1103,7 @@
   {
     "source": "runtime_memory",
     "function": "kernel_mprotect",
-    "signature": "iRQi",
+    "signature": "iQQi",
     "parameters": [
       "const void *",
       "uint64_t",
@@ -1103,7 +1115,7 @@
   {
     "source": "runtime_memory",
     "function": "query_protection",
-    "signature": "iPPPP",
+    "signature": "iQPPP",
     "parameters": [
       "void *",
       "void **",
@@ -1116,7 +1128,7 @@
   {
     "source": "runtime_memory",
     "function": "virtual_query",
-    "signature": "iRiPQ",
+    "signature": "iQiPQ",
     "parameters": [
       "const void *",
       "int",

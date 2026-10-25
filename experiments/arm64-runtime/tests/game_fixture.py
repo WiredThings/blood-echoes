@@ -111,6 +111,44 @@ def make(mode=None):
      r('48 8b 05',0x4800+8*names.index('__progname'));r('48 8d 3d',0x4500)
      e('c7 07 51 41 00 00 48 89 38');c('__strlen_qa');q('48 3d',2)
      r('48 8b 05',0x4800+8*names.index('__progname'));e('48 8b 38');c('__strlen_qa');q('48 3d',2)
+  elif mode and mode.startswith('msync-'):
+   variant=mode[6:]
+   def sync(flags=1,size=8192):e('be');e(int(size).to_bytes(4,'little').hex());e('ba');e(int(flags).to_bytes(4,'little').hex());c('msync')
+   def failed():q('3d',0xffffffff);c('__error');q('81 38',22)
+   if variant in ['image','whole-image','native-gap']:
+    r('48 8d 3d',0x5000 if variant=='image'else 0x4000 if variant=='whole-image'else 0x7ff0);sync(size=0 if variant=='whole-image'else 16384 if variant=='native-gap'else 8192)
+    if variant=='native-gap':failed()
+    else:z()
+   elif variant=='stack':e('48 89 e7 48 81 ef 00 80 00 00 48 81 e7 00 f0 ff ff');sync();z()
+   elif variant=='unpublished':e('48 bf 00 00 00 00 01 00 00 00');sync();failed()
+   elif variant=='overflow':e('48 bf f0 ff ff ff ff ff ff ff');sync(size=32);failed()
+   else:
+    r('48 8d 3d',0x4370);e('be 00 80 00 00 ba 03 00 00 00 31 c9');c('sceKernelMapFlexibleMemory');z()
+    r('48 8b 05',0x4370);e('c7 00 78 56 34 12')
+    if variant in ['none','none-unmap','release-none','query-none','virtual-none','query-bad-output']:r('48 8b 3d',0x4370);e('be 00 80 00 00 31 d2');c('sceKernelMprotect');z()
+    if variant in ['hole','freed']:
+     r('48 8b 3d',0x4370)
+     if variant=='hole':e('48 81 c7 00 40 00 00')
+     e('be');e((16384 if variant=='hole'else 32768).to_bytes(4,'little').hex());c('sceKernelMunmap');z()
+    if variant=='flags':
+     for flags in [0,1,2,4,8,16]:r('48 8b 3d',0x4370);e('48 81 c7 00 10 00 00');sync(flags);z()
+     r('48 8b 3d',0x4370);sync(3);failed()
+    else:
+     r('48 8b 3d',0x4370);sync(size=32768 if variant in ['hole','freed']else 8192)
+     if variant in ['hole','freed']:failed()
+     else:z()
+    if variant in ['query-none','query-bad-output']:
+     r('48 8b 3d',0x4370);r('48 8d 35',0x4500);r('48 8d 15',0x4508);r('48 8d 0d',0x7ffe if variant=='query-bad-output'else 0x4510);c('sceKernelQueryMemoryProtection');z();r('8b 05',0x4510);q('3d',0)
+    if variant=='virtual-none':
+     r('48 8b 3d',0x4370);e('31 f6');r('48 8d 15',0x4500);e('b9 48 00 00 00');c('sceKernelVirtualQuery');z();r('8b 05',0x4518);q('3d',0)
+    if variant=='mmap-reserved':
+     r('48 8d 3d',0x4380);e('be 00 80 00 00 31 d2 31 c9');c('sceKernelReserveVirtualRange');z()
+     r('48 8b 3d',0x4380);e('be 00 80 00 00 ba 03 00 00 00 b9 12 10 00 00 41 b8 ff ff ff ff 45 31 c9');c('mmap');r('48 3b 05',0x4380);g();e('48 89 c7');sync();z()
+    if variant in ['none-unmap','readonly-unmap','release-none']:
+     if variant=='readonly-unmap':r('48 8b 3d',0x4370);e('be 00 80 00 00 ba 01 00 00 00');c('sceKernelMprotect');z()
+     r('48 8b 3d',0x4370);e('be 00 80 00 00');c('sceKernelReleaseFlexibleMemory'if variant=='release-none'else'sceKernelMunmap');z();r('48 8b 3d',0x4370);sync();failed()
+    if variant in ['none','query-none','virtual-none']:r('48 8b 3d',0x4370);e('be 00 80 00 00 ba 03 00 00 00');c('sceKernelMprotect');z()
+    if variant not in ['hole','freed','none-unmap','readonly-unmap','release-none']:r('48 8b 05',0x4370);q('81 38',0x12345678)
   elif mode=='dialogs':
    for family in ['sceMsgDialog','sceSaveDataDialog','sceNpProfileDialog','sceNpCommerceDialog']:
     c(family+'Initialize');z()

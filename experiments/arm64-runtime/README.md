@@ -23,7 +23,10 @@ keys. It does not establish whole-game variant coverage or PSO success. The old
 GPU host also lacks the nine imports; source resolver parity is byte-verified,
 not an execution test of the production CPU. One DATA contract (__progname) is now implemented in the existing guest parameter page;
 the ModuleInfo query/matcher pair now uses the original loader and exact guest layout;
-six contracts remain pending. See docs/module-info-contracts.zh-CN.md and
+msync now uses real file synchronization and protected mapping leases. Six numeric VM
+address slots retain output-buffer validation while permitting PROT_NONE operations.
+Five contracts remain pending. See docs/msync-and-vm-address-contracts.zh-CN.md,
+docs/module-info-contracts.zh-CN.md and
 docs/guest-process-data-contracts.zh-CN.md.
 See docs/fixed-shader-catalog-and-imports.zh-CN.md. Game/catalog/cache payloads
 are local only; only authored tooling, controls and aggregate findings are exported.
@@ -39,8 +42,8 @@ remain under investigation; no performance improvement or complete compatibility
 Death/respawn, online and menu live retests are deferred for the owner's acceptance.
 All 16 original AvPlayer implementations now have guest callback/handle bridges.
 Real FEX callbacks, thread cleanup and layout/bounds controls pass; static ABBA
-48.492 versus 48.623 FPS shows no measured improvement. Six imports still need
-implementation; __progname and the ModuleInfo query/matcher pair have actual FEX controls. See docs/avplayer-bridge.zh-CN.md for qualifications; normal manual
+48.492 versus 48.623 FPS shows no measured improvement. Five imports still need
+implementation; __progname, msync and the ModuleInfo query/matcher pair have actual FEX controls. See docs/avplayer-bridge.zh-CN.md for qualifications; normal manual
 QA packaging remains on the earlier CPU and does not include this checkpoint.
 The private CPU QoS option remains OFF: its measured static ABBA did not show a benefit.
 See docs/inplace-texture-and-cpu-scheduling.zh-CN.md for actual in-place pixel controls,
@@ -88,6 +91,7 @@ python3 tools/run_current_regressions.py
 python3 tests/test_runtime_exit_contract.py
 python3 tests/test_libc_spans.py
 python3 tests/test_native_abi_declarations.py
+python3 tests/test_msync_fex.py
 python3 tests/test_manual_qa_policy.py
 ```
 
