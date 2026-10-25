@@ -80,6 +80,10 @@ def main():
     assert not new_gpu.exists();shutil.copytree(old_gpu,new_gpu,symlinks=False)
     extra['BB_GPU_USER_DIR']=str(new_gpu)
     extra.pop('BB_MTL_LOCAL_AOT_MODE',None)
+    # This new QA case exercises the validated resource path; formal preferences
+    # and previous QA profiles remain untouched. No diagnostic input is injected.
+    extra.update(BB_ARM_PAYLOAD_GATE='1',BB_ARM_RAW_PREWRITE='1',
+                 BB_LAYER_READ_TRAPS='1',BB_GPU_LIFETIME='1')
     prefs['extraEnv']='\n'.join(k+'='+v for k,v in extra.items())
     Path(case['preferences']).write_bytes(plistlib.dumps(prefs))
     validate_manual_environment(extra)
@@ -133,7 +137,7 @@ def main():
     (stage/'NATIVE-METAL.json').write_text(json.dumps(native,indent=2)+'\n')
     manifest=dict(schema=2,created_ns=time.time_ns(),app=str(app),private_case=case,
         host_local_only=True,portable_installer=False,formal_data_modified=False,
-        default_local_metal_preparation=True,new_component_stage=str(admitted_stage),
+        default_local_metal_preparation=True,protected_resource_writeback=True,new_component_stage=str(admitted_stage),
         local_metal_preparation=prepared['manifest'],
         private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,
         frozen_runtime=native['frozen_runtime'],cpu_runtime_manifest=dict(path=str(a.cpu_runtime_manifest.resolve()),sha256=sha(a.cpu_runtime_manifest),protocol_version=cpu_runtime['protocol_version'],live_payload_version=cpu_runtime['live_payload_version'],author_instrumentation=cpu_runtime.get('author_instrumentation',False)),
