@@ -1,0 +1,76 @@
+{
+  "status": "root-built-and-authored-controls-passed-no-scheduler",
+  "game_started": false,
+  "compiled_or_tests_run_by_worker": false,
+  "files": [
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/compile_snapshot.h",
+      "sha256": "4d97f06254b23961e5cce54522458696cc348c461d13c24de55f4a539700e810",
+      "worker_sha256_before_root_fix": "346c2d1ea54c80939b7759e8b47475a94e87d5a50ddd64e32ad136e1f9942d35"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/compile_snapshot.cpp",
+      "sha256": "d4696db7bdf0171dfb6620b47be40a764dba56b312c4d070902fb2988bbbadbd"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/info.h",
+      "sha256": "541215506104040c02435e7164f3294ecaf66a9f5167f68dbb2279ff68ad5b6c"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.h",
+      "sha256": "e00d51ddffa782e6b01956addddbd4c50242f028643585d66e264ed8fe522c3e"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.cpp",
+      "sha256": "1150ee0c48c7ece84767b5a71c2d162325ea23010a0b751cff6e6ba78c43cc2e"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/recompiler.h",
+      "sha256": "7625c1b203443b181274ab08a77782cbc92c1c834aededef36e9cda4e5b3f8c4"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_arm64.inc",
+      "sha256": "8ed2b23a55c30870fb9a7841ce69dd927d102adc727337e55250b0f6b83c0ed3"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.h",
+      "sha256": "614dffce5fbbdc68c90b72917bec2005913b20226dd898bef2e733eaef98942b"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
+      "sha256": "f5d7992b00d3bb30409a6bd34b473761d5faaed06692482d6742ff62f11cf47a"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.h",
+      "sha256": "3f390bc345ba5c1b319688b78008029cb11c4e5503522d6c527a2d9bf6b413a8"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.mm",
+      "sha256": "b668446df102fc3632428ef81e9ea25e9a05a1bfed43f7f527767587af5bd601"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.h",
+      "sha256": "40142f7bec6524b48a222ade9bb3e79b29722b69b265264ed6f797d4cc67d5f4"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.mm",
+      "sha256": "b097591be42234dd3428d526b4d3ffe220110fc9354900981aafecdafc929244"
+    },
+    {
+      "path": "tests/metal/test_shader_owned_snapshot.mm",
+      "sha256": "62b55380725a3b6efb22e00310c3a8303f4a15a7576e28a92fa641c458297a07"
+    },
+    {
+      "path": "tools/build_first_upload_test.py",
+      "sha256": "d478a1ae5d2e4ddd056890cf332c53ac7bc2dfeb24a49833083e65ace3002708"
+    }
+  ],
+  "root_validation": {
+    "build": "owned-shader-gpu-build-1792914074256475000",
+    "owned_controls": "first-upload-regression-1792914664168395000",
+    "normal_path_controls": "actual-shader-phase-controls-1792914761358088000",
+    "GPU_raw_controls": "texture-preservation-controls-1792914935759646000",
+    "scheduler_enabled": false,
+    "game_scene_is_startup_action_smoke_only": true
+  }
+}

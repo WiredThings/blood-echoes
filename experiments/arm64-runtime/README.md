@@ -195,3 +195,26 @@ No FPS improvement, whole-game acceptance or safe production conversion is claim
 This is a reviewed overlay on f349bd44. Unbuilt Mlock integration and owned-shader
 parallel drafts are intentionally excluded from this source checkpoint. Neither is
 enabled. The latest ordinary local QA package remains c22970cc; no Release changes.
+
+## Owned shader compilation foundation (scheduler still pending)
+
+See docs/owned-shader-validation.zh-CN.md and docs/owned-shader-source-review.zh-CN.md.
+All 230 GPU translation units were rebuilt together after the shared Info change.
+Authored real GCN/SPIR-V/Metal tests pass with owned input poisoning, independent
+compiler contexts, detached-module destruction and read-only speculative caches.
+The ordinary compiler's phase-probe off/on output matches the saved authored reference;
+24 GPU byte-preservation/alias/mip/padding controls also retain their expected outcomes.
+This does not establish whole-game shader coverage or a performance improvement.
+
+No asynchronous scheduler, first-program capture or complete GPU adoption is wired.
+The original path remains synchronous. Motion-vector owned jobs are rejected until
+their session inputs are captured explicitly; ordinary motion rendering is unchanged.
+The short game run is startup/action smoke only: the user observed the script striking
+a wall. It is neither real exploration nor combat/white-model acceptance; blind attack
+scripts will not be reused for those purposes. Production, normal QA package and Release
+remain unchanged. Mlock integration is still an unapplied draft, excluded from this overlay.
+
+Old-ABI diagnostic libraries now obtain f349bd44 sources through tools/frozen_gpu_headers.py,
+with revision-specific EOL attributes and Git-blob verification. They no longer compile
+against the newer Info structure. This still requires the prepared private dependency stage;
+it is not a clean-checkout standalone prototype build claim.

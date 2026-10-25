@@ -7,6 +7,7 @@
 #include "bbport_toggles.h"
 #include "common/assert.h"
 #include "shader_recompiler/frontend/decode.h"
+#include "shader_recompiler/compile_snapshot.h"
 #include "shader_recompiler/frontend/fetch_shader.h"
 
 namespace Shader::Gcn {
@@ -44,12 +45,18 @@ static bool IsTypedBufferLoad(const Gcn::GcnInst& inst) {
 }
 
 const u32* GetFetchShaderCode(const Info& info, u32 sgpr_base) {
+    if (info.compile_snapshot) {
+        throw std::runtime_error{"owned shader raw fetch-code access was not captured"};
+    }
     const u32* code;
     std::memcpy(&code, &info.UserData()[sgpr_base], sizeof(code));
     return code;
 }
 
 std::optional<FetchShaderData> ParseFetchShader(const Shader::Info& info) {
+    if (info.compile_snapshot) {
+        return CompileSnapshotFetch(*info.compile_snapshot);
+    }
     if (!info.has_fetch_shader) {
         return std::nullopt;
     }

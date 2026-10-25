@@ -27,6 +27,11 @@ struct Pools {
     }
 };
 
+/// Own this on exactly one compiling thread. Never share Pools with GPU/draw workers.
+struct CompileContext {
+    Pools pools;
+};
+
 [[nodiscard]] IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools,
                                            Info& info, RuntimeInfo& runtime_info,
                                            const Profile& profile);

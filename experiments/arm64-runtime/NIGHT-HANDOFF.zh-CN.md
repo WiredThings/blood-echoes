@@ -520,3 +520,7 @@ GOAL.zh-CN.md 已新增九接口收口及固定游戏着色器/特化目录，�
 ## 最新：GPU raw写入重叠与顺序诊断
 
 详见 docs/raw-write-order.zh-CN.md。两组19个实际Metal控制保留四种已知失效缺陷；GPU-only同submit顺序证明预写导出能保住旧/新数据，但尚未接入实际BufferCache。修正限额后的真实隔离场景17.01秒进入，16条潜在漏失效记录、最多4条/probe、swap终值+57.5MiB，无严重压力。binding覆盖不是实际逐字节写入或白模根因证明。正式11671既有文件/16脚本不变；不降画质、不改缓存预算、不更新正式包或Release。Mlock和owned-shader仍为独立未接入草稿；前者发现部分映射失败状态一致性门槛，不能当作已支持。
+
+## 最新：owned shader基础验证，下一步接入
+
+230个GPU单元完整构建，owned源毒化/异线程GCN和detached Metal、原同步phase与24raw控制通过；普通QA仍旧包，正式版不变。最后短场景用户观察到一直砍墙，只能算启动动作smoke，后续不再跑盲目攻击路线。scheduler/首见程序capture和完整GPU采用仍未接；Mlock二审补丁待串行应用和C/FEX验证。详见本机evidence/owned-shader-verified-checkpoint-20261025/report.zh-CN.md。

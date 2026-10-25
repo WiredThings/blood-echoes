@@ -220,6 +220,40 @@ PipelineCache::~PipelineCache() {
 
 ShaderModuleHandle PipelineCache::CreateShaderModule(std::span<const u32> spirv,
                                                      std::string_view name, bool from_cache) {
+    return InsertShaderModule(BuildShaderModule(compiler, spirv, name));
+}
+
+namespace {
+struct OwnedMetalShader final : VideoCore::PreparedShaderModule {
+    std::unique_ptr<ShaderModule> module;
+};
+}
+
+std::unique_ptr<VideoCore::PreparedShaderModule> PipelineCache::BuildOwnedShaderModule(
+    std::span<const u32> spirv, std::string_view name) {
+    // These diagnostics reserve session-global slots or create source references. They need
+    // explicit ownership too; never consume their budget in an unadopted speculative job.
+    if (std::getenv("BB_MTL_VERTEX_MATH_FILE") || std::getenv("BB_CAPTURE_COPY_POINTERS")) return {};
+    // Independent frontend/backend compiler context. The job owns all IR, SPIRV-Cross and
+    // returned Metal resources. No modules_ entry or live PSO/cache identity is published here.
+    ShaderCompiler context{device, compiler.CacheDir(), ReadFloatRules(), false};
+    auto result = std::make_unique<OwnedMetalShader>();
+    @autoreleasepool {
+        result->module = BuildShaderModule(context, spirv, name);
+    }
+    if (!result->module->shader) return {};
+    return result;
+}
+
+ShaderModuleHandle PipelineCache::AdoptOwnedShaderModule(
+    std::unique_ptr<VideoCore::PreparedShaderModule> prepared) {
+    auto* owned = dynamic_cast<OwnedMetalShader*>(prepared.get());
+    if (!owned || !owned->module) return {};
+    return InsertShaderModule(std::move(owned->module));
+}
+
+std::unique_ptr<ShaderModule> PipelineCache::BuildShaderModule(ShaderCompiler& context,
+    std::span<const u32> spirv, std::string_view name) {
     // The core's names carry the guest hash ("<stage>_0x<hash>_<perm>"): the MSL cache file and
     // the logs use it. Modules from the disk cache come without a name.
     u64 hash = 0;
@@ -237,7 +271,7 @@ ShaderModuleHandle PipelineCache::CreateShaderModule(std::span<const u32> spirv,
         module->stage = stage;
     } else {
         CompileResult result =
-            compiler.Compile(spirv, hash, name.empty() ? std::string_view{"cached"} : name);
+            context.Compile(spirv, hash, name.empty() ? std::string_view{"cached"} : name);
         module->status = result.status;
         module->stage = result.stage;
         module->shader = std::move(result.shader);
@@ -247,6 +281,12 @@ ShaderModuleHandle PipelineCache::CreateShaderModule(std::span<const u32> spirv,
         module->hash = hash;
         module->name = name.empty() ? std::string{"cached"} : std::string{name};
     }
+    return module;
+}
+
+ShaderModuleHandle PipelineCache::InsertShaderModule(std::unique_ptr<ShaderModule> module) {
+    const bool tessellation_stage = module->stage == ShaderStage::TessellationControl ||
+        module->stage == ShaderStage::TessellationEval || module->stage == ShaderStage::Geometry;
     ++counters.modules;
     if (!module->shader && !tessellation_stage) {
         // A cached shader that does not compile is no damaged entry, and a null handle from the

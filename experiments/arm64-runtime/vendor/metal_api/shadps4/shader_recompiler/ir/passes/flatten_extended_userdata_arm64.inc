@@ -25,6 +25,7 @@
 #include "core/emulator_settings.h"
 #include "core/signals.h"
 #include "shader_recompiler/info.h"
+#include "shader_recompiler/compile_snapshot.h"
 #include "shader_recompiler/ir/ir_emitter.h"
 #include "shader_recompiler/ir/opcodes.h"
 #include "shader_recompiler/ir/passes/srt.h"
@@ -875,7 +876,13 @@ static bool SrtCheckEnabled() {
 
 static void GenerateSrt(Info& info, PassInfo& pass_info) {
     if (pass_info.srt_roots.empty()) {
+        if (info.compile_snapshot) ApplyCompileSnapshotSrt(info, {}, NUM_USER_DATA_REGS);
         return;
+    }
+    if (info.compile_snapshot) {
+        const auto code = GenerateSrtBytecode(pass_info);
+        ApplyCompileSnapshotSrt(info, code, pass_info.dst_off_dw);
+        return; // no guest read and no global walker arena growth for a speculative result
     }
 #ifdef ARCH_X86_64
     if (SrtCheckEnabled()) {

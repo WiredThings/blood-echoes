@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792913734595882000,
+  "created_ns": 1792915621711689000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -325,7 +325,7 @@
     },
     {
       "path": "tools/build_first_upload_test.py",
-      "sha256": "30cdf52e8a0cbb97e06484570632ad56f7e07e3405b69cf6a8689f251a083810"
+      "sha256": "d478a1ae5d2e4ddd056890cf332c53ac7bc2dfeb24a49833083e65ace3002708"
     },
     {
       "path": "tools/build_heap_bridge.py",
@@ -673,7 +673,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "476f3a5c5631568a9be1b4312c55174e431d41a016b0e5f3a945268b675f4f9e"
+      "sha256": "7964adddd15da5b514aef7174b40938a88ea261ff65d1b0987abcb79ec01a801"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -31733,11 +31733,11 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.cpp",
-      "sha256": "e990e2aae7195008a4a2e26eea95bb13328b29a0d010d2fba05ab4812f14457c"
+      "sha256": "1150ee0c48c7ece84767b5a71c2d162325ea23010a0b751cff6e6ba78c43cc2e"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.h",
-      "sha256": "895f93a81e97b8a4224f97ce41422f17e832f88fb1ded2d459a313b45a0fd796"
+      "sha256": "e00d51ddffa782e6b01956addddbd4c50242f028643585d66e264ed8fe522c3e"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/format.cpp",
@@ -31809,7 +31809,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/info.h",
-      "sha256": "57045ca3d247717e03ef391a39f7ab19e192357604090cc11702e078d5f119c3"
+      "sha256": "541215506104040c02435e7164f3294ecaf66a9f5167f68dbb2279ff68ad5b6c"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/ir/abstract_syntax_list.cpp",
@@ -31905,7 +31905,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_arm64.inc",
-      "sha256": "55e41221ac484e016422cfa70bf20de8f1f74eaeb4f5e58f0435853fafa73be2"
+      "sha256": "8ed2b23a55c30870fb9a7841ce69dd927d102adc727337e55250b0f6b83c0ed3"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp",
@@ -32093,7 +32093,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/recompiler.h",
-      "sha256": "0928c96a8561024c1adaa510859cccc95adc900f8992e5f4b48788e3b2966808"
+      "sha256": "7625c1b203443b181274ab08a77782cbc92c1c834aededef36e9cda4e5b3f8c4"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/resource.h",
@@ -32417,11 +32417,11 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
-      "sha256": "7ac1387fa6d796a48e58eef42c2a021d3e2cc19a10d2c0513633d823b3d4993a"
+      "sha256": "f5d7992b00d3bb30409a6bd34b473761d5faaed06692482d6742ff62f11cf47a"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.h",
-      "sha256": "76eac10196bb35b70a4f1fa5d8ec9d30dce2a2b24d9e7edfdc9daa49d7865bb6"
+      "sha256": "614dffce5fbbdc68c90b72917bec2005913b20226dd898bef2e733eaef98942b"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core_serialization.cpp",
@@ -32625,11 +32625,11 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.h",
-      "sha256": "3454d62929f617e8548c26a15f9389c37bd673df5c92017fe7f10532b07cd880"
+      "sha256": "3f390bc345ba5c1b319688b78008029cb11c4e5503522d6c527a2d9bf6b413a8"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.mm",
-      "sha256": "ac10ee49f656a322d887a9a25d83a30d8b9b9a32b8626ddaceae37c687e10c45"
+      "sha256": "b668446df102fc3632428ef81e9ea25e9a05a1bfed43f7f527767587af5bd601"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_present_dump.h",
@@ -32709,11 +32709,11 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.h",
-      "sha256": "83887278946b79e0e1b1ed16afe2becbbca33c89e09b7029c14389d0d4b1f601"
+      "sha256": "40142f7bec6524b48a222ade9bb3e79b29722b69b265264ed6f797d4cc67d5f4"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.mm",
-      "sha256": "76e60b6a701053e210238e61ccf172f10da5aa25fd1f0a2f14dfe8fb356eb345"
+      "sha256": "b097591be42234dd3428d526b4d3ffe220110fc9354900981aafecdafc929244"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_spirv_geometry.cpp",
@@ -33309,7 +33309,7 @@
     },
     {
       "path": "vendor/metal_api/shim/bbport_overlay.cpp",
-      "sha256": "bea616520f0955c42cd09b74c6bdf8bc23aff3cac18ba14278f3f7dedebc3089"
+      "sha256": "b98c9179d879aa60d97c06646f055a6cbc0a69204509038fc1d29a5a69ccc8b6"
     },
     {
       "path": "vendor/metal_api/shim/bbport_overlay.h",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "e3eff5919eaa3a7ee8c1778876e0cd55a058c6f9902a9c006ffe1e2e259ac359"
+      "sha256": "06d605a860700b58cbb16108b2b7b0a24a5951130b7aaf2e579d65d94417c75e"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "ffee93abaf1f54c5ef38baf8b3150a5226cbded4b114ecf41ad838e0d4776aa0"
+      "sha256": "95191c65637ce8fde43b125a4aac0b367bdf78317c586c20e8b43427fc574536"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38921,7 +38921,7 @@
     },
     {
       "path": "tools/build_raw_write_observer.py",
-      "sha256": "800e581ad3121dccb401d08da0b169982336a54c1dd7356f4ba87061738e2bdb"
+      "sha256": "d4aee1e29319d0a5fae774258fef1d5d38a209313dfb993a43b44e47b356faaf"
     },
     {
       "path": "tools/prepare_raw_write_audit_gpu.py",
@@ -38929,7 +38929,7 @@
     },
     {
       "path": "tests/test_texture_authority_order.py",
-      "sha256": "b65c34f5ca1c6f7a68ab9d19fccd6be72f2de2570daecc3b443998367671360a"
+      "sha256": "52cfcb79f1b22a29ce878c6b813333a6a31a3fd07abf5b36353ebe265b28117e"
     },
     {
       "path": "tests/texture_layout_contract_proposal/texture_authority_order.mm",
@@ -38962,6 +38962,50 @@
     {
       "path": "docs/raw-write-order-aggregate.json",
       "sha256": "1181a1fb1c0151eaca4b677d98218881a3aa3820564165f6896798299d4b8422"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/compile_snapshot.h",
+      "sha256": "4d97f06254b23961e5cce54522458696cc348c461d13c24de55f4a539700e810"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/compile_snapshot.cpp",
+      "sha256": "d4696db7bdf0171dfb6620b47be40a764dba56b312c4d070902fb2988bbbadbd"
+    },
+    {
+      "path": "tests/metal/test_shader_owned_snapshot.mm",
+      "sha256": "62b55380725a3b6efb22e00310c3a8303f4a15a7576e28a92fa641c458297a07"
+    },
+    {
+      "path": "tools/build_owned_shader_candidate.py",
+      "sha256": "cb55599f8e5b408284681d3ae166ad679fdd5cc826e062882aaff79aaf2cad96"
+    },
+    {
+      "path": "tools/prepare_owned_shader_gpu.py",
+      "sha256": "16f804640018daefe287c6cb2b8d0a90916943759cb726b4009e2b3c07c6d82f"
+    },
+    {
+      "path": "tests/test_owned_shader.py",
+      "sha256": "294e19e30915e9afbbd3ea65468173ff521f18adf3df3a002685cd2e38b4e308"
+    },
+    {
+      "path": "tools/frozen_gpu_headers.py",
+      "sha256": "c83dd916a86d35e1f90d4c966983f2398ef585b61a8bce6b49373371c382eefa"
+    },
+    {
+      "path": "docs/owned-shader-source-review.zh-CN.md",
+      "sha256": "91dc396213eb90735cfd78cf8c2beb0dfb2eb0665bbd6c4098a2435010751dca"
+    },
+    {
+      "path": "docs/owned-shader-source-manifest.json",
+      "sha256": "b5123cd8b88fb81534893bf1340c2a02628900ca4bebc3e6845f62f654a53cdc"
+    },
+    {
+      "path": "docs/owned-shader-validation.zh-CN.md",
+      "sha256": "e4269bd250738f88a4652b2c6a077c434a2793f33bf3cce32342906fb1795719"
+    },
+    {
+      "path": "docs/shader-first-miss-design.zh-CN.md",
+      "sha256": "7714eb1e1cf6033b3a1ca0ee660a5aa3f90d805e38f4c379b830f740f6221c94"
     }
   ],
   "excluded": [
@@ -38978,29 +39022,42 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "f349bd44ed37bc2658ef1327f9e2a1ecba6ef5ef",
+    "base": "94de6bb5e1fb83e4537eee80cd6274419ed90e1e",
     "paths": [
-      "src/bb_raw_write_audit.h",
-      "vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp",
+      "vendor/metal_api/shadps4/shader_recompiler/compile_snapshot.h",
+      "vendor/metal_api/shadps4/shader_recompiler/compile_snapshot.cpp",
+      "vendor/metal_api/shadps4/shader_recompiler/info.h",
+      "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.h",
+      "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.cpp",
+      "vendor/metal_api/shadps4/shader_recompiler/recompiler.h",
+      "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_arm64.inc",
+      "vendor/metal_api/shadps4/video_core/pipeline_cache_core.h",
+      "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.h",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.mm",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.h",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.mm",
+      "tests/metal/test_shader_owned_snapshot.mm",
+      "tools/build_first_upload_test.py",
+      "vendor/metal_api/shim/bbport_overlay.cpp",
+      "tools/build_owned_shader_candidate.py",
+      "tools/prepare_owned_shader_gpu.py",
+      "tests/test_owned_shader.py",
+      "tools/frozen_gpu_headers.py",
       "tools/build_raw_write_observer.py",
-      "tools/prepare_raw_write_audit_gpu.py",
-      "tools/run_launcher_engine_abba.py",
       "tests/test_texture_authority_order.py",
-      "tests/texture_layout_contract_proposal/texture_authority_order.mm",
+      "tools/run_launcher_engine_abba.py",
       "CURRENT-PLAN.zh-CN.md",
       "NIGHT-HANDOFF.zh-CN.md",
-      "docs/raw-authority-review/report.zh-CN.md",
-      "docs/raw-authority-review/reviewed-excerpts.txt",
-      "docs/raw-authority-review/source-identity.json",
-      "docs/raw-authority-review/prewrite-design.zh-CN.md",
-      "docs/raw-authority-review/prewrite-source-identity.json",
-      "docs/raw-write-order.zh-CN.md",
-      "docs/raw-write-order-aggregate.json"
+      "docs/owned-shader-source-review.zh-CN.md",
+      "docs/owned-shader-source-manifest.json",
+      "docs/owned-shader-validation.zh-CN.md",
+      "docs/shader-first-miss-design.zh-CN.md"
     ],
     "excluded_parallel_drafts": [
       "bounded Mlock integration",
-      "owned shader compiler context/scheduling"
-    ],
-    "excerpt_trailing_whitespace_normalized": true
+      "first-program capture/scheduler patches",
+      "raw-write live lease/export patches"
+    ]
   }
 }

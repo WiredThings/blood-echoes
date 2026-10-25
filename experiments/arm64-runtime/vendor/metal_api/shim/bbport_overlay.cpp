@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bbport_overlay.h"
-#include "../../../../src/runtime_quicksave_bindings.h"
+#include "../../bb_runtime/src/runtime_quicksave_bindings.h"
 
 #include <algorithm>
 #include <atomic>

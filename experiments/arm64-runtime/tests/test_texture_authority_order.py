@@ -6,10 +6,10 @@ from test_texture_layout_audit import prepared_template,dependencies,sha,require
 sys.path.insert(0,str(P/'tools'))
 from native_observer import NativeObserver
 from qa_memory_policy import MemoryPolicy
-PINNED=Path('/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime')
+from frozen_gpu_headers import verified_headers
 
 def main():
- require_no_games();ap=argparse.ArgumentParser();ap.add_argument('--candidate',type=Path);ap.add_argument('--audit',action='store_true');a=ap.parse_args();m=json.loads((a.candidate or (P/'evidence/tiler-bounds-candidate-current.json')).read_text());lib=Path(m['candidate']);assert sha(lib)==m['sha256'];base=prepared_template(lib)
+ require_no_games();PINNED=verified_headers();ap=argparse.ArgumentParser();ap.add_argument('--candidate',type=Path);ap.add_argument('--audit',action='store_true');a=ap.parse_args();m=json.loads((a.candidate or (P/'evidence/tiler-bounds-candidate-current.json')).read_text());lib=Path(m['candidate']);assert sha(lib)==m['sha256'];base=prepared_template(lib)
  e=P/'evidence'/('texture-authority-order-'+str(time.time_ns()));e.mkdir();state=P/'state'/e.name;state.mkdir();home=state/'home';home.mkdir();source=P/'tests/texture_layout_contract_proposal/texture_authority_order.mm';obj=e/'controls.o';exe=e/'controls'
  cmd=[x.replace(str(P/'vendor/metal_api'),str(PINNED/'vendor/metal_api'))for x in base['compile']];cmd[1:1]=['-I'+str(PINNED/'src')];cmd.insert(cmd.index('-c'),'-UNDEBUG');cmd[cmd.index('-o')+1]=str(obj);cmd[cmd.index('-MF')+1]=str(obj.with_suffix('.d'));cmd[-1]=str(source)
  link=list(base['link']);old=base['compile'][base['compile'].index('-o')+1];link[link.index(old)]=str(obj);link[link.index('-o')+1]=str(exe)

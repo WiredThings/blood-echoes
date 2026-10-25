@@ -25,6 +25,11 @@ struct Archive;
 
 namespace Shader {
 
+struct CompileSnapshot;
+void ReadCompileSnapshotReg(const CompileSnapshot&, u32, u32, void*, size_t);
+void RefreshCompileSnapshotFlat(const CompileSnapshot&, const PersistentSrtInfo&, std::vector<u32>&);
+void ReadCompileSnapshotTess(const CompileSnapshot&, TessellationDataConstantBuffer&);
+
 enum class Qualifier : u8 {
     None,
     Smooth,
@@ -117,6 +122,8 @@ struct Info : InfoPersistent {
         Qualifier auxiliary;
     };
 
+    /// Non-null only for an explicitly owned, transient compilation context.
+    const CompileSnapshot* compile_snapshot{};
     std::span<const u32> user_data;
     std::vector<u32> flattened_ud_buf;
     PersistentSrtInfo srt_info;
@@ -210,8 +217,12 @@ struct Info : InfoPersistent {
     }
 
     template <typename T>
-    T ReadUdReg(u32 ptr_index, u32 dword_offset) const noexcept {
+    T ReadUdReg(u32 ptr_index, u32 dword_offset) const {
         T data;
+        if (compile_snapshot) {
+            ReadCompileSnapshotReg(*compile_snapshot, ptr_index, dword_offset, &data, sizeof(data));
+            return data;
+        }
         const auto ud = UserData();
         const u32* base = ud.data();
         if (ptr_index != IR::NumScalarRegs) {
@@ -240,6 +251,10 @@ struct Info : InfoPersistent {
     }
 
     void RefreshFlatBuf() {
+        if (compile_snapshot) {
+            RefreshCompileSnapshotFlat(*compile_snapshot, srt_info, flattened_ud_buf);
+            return;
+        }
         flattened_ud_buf.resize(srt_info.flattened_bufsize_dw);
         ASSERT(user_data.size() <= NUM_USER_DATA_REGS);
         std::memcpy(flattened_ud_buf.data(), user_data.data(), user_data.size_bytes());
@@ -255,6 +270,10 @@ struct Info : InfoPersistent {
     }
 
     void ReadTessConstantBuffer(TessellationDataConstantBuffer& tess_constants) const {
+        if (compile_snapshot) {
+            ReadCompileSnapshotTess(*compile_snapshot, tess_constants);
+            return;
+        }
         ASSERT(tess_consts_dword_offset >= 0); // We've already tracked the V# UD
         auto buf = ReadUdReg<AmdGpu::Buffer>(static_cast<u32>(tess_consts_ptr_base),
                                              static_cast<u32>(tess_consts_dword_offset));

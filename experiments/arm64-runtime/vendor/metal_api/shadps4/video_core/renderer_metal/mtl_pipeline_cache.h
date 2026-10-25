@@ -189,6 +189,15 @@ private:
                                                      std::string_view name,
                                                      bool from_cache) override;
     void DestroyShaderModule(VideoCore::ShaderModuleHandle module) override;
+    bool SupportsOwnedShaderPreparation() const override { return true; }
+    std::unique_ptr<VideoCore::PreparedShaderModule> BuildOwnedShaderModule(
+        std::span<const u32> spirv, std::string_view name) override;
+    VideoCore::ShaderModuleHandle AdoptOwnedShaderModule(
+        std::unique_ptr<VideoCore::PreparedShaderModule> module) override;
+    std::unique_ptr<ShaderModule> BuildShaderModule(ShaderCompiler& context,
+        std::span<const u32> spirv, std::string_view name);
+    VideoCore::ShaderModuleHandle InsertShaderModule(std::unique_ptr<ShaderModule> module);
+
     std::unique_ptr<VideoCore::PipelineSerialization> NewGraphicsSerialization() override;
     std::unique_ptr<VideoCore::PipelineSerialization> NewComputeSerialization() override;
     std::unique_ptr<VideoCore::PipelineBase> CreateGraphicsPipeline(

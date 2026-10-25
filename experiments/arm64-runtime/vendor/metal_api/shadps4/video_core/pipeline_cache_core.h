@@ -12,6 +12,7 @@
 #include <boost/container/static_vector.hpp>
 #include <tsl/robin_map.h>
 #include "shader_recompiler/profile.h"
+#include "shader_recompiler/compile_snapshot.h"
 #include "shader_recompiler/recompiler.h"
 #include "shader_recompiler/specialization.h"
 #include "video_core/pipeline_cache_core_types.h"
@@ -109,6 +110,15 @@ struct PipelineCapabilities {
     bool mixed_depth_samples{}; ///< color samples that differ from the depth samples
 };
 
+/// Detached backend result, owned by the preparing job until GPU-thread adoption.
+struct PreparedShaderModule {
+    virtual ~PreparedShaderModule() = default;
+};
+struct PreparedShader {
+    Shader::OwnedSpirv shader;
+    std::unique_ptr<PreparedShaderModule> module;
+};
+
 class PipelineCompiler;
 /// bbport: PipelineCompiler is complete only in pipeline_cache_core.cpp.
 struct PipelineCompilerDeleter {
@@ -128,6 +138,12 @@ public:
 
     void WarmUp();
     void Sync();
+
+    /// Purely owned compilation with the caller's independent context. No cache-table mutation,
+    /// guest access, or serialization. No scheduler calls this yet: source lifetime/generation
+    /// capture and ordered adoption must be proven before admitting draw-preparation jobs.
+    std::optional<PreparedShader> PrepareOwnedShader(
+        std::shared_ptr<const Shader::CompileSnapshot> inputs, Shader::CompileContext& context);
 
     bool LoadComputePipeline(Serialization::Archive& ar);
     bool LoadGraphicsPipeline(Serialization::Archive& ar);
@@ -194,6 +210,13 @@ protected:
     virtual ShaderModuleHandle CreateShaderModule(std::span<const u32> spirv, std::string_view name,
                                                   bool from_cache) = 0;
     virtual void DestroyShaderModule(ShaderModuleHandle module) = 0;
+    virtual bool SupportsOwnedShaderPreparation() const { return false; }
+    virtual std::unique_ptr<PreparedShaderModule> BuildOwnedShaderModule(
+        std::span<const u32> spirv, std::string_view name) { return {}; }
+    /// ONLY on the GPU command thread, after complete current-input revalidation.
+    virtual ShaderModuleHandle AdoptOwnedShaderModule(
+        std::unique_ptr<PreparedShaderModule> module) { return {}; }
+
     /// Shader collection for the debugger (EmulatorSettings.IsShaderCollect()); `spirv` is the
     /// emitted code, `patch` empty without a patch.
     virtual void CollectShader(const std::string& name, Shader::SwStage stage,
@@ -244,7 +267,7 @@ private:
         return num_new_pipelines > 0;
     }
 
-    Shader::Pools pools;
+    Shader::CompileContext compile_context;
     tsl::robin_map<size_t, std::unique_ptr<Program>> program_cache;
     /// bbport: exclusive for program/permutation insertions, shared for worker lookups.
     std::shared_mutex programs_mutex;

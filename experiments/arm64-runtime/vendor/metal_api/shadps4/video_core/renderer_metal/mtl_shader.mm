@@ -1094,8 +1094,10 @@ FloatRules ReadFloatRules() {
     return rules;
 }
 
-ShaderCompiler::ShaderCompiler(Device& device_, std::filesystem::path cache_dir_, FloatRules rules_)
-    : device{device_}, cache_dir{std::move(cache_dir_)}, rules{rules_} {
+ShaderCompiler::ShaderCompiler(Device& device_, std::filesystem::path cache_dir_, FloatRules rules_,
+                               bool allow_cache_writes_)
+    : device{device_}, cache_dir{std::move(cache_dir_)}, rules{rules_},
+      allow_cache_writes{allow_cache_writes_} {
     if (cache_dir.empty()) {
         cache_dir = DefaultCacheDir();
     }
@@ -1292,7 +1294,7 @@ CompileResult ShaderCompiler::Compile(std::span<const u32> spirv, u64 hash, std:
                 } else {
                     // A cached text the Metal compiler rejects now (new OS?): convert again.
                     std::error_code ec;
-                    std::filesystem::remove(cache_file, ec);
+                    if (allow_cache_writes) std::filesystem::remove(cache_file, ec);
                 }
             }
         }
@@ -1322,7 +1324,7 @@ CompileResult ShaderCompiler::Compile(std::span<const u32> spirv, u64 hash, std:
         if (!objects.error.empty()) {
             return fail(CompileStatus::Failed, objects.error);
         }
-        if (WriteFileAtomic(cache_file, CacheText(*shader, msl))) {
+        if (allow_cache_writes && WriteFileAtomic(cache_file, CacheText(*shader, msl))) {
             ++counters.cache_stores;
         }
     } else {

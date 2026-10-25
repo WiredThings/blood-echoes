@@ -261,7 +261,7 @@ public:
     /// `rules` decides which game shaders get Relaxed math (FloatRules::RelaxedMath only); the
     /// SPIR-V's NoContraction is the recompiler's business (Shader::Profile).
     explicit ShaderCompiler(Device& device, std::filesystem::path cache_dir = {},
-                            FloatRules rules = FloatRules::Strict);
+                            FloatRules rules = FloatRules::Strict, bool allow_cache_writes = true);
     ~ShaderCompiler();
 
     /// `hash` is the guest shader hash (log messages and cache file name), `name` a label for
@@ -294,6 +294,7 @@ private:
     Device& device;
     std::filesystem::path cache_dir;
     FloatRules rules;
+    bool allow_cache_writes;
     Counters counters;
     std::unique_ptr<LibraryMemo> library_memo;
 };

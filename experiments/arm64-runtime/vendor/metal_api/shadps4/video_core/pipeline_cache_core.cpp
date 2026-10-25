@@ -1044,6 +1044,22 @@ bool PipelineCacheCore::RefreshComputeKey() {
     return true;
 }
 
+std::optional<PreparedShader> PipelineCacheCore::PrepareOwnedShader(
+    std::shared_ptr<const Shader::CompileSnapshot> inputs, Shader::CompileContext& context) {
+    if (!SupportsOwnedShaderPreparation() || !inputs || inputs->profile != profile ||
+        EmulatorSettings.IsDumpShaders() || EmulatorSettings.IsShaderCollect() ||
+        EmulatorSettings.IsPatchShaders()) return std::nullopt;
+    PreparedShader result;
+    result.shader = Shader::CompileOwnedToSpirv(std::move(inputs), context);
+    const auto& source = *result.shader.inputs;
+    // The permutation number is not known until ordered GPU-thread adoption. It is a label,
+    // never the identity: no speculative metadata/SPIR-V filenames are written here.
+    const auto name = GetShaderName(source.hw_stage, source.hash) + "_owned";
+    result.module = BuildOwnedShaderModule(result.shader.spirv, name);
+    if (!result.module) return std::nullopt;
+    return result;
+}
+
 ShaderModuleHandle PipelineCacheCore::CompileModule(Shader::Info& info, Shader::RuntimeInfo& runtime_info,
                                               const std::span<const u32>& code, size_t perm_idx,
                                               Shader::Backend::Bindings& binding) {
@@ -1055,7 +1071,7 @@ ShaderModuleHandle PipelineCacheCore::CompileModule(Shader::Info& info, Shader::
                                    perm_idx)};
 
     BbShaderPhaseAudit::Phase ir_phase{phases,BbAudit::ShaderGcnToIR};
-    const auto ir_program = Shader::TranslateProgram(code, pools, info, runtime_info, profile);
+    const auto ir_program = Shader::TranslateProgram(code, compile_context.pools, info, runtime_info, profile);
     ir_phase.End();
     BbShaderPhaseAudit::Phase spirv_phase{phases,BbAudit::ShaderIRToSpirv};
     auto spv = Shader::Backend::SPIRV::EmitSPIRV(profile, runtime_info, ir_program, binding);

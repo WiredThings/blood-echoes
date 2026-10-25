@@ -1,7 +1,8 @@
 """Freeze a read-only raw-write probe on the tested logical-bounds GPU candidate."""
 from pathlib import Path
 import json,shutil,subprocess,time,hashlib,sys
-P=Path(__file__).resolve().parents[1];B=Path('/private/tmp/blood-echoes-arm64-metal-20261023/build');D=Path('/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit');PIN=D/'experiments/arm64-runtime'
+P=Path(__file__).resolve().parents[1];B=Path('/private/tmp/blood-echoes-arm64-metal-20261023/build');M=P/'vendor/metal_api'
+from frozen_gpu_headers import verified_headers
 from qa_build_guard import require_no_games
 from native_observer import NativeObserver
 from qa_memory_policy import MemoryPolicy
@@ -9,10 +10,8 @@ def sha(f):
  with Path(f).open('rb')as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 def main():
  require_no_games()
- # The renderer candidate links frozen baseline objects. Reject any header/context
- # drift from the reviewed source revision, while allowing this observer's source.
- changed=subprocess.check_output(['git','diff','--name-only','f349bd44ed37bc2658ef1327f9e2a1ecba6ef5ef','--','experiments/arm64-runtime/vendor/metal_api','experiments/arm64-runtime/src'],cwd=D,text=True).splitlines()
- assert set(changed).issubset({'experiments/arm64-runtime/src/bb_raw_write_audit.h','experiments/arm64-runtime/vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp'}),changed
+ # Frozen old-ABI objects must use the matching reviewed headers, not the current checkout.
+ PIN=verified_headers()
  e=P/'evidence'/('raw-write-observer-'+str(time.time_ns()));e.mkdir();base=json.loads((P/'evidence/tiler-bounds-candidate-current.json').read_text());lib=Path(base['candidate']);assert sha(lib)==base['sha256'];first=json.loads((P/'evidence/first-upload-candidate-current.json').read_text());original=Path(first['evidence'])/'texture_cache.cpp';assert sha(original)==first['source_fixed_sha256']
  source=original.read_text();current=(P/'vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp').read_text();start=current.index('\n    if (const auto probe = BbRawWriteAudit::Begin())');end=current.index('\n\n    // bbport: only an image',start);block=current[start:end];needle='void TextureCache::InvalidateMemoryFromGPU(VAddr address, size_t max_size) {\n    std::scoped_lock lock{mutex};';assert source.count(needle)==1;source=source.replace(needle,needle+block,1);needle='#include "bb_stutter_audit.h"';assert source.count(needle)==1;source=source.replace(needle,needle+'\n#include "bb_raw_write_audit.h"',1)
  snapshot=e/'source';snapshot.mkdir();f=snapshot/'texture_cache.cpp';f.write_text(source);shutil.copy2(P/'src/bb_raw_write_audit.h',snapshot/'bb_raw_write_audit.h')
