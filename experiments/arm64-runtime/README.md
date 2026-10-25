@@ -311,3 +311,16 @@ are hardened and tested. Other source call-site coverage, final PSO preparation,
 GUI integration and hardened-version AOT game performance remain pending. Normal QA/production apps and Release stay
 unchanged. Incremental tools require prepared local build metadata, not a claimed
 fresh-checkout clean build of this experiment.
+
+## Offline-library / PSO coexistence audit
+
+See docs/local-metal-aot-archive.zh-CN.md. Matched source/local/local/source runs
+showed archive hits 500/0/500/0: the two library routes replaced one shared
+archive. The isolated fix binds the local toolchain build identity into PSO
+archive scope; 19 native children prove true local building/loading, strict hits
+for both routes and preservation of both archives, with real GPU output.
+Texture regression selection now binds the actual chosen candidate SHA; earlier
+24-case runs accidentally used the prior warm-stage candidate and do not prove
+their then-current AOT library. No stable FPS gain or white-model fix is claimed.
+A separate 28-check authored probe proves GS ring/invocation and compute shared
+size omissions in RuntimeInfo equality; that candidate is not applied to vendor.

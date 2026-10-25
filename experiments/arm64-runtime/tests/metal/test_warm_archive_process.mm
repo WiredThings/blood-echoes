@@ -13,6 +13,7 @@
 #include "video_core/renderer_metal/mtl_device_impl.h"
 #include "video_core/renderer_metal/mtl_pso_cache.h"
 #include "video_core/renderer_metal/mtl_warm_archive_identity.h"
+#include "video_core/renderer_metal/mtl_local_aot.h"
 #include "test_gpu_runtime_stubs.cpp"
 static std::string Read(const std::filesystem::path& path) {
  std::ifstream file(path,std::ios::binary);return {std::istreambuf_iterator<char>(file),{}};
@@ -71,6 +72,14 @@ int main(int argc,char**argv) { @autoreleasepool {
  assert(scope_id!=Metal::WarmArchiveNamespace(token,"gpu-A","os-B","safe"));
  assert(scope_id!=Metal::WarmArchiveNamespace(token,"gpu-A","os-A","relaxed"));
  assert(Metal::WarmArchiveNamespace("bad","gpu-A","os-A","safe").empty());
+ const auto source_options=Metal::WarmArchiveLibraryOptions("safe","off",token);
+ assert(source_options==Metal::WarmArchiveLibraryOptions("safe","record",token));
+ assert(source_options==Metal::WarmArchiveLibraryOptions("safe","load","bad"));
+ const auto local_options=Metal::WarmArchiveLibraryOptions("safe","load",token);
+ assert(local_options!=source_options);
+ assert(local_options!=Metal::WarmArchiveLibraryOptions("safe","load",std::string(64,'b')));
+ assert(Metal::WarmArchiveNamespace(token,"gpu-A","os-A",source_options)!=
+        Metal::WarmArchiveNamespace(token,"gpu-A","os-A",local_options));
  Metal::Device device;auto native=device.GetImpl().device;
  if(mode.starts_with("render-"))return RenderControl(device,folder,mode,expected_loaded,expected_hits);
  const bool changed=mode=="source"||mode=="write-fail"||mode=="parent-write-fail";
@@ -78,9 +87,16 @@ int main(int argc,char**argv) { @autoreleasepool {
  :@"#include <metal_stdlib>\nusing namespace metal;kernel void main0(device uint* p [[buffer(0)]],uint i [[thread_position_in_grid]]){p[i]=(i*17u)^0x12345678u;}";
  NSError* error=nil;auto options=[MTLCompileOptions new];options.languageVersion=MTLLanguageVersion3_1;
  if(@available(macOS 15.0,*))options.mathMode=MTLMathModeSafe;else options.fastMathEnabled=NO;
- auto library=[native newLibraryWithSource:source options:options error:&error];
+ const std::string effective=source.UTF8String;
+ auto admitted=Metal::LocalAot::Try(native,effective,"main0",false);
+ auto library=admitted.library?admitted.library:[native newLibraryWithSource:source options:options error:&error];
  if(!library){std::fprintf(stderr,"%s\n",error.localizedDescription.UTF8String);return 3;}
- auto function=[library newFunctionWithName:@"main0"];assert(function);
+ auto function=admitted.function?admitted.function:[library newFunctionWithName:@"main0"];assert(function);
+ if(mode=="local-record") {
+  auto recorded=Metal::LocalAot::Try(native,effective,"main0",false,true,false,function);
+  assert(recorded.recorded);
+ }
+ if(mode=="local-seed"||mode=="local-load")assert(admitted.reason=="hit");
  Metal::CompiledShader shader;shader.stage=Metal::ShaderStage::Compute;shader.entry="main0";
  shader.local_size={mode=="descriptor"?1024u:16u,1,1};
  shader.library=(__bridge_retained void*)library;shader.function=(__bridge_retained void*)function;
@@ -89,8 +105,8 @@ int main(int argc,char**argv) { @autoreleasepool {
  const auto pipeline=cache.GetComputePipeline(key,&shader);assert(pipeline&&pipeline->state);
  assert(expected_hits<0||cache.GetCounters().archive_hits.load()==static_cast<unsigned>(expected_hits));
  const auto path=cache.ArchivePath();const auto before=Read(path);
- if(mode=="seed") {assert(!expected_loaded&&before.empty());assert(cache.Flush());assert(!Read(path).empty());}
- if(mode=="load") {assert(expected_loaded&&!before.empty());assert(cache.Flush());assert(Read(path)==before);}
+ if(mode=="seed"||mode=="local-seed") {assert(!expected_loaded&&before.empty());assert(cache.Flush());assert(!Read(path).empty());}
+ if(mode=="load"||mode=="local-load") {assert(expected_loaded&&!before.empty());assert(cache.Flush());assert(Read(path)==before);}
  if(mode=="parent-write-fail") {
   assert(!before.empty());auto saved=folder;saved+=".saved";assert(!std::filesystem::exists(saved));
   std::filesystem::rename(folder,saved);{std::ofstream blocker(folder);blocker<<"authored ENOTDIR blocker";}
@@ -120,7 +136,7 @@ int main(int argc,char**argv) { @autoreleasepool {
  [encoder dispatchThreads:MTLSizeMake(64,1,1) threadsPerThreadgroup:MTLSizeMake(16,1,1)];
  [encoder endEncoding];[command commit];[command waitUntilCompleted];assert(command.status==MTLCommandBufferStatusCompleted);
  for(uint32_t i=0;i<64;i++)assert(((uint32_t*)out.contents)[i]==((i*17u)^(changed?0x87654321u:0x12345678u)));
- if(mode!="seed")assert(Read(path)==before);
+ if(mode!="seed"&&mode!="local-seed")assert(Read(path)==before);
  std::printf("{\"mode\":\"%s\",\"archive_loaded\":%s,\"strict_archive_hits\":%llu,\"readback_after_release\":true,\"pid\":%d}\n",mode.c_str(),expected_loaded?"true":"false",(unsigned long long)cache.GetCounters().archive_hits.load(),getpid());
  return 0;
 }}

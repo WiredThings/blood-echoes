@@ -13,6 +13,20 @@ inline bool ValidWarmArchiveManifest(std::string_view manifest) {
     for (char c : manifest) if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
     return true;
 }
+// Source-created and offline-metallib functions can have different driver archive
+// identities even for the same effective MSL. Retain both ledgers instead of
+// replacing the other input route's archive after every switch. Unknown/invalid
+// load identities still fall back to the original source route in LocalAot.
+inline std::string WarmArchiveLibraryOptions(std::string_view options,
+                                            std::string_view mode,
+                                            std::string_view local_build) {
+    std::string result{options};
+    if (mode == "load" && ValidWarmArchiveManifest(local_build)) {
+        result += ";local-metallib-build=";
+        result += local_build;
+    }
+    return result;
+}
 // Explicit arguments also allow authored GPU/OS mismatch controls without lying about
 // the actual Metal device. Production always passes the real registry ID/name and OS build.
 inline std::string WarmArchiveNamespace(std::string_view manifest, std::string_view gpu,

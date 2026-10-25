@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792928690405194000,
+  "created_ns": 1792930310744369000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -32649,7 +32649,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pso_cache.mm",
-      "sha256": "a640b0cd3ad1a238a086903fa372fafe841b3c4aa0812aeaa8b80f7d20e2b466"
+      "sha256": "96cd8c5043237f5eb6d0f063bf9bd16d1e218052b5ef2d85a05529c0beb4a158"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_raster_util.h",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "991e7639716f9a5ffd3442828cf68bcfd140d3fda139d4f39d7336a50e038a1d"
+      "sha256": "680618f48b193bbb2a0646500dfe30eef20a9bca5003cb61684893cddda14173"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "709dab5a0eb4114cb8abe135e085a908107f9041fd484e100f1e045be304bdb0"
+      "sha256": "06c1baccbf0a61a79cdd8c6221463d8848f590025fcdf5fcfbcb5a5c0565fe96"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39137,7 +39137,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_warm_archive_identity.h",
-      "sha256": "151340c55f8b8536112c7e2b396fec053835ef4edf3fb3522b7d28276185a19e"
+      "sha256": "0da24c050bc2899ea1d8ef78f6a00f34f17ea7f03821088538dc0c594e5f86cc"
     },
     {
       "path": "tools/warm_archive_manifest.py",
@@ -39149,7 +39149,7 @@
     },
     {
       "path": "tools/run_warm_archive_process_controls.py",
-      "sha256": "28a545c0c406697bc1929394fe3b70c6d046c400ef23b03da4a17c937fc1b95e"
+      "sha256": "99cb768a0b9ae6c6e05b1dcec25910c1fecf65906e36beec68f18a483ed70023"
     },
     {
       "path": "tools/run_warm_stage_storage_controls.py",
@@ -39165,11 +39165,11 @@
     },
     {
       "path": "tools/run_warm_persistence_regressions.py",
-      "sha256": "90218bec2e6eefdad469ffeb09b9c1a09c96f9b948d476ca3d4c1a86e346e14e"
+      "sha256": "0337ef4b792f1ecd1634f7ef52949f26d2d37cbd525b31afdfb79c704214b9dd"
     },
     {
       "path": "tests/metal/test_warm_archive_process.mm",
-      "sha256": "07ac5a13c699308ba565ba8e977938224a127ecd66f0514c0f7e56f08476d8e2"
+      "sha256": "21afb2fce6e45e31b149904dc9fe83ed935ab29ded27a1a0f53b4a99ec90fa3e"
     },
     {
       "path": "tests/metal/test_warm_stage_storage.cpp",
@@ -39245,11 +39245,11 @@
     },
     {
       "path": "docs/local-metal-aot-validation.zh-CN.md",
-      "sha256": "5acf03b179152b4e929770dc0e6e170b84187e55634566f32da29335762ebe67"
+      "sha256": "79fabf5d1c3d2924eef7326f4cfdf5e7dca52f06031825294c64ffdf725cf13d"
     },
     {
       "path": "docs/local-metal-aot-validation.json",
-      "sha256": "e23f021f3477531ee1a2cb65eb236b50a0ee0f5560098b4323f4edb12bb3b1cd"
+      "sha256": "8fe309f60a400d9114103d654214646fdc2c15b07b8759d1f21fc18ec22c39a4"
     },
     {
       "path": "tools/test_local_aot_request_recovery.py",
@@ -39265,7 +39265,23 @@
     },
     {
       "path": "docs/local-metal-source-api-coverage.md",
-      "sha256": "012f4d7bd49d0aba2b405cb560c6a820cdc55abdad53e3c0f253a278e6911bbf"
+      "sha256": "d8fb5c09e1d1c683e377cf587dce45d9c8541ec9c6d9cd45a4867943ce1b43e5"
+    },
+    {
+      "path": "tools/run_local_aot_archive_matrix.py",
+      "sha256": "8b7bf360dc0abe6eae27cd905c436ef8a7f40527f08a0b5cd63c070c182b6a9c"
+    },
+    {
+      "path": "tools/probe_runtime_specialization_keys.py",
+      "sha256": "1d0fe61bd5901e6792a11a4e72da5c900492d7c2801cca26be7438fe5af2ee25"
+    },
+    {
+      "path": "docs/local-metal-aot-archive.zh-CN.md",
+      "sha256": "2732775eccfd38a86a5fdc45da301a392ac5bba081b454e6a36e1378f699f90b"
+    },
+    {
+      "path": "docs/local-metal-aot-archive.json",
+      "sha256": "8b9e5995b2a659dcd765b28a720352b93510b462228318b4ddad8d6c1b65ce62"
     }
   ],
   "excluded": [
@@ -39305,7 +39321,7 @@
       "docs/local-metal-aot-validation.zh-CN.md",
       "docs/local-metal-aot-validation.json"
     ],
-    "status": "experimental-local-aot-hardened-no-default-enable",
+    "status": "experimental-local-aot-archive-provenance-native-tested",
     "excluded": [
       "all game MSL/AIR/metallib/artifacts",
       "admission/recovery patches",
@@ -39328,6 +39344,21 @@
       "docs/local-metal-aot-validation.json",
       "docs/local-metal-source-api-coverage.md"
     ],
-    "exported_GPU_sha256": "a24a0569985495d79a78d02502052037517232f2ef92c4629916bd264e0e0f38"
+    "exported_GPU_sha256": "a24a0569985495d79a78d02502052037517232f2ef92c4629916bd264e0e0f38",
+    "archive_provenance_GPU_sha256": "3e6d7e83df299f146ea4c61857651122095c9da345a5166b7f20050075cbec9a",
+    "archive_provenance_paths": [
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_warm_archive_identity.h",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pso_cache.mm",
+      "tests/metal/test_warm_archive_process.mm",
+      "tools/run_warm_archive_process_controls.py",
+      "tools/run_warm_persistence_regressions.py",
+      "tools/run_local_aot_archive_matrix.py",
+      "tools/probe_runtime_specialization_keys.py",
+      "CURRENT-PLAN.zh-CN.md",
+      "NIGHT-HANDOFF.zh-CN.md",
+      "docs/local-metal-aot-archive.zh-CN.md",
+      "docs/local-metal-aot-archive.json"
+    ],
+    "archive_provenance_status": "native-verified-and-game-source-smoke-passed-not-default"
   }
 }

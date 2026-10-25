@@ -560,3 +560,9 @@ GOAL.zh-CN.md 已新增九接口收口及固定游戏着色器/特化目录，�
 ## 2026-10-25：本机AOT安全修正验证完毕，仍实验关闭
 
 见docs/local-metal-aot-validation.zh-CN.md末节。当前GPU a24a0569985495d79a78d02502052037517232f2ef92c4629916bd264e0e0f38，已补entry实际成功后准入/记录、memo失败绕过artifact回source、RENAME_EXCL、根相等拒绝、逐层创建前检查及只读中断恢复。26builder+9恢复+6policy、actual BuildLibrary假函数/路径负例、4真库/16真GPU负例、旧9专项/24保留通过；最终默认OFF游戏75秒进入场景正常退出。旧1ba32725性能表保留原版本，未冒充当前版本AOT性能。所有游戏编译产物留本机、旧428库保留。剩余：其它17个source API/defaults/constants、最终PSO和新场景覆盖、初次编译峰值记录、GUI与最终AOT验收；不可标整个目标完成。正式与普通QA、Release不变。
+
+## 2026-10-25：归档来源冲突修正与特化谓词负例
+
+见docs/local-metal-aot-archive.zh-CN.md。旧a24同候选ABBA的PSO归档命中500→0→500→0，确认source与本机离线库互相替换归档。3e6d7e83df299f146ea4c61857651122095c9da345a5166b7f20050075cbec9a按本机build_id隔离，只保留当前一套内存归档，19原生子进程严格命中/双文件保留/真实GPU输出通过；四库16准入及九组回归通过。修正preservation固定旧candidate的测试入口，本次24纹理实际载入3e6d7e83df299f146ea4c61857651122095c9da345a5166b7f20050075cbec9a。旧历史24项不能证明当时新AOT候选。AOT默认关，旧ABBA约0.68%差异不是收益证明。实际特化key28项作者负例确认GS invocations/ring尺寸及compute shared memory遗漏，仅shadow修复通过，vendor未改、白模根因未证。下一步独立实际IR输出/LoadStage/一致GPU重建；不清缓存。正式数据/应用/普通QA/Release不变。
+
+归档修复候选3e6d7e83的75.23秒source模式游戏smoke已完成，无保护中止；正式11671文件重验全不变。完整新候选AOT游戏性能仍待，尚未默认开启。

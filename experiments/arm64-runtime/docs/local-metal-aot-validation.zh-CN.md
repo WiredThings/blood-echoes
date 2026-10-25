@@ -67,3 +67,7 @@ python3 tools/run_authored_controls_guard.py local-aot-existing-regressions pyth
 新候选26构建器、9只读恢复、6启动策略通过；实际BuildLibrary的fake-entry/memo失败与根相等/软链接负例通过（真设备能力初始化，函数工厂mock，不提交fake GPU命令）。另重新执行真实本机4库构建/16类原生准入和整数/float GPU读回/真实GCN→BuildLibrary采用/再次verified-skip。旧9专项及24纹理保留均通过。最终候选默认AOT关闭下的75秒隔离游戏进入场景、按时正常退出、无保护中止。
 
 最终加固版AOT游戏性能未重测，不默认启用；428个旧成功游戏产物完整保留。18调用点覆盖表明确还有其它直接source工厂，不擅改nil/default math与function constants。下一步优先最终PSO及完整组合，新IR路径保留实验性；正常QA/正式应用/Release仍不变。
+
+## 后续证据修订
+
+归档联用审计发现旧测试runner的24纹理一项误指warm-stage旧库。上文历史24项不是当时新AOT库的覆盖证明；详见local-metal-aot-archive.zh-CN.md。修正后的本轮24项已核对实际加载归档来源修复库3e6d7e83。旧性能表与其它实际准入测试保持原版本边界。

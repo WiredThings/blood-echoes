@@ -291,6 +291,8 @@
     "default_off_game_smoke": "game-1792928449049734000",
     "default_off_game_smoke_seconds": 75.37617941608187,
     "final_aot_gameplay_rebenchmark": false,
-    "public_headers_unchanged": true
-  }
+    "public_headers_unchanged": true,
+    "texture_cases_on_exported_GPU_proven": false
+  },
+  "historical_texture_evidence_correction": "Earlier 24-case preservation job used the previous warm-stage library, not the then-current AOT library. See local-metal-aot-archive.json for a fresh 24-case run verified against GPU 3e6d7e83df299f146ea4c61857651122095c9da345a5166b7f20050075cbec9a."
 }

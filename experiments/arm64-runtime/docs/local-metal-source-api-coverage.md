@@ -15,7 +15,7 @@ not rewritten or assumed Safe. SDK: Xcode.app/.../Metal.framework/Headers/MTLLib
 | Call site | Purpose / entry | Language | Math / FP32 | LocalAot coverage / qualification |
 | --- | --- | --- | --- | --- |
 | renderer_metal/mtl_shader.mm:958 | Game translated effective MSL; parsed entry, normally main0; rewrites applied first | explicit3.1 | Safe or Relaxed explicit; Fast explicit on macOS15+; legacy fastMathEnabled=NO below15 | **Yes**, Try then source fallback. Scope is module library, not final PSO. |
-| renderer_metal/mtl_local_aot.h:102 | admitted .metallib data, request entry | receipt metal3.1 | receipt safe/relaxed + fast | **Yes**, sole binary-data site. Current helper checks names; proposed001 checks actual function. |
+| renderer_metal/mtl_local_aot.h:102 | admitted .metallib data, request entry | receipt metal3.1 | receipt safe/relaxed + fast | **Yes**, sole binary-data site. Current helper requires actual newFunction success before admission. |
 | renderer_metal/mtl_guest_memory.mm:58 | guest-memory self-test probe | options:nil/default | defaults; fp32Fast on current API | No. Its source compilation and self-test PSO are outside game-module hit count. |
 | renderer_metal/mtl_occlusion.mm:111 | visibility snapshot | unset/default | Safe explicit; fp32Fast default | No. Constructor creates snapshot compute PSO. |
 | renderer_metal/mtl_format_convert.mm:239 | rgb_convert / depth_convert | explicit3.1 | Safe explicit; fp32Fast default | No. Source library contains both entries; callers choose by conversion kind. |

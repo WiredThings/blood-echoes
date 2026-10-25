@@ -44,6 +44,26 @@ def main():
  original=files[0].read_bytes();assert original
  # Separate child PID and true FailOnBinaryArchiveMiss hit; speed is not the criterion.
  run('load',True,1)
+ # Local libraries are built here, on this host, from the authored source accepted
+ # by the native helper. No developer/generated game library is distributed.
+ local_root=case/'gpu/local-metal';local_root.mkdir(mode=0o700)
+ local_env={'BB_MTL_LOCAL_AOT_MODE':'record','BB_MTL_LOCAL_AOT_ROOT':str(local_root),'BB_MTL_LOCAL_AOT_COHORT':token}
+ run('local-record',True,1,local_env)
+ from local_metal_builder import build as local_build
+ old_gpu=os.environ.get('BB_GPU_USER_DIR');os.environ['BB_GPU_USER_DIR']=str(case/'gpu')
+ try:local_result=local_build(local_root,token,enabled=True)
+ finally:
+  if old_gpu is None:os.environ.pop('BB_GPU_USER_DIR',None)
+  else:os.environ['BB_GPU_USER_DIR']=old_gpu
+ assert local_result['status']=='passed'and local_result['built']==1
+ local_env.update(BB_MTL_LOCAL_AOT_MODE='load',BB_MTL_LOCAL_AOT_BUILD_ID=local_result['build_id'])
+ run('local-seed',False,0,local_env)
+ assert files[0].read_bytes()==original
+ local_files=[x for x in cache.glob('pipelines-v3-*.binaryarchive')if x!=files[0]];assert len(local_files)==1
+ local_bytes=local_files[0].read_bytes();assert local_bytes
+ run('local-load',True,1,local_env)
+ run('load',True,1)
+ assert local_files[0].read_bytes()==local_bytes and files[0].read_bytes()==original
  run('source',True,0)
  # A render attachment format changes the final PSO while the exact authored
  # vertex/fragment source and manifest stay fixed. Correct pixels are required;
@@ -68,6 +88,6 @@ def main():
  different,_=identity(artifacts={'actual_loaded_gpu_library':changed});assert different!=token
  run('translator-identity',False,0,{'BB_MTL_ARCHIVE_COMPATIBILITY_ID':different})
  assert files[0].read_bytes()==original and legacy.read_bytes()==b'authored legacy sentinel'
- summary=dict(status='passed-authored-native-controls',case=str(case),children=len(results),cold_and_warm_are_distinct_processes=True,strict_hits_required=True,system_driver_cache_not_cleared=True,game_launched=False,gpu_os_identity_negatives='authored pure-helper arguments; actual other GPU/OS not available',archive_sha256=hashlib.sha256(original).hexdigest())
+ summary=dict(status='passed-authored-native-controls',case=str(case),children=len(results),local_library_built_on_this_host=True,source_and_local_archives_preserved=True,cold_and_warm_are_distinct_processes=True,strict_hits_required=True,system_driver_cache_not_cleared=True,game_launched=False,gpu_os_identity_negatives='authored pure-helper arguments; actual other GPU/OS not available',archive_sha256=hashlib.sha256(original).hexdigest())
  (case/'summary.json').write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps(summary,indent=2))
 if __name__=='__main__':main()

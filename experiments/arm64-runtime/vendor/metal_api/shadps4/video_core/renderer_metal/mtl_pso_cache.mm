@@ -252,6 +252,10 @@ PsoCache::PsoCache(Device& device_, std::filesystem::path cache_dir, bool relaxe
                 const char* value = std::getenv(key);
                 options += std::string(";") + key + "=" + (value ? value : "<unset>");
             }
+            const char* local_mode = std::getenv("BB_MTL_LOCAL_AOT_MODE");
+            const char* local_build = std::getenv("BB_MTL_LOCAL_AOT_BUILD_ID");
+            options = WarmArchiveLibraryOptions(options, local_mode ? local_mode : "",
+                                                local_build ? local_build : "");
             compatibility = WarmArchiveNamespace(token, gpu, os_build, options);
         }
         if (compatibility.empty()) {
