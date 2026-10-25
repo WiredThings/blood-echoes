@@ -2,6 +2,16 @@
  * guest receives stay below 1 TiB. Included by runtime.h for C files only. */
 #ifndef BB_LOW_HEAP_H
 #define BB_LOW_HEAP_H
+#include <stddef.h>
+/* Shared description of this allocator, not the host C++ max_align_t. Small
+ * blocks have power-of-two size/alignment; large runs are chunk-aligned. */
+enum { BB_LOW_HEAP_MIN_SHIFT=4, BB_LOW_HEAP_CHUNK_SHIFT=20 };
+static inline size_t bb_low_allocation_alignment(size_t size) {
+    size_t alignment=(size_t)1<<BB_LOW_HEAP_MIN_SHIFT;
+    const size_t chunk=(size_t)1<<BB_LOW_HEAP_CHUNK_SHIFT;
+    while (alignment<size && alignment<chunk) alignment<<=1;
+    return alignment;
+}
 #if defined(__APPLE__) && !defined(__cplusplus) && !defined(BB_LOW_HEAP_IMPL)
 #include <stddef.h>
 void *bb_low_malloc(size_t size);

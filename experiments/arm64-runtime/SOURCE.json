@@ -11,5 +11,13 @@
       "patches/Bloodborne.xml": "7d4175cedda53859384eaf4c054462afc6bc4eb4dc6d66e026b13b6e732e5ebe"
     },
     "scope": "private unchanged source snapshots; no formal repository edits"
+  },
+  "module_metadata_loader": {
+    "source": "original Blood Echoes launcher scripts, copied byte-for-byte for component-side metadata",
+    "stage_scripts_unmodified": true,
+    "files": {
+      "prepare.py": "024f47f3ccc62874557712944b4be49e003327b515e44a31b67bf5a50e3e8c83",
+      "game_check.py": "4a24e16552e4f75c3ae14cfa224979c103de3a0c1e4d092039c401d063e79255"
+    }
   }
 }

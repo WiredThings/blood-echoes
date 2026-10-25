@@ -18,10 +18,10 @@
 #define BB_LOW_HEAP_IMPL
 #include "runtime.h"
 
-#define CHUNK_SHIFT 20
+#define CHUNK_SHIFT BB_LOW_HEAP_CHUNK_SHIFT
 #define CHUNK ((size_t)1 << CHUNK_SHIFT)
 #define CHUNKS 8192 /* 8 GiB, committed only when touched */
-#define MIN_SHIFT 4
+#define MIN_SHIFT BB_LOW_HEAP_MIN_SHIFT
 #define MAX_SMALL_SHIFT 19 /* 512 KiB; larger requests use whole chunks */
 #define CLASSES (MAX_SMALL_SHIFT - MIN_SHIFT + 1)
 #define LARGE 0xFF

@@ -22,7 +22,9 @@ program hashes, and indexes 508 existing serialized specializations/409 pipeline
 keys. It does not establish whole-game variant coverage or PSO success. The old
 GPU host also lacks the nine imports; source resolver parity is byte-verified,
 not an execution test of the production CPU. One DATA contract (__progname) is now implemented in the existing guest parameter page;
-the other eight contracts remain pending. See docs/guest-process-data-contracts.zh-CN.md.
+the ModuleInfo query/matcher pair now uses the original loader and exact guest layout;
+six contracts remain pending. See docs/module-info-contracts.zh-CN.md and
+docs/guest-process-data-contracts.zh-CN.md.
 See docs/fixed-shader-catalog-and-imports.zh-CN.md. Game/catalog/cache payloads
 are local only; only authored tooling, controls and aggregate findings are exported.
 Bounded compiler-layout decoding now verifies the 508/409 and 327/259 cohorts
@@ -37,8 +39,8 @@ remain under investigation; no performance improvement or complete compatibility
 Death/respawn, online and menu live retests are deferred for the owner's acceptance.
 All 16 original AvPlayer implementations now have guest callback/handle bridges.
 Real FEX callbacks, thread cleanup and layout/bounds controls pass; static ABBA
-48.492 versus 48.623 FPS shows no measured improvement. Eight imports still need
-implementation; the ninth (__progname) now has actual FEX read/write/reset controls. See docs/avplayer-bridge.zh-CN.md for qualifications; normal manual
+48.492 versus 48.623 FPS shows no measured improvement. Six imports still need
+implementation; __progname and the ModuleInfo query/matcher pair have actual FEX controls. See docs/avplayer-bridge.zh-CN.md for qualifications; normal manual
 QA packaging remains on the earlier CPU and does not include this checkpoint.
 The private CPU QoS option remains OFF: its measured static ABBA did not show a benefit.
 See docs/inplace-texture-and-cpu-scheduling.zh-CN.md for actual in-place pixel controls,

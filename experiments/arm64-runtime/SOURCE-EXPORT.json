@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792900642298195000,
+  "created_ns": 1792902934652492000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -141,7 +141,11 @@
     },
     {
       "path": "src/game_runtime.cpp",
-      "sha256": "428a50f2f67ca9e2a2e21ede4f3cbcc450fe3bba2ad677c48f5195c10913d348"
+      "sha256": "a82283824be98385599b69d5e6ed59507f83371753b2d16f1123aaa060d35ae0"
+    },
+    {
+      "path": "src/guest_module_info.h",
+      "sha256": "bbef9f0bce03b474830662cd6de5df0198979c607a56a72ca2f0922d5e709c1a"
     },
     {
       "path": "src/guest_process_parameters.h",
@@ -202,6 +206,10 @@
     {
       "path": "src/native_stubs.c",
       "sha256": "a8a7c17c0853b587fcb4c9de9b2ae5745870a8aaaf780d33a959ac7a91bbc731"
+    },
+    {
+      "path": "src/prepare_guest_module_info.h",
+      "sha256": "601ea34ebc9aaea820d6036adf9bf9f9f6d5b8049c7e1662042835fc84208a6d"
     },
     {
       "path": "src/qa_cpu_qos.h",
@@ -486,6 +494,10 @@
     {
       "path": "tools/prepare_launcher_gui_qa.py",
       "sha256": "a8016156df30af120ffe5cd502c001a9629bb03cbe501de19768ba9d181c995f"
+    },
+    {
+      "path": "tools/prepare_module_metadata.py",
+      "sha256": "c9b46ea623b6c6c29bfb8c64696b99004a94560296186f42c3f22c41a624df7f"
     },
     {
       "path": "tools/prepare_startup.py",
@@ -804,6 +816,10 @@
       "sha256": "eb50ef4e0b63c85c775a622e5347cfcb5a0c7e98f780f28434637c2db4925974"
     },
     {
+      "path": "tests/module_info_fixture.py",
+      "sha256": "d163f2155885bafc4c32428d576a832be5efb728463359571b7d332561b2b79a"
+    },
+    {
       "path": "tests/probe_hardware_tso.c",
       "sha256": "af5c3c9b115c132e8261985f95b460d1e6c80f7ca728df07a9027e22bfab592c"
     },
@@ -976,6 +992,10 @@
       "sha256": "40b4ad9338e24c504f964b7b8b3bdc6e9aab07cb0385830045748c30bbff0528"
     },
     {
+      "path": "tests/test_guest_module_info.cpp",
+      "sha256": "bb9e656056545c6b03a8f57c8618e981be4fbab3094cac00dcea010f18c29eac"
+    },
+    {
       "path": "tests/test_guest_process_parameters.cpp",
       "sha256": "deaf0d98154697e25058b5d5f2cd91347e58960127d915f49a86436786d6bb41"
     },
@@ -1062,6 +1082,14 @@
     {
       "path": "tests/test_missing_data_imports.py",
       "sha256": "248dc4992e5798a53a66c49da9b1c60dbe0dc698f2ce5a4c27e4d95649606c4c"
+    },
+    {
+      "path": "tests/test_module_info_fex.py",
+      "sha256": "cdd244d262fbb7c5d9071a1441ba7093e8c9ede1bf0ce5c5f8937c674b8dc5e6"
+    },
+    {
+      "path": "tests/test_module_metadata.py",
+      "sha256": "0cac2b298798f92be3a98536bf22bd76d57d9923c141e412680892329f7844a0"
     },
     {
       "path": "tests/test_native_abi_declarations.py",
@@ -29257,11 +29285,11 @@
     },
     {
       "path": "vendor/bb_runtime/src/low_heap.c",
-      "sha256": "735950d32a1a2c44e65bb4af493d46691abb8a65f3a991e91e1d8a549388fd73"
+      "sha256": "32111f9d3da5712c8235cd0a03bb2ead76015ded4096b51fbbfba6220f3310f0"
     },
     {
       "path": "vendor/bb_runtime/src/low_heap.h",
-      "sha256": "b748f4866d0ff1c9a46299ddab71f433e87d9c29bf750eeddca6bef2e2a88f43"
+      "sha256": "d579e715b7b725969450dbb7b3d87fcf08b7d9619fad72e3b19204bf802faebe"
     },
     {
       "path": "vendor/bb_runtime/src/native_host_protection.h",
@@ -30326,6 +30354,14 @@
     {
       "path": "vendor/blood_echoes/launcher_patches.py",
       "sha256": "1f59d8cfb556ed28b8124bb16f41cebaef9a50a02b9a8e55dd8425d4543f66e1"
+    },
+    {
+      "path": "vendor/blood_echoes/loader/game_check.py",
+      "sha256": "4a24e16552e4f75c3ae14cfa224979c103de3a0c1e4d092039c401d063e79255"
+    },
+    {
+      "path": "vendor/blood_echoes/loader/prepare.py",
+      "sha256": "024f47f3ccc62874557712944b4be49e003327b515e44a31b67bf5a50e3e8c83"
     },
     {
       "path": "vendor/blood_echoes/mods.py",
@@ -38541,7 +38577,7 @@
     },
     {
       "path": "SOURCE.json",
-      "sha256": "26c028a7c15238fba2d5b2a1deeb7a7f3f8278b7ddb804761075b9757ad9ce51"
+      "sha256": "6ba79e62b6f7f798241e80c4573d28038ce6828f403d078e46306fe3bf52539a"
     },
     {
       "path": "targets.cmake",
@@ -38553,15 +38589,15 @@
     },
     {
       "path": "GOAL.zh-CN.md",
-      "sha256": "1ba998b3d8ec023058a76841bafc5ce1afb690672e0cc2101773217e32d6fef4"
+      "sha256": "ab905aa7ee6fb39891701c1528882856f2812af65f6d0f92efe7be726ddad1a1"
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "4dbfe42c582ec92be0bbdf2cdb151a7d7412cc57f8de71ef88c89f6914a6c843"
+      "sha256": "df2cfaede262fe78f6201e726b0d308099d28267e8e4be201355caa6209e8843"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "1ad8989a389b0e28543b69e3b45bc1589c7f56d9d67a3a0c45ccfc118c40fc88"
+      "sha256": "b391f04eda183279a51cc21c8df4fc750cbcaf0a5cc088b6d2c26d451d841311"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38654,6 +38690,10 @@
     {
       "path": "docs/guest-process-data-contracts.zh-CN.md",
       "sha256": "fd3460014b5e75a2d5c3a642c8217cd1f28f1b948abd0a0ae55b66d2654457ce"
+    },
+    {
+      "path": "docs/module-info-contracts.zh-CN.md",
+      "sha256": "a769646f3865034be3548ed8cea12819363e58dbb0872b7385a49089db59d30d"
     }
   ],
   "excluded": [

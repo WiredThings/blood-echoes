@@ -34,6 +34,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "boot_image.h"
 #include "guest_process_parameters.h"
+#include "guest_module_info.h"
+#include "prepare_guest_module_info.h"
 #include "remote/bb_memory_mirror.h"
 #include "core/guest_cpu/fex_guest_cpu.h"
 #include "core/guest_cpu/fex_hle_bridge.h"
@@ -88,7 +90,7 @@ struct CodeMapOutput final:FEXCore::CodeMapOpener {
  int OpenCodeMapFile() override{if(opened)return -1;opened=true;const int fd=open(path.c_str(),O_CREAT|O_EXCL|O_WRONLY,0600);check(fd>=0,"private CPU code map unavailable");return fd;}
 };
 struct State {
- HleCallRegistry registry;HleVeneerAllocator veneers;
+ HleCallRegistry registry;HleVeneerAllocator veneers;BbGuestModules::Registry module_info;
  // Published once, before guest entry; fault handling only reads this immutable list.
  std::vector<std::pair<uintptr_t,size_t>> missing_data_ranges;std::atomic<bool> missing_data_ready{false};
  std::map<uintptr_t,std::shared_ptr<HleCallAdapter>> native;
@@ -266,6 +268,19 @@ extern "C" void bb_arm_require_string(const char* name,const char* string,size_t
  }
  std::fprintf(stderr,"ARM ABI STOP %s unterminated string\n",name);_Exit(BB_ARM_EXIT_HLE_FAULT);
 }
+namespace {
+int32_t module_query(uintptr_t address,int32_t flags,void* output){
+ constexpr auto Error=[](unsigned e){return static_cast<int32_t>(0x80020000u|e);};
+ if(!active||!active->valid(reinterpret_cast<uintptr_t>(output),sizeof(BbGuestModules::Info),true))return Error(14);
+ if(static_cast<uint32_t>(flags)>=3){std::memset(output,0,sizeof(BbGuestModules::Info));return Error(22);}
+ const auto* info=active->module_info.Find(address);if(!info)return Error(3);
+ std::memcpy(output,info,sizeof(*info));return 0;
+}
+int module_match(const BbGuestModules::Info* input,uintptr_t address){
+ bb_arm_require_range("__elf_phdr_match_addr",reinterpret_cast<uintptr_t>(input),sizeof(*input),0);
+ BbGuestModules::Info copy;std::memcpy(&copy,input,sizeof(copy));return BbGuestModules::Match(copy,address);
+}
+}
 extern "C" void bb_arm_image_info(uintptr_t* base,uintptr_t* end,uintptr_t* libc,uint64_t* size){
  if(base)*base=active?active->image:0;if(end)*end=active?active->text_end:0;if(libc)*libc=active?active->libc:0;if(size)*size=active?active->image_size:0;
 }
@@ -375,6 +390,10 @@ int game_main(int argc,char** argv){
   else {const char* enabled=getenv("BB_QUICKSAVE");if(!enabled||strcmp(enabled,"1")){setenv("BB_QUICKSAVE","0",1);unsetenv("BB_QUICKLOAD_PENDING");}}setenv("BB_NATIVE_GPU",graphics?"1":"0",1);setenv("BB_TEXTURE_RELEASED_STORAGE","0",1);
   if(launcher_compat)std::printf("ARM LAUNCHER HLE published lookup=%d; explicit legacy override retained\n",BbLauncherCpu::ConfigurePublishedLookup());
   Boot b(boot);check(b.format=="BBPROBE5"&&b.caps==1,"require linked BBPROBE5");
+  fs::path module_metadata;
+  if(heap_fixture){if(const char* path=getenv("BB_ARM_AUTHORED_MODULE_INFO")){module_metadata=path;check(private_path(module_metadata)&&!fs::is_symlink(module_metadata),"authored module metadata outside Shared");}}
+  else if(!app0.empty())module_metadata=BbGuestModules::Prepare(boot,app0,state);
+
   std::vector<std::unique_ptr<Mapping>> missing_data_storage; // outlives the FEX State
   State s;active=&s;
   protect_host(s);
@@ -390,6 +409,8 @@ int game_main(int argc,char** argv){
   bbgpu_register_kernel();
   Mapping image(b.size),halt(Page),driver(Page),params(Page);s.image=image.at();s.image_size=b.size;s.libc=image.at()+b.modules.at(0).base;for(auto segment:b.segments)if(segment.flags&1)s.text_end=std::max<uintptr_t>(s.text_end,image.at()+segment.address+segment.size);s.halt=halt.at();b.load(image.ptr);*static_cast<uint8_t*>(halt.ptr)=0xf4;
   const auto progname=BbGuestProcess::Initialize(std::span(static_cast<std::byte*>(params.ptr),params.size),params.at());
+  if(!module_metadata.empty()){s.module_info.Load(module_metadata,BbStaticCode::SourceHash(boot),b,image.at());std::printf("ARM MODULE registry=%zu bytes=%zu\n",s.module_info.Size(),s.module_info.Size()*sizeof(BbGuestModules::Info));}
+
   uint64_t net_sdk{};memcpy(&net_sdk,static_cast<uint8_t*>(image.ptr)+b.procparam+16,8);runtime_net_configure(app0.c_str(),game_metadata.serial.c_str(),game_metadata.title.c_str(),game_metadata.version.c_str(),static_cast<unsigned char*>(image.ptr),b.size,uint32_t(net_sdk));
   std::vector<uintptr_t> imported(b.names.size());std::vector<uint64_t> kinds(b.names.size());for(auto x:b.relocs)if(x.kind){check(!kinds[x.value]||kinds[x.value]==x.kind,"mixed import kind");kinds[x.value]=x.kind;}
   if(graphics){
@@ -414,6 +435,10 @@ int game_main(int argc,char** argv){
    else if(net_adapter){auto net=std::shared_ptr<HleCallAdapter>(std::move(net_adapter));imported[i]=veneer(s,s.registry.Register(framed(net),std::string("net.")+runtime_import_name(b.names[i].c_str())));++native;route="native-net";}
    else if(av_adapter){
     imported[i]=veneer(s,s.registry.Register(framed(av_adapter),std::string("avplayer.")+runtime_import_name(b.names[i].c_str())));++native;route="native-avplayer";}
+   else if(!host&&!b.bindings.contains(i)&&kinds[i]==1&&s.module_info.Ready()&&(b.names[i]=="f7KBOafysXo#p#J"||b.names[i]=="Fjc4-n1+y2g#p#J")){
+    auto adapter=b.names[i]=="f7KBOafysXo#p#J"?MakeHleCallAdapter(module_query):MakeHleCallAdapter(module_match);
+    imported[i]=veneer(s,s.registry.Register(framed(adapter),std::string("loader.")+runtime_import_name(b.names[i].c_str())));++native;route="native-module-info";
+   }
    else if(!host&&!b.bindings.contains(i)&&BbGuestProcess::IsProgramName(b.names[i],kinds[i],b.caps)){imported[i]=progname;route="guest-process-data";}
    else if(host&&kinds[i]==2){imported[i]=host;route="native-data";auto page=host&~uintptr_t(Page-1);s.ranges.push_back({page,Page,false,true});}
    else if(host&&s.native.contains(host)){imported[i]=veneer(s,s.native.at(host));++native;route="native";}
