@@ -20,7 +20,7 @@
 #include <fcntl.h>
 
 namespace Metal::LocalAot {
-inline constexpr size_t MaxSource=1024*1024,MaxLibrary=32*1024*1024,MaxRequests=4096;
+inline constexpr size_t MaxSource=1024*1024,MaxLibrary=32*1024*1024;
 inline constexpr const char* Recipe="bb-metal-local-aot-v1";
 inline bool Hex(std::string_view s){if(s.size()!=64)return false;for(char c:s)if(!((c>='0'&&c<='9')||(c>='a'&&c<='f')))return false;return true;}
 inline std::string Sha(const void* bytes,size_t size){
@@ -83,7 +83,17 @@ inline bool Publish(const std::filesystem::path& path,NSData* bytes){
  if(ok&&renamex_np(tmp.c_str(),path.c_str(),RENAME_EXCL)!=0)ok=errno==EEXIST;
  unlink(tmp.c_str());return ok;
 }
-struct Result{ id<MTLLibrary> library{};id<MTLFunction> function{};std::string key;std::string reason;bool recorded{}; };
+// Content-addressed leaves bound directory size without limiting full-game discovery.
+inline bool RequestShard(const std::filesystem::path& folder,std::string_view key,
+                         std::filesystem::path& requests){
+ if(!Hex(key)||!Directory(folder,true))return false;
+ auto root=folder/"requests";if(!Directory(root,true))return false;
+ requests=root/std::string(key.substr(0,2));return Directory(requests,true);
+}
+struct Result{ id<MTLLibrary> library{};id<MTLFunction> function{};std::string key;std::string reason;bool recorded{};
+ // Successful loaded-byte provenance; populated from the same pinned data already verified.
+ std::string source_sha256,cohort,build_id,library_sha256;
+};
 inline Result Try(id<MTLDevice> device,const std::string& source,const std::string& entry,bool relaxed,bool allow_record=false,bool allow_lookup=true,id<MTLFunction> accepted_function=nil){
  const char* mode_env=std::getenv("BB_MTL_LOCAL_AOT_MODE");
  if(!mode_env)return {};
@@ -94,6 +104,7 @@ inline Result Try(id<MTLDevice> device,const std::string& source,const std::stri
  std::filesystem::path root=root_env,gpu=gpu_env;std::error_code ec;
  if(!root.is_absolute()||!gpu.is_absolute()||!Directory(gpu,false)||!Directory(root,false)||!Child(root,gpu)){result.reason="private-root";return result;}
  std::string cohort=cohort_env;const auto source_sha=Sha(source.data(),source.size());result.key=Key(cohort,source_sha,entry,relaxed);
+ result.source_sha256=source_sha;result.cohort=cohort;
  auto folder=root/cohort;auto requests=folder/"requests";
  const auto options=[&](NSDictionary* json){
   return Integer(json,@"schema",1)&&
@@ -108,13 +119,14 @@ inline Result Try(id<MTLDevice> device,const std::string& source,const std::stri
     auto receipt=Json(artifacts/(result.key+".json"));
     if(receipt&&options(receipt)&&String(receipt,@"build_id",build_env)){
      auto data=Read(artifacts/(result.key+".metallib"),MaxLibrary);
-     if(data&&Integer(receipt,@"library_bytes",data.length)&&String(receipt,@"library_sha256",Sha(data.bytes,data.length))){
+     const auto library_sha=data?Sha(data.bytes,data.length):std::string{};
+     if(data&&Integer(receipt,@"library_bytes",data.length)&&String(receipt,@"library_sha256",library_sha)){
       NSError* error=nil;dispatch_data_t input=dispatch_data_create(data.bytes,data.length,dispatch_get_global_queue(QOS_CLASS_UTILITY,0),^{(void)data.length;});
       id<MTLLibrary> library=[device newLibraryWithData:input error:&error];
       // A name in reflection is insufficient: the requested function must actually
       // be constructible before the artifact can bypass source compilation.
       id<MTLFunction> function=library?[library newFunctionWithName:[NSString stringWithUTF8String:entry.c_str()]]:nil;
-      if(function){result.library=library;result.function=function;result.reason="hit";return result;}
+      if(function&&[function.name isEqualToString:[NSString stringWithUTF8String:entry.c_str()]]){result.library=library;result.function=function;result.build_id=build_env;result.library_sha256=library_sha;result.reason="hit";return result;}
       result.reason=library?"entry-rejected":"library-rejected";
      }else result.reason="library-integrity";
     }else result.reason="receipt-miss";
@@ -127,9 +139,7 @@ inline Result Try(id<MTLDevice> device,const std::string& source,const std::stri
  // Recording is an explicit post-source-success operation. A failed/absent entry
  // cannot become a supposedly preparable request. OFF still returned above any IO.
  if(!accepted_function||![accepted_function.name isEqualToString:[NSString stringWithUTF8String:entry.c_str()]]){result.reason+="/unvalidated-entry";return result;}
- static std::atomic<size_t> request_attempts{};
- auto count=request_attempts.fetch_add(1);if(count>=MaxRequests){result.reason+="/record-budget";return result;}
- if(!Directory(folder,true)||!Directory(requests,true)){result.reason+="/request-directory";return result;}
+ if(!RequestShard(folder,result.key,requests)){result.reason+="/request-directory";return result;}
  NSDictionary* metadata=@{@"schema":@1,@"key":@(result.key.c_str()),@"cohort":@(cohort.c_str()),@"source_sha256":@(source_sha.c_str()),@"entry":@(entry.c_str()),@"language":@"metal3.1",@"math_mode":relaxed?@"relaxed":@"safe",@"math_fp32":@"fast",@"recipe":@(Recipe)};
  NSData* encoded=[NSJSONSerialization dataWithJSONObject:metadata options:NSJSONWritingSortedKeys error:nil];
  auto source_path=requests/(result.key+".metal");auto manifest_path=requests/(result.key+".json");

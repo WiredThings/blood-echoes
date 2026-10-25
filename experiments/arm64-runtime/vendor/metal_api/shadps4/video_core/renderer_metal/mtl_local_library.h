@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "video_core/renderer_metal/mtl_local_aot.h"
+#include "video_core/renderer_metal/mtl_library_origin.h"
 #include <cstdio>
 #include <initializer_list>
 #include <optional>
@@ -9,7 +10,6 @@ namespace Metal::LocalLibrary {
 // Full libraries have no function-constant identity: the caller supplies its real
 // entry factory for admission. Final functions/PSOs retain their own exact keys.
 inline constexpr const char* Recipe="bb-metal-local-library-v2";
-inline std::atomic<size_t> request_attempts{};
 inline std::optional<std::string> Language(NSUInteger raw) {
     const auto major=raw>>16, minor=raw&0xffff;
     if ((major==1&&minor<=2)||(major==2&&minor<=4)||(major==3&&minor<=2)||(major==4&&minor<=1))
@@ -72,15 +72,33 @@ inline bool PlainEntries(id<MTLLibrary> library,std::initializer_list<NSString*>
 template<class Factory>
 inline id<MTLLibrary> BuildInner(id<MTLDevice> device, NSString* source,
                            MTLCompileOptions* options, NSError** error, Factory&& factory,
-                           bool allow_lookup=true) {
+                           bool allow_lookup=true,Origin* success_origin=nullptr) {
+    if(success_origin)*success_origin={};
     MTLCompileOptions* actual_options=options;
+    std::string source_sha;
+    const auto accepted_source_origin=[&] {
+        if(!success_origin)return;
+        if(source_sha.empty()) {
+            NSData* bytes=[source dataUsingEncoding:NSUTF8StringEncoding];
+            if(!bytes||!bytes.length||bytes.length>LocalAot::MaxSource||std::memchr(bytes.bytes,0,bytes.length))return;
+            source_sha=LocalAot::Sha(bytes.bytes,bytes.length);
+        }
+        *success_origin=Origin{.route=Route::Source,.source_sha256=source_sha};
+    };
     const auto source_build=[&] {
         if(error)*error=nil;
         return [device newLibraryWithSource:source options:actual_options error:error];
     };
+    const auto source_admitted=[&] {
+        auto library=source_build();
+        // Optional provenance is valid only after the caller's real entry and
+        // actual typed constants succeeded. Non-opted-in legacy calls unchanged.
+        if(success_origin&&library&&factory(library))accepted_source_origin();
+        return library;
+    };
     const char* mode_env=std::getenv("BB_MTL_LOCAL_AOT_MODE");
     if(!mode_env || (std::string_view(mode_env)!="load"&&std::string_view(mode_env)!="record"))
-        return source_build(); // Zero AOT filesystem/hash/factory work when disabled.
+        return source_admitted(); // Zero AOT filesystem/hash/factory work when disabled.
     actual_options=[options copy];
     const char* root_env=std::getenv("BB_MTL_LOCAL_AOT_ROOT");
     const char* cohort_env=std::getenv("BB_MTL_LOCAL_AOT_COHORT");
@@ -89,12 +107,12 @@ inline id<MTLLibrary> BuildInner(id<MTLDevice> device, NSString* source,
     NSData* source_data=[source dataUsingEncoding:NSUTF8StringEncoding];
     if(!device||!profile||!root_env||!gpu_env||!cohort_env||!LocalAot::Hex(cohort_env)||
        !source_data||!source_data.length||source_data.length>LocalAot::MaxSource||
-       std::memchr(source_data.bytes,0,source_data.length)) return source_build();
+       std::memchr(source_data.bytes,0,source_data.length)) return source_admitted();
     const std::filesystem::path root=root_env,gpu=gpu_env;
     if(!LocalAot::Directory(gpu,false)||!LocalAot::Directory(root,false)||!LocalAot::Child(root,gpu))
-        return source_build();
+        return source_admitted();
     const std::string cohort=cohort_env;
-    const auto source_sha=LocalAot::Sha(source_data.bytes,source_data.length);
+    source_sha=LocalAot::Sha(source_data.bytes,source_data.length);
     const auto key=Key(cohort,source_sha,[profile[@"language"] UTF8String],
                        [profile[@"math_mode"] UTF8String],[profile[@"math_fp32"] UTF8String]);
     auto folder=root/cohort; auto requests=folder/"requests";
@@ -113,15 +131,18 @@ inline id<MTLLibrary> BuildInner(id<MTLDevice> device, NSString* source,
             if(LocalAot::Directory(folder,false)&&LocalAot::Directory(artifacts,false)) {
                 auto receipt=LocalAot::Json(artifacts/(key+".json"));
                 auto blob=LocalAot::Read(artifacts/(key+".metallib"),LocalAot::MaxLibrary);
+                const auto library_sha=blob?LocalAot::Sha(blob.bytes,blob.length):std::string{};
                 if(receipt&&blob&&accepts(receipt)&&LocalAot::String(receipt,@"build_id",build)&&
                    LocalAot::Integer(receipt,@"library_bytes",blob.length)&&
-                   LocalAot::String(receipt,@"library_sha256",LocalAot::Sha(blob.bytes,blob.length))) {
+                   LocalAot::String(receipt,@"library_sha256",library_sha)) {
                     dispatch_data_t data=dispatch_data_create(blob.bytes,blob.length,
                         dispatch_get_global_queue(QOS_CLASS_UTILITY,0),^{(void)blob.length;});
                     id<MTLLibrary> library=[device newLibraryWithData:data error:nil];
                     // Reflection names alone cannot accept an artifact. The caller
                     // creates its real entries using its actual constant values.
                     if(library&&factory(library)) {
+                        if(success_origin)*success_origin=Origin{.route=Route::LocalMetallib,
+                            .source_sha256=source_sha,.cohort=cohort,.build_id=build,.key=key,.library_sha256=library_sha};
                         std::printf("Metal helper local AOT: hit key=%s\n",key.c_str());
                         return library;
                     }
@@ -131,8 +152,8 @@ inline id<MTLLibrary> BuildInner(id<MTLDevice> device, NSString* source,
     }
     auto library=source_build();
     if(!library||!factory(library)) return library; // Original caller owns failure policy.
-    if(request_attempts.fetch_add(1)>=LocalAot::MaxRequests ||
-       !LocalAot::Directory(folder,true)||!LocalAot::Directory(requests,true)) return library;
+    accepted_source_origin();
+    if(!LocalAot::RequestShard(folder,key,requests)) return library;
     NSDictionary* request=@{@"schema":@2,@"recipe":@(Recipe),@"key":@(key.c_str()),
         @"cohort":@(cohort.c_str()),@"source_sha256":@(source_sha.c_str()),
         @"language":profile[@"language"],@"math_mode":profile[@"math_mode"],@"math_fp32":profile[@"math_fp32"]};
@@ -148,13 +169,14 @@ inline id<MTLLibrary> BuildInner(id<MTLDevice> device, NSString* source,
 template<class Factory>
 inline id<MTLLibrary> Build(id<MTLDevice> device, NSString* source,
                            MTLCompileOptions* options, NSError** error, Factory&& factory,
-                           bool allow_lookup=true) {
+                           bool allow_lookup=true,Origin* success_origin=nullptr) {
     // Keep returned objects AND NSError alive across the temporary-source pool.
     // Factory captures use caller-owned strong function slots, never a lease.
+    if(success_origin)*success_origin={};
     id<MTLLibrary> accepted=nil;
     NSError* retained_error=nil;
     @autoreleasepool {
-        accepted=BuildInner(device,source,options,&retained_error,factory,allow_lookup);
+        accepted=BuildInner(device,source,options,&retained_error,factory,allow_lookup,success_origin);
     }
     if(error)*error=retained_error;
     return accepted;

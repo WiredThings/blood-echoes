@@ -10,6 +10,7 @@
 
 #include "common/types.h"
 #include "video_core/buffer_cache/buffer.h"
+#include "video_core/renderer_metal/mtl_host_pso_recipe.h"
 #include "video_core/cache_backend.h"
 #include "video_core/texture_cache/image.h"
 #include "video_core/texture_cache/image_view.h"
@@ -22,6 +23,7 @@ class Device;
 class Scheduler;
 class SceneTargets;
 class Runtime;
+class PsoCache;
 
 /// Pending buffer accesses between two FlushBarriers (the Vulkan runtime's BarrierTracker, cut
 /// down: a few ranges per buffer, merged into one bounding range when there are more).
@@ -111,6 +113,12 @@ public:
     Runtime(Device& device, Scheduler& scheduler);
     /// Finishes the GPU work (the kernels' pipelines are released with it).
     ~Runtime() override;
+
+    void BindHostPsoCache(PsoCache* cache);
+    HostPso::WarmResult WarmHostPipelines();
+    HostPso::WarmResult FinishHostPreparation();
+    const HostPso::WarmResult& HostPreparationResult()const;
+    bool HostPreparationCritical()const;
 
     struct Impl;
     Impl& GetImpl() const {

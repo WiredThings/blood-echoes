@@ -24,6 +24,7 @@
 #include <system_error>
 #include <tuple>
 #include <unistd.h>
+#include <sys/sysctl.h>
 
 #include <spirv_cross/spirv_msl.hpp>
 
@@ -900,6 +901,42 @@ bool WriteFileAtomic(const std::filesystem::path& path, const std::string& text)
 
 using MetalObjects = MetalLibraryObjects;
 
+
+FunctionIdentity::Context FunctionContext(id<MTLDevice> device) {
+    FunctionIdentity::Context context;
+    const char* cohort=std::getenv("BB_MTL_ARCHIVE_COMPATIBILITY_ID");
+    if(!device||!cohort||!FunctionIdentity::Hex(cohort))return context;
+    context.cohort=cohort;context.registry_id=device.registryID;
+    context.device_name=device.name.UTF8String?:"";
+    char build[256]{};size_t length=sizeof(build);
+    if(sysctlbyname("kern.osversion",build,&length,nullptr,0)!=0||!length||length>sizeof(build)||!memchr(build,0,length))return {};
+    context.os_build=build;
+    context.compiler=std::string(kSpirvCrossVersion)+":msl-cache-"+std::to_string(kMslCacheVersion)+":"+__clang_version__;
+    return context;
+}
+
+FunctionIdentity::CompileOptions FunctionOptions(MTLCompileOptions* options) {
+    FunctionIdentity::CompileOptions value;
+    if(!options||options.preprocessorMacros.count||options.libraries.count||options.installName.length)return value;
+    value.language=options.languageVersion;value.legacy_fast_math=options.fastMathEnabled;
+    value.library_type=options.libraryType;value.preserve_invariance=options.preserveInvariance;
+    value.optimization=options.optimizationLevel;value.symbol_visibility=options.compileSymbolVisibility;
+    value.allow_undefined=options.allowReferencingUndefinedSymbols;value.max_threads=options.maxTotalThreadsPerThreadgroup;
+    if(@available(macOS 15.0,*)) {
+        value.math_api=1;value.math_mode=options.mathMode;value.math_fp=options.mathFloatingPointFunctions;
+        value.enable_logging=options.enableLogging;
+    }
+    if(@available(macOS 26.0,*)) {
+        const auto n=options.requiredThreadsPerThreadgroup;
+        value.required_x=n.width;value.required_y=n.height;value.required_z=n.depth;
+    }
+    if(@available(macOS 27.0,*)) {
+        value.conversion_rounding_api=1;value.conversion_rounding=options.floatingPointConversionRoundingMode;
+    }
+    value.supported=true;return value;
+}
+
+
 /// The first "error:" line of a Metal compiler message, without the "program_source:L:C:" prefix.
 std::string FirstMetalError(const std::string& text) {
     size_t pos = 0;
@@ -944,6 +981,13 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
         } else {
             options.fastMathEnabled = NO;
         }
+        const auto identity_context=FunctionContext(device);
+        const auto identity_options=FunctionOptions(options);
+        const char* lookup_mode=std::getenv("BB_MTL_LOCAL_AOT_MODE");
+        const char* lookup_cohort=std::getenv("BB_MTL_LOCAL_AOT_COHORT");
+        const char* lookup_build=std::getenv("BB_MTL_LOCAL_AOT_BUILD_ID");
+        const auto identity_namespace=FunctionIdentity::MemoNamespace(identity_context,identity_options,
+            lookup_mode&&std::string_view(lookup_mode)=="load",lookup_cohort?lookup_cohort:"",lookup_build?lookup_build:"");
         const auto compile = [&](const std::string& text) -> MetalObjects {
             const auto source_build = [&]() -> MetalObjects {
                 BbAudit::Scope actual_compile_audit{BbAudit::MetalLibraryBuild,0,100000};
@@ -957,7 +1001,7 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
                 }
                 id<MTLFunction> function = [library newFunctionWithName:
                     [NSString stringWithUTF8String:entry.c_str()]];
-                if (!function) {
+                if (!function || ![function.name isEqualToString:[NSString stringWithUTF8String:entry.c_str()]]) {
                     // Return no accepted library: this also keeps a speculative rewrite's
                     // original-source fallback and the weak memo's failure path intact.
                     return {nil, nil, fmt::format("Metal: function '{}' not found in the library", entry)};
@@ -966,24 +1010,35 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
                 if(!recorded.key.empty())std::printf("Metal local AOT: source key=%s recorded=%d\n",recorded.key.c_str(),int(recorded.recorded));
                 library.label = [[NSString alloc] initWithBytes:label.data() length:label.size()
                                                       encoding:NSUTF8StringEncoding];
-                return {library, function, {}};
+                PersistentFunctionIdentity identity;
+                if(identity_context.valid()&&identity_options.supported) {
+                    const auto source_sha=recorded.source_sha256.empty()?FunctionIdentity::Sha(text):recorded.source_sha256;
+                    identity=FunctionIdentity::Make(identity_context,identity_options,
+                        {.source_sha=source_sha,.entry=entry,.route=PersistentLibraryRoute::Source,
+                         .requested_entry_succeeded=true});
+                }
+                return {library, function, {}, false, identity};
             };
             const auto build = [&]() -> MetalObjects {
                 auto local=LocalAot::Try(device,text,entry,relaxed_math,false);
                 if(local.library&&local.function){
                     std::printf("Metal local AOT: hit key=%s recorded=0\n",local.key.c_str());
                     local.library.label=[[NSString alloc] initWithBytes:label.data() length:label.size() encoding:NSUTF8StringEncoding];
-                    return {local.library,local.function,{},true};
+                    const auto identity=FunctionIdentity::Make(identity_context,identity_options,
+                        {.source_sha=local.source_sha256,.entry=entry,.local_cohort=local.cohort,
+                         .local_build=local.build_id,.local_key=local.key,.local_library_sha=local.library_sha256,
+                         .route=PersistentLibraryRoute::LocalMetallib,.requested_entry_succeeded=true});
+                    return {local.library,local.function,{},true,identity};
                 }
                 return source_build();
             };
-            auto built = memo ? memo->Get(text, entry, relaxed_math, build) : build();
+            auto built = memo ? memo->Get(text, entry, relaxed_math, build, identity_namespace) : build();
             if (built.library && !built.function) {
                 // A memo owns only the library. Every module still requests its own
                 // function and retains independent reflection/binding metadata.
                 built.function = [built.library newFunctionWithName:
                     [NSString stringWithUTF8String:entry.c_str()]];
-                if (!built.function) {
+                if (!built.function || ![built.function.name isEqualToString:[NSString stringWithUTF8String:entry.c_str()]]) {
                     // Do not retry the same artifact/memo after an entry rejection.
                     // Compile this exact effective source once; its own entry gate
                     // decides success before any request can be recorded.
@@ -1007,7 +1062,8 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
         // Function identity is part of existing PSO cache keys; library reuse must not merge it.
         if (!objects.function) objects.function = [objects.library newFunctionWithName:
             [NSString stringWithUTF8String:entry.c_str()]];
-        if (!objects.function) {
+        if (!objects.function || ![objects.function.name isEqualToString:[NSString stringWithUTF8String:entry.c_str()]]) {
+            objects.persistent_identity={};
             objects.error = fmt::format("Metal: function '{}' not found in the library", entry);
             return objects;
         }
@@ -1398,11 +1454,13 @@ CompileResult ShaderCompiler::Compile(std::span<const u32> spirv, u64 hash, std:
             reference->num_samplers=shader->num_samplers;reference->variant=shader->variant;
             reference->library=(__bridge_retained void*)original.library;
             reference->function=(__bridge_retained void*)original.function;
+            reference->persistent_identity=FunctionIdentity::BindModule(original.persistent_identity,*reference);
             shader->strict_vertex_reference=std::move(reference);
         }
         std::printf("Metal vertex math shader: hash=%llx, helpers=%u, reference=%d; strict fma, Safe, contract(off)\n",
             (unsigned long long)hash,shader->strict_vertex_helpers_inlined,int(shader->strict_vertex_reference!=nullptr));
     }
+    shader->persistent_identity=FunctionIdentity::BindModule(objects.persistent_identity,*shader);
     ++counters.compiled;
     audit.ok = true; audit.cached = cached;
     if (library_memo && CompileAudit::Enabled()) {

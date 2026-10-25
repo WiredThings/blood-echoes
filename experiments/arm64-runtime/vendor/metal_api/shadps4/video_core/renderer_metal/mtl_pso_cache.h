@@ -8,6 +8,8 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
+#include "video_core/renderer_metal/mtl_host_pso_recipe.h"
 
 #include "common/types.h"
 #include "video_core/renderer_metal/mtl_shader.h"
@@ -270,6 +272,23 @@ public:
     /// id<MTLDepthStencilState> (owned by the cache), nullptr on failure.
     void* GetDepthStencilState(const DepthStencilKey& key);
 
+    // Helper callers keep their existing active-map ownership. These methods only
+    // share the original archive/create path and return one owned native state.
+    void* CreateArtifactPipeline(void* descriptor,bool compute,std::string_view stable_recipe,
+        bool prepare,HostPso::ArtifactOutcome& outcome,std::string& error,bool allow_compile=true);
+    // Set once before startup-only preparation; runtime instances default to false.
+    // This is not a draw-time switch and does not change live-map ownership.
+    void SetArtifactPreparation(bool prepare,bool allow_compile=true) {
+        artifact_preparation=prepare; artifact_allow_compile=allow_compile;
+    }
+    bool ArtifactPreparation()const { return artifact_preparation; }
+    bool ArtifactCompilationAllowed()const { return artifact_allow_compile; }
+    std::string HostPreparationCursor()const;
+    void HostPreparationProgress(const HostPso::WarmResult&,std::string_view after);
+    static std::string ArtifactDescriptorIdentity(void* descriptor,bool compute);
+    const std::string& PreparationIdentity() const { return preparation_identity; }
+    const std::string& DiscoveryIdentity() const { return discovery_identity; }
+
     /// Writes the binary archive when pipelines were added since the last write (atomically:
     /// temp file + rename). Cheap to call when nothing changed; call it every few new pipelines
     /// and at shutdown (the destructor does).
@@ -288,6 +307,11 @@ public:
         std::atomic<u64> depth_stencil_states{};
         std::atomic<u64> archive_hits{};       ///< pipelines taken from the binary archive
         std::atomic<u64> archive_adds{};
+        // Independent complete-recipe artifacts: one terminal outcome per cold API call.
+        // A non-null ordinary native fallback is never counted as prepared.
+        std::atomic<u64> artifact_attempts{}, artifact_hits{}, artifact_built{};
+        std::atomic<u64> artifact_deferred{}, artifact_failed{}, artifact_critical{};
+        std::atomic<u64> artifact_unavailable{}, artifact_compile_attempts{};
         /// Microseconds spent in the Metal pipeline-state calls.
         std::atomic<u64> render_us{};
         std::atomic<u64> compute_us{};
@@ -307,6 +331,8 @@ public:
 private:
     Device& device;
     std::filesystem::path archive_path;
+    std::string preparation_identity,discovery_identity;
+    bool artifact_preparation{},artifact_allow_compile{true};
     bool archive_loaded{}; ///< an existing archive file was opened
     Counters counters;
     std::unique_ptr<Impl> impl;

@@ -1,4 +1,7 @@
 #include "video_core/renderer_metal/mtl_local_library.h"
+#include "video_core/renderer_metal/mtl_game_pso_recipe.h"
+#include "runtime_exit_codes.h"
+#include <cstdlib>
 #include "bb_stutter_audit.h"
 #include "video_core/renderer_metal/mtl_compile_audit.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -21,6 +24,7 @@
 #include <xxhash.h>
 
 #include "common/assert.h"
+#include "common/scope_exit.h"
 #include "common/logging/log.h"
 #include "video_core/renderer_metal/mtl_device_impl.h"
 #include "video_core/renderer_metal/mtl_pso_cache.h"
@@ -240,7 +244,7 @@ PsoCache::PsoCache(Device& device_, std::filesystem::path cache_dir, bool relaxe
     // must bind the actual translator binary/dependencies, effective options, and game
     // image + applied patches. Real device/OS and source-affecting toggles add local guards.
     std::string compatibility;
-    if (impl->persist_enabled) {
+    { // Identity also admits metadata-only helper warmup when disk PSO persistence is OFF.
         const char* token = std::getenv("BB_MTL_ARCHIVE_COMPATIBILITY_ID");
         char os_build[256]{}; size_t os_bytes = sizeof(os_build);
         if (token && sysctlbyname("kern.osversion", os_build, &os_bytes, nullptr, 0) == 0) {
@@ -259,11 +263,16 @@ PsoCache::PsoCache(Device& device_, std::filesystem::path cache_dir, bool relaxe
                                                 local_build ? local_build : "");
             compatibility = WarmArchiveNamespace(token, gpu, os_build, options);
         }
-        if (compatibility.empty()) {
+        if (impl->persist_enabled && compatibility.empty()) {
             impl->persist_enabled = false;
             LOG_WARNING(Render, "Metal archive persistence requires a verified 64-hex compatibility manifest; ignoring disk archives");
         }
     }
+    preparation_identity = compatibility;
+    // The launcher verified this source/input cohort before choosing record/load
+    // and the local toolchain build. It is deliberately stable across those phases.
+    const auto* discovery=std::getenv("BB_MTL_LOCAL_AOT_COHORT");
+    if(!compatibility.empty()&&discovery&&LocalAot::Hex(discovery))discovery_identity=discovery;
     // No automatic legacy import: it lacks a translator/options/game identity. It is
     // preserved unchanged. OFF keeps its prior fresh transient compilation behavior.
     archive_path = cache_dir / (compatibility.empty()
@@ -411,9 +420,9 @@ namespace {
 /// FailOnBinaryArchiveMiss first (an archive hit skips the compiler), the regular creation
 /// otherwise. Persistence records every descriptor for a fresh Flush; loaded archives stay
 /// lookup-only. The nonpersistent transient compilation archive retains its prior behavior.
-template <typename Descriptor, typename Create, typename Add>
-id CreateWithArchive(PsoCache::Impl& impl, bool archive_loaded, Descriptor* descriptor,
-                     Create create, Add add, bool& from_archive, std::string& error) {
+template <typename Archive,typename Descriptor, typename Create, typename Add>
+id CreateWithArchive(Archive& impl, bool archive_loaded, Descriptor* descriptor,
+                     Create create, Add add, bool& from_archive, std::string& error,bool allow_compile=true,bool* compiled=nullptr) {
     BbAudit::Scope detailed_audit{BbAudit::MetalPSO,0,100000};
     CompileAudit audit{"pso"};
     audit.cached = 0;
@@ -440,6 +449,8 @@ id CreateWithArchive(PsoCache::Impl& impl, bool archive_loaded, Descriptor* desc
             ns_error = nil;
         }
     }
+    if(!allow_compile){error="native pipeline archive miss; preparation deferred";return nil;}
+    if(compiled)*compiled=true;
     id state = create(MTLPipelineOptionNone, &ns_error);
     if (!state) {
         error = FirstLine(ns_error);
@@ -468,6 +479,11 @@ id CreateWithArchive(PsoCache::Impl& impl, bool archive_loaded, Descriptor* desc
 }
 
 } // namespace
+
+#include "video_core/renderer_metal/mtl_pso_descriptor_identity.inc"
+#include "video_core/renderer_metal/mtl_pso_artifact.inc"
+
+#include "video_core/renderer_metal/mtl_game_pso_artifact.inc"
 
 const RenderPipeline* PsoCache::GetRenderPipeline(const Vulkan::GraphicsPipelineKey& key,
                                                        const CompiledShader* vs,
@@ -698,7 +714,11 @@ const RenderPipeline* PsoCache::GetRenderPipeline(const Vulkan::GraphicsPipeline
                 LOG_WARNING(Render, "Metal has no logic ops; the pipelines ignore them");
             }
             const auto start = Clock::now();
-            id state = CreateWithArchive(
+            const auto artifact = GamePso::TryArtifact(*this, (__bridge void*)desc, false,
+                *vs, fs, error);
+            from_archive = artifact.archive_hit;
+            id state = artifact.state;
+            if (!artifact.handled) state = CreateWithArchive(
                 *impl, archive_loaded, desc,
                 [&](MTLPipelineOption options, NSError** err) {
                     return [impl->mtl_device newRenderPipelineStateWithDescriptor:desc
@@ -805,7 +825,11 @@ const ComputePipeline* PsoCache::GetComputePipeline(const Vulkan::ComputePipelin
                 desc.maxTotalThreadsPerThreadgroup = total;
             }
             const auto start = Clock::now();
-            id state = CreateWithArchive(
+            const auto artifact = GamePso::TryArtifact(*this, (__bridge void*)desc, true,
+                *cs, nullptr, error);
+            from_archive = artifact.archive_hit;
+            id state = artifact.state;
+            if (!artifact.handled) state = CreateWithArchive(
                 *impl, archive_loaded, desc,
                 [&](MTLPipelineOption options, NSError** err) {
                     return [impl->mtl_device newComputePipelineStateWithDescriptor:desc
@@ -861,7 +885,7 @@ namespace {
 
 /// One of the tessellation path's compute pipelines; `stage_in` (nil: none) describes the vertex
 /// kernel's attributes. False with `error` set.
-bool MakeKernel(PsoCache::Impl& impl, bool archive_loaded, TessKernel& kernel,
+bool MakeKernel(PsoCache& owner, PsoCache::Impl& impl, bool archive_loaded, TessKernel& kernel,
                 const CompiledShader& shader, NSString* label,
                 MTLStageInputOutputDescriptor* stage_in, bool& from_archive, std::string& error) {
     kernel.shader = &shader;
@@ -871,7 +895,11 @@ bool MakeKernel(PsoCache::Impl& impl, bool archive_loaded, TessKernel& kernel,
     desc.computeFunction = (__bridge id<MTLFunction>)shader.function;
     desc.stageInputDescriptor = stage_in;
     bool archived = false;
-    id state = CreateWithArchive(
+    const auto artifact = GamePso::TryArtifact(owner, (__bridge void*)desc, true,
+        shader, nullptr, error);
+    archived = artifact.archive_hit;
+    id state = artifact.state;
+    if (!artifact.handled) state = CreateWithArchive(
         impl, archive_loaded, desc,
         [&](MTLPipelineOption options, NSError** err) {
             return [impl.mtl_device newComputePipelineStateWithDescriptor:desc
@@ -1049,7 +1077,7 @@ const TessellationPipeline* PsoCache::GetTessellationPipeline(
                     stringWithFormat:@"tess vs %#llx idx%u",
                                      (unsigned long long)key.stage_hashes[u32(Shader::SwStage::Vertex)],
                                      index_type];
-                if (!MakeKernel(*impl, archive_loaded, pipeline->vertex[index_type],
+                if (!MakeKernel(*this, *impl, archive_loaded, pipeline->vertex[index_type],
                                 *input.vertex[index_type], label, stage_in[index_type],
                                 from_archive, error)) {
                     break;
@@ -1061,7 +1089,7 @@ const TessellationPipeline* PsoCache::GetTessellationPipeline(
             NSString* label = [NSString
                 stringWithFormat:@"tess hs %#llx",
                                  (unsigned long long)key.stage_hashes[u32(Shader::SwStage::TessellationControl)]];
-            if (!MakeKernel(*impl, archive_loaded, pipeline->control, tcs, label, nil,
+            if (!MakeKernel(*this, *impl, archive_loaded, pipeline->control, tcs, label, nil,
                             from_archive, error)) {
                 break;
             }
@@ -1223,7 +1251,7 @@ const GeometryPipeline* PsoCache::GetGeometryPipeline(const Vulkan::GraphicsPipe
                     stringWithFormat:@"gs es %#llx idx%u",
                                      (unsigned long long)key.stage_hashes[u32(Shader::SwStage::Vertex)],
                                      index_type];
-                if (!MakeKernel(*impl, archive_loaded, pipeline->es[index_type],
+                if (!MakeKernel(*this, *impl, archive_loaded, pipeline->es[index_type],
                                 *input.es[index_type], label, stage_in[index_type], from_archive,
                                 error)) {
                     break;
@@ -1235,7 +1263,7 @@ const GeometryPipeline* PsoCache::GetGeometryPipeline(const Vulkan::GraphicsPipe
             NSString* label = [NSString
                 stringWithFormat:@"gs %#llx",
                                  (unsigned long long)key.stage_hashes[u32(Shader::SwStage::Geometry)]];
-            if (!MakeKernel(*impl, archive_loaded, pipeline->gs, gs, label, nil, from_archive,
+            if (!MakeKernel(*this, *impl, archive_loaded, pipeline->gs, gs, label, nil, from_archive,
                             error)) {
                 break;
             }

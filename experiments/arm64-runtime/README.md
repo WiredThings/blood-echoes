@@ -12,6 +12,24 @@ Vendored code retains its original licenses. SOURCE.json records upstream proven
 
 ## Current status
 
+The 2026-10-26 native PSO preparation checkpoint is described in
+[local-pso-preparation.zh-CN.md](docs/local-pso-preparation.zh-CN.md).
+The coherent 230-unit build passes source/local-library strict archive and GPU
+pixel controls. Three real complete game recipes prepare seven native PSOs;
+independent warm processes hit all seven without PSO compilation. This is not
+whole-game coverage or an original-game runtime acceptance test. Automatic startup
+orchestration, remaining helpers/variants and matched game hitch/memory checks
+remain open. Production and Release are unchanged.
+
+Local per-user compilation is the default-on delivery direction, superseding the
+earlier average-FPS-based default-off decisions below. Game compiler payloads stay
+local; only source, authored controls and aggregate evidence are published.
+
+## Earlier investigation checkpoints
+
+The following records describe their original cohorts and versions. Current
+acceptance is stated above and in CURRENT-PLAN.zh-CN.md.
+
 See GOAL.zh-CN.md, CURRENT-PLAN.zh-CN.md, NIGHT-HANDOFF.zh-CN.md and docs/.
 The goal now explicitly includes resolving the nine remaining imports and building
 a version-bound shader/material and full-specialization inventory. Bounded discovery

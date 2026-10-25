@@ -77,6 +77,9 @@ constexpr std::string GetBlobFileExtension(BlobType type) {
     case BlobType::PipelineKey: {
         return "key";
     }
+    case BlobType::HostPipelineRecipe: {
+        return "hostpso";
+    }
     case BlobType::ShaderProfile: {
         return "bin";
     }
@@ -274,6 +277,52 @@ void DataBase::ForEachBlob(BlobType type, const std::function<void(std::vector<u
             }
         }
     }
+}
+
+BoundedReadResult DataBase::ForEachBlobBounded(BlobType type,std::string_view prefix,size_t max_count,
+    size_t max_bytes,const std::function<bool(std::string_view,std::vector<u8>&&)>& func) noexcept {
+    BoundedReadResult result{};
+    try {
+      if(!opened||!max_count||!max_bytes||prefix.empty()||!func){result.stop=BoundedStop::Unavailable;return result;}
+      const std::string extension="."+GetBlobFileExtension(type);
+      const auto matches=[&](const std::string&name){return name.starts_with(prefix)&&name.ends_with(extension)&&name.find('/')==std::string::npos&&name.find('\\')==std::string::npos;};
+      const auto admit=[&](std::string_view name,std::vector<u8>&& data){++result.delivered;if(!func(name,std::move(data))){result.stop=BoundedStop::Cancelled;return false;}return true;};
+      if(EmulatorSettings.IsPipelineCacheArchived()) {
+        const auto count=mz_zip_reader_get_num_files(&zip_ar);
+        for(mz_uint index=0;index<count;++index) {
+          if(result.scanned++>=65536){result.stop=BoundedStop::ScanLimit;break;}
+          std::array<char,MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE> name{};
+          const auto length=mz_zip_reader_get_filename(&zip_ar,index,name.data(),name.size());
+          if(!length||length>name.size()||name[length-1]!=0){++result.rejected;continue;}
+          const std::string text{name.data()};if(!matches(text))continue;
+          if(result.delivered>=max_count){result.stop=BoundedStop::ItemLimit;break;}
+          mz_zip_archive_file_stat info{};
+          if(!mz_zip_reader_file_stat(&zip_ar,index,&info)||!info.m_uncomp_size||info.m_uncomp_size>max_bytes){++result.rejected;continue;}
+          std::vector<u8> data(static_cast<size_t>(info.m_uncomp_size));
+          if(!mz_zip_reader_extract_to_mem(&zip_ar,index,data.data(),data.size(),0)){++result.rejected;continue;}
+          if(!admit(text,std::move(data)))break;
+        }
+      } else {
+        std::error_code ec;std::filesystem::directory_iterator it(cache_path,ec),end;
+        if(ec){result.stop=BoundedStop::Io;return result;}
+        while(it!=end) {
+          if(result.scanned++>=65536){result.stop=BoundedStop::ScanLimit;break;}
+          const auto&entry=*it;const std::string name=entry.path().filename().string();
+          if(matches(name)) {
+            if(result.delivered>=max_count){result.stop=BoundedStop::ItemLimit;break;}
+            const auto status=entry.symlink_status(ec);const auto bytes=ec?0:entry.file_size(ec);
+            if(ec||!std::filesystem::is_regular_file(status)||!bytes||bytes>max_bytes){++result.rejected;ec.clear();}
+            else {
+              using namespace Common::FS;const IOFile file{entry.path(),FileAccessMode::Read};
+              if(!file.IsOpen()||file.GetSize()!=bytes)++result.rejected;
+              else {std::vector<u8> data(static_cast<size_t>(bytes));if(file.Read(data)!=data.size())++result.rejected;else if(!admit(name,std::move(data)))break;}
+            }
+          }
+          it.increment(ec);if(ec){result.stop=BoundedStop::Io;break;}
+        }
+      }
+    }catch(...){result.stop=BoundedStop::Io;}
+    return result;
 }
 
 void DataBase::Clear() {

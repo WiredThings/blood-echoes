@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "status": "native-cold-warm-paths-validated-not-whole-game-acceptance",
+  "library_sha256": "527592556231ffc5707059a77e127856e56aef4e85bc9460ef83f10210da4bd7",
+  "all_GPU_units_rebuilt": 230,
+  "author_native": {
+    "processes": 7,
+    "assertions": 681,
+    "all_passed": true,
+    "source_disk_cache_identity_equal": true,
+    "source_and_local_strict_hits": true,
+    "pixel_oracle": true,
+    "negative_cases": [
+      "descriptor changed",
+      "missing function provenance",
+      "corrupt authored receipt",
+      "missing local build source fallback"
+    ],
+    "max_pressure": 1,
+    "swap_growth_mib": 0.0
+  },
+  "helper_native": {
+    "processes": 7,
+    "assertions": 2138,
+    "all_passed": true,
+    "family": "FillU32",
+    "stable_discovery_across_record_and_load": true,
+    "actual_source_local_origin": true,
+    "entry_failure_source_fallback_separate_artifact": true,
+    "restored_local_artifact_still_hits": true,
+    "max_pressure": 1,
+    "swap_growth_mib": 0.0
+  },
+  "game_recipe_native": {
+    "passed": true,
+    "families": [
+      {
+        "family": "compute",
+        "pipelines": 1,
+        "cold_built": 1,
+        "warm_strict_hits": 1,
+        "warm_compile_attempts": 0,
+        "distinct_processes": true,
+        "actual_final_identity_and_blob_equal": true,
+        "source_fallback": false
+      },
+      {
+        "family": "ordinary-graphics",
+        "pipelines": 1,
+        "cold_built": 1,
+        "warm_strict_hits": 1,
+        "warm_compile_attempts": 0,
+        "distinct_processes": true,
+        "actual_final_identity_and_blob_equal": true,
+        "source_fallback": false
+      },
+      {
+        "family": "tessellation",
+        "pipelines": 5,
+        "cold_built": 5,
+        "warm_strict_hits": 5,
+        "warm_compile_attempts": 0,
+        "distinct_processes": true,
+        "actual_final_identity_and_blob_equal": true,
+        "source_fallback": false
+      }
+    ],
+    "total_pipelines": 7,
+    "game_started": false,
+    "actual_game_recipe_inputs": true,
+    "full_catalog_coverage_proven": false,
+    "runtime_consumer_from_original_game_proven": false,
+    "warm_seconds": 1.6361854170681909,
+    "cold_seconds": 11.364398624980822,
+    "warm_pressure": 1,
+    "cold_pressure": 1,
+    "warm_swap_mib": 0.0,
+    "cold_swap_mib": 0.0
+  },
+  "public_python_controls": {
+    "passed": true,
+    "tests": 40,
+    "errors": 0,
+    "failures": 0,
+    "native_compiler_gpu_game_started": false,
+    "state_root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/state"
+  },
+  "paged_controls": {
+    "tests": 22,
+    "requests": 4101,
+    "protected_stop_built": 300,
+    "resume_built": 3801,
+    "verified_skip": 300,
+    "warm_skip": 4101,
+    "real_metal_compiler": false
+  },
+  "game_started": false,
+  "formal_app_or_data_modified": false,
+  "release_updated": false,
+  "remaining": [
+    "automatic startup orchestration/full recipe coverage",
+    "original runtime consuming game artifacts",
+    "RectList-specific native recipe coverage",
+    "remaining helper final PSO families",
+    "cold/warm game hitches and memory comparison",
+    "separate function-ABI bookkeeping cleanup pending next full rebuild"
+  ]
+}

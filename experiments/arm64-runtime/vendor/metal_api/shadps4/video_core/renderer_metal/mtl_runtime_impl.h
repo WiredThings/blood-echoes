@@ -17,6 +17,8 @@
 #include <unordered_set>
 
 #include "video_core/renderer_metal/msl_host_shader.h"
+#include "video_core/renderer_metal/mtl_host_pso_recipe.h"
+#include "video_core/renderer_metal/mtl_library_origin.h"
 #include "video_core/renderer_metal/mtl_format_convert_impl.h"
 #include "video_core/renderer_metal/mtl_device_impl.h"
 #include "video_core/renderer_metal/mtl_runtime.h"
@@ -41,6 +43,11 @@ class HostKernels {
 public:
     HostKernels(Device::Impl& dev, Scheduler& scheduler);
     ~HostKernels();
+    void BindPsoCache(PsoCache* cache);
+    HostPso::WarmResult WarmPipelines();
+    HostPso::WarmResult FinishPreparation();
+    const HostPso::WarmResult& PreparationResult()const{return warm_result;}
+    void ConfigureFaultParser(u32 page_bits,u32 max_faults);
 
     /// The pipeline of the tiling kernel for `dispatch` and the shader it came from (the
     /// buffer slots); null pipeline when it did not compile (logged).
@@ -48,10 +55,8 @@ public:
                                        const HostShaders::Shader*& shader);
     id<MTLComputePipelineState> TextureTiling(const VideoCore::TilingDispatch& dispatch, bool proxy);
     /// Builds the fault parser pipeline for bitmaps of 1 bit per `1 << page_bits` bytes.
-    void CreateFaultParser(u32 page_bits, u32 max_faults);
-    [[nodiscard]] id<MTLComputePipelineState> FaultParser() const {
-        return fault_parser;
-    }
+    bool CreateFaultParser(u32 page_bits, u32 max_faults);
+    [[nodiscard]] id<MTLComputePipelineState> FaultParser();
     /// `kernel fill_u32(device uint* dst [[buffer(0)]], constant uint& value [[buffer(1)]],
     /// constant uint& count [[buffer(2)]])`, one thread per word.
     id<MTLComputePipelineState> FillU32();
@@ -71,21 +76,35 @@ public:
     void ColorToMsDepth(id<MTLTexture> src, id<MTLTexture> dst);
 
     /// The MTLLibrary of a host shader (compiled once).
-    id<MTLLibrary> Library(const HostShaders::Shader& shader, MTLFunctionConstantValues* values, bool source_only=false, id<MTLFunction> __strong* prepared=nullptr);
+    id<MTLLibrary> Library(const HostShaders::Shader& shader, MTLFunctionConstantValues* values, bool source_only=false, id<MTLFunction> __strong* prepared=nullptr, LocalLibrary::Origin* origin=nullptr);
     /// The function of a host shader with the function constants of `constants` (indexed by the
     /// constant's id; ids beyond `count` keep the shader's default).
-    id<MTLFunction> Function(const HostShaders::Shader& shader, const u32* constants, u32 count);
+    id<MTLFunction> Function(const HostShaders::Shader& shader, const u32* constants, u32 count, LocalLibrary::Origin* origin=nullptr);
 
 private:
     id<MTLComputePipelineState> ComputePipeline(const HostShaders::Shader& shader,
                                                 const u32* constants, u32 count,
-                                                NSString* label);
+                                                NSString* label, HostPso::Invocation invocation);
     id<MTLRenderPipelineState> MsCopyPipeline(u32 samples, MTLPixelFormat format, bool src_msaa);
     id<MTLRenderPipelineState> MsDepthPipeline(u32 samples, MTLPixelFormat format);
 
+    id Descriptor(const HostPso::Invocation& invocation) const;
+    std::optional<HostPso::Recipe> Describe(const HostPso::Invocation& invocation,id descriptor) const;
+    id<MTLComputePipelineState> MakeCompute(MTLComputePipelineDescriptor*,const HostPso::Invocation&,std::span<const LocalLibrary::Origin>,NSError**);
+    id<MTLRenderPipelineState> MakeRender(MTLRenderPipelineDescriptor*,const HostPso::Invocation&,std::span<const LocalLibrary::Origin>,NSError**);
+    void RecordRecipe(const HostPso::Invocation&,id descriptor);
+    bool Replay(const HostPso::Recipe&);
+    PsoCache* pso_cache{}; // detached before PipelineCache dies; no native state ownership
+    bool warming{},fault_known{},fault_with_cache{},warm_allow_compile=true;
+    const HostPso::Recipe* expected_recipe{}; // one synchronous preparation only
+    HostPso::ArtifactOutcome artifact_outcome{};
+    HostPso::WarmResult warm_result{};
+    std::array<u32,2> fault_arguments{};
+
     Device::Impl& dev;
     Scheduler& scheduler;
-    std::unordered_map<const void*, id<MTLLibrary>> libraries;
+    struct LibraryRecord {id<MTLLibrary> library=nil;LocalLibrary::Origin origin;};
+    std::unordered_map<const void*,LibraryRecord> libraries;
     using TilingKey = std::tuple<u32, bool, std::array<u32, 12>, bool>;
     using LegacyTilingKey = std::tuple<u32, bool, std::array<u32, 12>>;
     // Only HostKernels' out-of-line methods touch or destroy these nodes. Keep

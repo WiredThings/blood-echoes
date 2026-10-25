@@ -127,10 +127,10 @@ class BuilderTests(unittest.TestCase):
  def test_library_size_limit(self):
   self.export();self.runner.library_size=65
   with patch.object(builder,'LIBRARY_MAX',64):self.assertEqual(self.run_builder()['status'],'refused')
- def test_request_count_limit_bounds_enumeration(self):
+ def test_main_build_uses_pages_instead_of_legacy_flat_count_limit(self):
   for i in range(3):self.export(('kernel '+str(i)).encode())
-  with patch.object(builder,'REQUEST_MAX',2):self.assertEqual(self.run_builder()['status'],'refused')
-  self.assertFalse(self.runner.compiles())
+  with patch.object(builder,'REQUEST_MAX',2):self.assertEqual(self.run_builder()['status'],'passed')
+  self.assertEqual(len(self.runner.compiles()),3)
  def test_protection_stop_prevents_any_tool_call(self):
   self.export();self.guard.stop=True;self.assertEqual(self.run_builder()['status'],'stopped');self.assertFalse(self.runner.calls)
  def test_fixed_runner_nonzero_retains_only_private_bounded_diagnostic_tail(self):

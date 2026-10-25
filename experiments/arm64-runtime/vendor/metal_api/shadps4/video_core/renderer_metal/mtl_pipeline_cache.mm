@@ -1,3 +1,5 @@
+#include "runtime_exit_codes.h"
+#include "video_core/renderer_metal/mtl_runtime.h"
 #if defined(__aarch64__)
 #define BB_MTL_HOST_NAMESPACE(name) name "-arm64-srt1"
 #else
@@ -17,8 +19,10 @@
 #include "common/assert.h"
 #include "common/logging/log.h"
 #include "common/serdes.h"
+#include "common/scope_exit.h"
 #include "video_core/renderer_metal/mtl_device_impl.h"
 #include "video_core/renderer_metal/mtl_pipeline_cache.h"
+#include "video_core/renderer_metal/mtl_cached_variants.h"
 #include "video_core/renderer_metal/mtl_spirv_geometry.h"
 #include "video_core/renderer_metal/mtl_spirv_rectlist.h"
 #include "video_core/renderer_metal/mtl_vertex_metadata.h"
@@ -30,7 +34,6 @@ using VideoCore::ShaderModuleHandle;
 constexpr u32 SpirvVersion1_6 = 0x00010600U;
 /// Xored into the guest hash of a vertex module's RectList variant (the log label and the name of
 /// its MSL cache file; the file name also holds the hash of the rewritten SPIR-V).
-constexpr u64 RectListHashSalt = 0x5265637400000000ULL; // "Rect"
 
 /// The viewport limit of every Metal GPU the backend supports (Apple family 7+, Mac2).
 constexpr u32 MaxViewportDimension = 16384;
@@ -188,7 +191,7 @@ bool GraphicsSerialization::Deserialize(Serialization::Archive& ar) {
 
 PipelineCache::PipelineCache(Device& device_, const VideoCore::BackendLimits& limits,
                              AmdGpu::Liverpool* liverpool_, u32 sparse_page_shift,
-                             std::filesystem::path msl_cache_dir)
+                             std::filesystem::path msl_cache_dir, Runtime* host_runtime_)
     : PipelineCacheCore{liverpool_, MakeShaderProfile(device_, limits), MakePipelineCapabilities(),
                         sparse_page_shift,
                         // 1D lowering changes SPIR-V image types. Preserve old core archives
@@ -197,23 +200,39 @@ PipelineCache::PipelineCache(Device& device_, const VideoCore::BackendLimits& li
                         limits.two_level_bda
                             ? (ReadFloatRules()==FloatRules::Strict?BB_MTL_HOST_NAMESPACE("metal-pt2-img2d-v2"):BB_MTL_HOST_NAMESPACE("metal-relaxed-pt2-img2d-v2"))
                             : (ReadFloatRules()==FloatRules::Strict?BB_MTL_HOST_NAMESPACE("metal-flat2-img2d-v2"):BB_MTL_HOST_NAMESPACE("metal-relaxed-flat2-img2d-v2"))},
-      device{device_}, compiler{device_, msl_cache_dir, ReadFloatRules()},
+      host_runtime{host_runtime_}, device{device_}, compiler{device_, msl_cache_dir, ReadFloatRules()},
       pso_cache{device_, msl_cache_dir, ReadFloatRules() == FloatRules::RelaxedMath},
       pass_through{device_} {
     std::printf("GPU: Metal float rules %s\n", FloatRulesName(ReadFloatRules()));
+    bool host_bound=false;
+    if(host_runtime){host_runtime->BindHostPsoCache(&pso_cache);host_bound=true;}
+    bool construction_complete=false;
+    SCOPE_EXIT{if(host_bound&&!construction_complete)host_runtime->BindHostPsoCache(nullptr);};
     WarmUp();
+    FinishMainPreparation();
+    if(host_runtime){const auto result=host_runtime->FinishHostPreparation();if(result.state==HostPso::WarmState::Critical){std::fputs("Metal preparation stopped: critical host pressure\n",stderr);std::_Exit(BB_ARM_EXIT_HOST_PROTECTION);}}
     // Test/benchmark shutdown can bypass destructors. Persist already known prewarmed PSOs
     // before gameplay, so the next start can actually use its binary archive.
     // No cache capacity/resource change and no periodic serialization in the render loop.
     // Loading serialized PSOs has a material CPU-memory cost on this 16 GiB machine.
     // Keep disk persistence opt-in; ordinary SPIR-V/MSL/keys and live PSOs stay cached.
-    const char* persist_archive = std::getenv("BB_MTL_PERSIST_WARM_ARCHIVE");
-    if (persist_archive && persist_archive[0] == '1') pso_cache.Flush();
-    const char* release_archive = std::getenv("BB_MTL_RELEASE_WARM_ARCHIVE");
-    if (!release_archive || release_archive[0] != '0') pso_cache.ReleaseWarmArchive();
+    construction_complete=true;
+}
+
+void PipelineCache::FinishMainPreparation(){
+ if(main_preparation_finished)return;
+ if(host_runtime&&host_runtime->HostPreparationCritical()){std::fputs("Metal preparation stopped: critical host pressure before main archive\n",stderr);std::_Exit(BB_ARM_EXIT_HOST_PROTECTION);}
+ const char*persist=std::getenv("BB_MTL_PERSIST_WARM_ARCHIVE");if(persist&&persist[0]=='1')pso_cache.Flush();
+ const char*release=std::getenv("BB_MTL_RELEASE_WARM_ARCHIVE");if(!release||release[0]!='0')pso_cache.ReleaseWarmArchive();
+ main_preparation_finished=true;
+}
+void PipelineCache::WarmExtraPipelines(){
+ FinishMainPreparation();
+ if(host_runtime){const auto result=host_runtime->WarmHostPipelines();if(result.state==HostPso::WarmState::Critical){std::fputs("Metal preparation stopped: critical host pressure\n",stderr);std::_Exit(BB_ARM_EXIT_HOST_PROTECTION);}}
 }
 
 PipelineCache::~PipelineCache() {
+    if(host_runtime)host_runtime->BindHostPsoCache(nullptr);
     // The pipelines refer to the modules' shaders and the PSO cache: stop the core first.
     DestroyPipelines();
 }
@@ -253,35 +272,8 @@ ShaderModuleHandle PipelineCache::AdoptOwnedShaderModule(
 }
 
 std::unique_ptr<ShaderModule> PipelineCache::BuildShaderModule(ShaderCompiler& context,
-    std::span<const u32> spirv, std::string_view name) {
-    // The core's names carry the guest hash ("<stage>_0x<hash>_<perm>"): the MSL cache file and
-    // the logs use it. Modules from the disk cache come without a name.
-    u64 hash = 0;
-    if (const size_t pos = name.find("0x"); pos != std::string_view::npos) {
-        hash = std::strtoull(std::string{name.substr(pos)}.c_str(), nullptr, 16);
-    }
-    auto module = std::make_unique<ShaderModule>();
-    const ShaderStage stage = ReadShaderStage(spirv);
-    const bool tessellation_stage = stage == ShaderStage::TessellationControl ||
-                                    stage == ShaderStage::TessellationEval ||
-                                    stage == ShaderStage::Geometry;
-    if (tessellation_stage) {
-        // Only compiled as a variant of a tessellated or geometry pipeline.
-        module->status = CompileStatus::Ok;
-        module->stage = stage;
-    } else {
-        CompileResult result =
-            context.Compile(spirv, hash, name.empty() ? std::string_view{"cached"} : name);
-        module->status = result.status;
-        module->stage = result.stage;
-        module->shader = std::move(result.shader);
-    }
-    if (module->stage == ShaderStage::Vertex || tessellation_stage) { // (incl. geometry)
-        module->spirv.assign(spirv.begin(), spirv.end());
-        module->hash = hash;
-        module->name = name.empty() ? std::string{"cached"} : std::string{name};
-    }
-    return module;
+    std::span<const u32> spirv,std::string_view name) {
+    return CachedVariants::BuildModule(context,spirv,name);
 }
 
 ShaderModuleHandle PipelineCache::InsertShaderModule(std::unique_ptr<ShaderModule> module) {
@@ -325,128 +317,19 @@ void PipelineCache::DestroyShaderModule(ShaderModuleHandle handle) {
     modules_.erase(it);
 }
 
-const CompiledShader* PipelineCache::RectListShader(ShaderModuleHandle handle, std::string& error) {
-    ShaderModule* module = handle ? ToModule(handle) : nullptr;
-    if (!module || module->stage != ShaderStage::Vertex || module->spirv.empty()) {
-        error = "no vertex module";
-        return nullptr;
-    }
-    std::scoped_lock lock{module->rect_mutex};
-    if (!module->rect_tried) {
-        module->rect_tried = true;
-        const RectListRewrite rewrite = RewriteRectListVertex(module->spirv);
-        if (!rewrite.ok) {
-            module->rect_error = rewrite.error;
-        } else {
-            CompileResult result = compiler.Compile(rewrite.spirv, module->hash ^ RectListHashSalt,
-                                                    module->name + "_rect");
-            if (result.shader) {
-                module->rect_shader = std::move(result.shader);
-            } else {
-                module->rect_error = "the rewritten shader did not compile: " + result.error;
-            }
-        }
-    }
-    error = module->rect_error;
-    return module->rect_shader.get();
+const CompiledShader* PipelineCache::RectListShader(ShaderModuleHandle handle,std::string& error) {
+    return CachedVariants::RectList(compiler,handle?ToModule(handle):nullptr,error);
 }
-
-const CompiledShader* PipelineCache::VariantShader(ShaderModule& module,
-                                                   const CompileVariant& variant,
-                                                   std::string& error) {
-    std::scoped_lock lock{module.variant_mutex};
-    for (const ShaderModule::Variant& known : module.variants) {
-        if (known.variant == variant) {
-            error = known.error;
-            return known.shader.get();
-        }
-    }
-    ShaderModule::Variant& made = module.variants.emplace_back();
-    made.variant = variant;
-    if (module.spirv.empty()) {
-        made.error = "no SPIR-V kept for the module";
-    } else {
-        const char* suffix = variant.kind == CompileVariant::Kind::TessVertex    ? "_tessvs"
-                             : variant.kind == CompileVariant::Kind::TessControl ? "_tesstcs"
-                             : variant.kind == CompileVariant::Kind::GeometryKernel ? "_gskernel"
-                                                                                 : "_tesstes";
-        CompileResult result =
-            compiler.Compile(module.spirv, module.hash, module.name + suffix, variant);
-        if (result.shader) {
-            made.shader = std::move(result.shader);
-        } else {
-            made.error = result.error;
-        }
-    }
-    error = made.error;
-    return made.shader.get();
+const CompiledShader* PipelineCache::VariantShader(ShaderModule& module,const CompileVariant& variant,
+                                                  std::string& error) {
+    return CachedVariants::Variant(compiler,module,variant,error);
 }
-
 bool PipelineCache::TessellationShaders(
-    std::span<const ShaderModuleHandle, VideoCore::MaxShaderStages> modules,
-    TessellationInput& input, std::string& error, bool& unsupported) {
-    using Shader::SwStage;
-    unsupported = false;
-    ShaderModule* vs = modules[u32(SwStage::Vertex)] ? ToModule(modules[u32(SwStage::Vertex)]) : nullptr;
-    ShaderModule* tcs = modules[u32(SwStage::TessellationControl)]
-                            ? ToModule(modules[u32(SwStage::TessellationControl)])
-                            : nullptr;
-    ShaderModule* tes = modules[u32(SwStage::TessellationEval)]
-                            ? ToModule(modules[u32(SwStage::TessellationEval)])
-                            : nullptr;
-    if (!vs || vs->stage != ShaderStage::Vertex || !tcs ||
-        tcs->stage != ShaderStage::TessellationControl || !tes ||
-        tes->stage != ShaderStage::TessellationEval) {
-        error = "a stage's module is missing or of another stage";
-        return false;
-    }
-    const TessellationInfo tes_info = ReadTessellationInfo(tes->spirv);
-    const TessellationInfo tcs_info = ReadTessellationInfo(tcs->spirv);
-    if (tes_info.domain != TessDomain::Triangles && tes_info.domain != TessDomain::Quads) {
-        error = "Metal tessellates triangles and quads only (the evaluation shader's domain)";
-        unsupported = true;
-        return false;
-    }
-    if (tes_info.point_mode) {
-        error = "Metal's tessellator has no point mode";
-        unsupported = true;
-        return false;
-    }
-    if (tcs_info.output_vertices == 0) {
-        error = "the control shader declares no OutputVertices";
-        return false;
-    }
-    for (u32 index_type = 0; index_type < 3; ++index_type) {
-        input.vertex[index_type] = VariantShader(
-            *vs, {.kind = CompileVariant::Kind::TessVertex, .index_type = index_type}, error);
-        if (!input.vertex[index_type]) {
-            error = "vertex kernel: " + error;
-            return false;
-        }
-    }
-    input.control = VariantShader(
-        *tcs, {.kind = CompileVariant::Kind::TessControl, .domain = tes_info.domain}, error);
-    if (!input.control) {
-        error = "control kernel: " + error;
-        return false;
-    }
-    if (!input.control->tess_layout.patch_output_complete) {
-        error = "control kernel: incomplete per-patch output reflection";
-        return false;
-    }
-    input.eval = VariantShader(
-        *tes,
-        {.kind = CompileVariant::Kind::TessEval,
-         .output_vertices = tcs_info.output_vertices,
-         .link_patch_input = true,
-         .patch_input = {.stride = input.control->tess_layout.patch_output,
-                         .members = input.control->tess_layout.patch_members}},
-        error);
-    if (!input.eval) {
-        error = "evaluation function: " + error;
-        return false;
-    }
-    return true;
+    std::span<const ShaderModuleHandle,VideoCore::MaxShaderStages> modules,TessellationInput& input,
+    std::string& error,bool& unsupported) {
+    std::array<ShaderModule*,VideoCore::MaxShaderStages> native{};
+    for(size_t i=0;i<native.size();++i)native[i]=modules[i]?ToModule(modules[i]):nullptr;
+    return CachedVariants::Tessellation(compiler,native,input,error,unsupported);
 }
 
 bool PipelineCache::GeometryShaders(

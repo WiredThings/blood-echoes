@@ -22,6 +22,7 @@ struct MetalLibraryObjects {
     id<MTLFunction> function{};
     std::string error;
     bool reused{};
+    PersistentFunctionIdentity persistent_identity{};
 };
 
 class LibraryMemo {
@@ -37,13 +38,15 @@ class LibraryMemo {
         std::condition_variable ready;
         bool building{true};
         __weak id<MTLLibrary> library{};
+        PersistentFunctionIdentity persistent_identity{};
     };
     static constexpr size_t Capacity = 1024;
     mutable std::mutex mutex;
     std::unordered_map<Key, std::shared_ptr<Entry>, KeyHash> entries;
     std::atomic<uint64_t> builds{}, hits{}, waits{};
 
-    static Key MakeKey(const std::string& source, const std::string& entry, bool relaxed) {
+    static Key MakeKey(const std::string& source, const std::string& entry, bool relaxed,
+                       std::string_view identity_namespace) {
         CC_SHA256_CTX digest;
         CC_SHA256_Init(&digest);
         const auto update = [&](const void* data, size_t size) {
@@ -59,6 +62,8 @@ class LibraryMemo {
         const uint64_t options[]{1, 0x030100, relaxed ? 1u : 0u, source.size(), entry.size()};
         update(options, sizeof(options)); update(source.data(), source.size());
         update(entry.data(), entry.size());
+        const uint64_t domain_size=identity_namespace.size();
+        update(&domain_size,sizeof(domain_size));update(identity_namespace.data(),identity_namespace.size());
         Key key{}; CC_SHA256_Final(key.data(), &digest);
         return key;
     }
@@ -70,8 +75,8 @@ public:
 
     template <typename Build>
     MetalLibraryObjects Get(const std::string& source, const std::string& entry,
-                            bool relaxed, Build&& build) {
-        const auto key = MakeKey(source, entry, relaxed);
+                            bool relaxed, Build&& build, std::string_view identity_namespace = {}) {
+        const auto key = MakeKey(source, entry, relaxed, identity_namespace);
         std::shared_ptr<Entry> slot;
         {
             std::unique_lock lock{mutex};
@@ -86,9 +91,10 @@ public:
                 id<MTLLibrary> library = slot->library;
                 if (library) {
                     ++hits;
-                    return {library, nil, {}, true};
+                    return {library, nil, {}, true, slot->persistent_identity};
                 }
                 slot->building = true;
+                slot->persistent_identity = {};
             } else {
                 if (entries.size() >= Capacity) {
                     for (auto it = entries.begin(); it != entries.end();) {
@@ -109,9 +115,11 @@ public:
         MetalLibraryObjects result;
         try {
             result = build();
+            if(!result.library || !result.function) result.persistent_identity = {};
         } catch (...) {
             if (slot) {
                 std::scoped_lock lock{mutex};
+                slot->library = nil;slot->persistent_identity = {};
                 slot->building = false; slot->ready.notify_all();
             }
             throw;
@@ -119,6 +127,7 @@ public:
         if (slot) {
             std::scoped_lock lock{mutex};
             slot->library = result.library;
+            slot->persistent_identity = result.library ? result.persistent_identity : PersistentFunctionIdentity{};
             slot->building = false; slot->ready.notify_all();
         }
         return result;

@@ -12,6 +12,7 @@
 #include <vector>
 #include "common/types.h"
 #include "video_core/renderer_metal/mtl_spirv_geometry.h"
+#include "video_core/renderer_metal/mtl_function_identity.h"
 
 namespace Metal {
 
@@ -159,6 +160,10 @@ struct CompiledShader {
     /// id<MTLLibrary> and id<MTLFunction>, retained (+1); for .mm files: (__bridge id<...>).
     void* library{};
     void* function{};
+
+    // Final successful effective source/entry/options/route and module ABI.
+    // Empty means not admitted for persistent artifacts; existing live maps are unchanged.
+    PersistentFunctionIdentity persistent_identity{};
 
     ShaderStage stage{ShaderStage::Unknown};
     std::string entry; ///< MSL function name ("main" becomes "main0")

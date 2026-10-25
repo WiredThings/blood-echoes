@@ -24,6 +24,7 @@
 namespace Metal {
 
 class Device;
+class Runtime;
 
 /// The shader profile of the Metal backend (see mtl_pipeline_cache.mm for each field's source).
 /// `limits` are the cache backend's (Metal::Runtime); the core adds the sparse page shift, paged
@@ -141,7 +142,7 @@ public:
     /// `msl_cache_dir` is the folder of ShaderCompiler / PsoCache (default: <cache>/<title>/metal).
     PipelineCache(Device& device, const VideoCore::BackendLimits& limits,
                   AmdGpu::Liverpool* liverpool, u32 sparse_page_shift,
-                  std::filesystem::path msl_cache_dir = {});
+                  std::filesystem::path msl_cache_dir = {}, Runtime* host_runtime = nullptr);
     ~PipelineCache() override;
 
     /// Null: the draw is dropped (no pipeline can be made for it; see Counters).
@@ -160,6 +161,8 @@ public:
     const ComputeShaderPipeline* GetComputePipeline() {
         return static_cast<const ComputeShaderPipeline*>(PipelineCacheCore::GetComputePipeline());
     }
+
+    void WarmExtraPipelines() override;
 
     PsoCache& GetPsoCache() {
         return pso_cache;
@@ -241,6 +244,9 @@ private:
     void NoteSkipped(const VideoCore::GraphicsPipelineKey& key, std::atomic<u64>& counter,
                      const char* reason);
 
+    void FinishMainPreparation();
+    bool main_preparation_finished{};
+    Runtime* host_runtime{};
     Device& device;
     ShaderCompiler compiler;
     PsoCache pso_cache;

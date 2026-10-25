@@ -226,3 +226,12 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 ### 全目录工具已公开并完成有界实现的实际重扫
 
 四个静态工具及两份作者测试已整理进tools/tests，默认当前源码树vendor，独立最小树入口与23项作者控制通过。FLVER/BHF增加逻辑引用累计预算、共享offset收费及结构化budget缺口，输出逐块编码。重新读完28,852文件/31.4GB，全部SHA与旧台账一致；15,371模型及120,726拆包条目完整，新增预算拒绝0，旧8853/8311程序/代码集合完全一致。184.4秒，独立扫描进程峰值642.9MiB、最高压力1，完整数据只留新Shared目录。唯一right.sprx格式缺口及155材质引用未解决，静态完整PSO仍0，不把目录交付说成所有组合已预编译。见docs/full-game-static-catalog.zh-CN.md与evidence/static-catalog-final-replay/validation-summary.json。
+
+
+### 2026-10-26：真实本机库和最终 PSO 的准备/读取链路已贯通
+
+详见 docs/local-pso-preparation.zh-CN.md。helper v2 的稳定 discovery 与实际 Source/Local 来源已分开；成功函数身份和原游戏冷工厂采用独立严格验证产物，新增无窗口 spec-only 准备器及两个分片发布者/分页 builder。230TU一致重建为52759255…；自编写 VS/FS 7进程681断言、真实FillU32 7进程2138断言通过。三族真实游戏配方生成7条PSO，独立暖进程禁止PSO编译时7/7 strict hit、0 ordinary PSO compile，完整Tess为5条；冷/暖最高压力1、swap+0。当前正常fresh/disk/memo/local身份一致，另有去冗余诊断计数的小补丁尚未合入，不混头/库。
+
+217项当前layout数值、49 Profile字段和7类Writer字节与旧版相等；新的source SHA校验未绕过，旧producer仍unknown。旧输入只作候选重译，游戏不导入Meta/SPV/SRT。公开40项Python控制和22项分页控制通过；4101作者请求可保护停止后续建、跳过已成功项。所有游戏输入/库/PSO和完整配方仅留Shared；源码、作者输入与汇总同步开发分支，Release/正式应用/正式数据不变。
+
+未完成：原启动器自动编排与完整配方分页覆盖、原游戏实际消费、RectList专项、其它helper最终PSO、真实游戏冷暖启动/卡顿/内存对照。当前实际QA包仍是资源回写检查点，不能把新源码说成已安装新QA，更不能标整体目标完成。死亡/在线/菜单仍按用户安排暂缓；白模不扩新假设。

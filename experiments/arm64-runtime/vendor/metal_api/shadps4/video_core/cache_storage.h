@@ -20,8 +20,11 @@ enum class BlobType : u32 {
     ShaderBinary,
     PipelineKey,
     ShaderProfile,
+    HostPipelineRecipe, // independent bounded helper metadata; old enum values unchanged
 };
 
+enum class BoundedStop {End,Unavailable,Cancelled,ItemLimit,ScanLimit,Io};
+struct BoundedReadResult {size_t delivered{},scanned{},rejected{};BoundedStop stop=BoundedStop::End;bool complete()const{return stop==BoundedStop::End;}};
 class DataBase {
 public:
     static DataBase& Instance() {
@@ -50,6 +53,10 @@ public:
     void Load(BlobType type, const std::string& name, std::vector<u32>& data);
 
     void ForEachBlob(BlobType type, const std::function<void(std::vector<u8>&& data)>& func);
+    // Preparation only: bound matching files AND allocation size before reading.
+    // Returning false stops admission without touching remaining existing blobs.
+    BoundedReadResult ForEachBlobBounded(BlobType type, std::string_view prefix, size_t max_count,
+        size_t max_bytes, const std::function<bool(std::string_view,std::vector<u8>&&)>& func) noexcept;
 
 private:
     std::jthread io_worker{};

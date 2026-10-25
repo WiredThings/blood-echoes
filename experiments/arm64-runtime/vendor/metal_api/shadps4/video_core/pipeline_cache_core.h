@@ -137,6 +137,8 @@ public:
     virtual ~PipelineCacheCore();
 
     void WarmUp();
+    // Backend extras use the same open read-only store, before FinishPreload.
+    virtual void WarmExtraPipelines() {}
     void Sync();
 
     /// Purely owned compilation with the caller's independent context. No cache-table mutation,

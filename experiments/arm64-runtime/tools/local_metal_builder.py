@@ -302,7 +302,7 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None):
     # Do not move path resolution, imports, enumeration, hashes or services above this gate.
     if not enabled:return dict(status='off',build_id=None,built=0,skipped=0)
     summary=dict(status='failed',build_id=None,built=0,skipped=0,requests=0,results=[])
-    observer=None;lock_fd=None;summary_path=None
+    observer=None;lock_fd=None;summary_path=None;index=None;results_fd=None;results_tmp=None
     try:
         if type(cohort)is not str or not HEX.fullmatch(cohort):raise Refused('cohort must be lowercase 64-hex')
         root=checked_root(root);folder=child_directory(root,cohort);requests=child_directory(folder,'requests')
@@ -317,8 +317,16 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None):
         if(guard is None)!=(toolchain is None):raise Refused('internal test services must be supplied together')
         if guard is None:observer,guard,toolchain=real_services(private_tmp)
         guard.check(preflight=True)
-        recovery={};pins={}
-        keys=request_keys(requests,recovery=recovery,pins=pins);summary['requests']=len(keys);summary['request_recovery']=recovery
+        from paged_metal_requests import RequestIndex,PAGE_MAX
+        index=RequestIndex(requests,private_tmp,guard,api=__import__('sys').modules[__name__])
+        summary['requests']=index.request_count;summary['request_recovery']=index.recovery()
+        results_fd,results_tmp=tempfile.mkstemp(prefix='builder-results-',suffix='.jsonl',dir=private_tmp)
+        def record_result(value):
+            if len(summary['results'])<PAGE_MAX:summary['results'].append(value)
+            else:summary['results_preview_truncated']=True
+            encoded=canonical(value)+b'\n'
+            if os.write(results_fd,encoded)!=len(encoded):raise Refused('short result log write')
+        for deferred in index.deferred():record_result(deferred)
         build_id,manifest=toolchain.identify(guard)
         if not HEX.fullmatch(build_id)or digest(canonical(manifest))!=build_id:raise Refused('invalid toolchain build identity')
         summary['build_id']=build_id
@@ -327,11 +335,12 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None):
         if os.path.lexists(build_record):
             if canonical(read_json(build_record))!=canonical(manifest):raise Refused('existing build manifest identity mismatch')
         else:atomic_json(build_record,manifest)
-        for key in keys:
+        for batch in index.batches():
+          for key in batch:
             guard.check(preflight=True)
-            request,source=load_request(requests,key,cohort,pins=pins)
+            request,source=index.load_owned(key,cohort)
             if already_succeeded(artifacts,request,build_id):
-                summary['skipped']+=1;summary['results'].append(dict(key=key,status='skipped-verified'));continue
+                summary['skipped']+=1;record_result(dict(key=key,status='skipped-verified'));continue
             with tempfile.TemporaryDirectory(prefix=key+'-',dir=private_tmp)as scratch:
                 scratch=Path(scratch);snapshot=scratch/'source.metal';air=scratch/'output.air';library=scratch/'output.metallib'
                 write_new(snapshot,source);del source
@@ -350,14 +359,29 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None):
                 fd=os.open(artifacts,os.O_RDONLY|os.O_DIRECTORY)
                 try:os.fsync(fd)
                 finally:os.close(fd)
-            summary['built']+=1;summary['results'].append(dict(key=key,status='built'))
-        summary['status']='partial'if recovery['deferred_unpaired']else'passed'
+            summary['built']+=1;record_result(dict(key=key,status='built'))
+        summary['status']='partial'if index.deferred_count else'passed'
+        summary['request_window']=dict(max_batch=index.max_batch_len,max_final_pins=index.max_pin_count)
     except KeyboardInterrupt:
         summary['status']='stopped';summary['error']='interrupted'
     except Exception as error:
         summary['status']='stopped'if isinstance(error,Stopped)else'refused'if isinstance(error,(Refused,OSError,ValueError,TypeError))else'failed'
         summary['error']=str(error)[:1024]
     finally:
+        if results_fd is not None:
+            try:
+                os.fsync(results_fd);os.close(results_fd);results_fd=None
+                result_path=summary_path.parent/'builder-results.jsonl'
+                os.replace(results_tmp,result_path);results_tmp=None
+                summary['results_jsonl']=str(result_path)
+            except Exception as error:
+                if summary['status']!='stopped':summary['status']='failed'
+                summary['results_write_error']=str(error)[:512]
+        if index is not None:
+            try:index.close()
+            except Exception as error:
+                if summary['status']!='stopped':summary['status']='failed'
+                summary['index_cleanup_error']=str(error)[:512]
         if summary_path is not None:
             try:atomic_json(summary_path,summary)
             except Exception as error:

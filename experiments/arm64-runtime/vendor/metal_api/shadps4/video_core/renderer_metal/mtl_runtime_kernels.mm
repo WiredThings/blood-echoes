@@ -7,6 +7,11 @@
 #include <string>
 #include <cstring>
 #include <memory>
+#include <chrono>
+#include <sys/sysctl.h>
+#include "common/scope_exit.h"
+#include "video_core/cache_storage.h"
+#include "video_core/renderer_metal/mtl_pso_cache.h"
 #include "video_core/texture_cache/tile_manager.h"
 #include "bb_tiler_bounds.h"
 
@@ -49,6 +54,11 @@ NSString* const FillSource = @"#include <metal_stdlib>\n"
     "    }\n"
     "}\n";
 
+NSString* const InlineUpdateSource=@"#include <metal_stdlib>\nusing namespace metal;\n"
+    "kernel void inline_update(device uint* dst [[buffer(0)]], "
+    "constant uint* src [[buffer(1)]], uint i [[thread_position_in_grid]]) { dst[i] = src[i]; }\n";
+NSString* const RenderInlineUpdateSource=@"#include <metal_stdlib>\nusing namespace metal;\nvertex void update(device uint* dst[[buffer(0)]],constant uint* src[[buffer(1)]],uint i[[vertex_id]]){dst[i]=src[i];}\n";
+
 MTLCompileOptions* CompileOptions() {
     // The options of mtl_shader.mm: Metal 3.1, no fast math (the host shaders are SPIR-V ports).
     MTLCompileOptions* options = [MTLCompileOptions new];
@@ -86,6 +96,8 @@ HostKernels::HostKernels(Device::Impl& dev_, Scheduler& scheduler_)
 
 HostKernels::~HostKernels() = default;
 
+#include "video_core/renderer_metal/mtl_host_pso_prepare.inc"
+
 u32 HostKernels::BufferSlot(const H::Shader& shader, u32 binding) {
     for (const H::Binding& b : shader.bindings) {
         if (b.kind == H::Binding::Kind::Buffer && b.set == 0 && b.binding == binding) {
@@ -95,10 +107,13 @@ u32 HostKernels::BufferSlot(const H::Shader& shader, u32 binding) {
     UNREACHABLE_MSG("Host shader without buffer binding {}", binding);
 }
 
-id<MTLLibrary> HostKernels::Library(const H::Shader& shader, MTLFunctionConstantValues* values, bool source_only, id<MTLFunction> __strong* prepared) {
+id<MTLLibrary> HostKernels::Library(const H::Shader& shader, MTLFunctionConstantValues* values, bool source_only, id<MTLFunction> __strong* prepared,LocalLibrary::Origin* origin) {
     if (const auto it = libraries.find(&shader); !source_only && it != libraries.end()) {
-        return it->second;
+        if(origin)*origin=it->second.origin;
+        return it->second.library;
     }
+    if(origin)*origin={};
+    LocalLibrary::Origin actual_origin;
     NSString* source = [[NSString alloc] initWithBytes:shader.msl.data()
                                                 length:shader.msl.size()
                                               encoding:NSUTF8StringEncoding];
@@ -112,26 +127,32 @@ id<MTLLibrary> HostKernels::Library(const H::Shader& shader, MTLFunctionConstant
                 : [local newFunctionWithName:entry constantValues:values error:nil];
             if (prepared) *prepared = function;
             return bool(function);
-        }, !source_only);
+        }, !source_only, &actual_origin);
+    if(warming&&!library)return nil;
     ASSERT_MSG(library, "Host shader '{}' did not compile: {}", std::string(shader.entry),
                ErrorText(error));
-    libraries.insert_or_assign(&shader, library);
+    if(origin)*origin=actual_origin;
+    if(!warming)libraries.insert_or_assign(&shader,LibraryRecord{library,std::move(actual_origin)});
     return library;
 }
 
-id<MTLFunction> HostKernels::Function(const H::Shader& shader, const u32* constants, u32 count) {
+id<MTLFunction> HostKernels::Function(const H::Shader& shader, const u32* constants, u32 count,LocalLibrary::Origin* origin) {
+    if(origin)*origin={};
+    LocalLibrary::Origin actual_origin;
     NSString* entry = [[NSString alloc] initWithBytes:shader.entry.data()
                                                length:shader.entry.size()
                                              encoding:NSUTF8StringEncoding];
     id<MTLFunction> function = nil;
     if (shader.spec_constants.empty()) {
-        id<MTLLibrary> library = Library(shader, nil, false, &function);
+        id<MTLLibrary> library = Library(shader, nil, false, &function,&actual_origin);
         if (!function) function = [library newFunctionWithName:entry];
         if (!function) {
-            library = Library(shader, nil, true, &function);
+            library = Library(shader, nil, true, &function,&actual_origin);
             if (!function) function = [library newFunctionWithName:entry];
         }
+        if(warming&&!function)return nil;
         ASSERT_MSG(function, "Host shader function '{}' not found", std::string(shader.entry));
+        if(function&&origin)*origin=actual_origin;
         return function;
     }
     MTLFunctionConstantValues* values = [MTLFunctionConstantValues new];
@@ -158,24 +179,29 @@ id<MTLFunction> HostKernels::Function(const H::Shader& shader, const u32* consta
         }
     }
     NSError* error = nil;
-    id<MTLLibrary> library = Library(shader, values, false, &function);
+    id<MTLLibrary> library = Library(shader, values, false, &function,&actual_origin);
     if (!function) function = [library newFunctionWithName:entry constantValues:values error:&error];
     if (!function) {
-        library = Library(shader, values, true, &function);
+        library = Library(shader, values, true, &function,&actual_origin);
         if (!function) function = [library newFunctionWithName:entry constantValues:values error:&error];
     }
+    if(warming&&!function)return nil;
     ASSERT_MSG(function, "Host shader function '{}' with constants failed: {}",
                std::string(shader.entry), ErrorText(error));
+    if(function&&origin)*origin=actual_origin;
     return function;
 }
 
 id<MTLComputePipelineState> HostKernels::ComputePipeline(const H::Shader& shader,
                                                          const u32* constants, u32 count,
-                                                         NSString* label) {
-    id<MTLFunction> function = Function(shader, constants, count);
+                                                         NSString* label, HostPso::Invocation invocation) {
+    std::array<LocalLibrary::Origin,1> origins;
+    id<MTLFunction> function = Function(shader, constants, count,&origins[0]);
     NSError* error = nil;
-    id<MTLComputePipelineState> pipeline =
-        [dev.device newComputePipelineStateWithFunction:function error:&error];
+    auto* descriptor=(MTLComputePipelineDescriptor*)Descriptor(invocation);
+    descriptor.computeFunction=function;
+    id<MTLComputePipelineState> pipeline = function?MakeCompute(descriptor,invocation,origins,&error):nil;
+    if(warming&&!pipeline)return nil;
     ASSERT_MSG(pipeline, "Compute pipeline '{}' failed: {}", label.UTF8String, ErrorText(error));
     return pipeline;
 }
@@ -192,7 +218,7 @@ id<MTLComputePipelineState> HostKernels::Tiling(const VideoCore::TilingDispatch&
     // Canonicalize the actual defaults, so omitted parameters cannot collide with
     // a caller that explicitly supplies a different value for the same constant.
     std::copy_n(constants.begin(), 12, std::get<2>(key).begin());
-    if (const auto it = tiling.find(key); it != tiling.end()) {
+    if (const auto it = tiling.find(key); !warming && it != tiling.end()) {
         return it->second;
     }
     NSString* label = [NSString stringWithFormat:@"tiling %@ %u %s",
@@ -200,20 +226,25 @@ id<MTLComputePipelineState> HostKernels::Tiling(const VideoCore::TilingDispatch&
                                                  dispatch.key.num_bits,
                                                  dispatch.key.is_tiler ? "tiler" : "detiler"];
     LOG_INFO(Render, "Creating tiling pipeline {}", label.UTF8String);
+    HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::Tiling;
+    invocation.bits=dispatch.key.num_bits;invocation.macro=dispatch.is_macro;invocation.bounded=bounded;
+    invocation.count=constants.size();invocation.provided=constants;
     id<MTLComputePipelineState> pipeline =
-        ComputePipeline(shader, constants.data(), constants.size(), label);
-    tiling.emplace(key, pipeline);
+        ComputePipeline(shader, constants.data(), constants.size(), label,invocation);
+    if(!warming)tiling.emplace(key, pipeline);
     return pipeline;
 }
 
 id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDispatch& dispatch, bool proxy) {
     ASSERT(dispatch.num_constants <= dispatch.constants.size());
-    const auto key=std::make_pair(proxy,TilingKey{dispatch.key.num_bits, true, dispatch.constants, VideoCore::TilerBounds::Enabled(dispatch)});
-    if(const auto i=texture_tiling.find(key);i!=texture_tiling.end())return i->second;
-    if(texture_tiling.size()>=32)return nil;
+    const auto canonical=VideoCore::TilerBounds::Constants(std::span(dispatch.constants).first(dispatch.num_constants),TilingShader(dispatch.key.num_bits,true).spec_constants,VideoCore::TilerBounds::Enabled(dispatch));
+    std::array<u32,12> key_values{};std::copy_n(canonical.begin(),12,key_values.begin());
+    const auto key=std::make_pair(proxy,TilingKey{dispatch.key.num_bits, true, key_values, VideoCore::TilerBounds::Enabled(dispatch)});
+    if(const auto i=texture_tiling.find(key);!warming&&i!=texture_tiling.end())return i->second;
+    if(!warming&&texture_tiling.size()>=32)return nil;
     const auto& shader=TilingShader(dispatch.key.num_bits,true);
     const auto source=TextureTilingSource(shader.msl,dispatch.key.num_bits==64);
-    if(source.empty()) {texture_tiling.emplace(key,nil);return nil;}
+    if(source.empty()) {if(!warming)texture_tiling.emplace(key,nil);return nil;}
     NSError* error=nil;
     MTLFunctionConstantValues* values=[MTLFunctionConstantValues new];
     for(const auto& spec:shader.spec_constants) {
@@ -230,64 +261,85 @@ id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDi
     [values setConstantValue:&bounded type:MTLDataTypeBool atIndex:13];
     const u32 scale=proxy?2u:1u;[values setConstantValue:&scale type:MTLDataTypeUInt atIndex:12];
     id<MTLFunction> function=nil;
+    std::array<LocalLibrary::Origin,1> origins;
     auto library=LocalLibrary::Build(dev.device, @(source.c_str()), CompileOptions(), &error,
         [&](id<MTLLibrary> local) {
             function=[local newFunctionWithName:@"main0" constantValues:values error:nil];
             return bool(function);
-        });
+        },true,&origins[0]);
     if(!function&&library)function=[library newFunctionWithName:@"main0" constantValues:values error:&error];
-    auto pipeline=function?[dev.device newComputePipelineStateWithFunction:function error:&error]:nil;
+    HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::TextureTiling;
+    invocation.bits=dispatch.key.num_bits;invocation.macro=1;invocation.proxy=proxy;invocation.bounded=bounded;invocation.count=dispatch.num_constants;
+    std::copy_n(dispatch.constants.begin(),dispatch.num_constants,invocation.provided.begin());
+    auto* descriptor=(MTLComputePipelineDescriptor*)Descriptor(invocation);descriptor.computeFunction=function;
+    auto pipeline=function?MakeCompute(descriptor,invocation,origins,&error):nil;
     if(!pipeline)LOG_WARNING(Render,"Texture tiling unavailable; original staging retained: {}",ErrorText(error));
-    texture_tiling.emplace(key,pipeline);
+    if(!warming)texture_tiling.emplace(key,pipeline);
     return pipeline;
 }
 
-void HostKernels::CreateFaultParser(u32 page_bits, u32 max_faults) {
+void HostKernels::ConfigureFaultParser(u32 page_bits,u32 max_faults){
+    fault_arguments={page_bits,max_faults};fault_known=true;fault_with_cache=false;fault_parser=nil;
+}
+id<MTLComputePipelineState> HostKernels::FaultParser(){
+    if(!fault_parser&&fault_known){const bool ok=CreateFaultParser(fault_arguments[0],fault_arguments[1]);ASSERT_MSG(ok,"Fault parser actual creation failed");}
+    return fault_parser;
+}
+bool HostKernels::CreateFaultParser(u32 page_bits, u32 max_faults) {
     const std::array<u32, 2> constants{page_bits, max_faults};
-    fault_parser = ComputePipeline(H::FAULT_BUFFER_PROCESS_COMP, constants.data(),
-                                   static_cast<u32>(constants.size()), @"Fault Buffer Parser");
+    HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::FaultParser;invocation.count=2;
+    invocation.provided[0]=page_bits;invocation.provided[1]=max_faults;
+    auto result=ComputePipeline(H::FAULT_BUFFER_PROCESS_COMP, constants.data(),
+                                   static_cast<u32>(constants.size()), @"Fault Buffer Parser",invocation);
+    if (!result) return false;
+    if(!warming){fault_parser=result;fault_known=true;fault_arguments=constants;fault_with_cache=bool(pso_cache);}
+    return true;
 }
 
 id<MTLComputePipelineState> HostKernels::InlineUpdate() {
-    if (!inline_update_tried) {
-        inline_update_tried = true;
-        @autoreleasepool {
-            NSError* error = nil;
-            NSString* source = @"#include <metal_stdlib>\nusing namespace metal;\n"
-                "kernel void inline_update(device uint* dst [[buffer(0)]], "
-                "constant uint* src [[buffer(1)]], uint i [[thread_position_in_grid]]) "
-                "{ dst[i] = src[i]; }\n";
-            auto library = Metal::LocalLibrary::Build(dev.device, source, CompileOptions(), &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"inline_update"}); });
-            auto function = library ? [library newFunctionWithName:@"inline_update"] : nil;
-            inline_update = function ? [dev.device newComputePipelineStateWithFunction:function error:&error] : nil;
-            if (!inline_update) LOG_WARNING(Render, "Inline update unavailable; retaining staging copy: {}", ErrorText(error));
-        }
+    if(!warming&&inline_update_tried)return inline_update;
+    const bool previous_tried=inline_update_tried;inline_update_tried=true;
+    SCOPE_EXIT{if(warming)inline_update_tried=previous_tried;};
+    @autoreleasepool {
+      std::array<LocalLibrary::Origin,1> origins;
+      NSError*error=nil;auto library=LocalLibrary::Build(dev.device,InlineUpdateSource,CompileOptions(),&error,[](id<MTLLibrary>local){return LocalLibrary::PlainEntries(local,{@"inline_update"});},true,&origins[0]);
+      auto function=library?[library newFunctionWithName:@"inline_update"]:nil;
+      HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::InlineUpdate;
+      auto*descriptor=(MTLComputePipelineDescriptor*)Descriptor(invocation);descriptor.computeFunction=function;
+      auto result=function?MakeCompute(descriptor,invocation,origins,&error):nil;
+      if(!warming)inline_update=result;
+      if(!result)LOG_WARNING(Render,"Inline update unavailable; retaining staging copy: {}",ErrorText(error));
+      return result;
     }
-    return inline_update;
 }
 id<MTLRenderPipelineState> HostKernels::RenderInlineUpdate() {
-    if(!render_inline_update_tried) {
-        render_inline_update_tried=true;
-        @autoreleasepool {
-            NSError* error=nil;
-            auto library=Metal::LocalLibrary::Build(dev.device, @"#include <metal_stdlib>\nusing namespace metal;\nvertex void update(device uint* dst[[buffer(0)]],constant uint* src[[buffer(1)]],uint i[[vertex_id]]){dst[i]=src[i];}\n", CompileOptions(), &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"update"}); });
-            auto descriptor=[MTLRenderPipelineDescriptor new];
-            descriptor.vertexFunction=library ? [library newFunctionWithName:@"update"] : nil;
-            descriptor.rasterizationEnabled=NO;
-            if(descriptor.vertexFunction)render_inline_update=[dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error];
-            if(!render_inline_update)LOG_WARNING(Render,"Render inline update unavailable; retaining compute: {}",ErrorText(error));
-        }
+    if(!warming&&render_inline_update_tried)return render_inline_update;
+    const bool previous_tried=render_inline_update_tried;render_inline_update_tried=true;
+    SCOPE_EXIT{if(warming)render_inline_update_tried=previous_tried;};
+    @autoreleasepool {
+      std::array<LocalLibrary::Origin,1> origins;
+      NSError*error=nil;auto library=LocalLibrary::Build(dev.device,RenderInlineUpdateSource,CompileOptions(),&error,[](id<MTLLibrary>local){return LocalLibrary::PlainEntries(local,{@"update"});},true,&origins[0]);
+      HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::RenderInlineUpdate;
+      auto*descriptor=(MTLRenderPipelineDescriptor*)Descriptor(invocation);descriptor.vertexFunction=library?[library newFunctionWithName:@"update"]:nil;
+      auto result=descriptor.vertexFunction?MakeRender(descriptor,invocation,origins,&error):nil;
+      if(!warming)render_inline_update=result;
+      if(!result)LOG_WARNING(Render,"Render inline update unavailable; retaining compute: {}",ErrorText(error));
+      return result;
     }
-    return render_inline_update;
 }
 
 id<MTLComputePipelineState> HostKernels::FillU32() {
-    if (!fill_u32) {
+    if (warming || !fill_u32) {
         NSError* error = nil;
-        id<MTLLibrary> library = Metal::LocalLibrary::Build(dev.device, FillSource, CompileOptions(), &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"fill_u32"}); });
+        std::array<LocalLibrary::Origin,1> origins;
+        id<MTLLibrary> library = Metal::LocalLibrary::Build(dev.device, FillSource, CompileOptions(), &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"fill_u32"}); },true,&origins[0]);
+        if(warming&&!library)return nil;
         ASSERT_MSG(library, "fill_u32 did not compile: {}", ErrorText(error));
-        fill_u32 = [dev.device newComputePipelineStateWithFunction:[library newFunctionWithName:@"fill_u32"]
-                                                             error:&error];
+        HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::Fill;
+        auto* descriptor=(MTLComputePipelineDescriptor*)Descriptor(invocation);descriptor.computeFunction=[library newFunctionWithName:@"fill_u32"];
+        auto result=MakeCompute(descriptor,invocation,origins,&error);
+        if(warming)return result;
+        fill_u32=result;
         ASSERT_MSG(fill_u32, "fill_u32 pipeline failed: {}", ErrorText(error));
     }
     return fill_u32;
@@ -296,40 +348,38 @@ id<MTLComputePipelineState> HostKernels::FillU32() {
 id<MTLRenderPipelineState> HostKernels::MsCopyPipeline(u32 samples, MTLPixelFormat format,
                                                        bool src_msaa) {
     const auto key = std::make_tuple(samples, static_cast<u32>(format), src_msaa);
-    if (const auto it = ms_copy.find(key); it != ms_copy.end()) {
+    if (const auto it = ms_copy.find(key); !warming && it != ms_copy.end()) {
         return it->second;
     }
-    MTLRenderPipelineDescriptor* descriptor = [MTLRenderPipelineDescriptor new];
-    descriptor.label = [NSString stringWithFormat:@"Image to MS image %u", samples];
-    descriptor.vertexFunction = Function(H::FS_TRI_VERT, nullptr, 0);
+    HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::MsCopy;invocation.samples=samples;invocation.format=u32(format);invocation.src_msaa=src_msaa;
+    auto* descriptor=(MTLRenderPipelineDescriptor*)Descriptor(invocation);
+    std::array<LocalLibrary::Origin,2> origins;
+    descriptor.vertexFunction = Function(H::FS_TRI_VERT, nullptr, 0,&origins[0]);
     descriptor.fragmentFunction =
-        Function(src_msaa ? H::MS_IMAGE_BLIT_MSAA_FRAG : H::MS_IMAGE_BLIT_FRAG, nullptr, 0);
-    descriptor.rasterSampleCount = samples;
-    descriptor.colorAttachments[0].pixelFormat = format;
+        Function(src_msaa ? H::MS_IMAGE_BLIT_MSAA_FRAG : H::MS_IMAGE_BLIT_FRAG, nullptr, 0,&origins[1]);
     NSError* error = nil;
-    id<MTLRenderPipelineState> pipeline =
-        [dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+    id<MTLRenderPipelineState> pipeline = MakeRender(descriptor,invocation,origins,&error);
+    if(warming&&!pipeline)return nil;
     ASSERT_MSG(pipeline, "MS copy pipeline failed: {}", ErrorText(error));
-    ms_copy.emplace(key, pipeline);
+    if(!warming)ms_copy.emplace(key, pipeline);
     return pipeline;
 }
 
 id<MTLRenderPipelineState> HostKernels::MsDepthPipeline(u32 samples, MTLPixelFormat format) {
     const auto key = std::make_pair(samples, static_cast<u32>(format));
-    if (const auto it = ms_depth.find(key); it != ms_depth.end()) {
+    if (const auto it = ms_depth.find(key); !warming && it != ms_depth.end()) {
         return it->second;
     }
-    MTLRenderPipelineDescriptor* descriptor = [MTLRenderPipelineDescriptor new];
-    descriptor.label = [NSString stringWithFormat:@"Color to MS depth %u", samples];
-    descriptor.vertexFunction = Function(H::FS_TRI_VERT, nullptr, 0);
-    descriptor.fragmentFunction = Function(H::COLOR_TO_MS_DEPTH_FRAG, nullptr, 0);
-    descriptor.rasterSampleCount = samples;
-    descriptor.depthAttachmentPixelFormat = format;
+    HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::MsDepth;invocation.samples=samples;invocation.format=u32(format);
+    auto* descriptor=(MTLRenderPipelineDescriptor*)Descriptor(invocation);
+    std::array<LocalLibrary::Origin,2> origins;
+    descriptor.vertexFunction = Function(H::FS_TRI_VERT, nullptr, 0,&origins[0]);
+    descriptor.fragmentFunction = Function(H::COLOR_TO_MS_DEPTH_FRAG, nullptr, 0,&origins[1]);
     NSError* error = nil;
-    id<MTLRenderPipelineState> pipeline =
-        [dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+    id<MTLRenderPipelineState> pipeline = MakeRender(descriptor,invocation,origins,&error);
+    if(warming&&!pipeline)return nil;
     ASSERT_MSG(pipeline, "Color to MS depth pipeline failed: {}", ErrorText(error));
-    ms_depth.emplace(key, pipeline);
+    if(!warming)ms_depth.emplace(key, pipeline);
     return pipeline;
 }
 
@@ -452,7 +502,7 @@ bool Runtime::DownloadTiledImage(VideoCore::Image* image, const VideoCore::Tilin
 }
 
 void Runtime::CreateFaultParser(u32 page_bits, u32 max_faults) {
-    impl->kernels.CreateFaultParser(page_bits, max_faults);
+    impl->kernels.ConfigureFaultParser(page_bits, max_faults);
 }
 
 void Runtime::ParseFaultBuffer(const VideoCore::FaultParseDispatch& dispatch) {

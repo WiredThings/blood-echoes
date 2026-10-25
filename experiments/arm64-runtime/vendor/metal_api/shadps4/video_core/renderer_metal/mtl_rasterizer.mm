@@ -203,7 +203,7 @@ Rasterizer::Rasterizer(Device& device_, Scheduler& scheduler_, Runtime& runtime_
     impl->runtime_ptr = &runtime;
     impl->scheduler_ptr = &scheduler;
     pipeline_cache = std::make_unique<PipelineCache>(device, runtime.Limits(), liverpool,
-                                                     buffer_cache.GetSparsePageShift());
+                                                     buffer_cache.GetSparsePageShift(), std::filesystem::path{}, &runtime);
     // Before the rasterizer is bound: Liverpool enqueues buffers only once it sees it.
     draw_prep = std::make_unique<Vulkan::DrawPreparation>(*pipeline_cache);
     // Scene services (P5.4, P7.5): the camera motion, the reduced scene targets of the live

@@ -448,6 +448,7 @@ void PipelineCacheCore::WarmUp() {
                     num_total_pipelines - num_pipelines);
     }
 
+    WarmExtraPipelines();
     Storage::DataBase::Instance().FinishPreload();
 }
 
