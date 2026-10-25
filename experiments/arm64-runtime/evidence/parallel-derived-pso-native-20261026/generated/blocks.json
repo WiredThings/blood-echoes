@@ -1,0 +1,14 @@
+[
+  {
+    "name": "no_depth",
+    "source": "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/parallel-pso-coverage-20261026/proposed/mtl_rasterizer.mm",
+    "start_line": 989,
+    "block_sha256": "0d90a67fd8466437e2d4a130065a75914b92f9aab36a84a3875561072b270729"
+  },
+  {
+    "name": "velocity",
+    "source": "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/parallel-pso-coverage-20261026/proposed/mtl_rasterizer.mm",
+    "start_line": 1867,
+    "block_sha256": "2de9f2388fbb66a403913a1b1129145048fe214b8d4edd2b21cf18b815aa94d4"
+  }
+]

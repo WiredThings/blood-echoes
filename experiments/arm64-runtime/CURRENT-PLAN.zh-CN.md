@@ -218,3 +218,7 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 完整配方只读盘点另得基线同profile域额外1,016个逐blob配方，其中1,006无已知motion/GS-span拒载标记，但只增加5个程序/阶段对，不能作为1,006个语义不同或已准入的PSO。长编译37a8af3d的完整引用已定位；保留原cache-local permutation命名空间，不直接合并索引或改旧缓存。
 
 两处portable派生PSO缺少RegisterPipelineData已形成小补丁，正在私有新cohort完整重建并准备原生descriptor/像素/跨进程archive回归；此时尚未合入公共运行时或更新QA。其它helper的typed constants和最终PSO准备另有私有草稿，未编译验证，不能用旧模块AOT测试为它背书。正式应用、存档、设置、缓存和Release均不变。
+
+### 派生key原生回归续进
+
+上述新cohort完整230TU已重建为d2389413；真实Metal/Storage/原WarmUp在seed及独立warm进程分别通过260/192项断言，strict archive命中2/2，native无深度附件与原VS/FS的RGBA16Float像素/速度值读回正确。重复16次不登记、不新建、不重写key；失败/motion拒录保留。详见docs/derived-pipeline-warmup.zh-CN.md。两处12行持久化成功分支已纳入开发源码，未更新QA/正式应用；整场景命中率、启动/卡顿和内存对照仍待。其它helper草稿只在私有目录修复，尚未合入。

@@ -1,0 +1,39 @@
+{
+  "status": "frozen-real-native-author-controls-passed",
+  "production_source_modified": false,
+  "game_launched": false,
+  "existing_cache_walker": false,
+  "source_root": "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/pso-derived-integration/local/overlay",
+  "binary": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-native-1792950118685264000-attempt2/derived-native",
+  "binary_sha256": "3f59a7dcecd0475fd847a445d237c3f62737ae850cf29756e07adc69b335161f",
+  "library": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-gpu-1792949840875543000/libbbgpu.derived-pso-1792949840901813000.dylib",
+  "library_sha256": "d23894136ecd8df8109850d92bfc82399d0939dd2fbed1ce666dde6366ea26be",
+  "validation_sha256": "19cd93564448b7d1bec0a14857d69d9c6bdbe84f5b758b1922209e47dd117224",
+  "report_sha256": "f957c8e377e78013715c55ae518dbb510b894244db53c8f1c1c6ab12c51855ff",
+  "files": {
+    "warm.log": "f1e00417e69333bfadaf64c812f745bdafbb0769d8d9f7107a231dfd1506a270",
+    "make_branch_controls.py": "e8e028cf878f4bca09ebf7d2cc131fc015be2e53d39d74bb5c01c712cf8105fc",
+    "derived_native.mm": "fd5854c89f6c8a55f46e267fc62107da08bd058b7384b9e37f7d8ea458e28028",
+    "authored.vert": "9aff853b7349c7ed54fb5bb380275acfad80c8fc0b3851e7cd0ba261eacb6b88",
+    "seed.log": "a250a337f93bea95392006b8f7b4e972b8f9e8b299ee02a3401c2a4123119b30",
+    "run_native.py": "05263d09e737c0802d1e04567ce79cf20af1d269cc0b8b2bd3d562437d0317ce",
+    "syntax-attempt1.log": "ad6dbcc0710ee13e73f2ddbc96276fed6a031751f787648f883a28aa520eeb43",
+    "validation.json": "19cd93564448b7d1bec0a14857d69d9c6bdbe84f5b758b1922209e47dd117224",
+    "README.zh-CN.md": "f957c8e377e78013715c55ae518dbb510b894244db53c8f1c1c6ab12c51855ff",
+    "syntax.log": "ad6dbcc0710ee13e73f2ddbc96276fed6a031751f787648f883a28aa520eeb43",
+    "syntax.json": "ccd1ca754665627e4c931c8a47e8759b4edf8a761d96476a22bded7efdc7c248",
+    "authored.frag": "da915897c6fd6d2fbb5a0b6cf3521f74df412e5fb1ea2544da90666ec7dbb1b9",
+    "build.json": "84d956f1b72c95d616802d44bfcece30786963293fdcbad9810c8c9071f0859b",
+    "build_native.py": "f944b416897131e0fd1ad17fa459fc3d26d6b63b7cf85a80c079254c8f5ef785",
+    "build.log": "32d1b5999d091e992b7994df069586ce154634ed39a56219572ce661d6af0eb5"
+  },
+  "native_checks": 452,
+  "strict_warm_hits": 2,
+  "bounds": [
+    "author shaders and new disk storage only",
+    "real original loader/SPIRV-Cross/native PsoCache",
+    "no full Rasterizer eligibility or gameplay performance claim",
+    "source-library PSO archive route; local AOT off",
+    "first fixture failure preserved in attempt1"
+  ]
+}

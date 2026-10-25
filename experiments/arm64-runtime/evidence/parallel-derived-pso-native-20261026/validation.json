@@ -1,0 +1,332 @@
+{
+  "before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 7386.6875
+  },
+  "state": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/state/derived-pso-native-1792950118685264000-attempt2",
+  "build": {
+    "binary": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-native-1792950118685264000-attempt2/derived-native",
+    "binary_sha256": "3f59a7dcecd0475fd847a445d237c3f62737ae850cf29756e07adc69b335161f",
+    "library": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-gpu-1792949840875543000/libbbgpu.derived-pso-1792949840901813000.dylib",
+    "library_sha256": "d23894136ecd8df8109850d92bfc82399d0939dd2fbed1ce666dde6366ea26be",
+    "source_root": "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/pso-derived-integration/local/overlay",
+    "execution_root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-native-1792950118685264000-attempt2",
+    "compile": [
+      "/usr/bin/clang++",
+      "-c",
+      "-o",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-native-1792950118685264000-attempt2/derived-native.o",
+      "-I/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/parallel-derived-pso-native-20261026",
+      "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/tests/metal",
+      "-I/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/pso-derived-integration/local/overlay/vendor/metal_api",
+      "-I/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/pso-derived-integration/local/overlay/vendor/metal_api/shim",
+      "-I/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/pso-derived-integration/local/overlay/vendor/metal_api/shadps4",
+      "-DFMT_SHARED",
+      "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/metal_api/shim",
+      "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/metal_api/shadps4",
+      "-I/private/tmp/blood-echoes-arm64-metal-20261023/build/include",
+      "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/metal_api/third_party/half/include",
+      "-I/opt/homebrew/Cellar/ffmpeg/8.1/include",
+      "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/metal_api/third_party/sirit/src/../include",
+      "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/metal_api/third_party/sirit/externals/SPIRV-Headers/include",
+      "-isystem",
+      "/opt/homebrew/include",
+      "-isystem",
+      "/private/tmp/bbport-perf-deps/include",
+      "-isystem",
+      "/opt/homebrew/Cellar/xxhash/0.8.4/include",
+      "-isystem",
+      "/opt/homebrew/include/miniz",
+      "-x",
+      "objective-c++",
+      "-O3",
+      "-std=gnu++23",
+      "-arch",
+      "arm64",
+      "-mmacosx-version-min=26.0",
+      "-fPIE",
+      "-fno-omit-frame-pointer",
+      "-UNDEBUG",
+      "-fPIC",
+      "-fobjc-arc",
+      "-include",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/metal_api/shim/bbport_platform.h",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-native-1792950118685264000-attempt2/derived_native.mm"
+    ],
+    "link": [
+      "/usr/bin/c++",
+      "-O3",
+      "-DNDEBUG",
+      "-flto=thin",
+      "-arch",
+      "arm64",
+      "-mmacosx-version-min=26.0",
+      "-Wl,-search_paths_first",
+      "-Wl,-headerpad_max_install_names",
+      "-Wl,-export_dynamic",
+      "-Wl,-rpath,/opt/homebrew/lib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-native-1792950118685264000-attempt2/derived-native.o",
+      "-o",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-native-1792950118685264000-attempt2/derived-native",
+      "-L/opt/homebrew/Cellar/ffmpeg/8.1/lib",
+      "-Wl,-rpath,/opt/homebrew/Cellar/ffmpeg/8.1/lib",
+      "-Wl,-rpath,/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/bin/gpu-metal-arm64",
+      "-Wl,-rpath,/opt/homebrew/lib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-gpu-1792949840875543000/libbbgpu.derived-pso-1792949840901813000.dylib",
+      "-framework",
+      "Metal",
+      "-framework",
+      "Foundation",
+      "/opt/homebrew/lib/libfmt.12.2.0.dylib",
+      "/opt/homebrew/Cellar/xxhash/0.8.4/lib/libxxhash.dylib",
+      "/opt/homebrew/lib/libSDL3.dylib",
+      "/opt/homebrew/lib/libminiz.3.1.2.dylib",
+      "/opt/homebrew/lib/libZydis.4.1.1.0.dylib",
+      "/opt/homebrew/lib/libZycore.1.5.2.0.dylib",
+      "/private/tmp/blood-echoes-arm64-metal-20261023/build/third_party/sirit/src/libsirit.a",
+      "-lavformat",
+      "-lavcodec",
+      "-lswscale",
+      "-lswresample",
+      "-lavutil",
+      "-framework",
+      "VideoToolbox",
+      "-framework",
+      "AudioToolbox",
+      "-framework",
+      "CoreMedia",
+      "-framework",
+      "CoreVideo",
+      "-framework",
+      "CoreFoundation",
+      "-framework",
+      "CoreServices",
+      "-framework",
+      "QuartzCore",
+      "-framework",
+      "Metal",
+      "-framework",
+      "MetalFX",
+      "-framework",
+      "Foundation",
+      "-framework",
+      "Security",
+      "-lbz2",
+      "-lz",
+      "-liconv"
+    ],
+    "rewrites": [
+      [
+        "/opt/homebrew/opt/fmt/lib/libfmt.12.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libfmt.12.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/xxhash/lib/libxxhash.0.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libxxhash.0.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/sdl3/lib/libSDL3.0.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libSDL3.0.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/miniz/lib/libminiz.3.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libminiz.3.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/zydis/lib/libZydis.4.1.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libZydis.4.1.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/zycore-c/lib/libZycore.1.5.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libZycore.1.5.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/ffmpeg/lib/libavformat.62.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libavformat.62.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/ffmpeg/lib/libavcodec.62.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libavcodec.62.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/ffmpeg/lib/libswscale.9.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libswscale.9.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/ffmpeg/lib/libswresample.6.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libswresample.6.dylib"
+      ],
+      [
+        "/opt/homebrew/opt/ffmpeg/lib/libavutil.60.dylib",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libavutil.60.dylib"
+      ]
+    ],
+    "full_gpu_build": false,
+    "source_sha256": "fd5854c89f6c8a55f46e267fc62107da08bd058b7384b9e37f7d8ea458e28028",
+    "dependencies": [
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-gpu-1792949840875543000/libbbgpu.derived-pso-1792949840901813000.dylib",
+      "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+      "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libfmt.12.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libxxhash.0.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libSDL3.0.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libminiz.3.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libZydis.4.1.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libZycore.1.5.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libavformat.62.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libavcodec.62.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libswscale.9.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libswresample.6.dylib",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/deps-metal-arm64/lib/libavutil.60.dylib",
+      "/System/Library/Frameworks/VideoToolbox.framework/Versions/A/VideoToolbox",
+      "/System/Library/Frameworks/AudioToolbox.framework/Versions/A/AudioToolbox",
+      "/System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia",
+      "/System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo",
+      "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+      "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+      "/System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore",
+      "/System/Library/Frameworks/MetalFX.framework/Versions/A/MetalFX",
+      "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+      "/usr/lib/libbz2.1.0.dylib",
+      "/usr/lib/libz.1.dylib",
+      "/usr/lib/libiconv.2.dylib",
+      "/usr/lib/libc++.1.dylib",
+      "/usr/lib/libSystem.B.dylib",
+      "/usr/lib/libobjc.A.dylib"
+    ],
+    "authored_spirv": {
+      "authored.vert.spv": "4d4adb525d706822e445395d25cfd87061659d9475e752603c8ecbc3b886fdbd",
+      "authored.frag.spv": "bf608a69ee741e0087406b720c9747ebb2c2e35047a9b4c46cd5e79fffb81d47"
+    }
+  },
+  "manifest": {
+    "schema": 1,
+    "translator": {
+      "actual_gpu_library": {
+        "sha256": "d23894136ecd8df8109850d92bfc82399d0939dd2fbed1ce666dde6366ea26be",
+        "bytes": 18499536
+      }
+    },
+    "game": {
+      "authored_fs": {
+        "sha256": "bf608a69ee741e0087406b720c9747ebb2c2e35047a9b4c46cd5e79fffb81d47",
+        "bytes": 388
+      },
+      "authored_vs": {
+        "sha256": "4d4adb525d706822e445395d25cfd87061659d9475e752603c8ecbc3b886fdbd",
+        "bytes": 1000
+      }
+    },
+    "options": {
+      "derived": "portable-author-controls",
+      "math": "safe"
+    },
+    "profile": "authored-derived-pso"
+  },
+  "token": "a3869cd6938a785db247803418093833167451b4b2ae65e575b5b44e534c04c9",
+  "memory_policy": {
+    "schema": 2,
+    "severe_seconds": 5.0,
+    "swap_total_mib": 2048.0,
+    "burst_window_seconds": 5.0,
+    "burst_growth_mib": 1024.0,
+    "warning_stops": false,
+    "lock_stops": true
+  },
+  "game_launched": false,
+  "existing_cache_walker": false,
+  "actual_portable_storage": true,
+  "actual_native_factories": true,
+  "cases": [
+    {
+      "mode": "seed",
+      "exit": 0,
+      "pid": 88854,
+      "seconds": 0.5516647089971229,
+      "actual_loaded_gpu_libraries": [
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-gpu-1792949840875543000/libbbgpu.derived-pso-1792949840901813000.dylib"
+      ],
+      "author": {
+        "mode": "seed",
+        "pid": 88854,
+        "checks": 260,
+        "key_files": 2,
+        "observed_real_registers": 2,
+        "native_factory_calls": 4,
+        "strict_archive_hits": 0,
+        "native_pixel_oracle": true,
+        "native_half_oracle": true,
+        "actual_warmup": true
+      },
+      "log": "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/parallel-derived-pso-native-20261026/seed.log"
+    },
+    {
+      "mode": "warm",
+      "exit": 0,
+      "pid": 88857,
+      "seconds": 0.11101829097606242,
+      "actual_loaded_gpu_libraries": [
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/derived-pso-gpu-1792949840875543000/libbbgpu.derived-pso-1792949840901813000.dylib"
+      ],
+      "author": {
+        "mode": "warm",
+        "pid": 88857,
+        "checks": 192,
+        "key_files": 2,
+        "observed_real_registers": 0,
+        "native_factory_calls": 2,
+        "strict_archive_hits": 2,
+        "native_pixel_oracle": true,
+        "native_half_oracle": true,
+        "actual_warmup": true
+      },
+      "log": "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/evidence/parallel-derived-pso-native-20261026/warm.log"
+    }
+  ],
+  "all_passed": true,
+  "after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 7386.6875
+  },
+  "seconds": 0.7019134999718517,
+  "samples": [
+    {
+      "seconds": 0.019265874987468123,
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 7386.6875
+    },
+    {
+      "seconds": 0.1294136659707874,
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 7386.6875
+    },
+    {
+      "seconds": 0.2395651659462601,
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 7386.6875
+    },
+    {
+      "seconds": 0.34983874997124076,
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 7386.6875
+    },
+    {
+      "seconds": 0.4599460829049349,
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 7386.6875
+    },
+    {
+      "seconds": 0.5908564579440281,
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 7386.6875
+    }
+  ]
+}

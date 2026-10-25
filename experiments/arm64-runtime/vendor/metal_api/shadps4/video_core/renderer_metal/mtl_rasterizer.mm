@@ -986,6 +986,12 @@ const RenderPipeline& Rasterizer::PipelineForPass(const GraphicsPipeline& pipeli
                                                                ? GsOutputPrimitive::LineStrip
                                                                : GsOutputPrimitive::TriangleStrip};
         it->second = pipeline_cache->GetPsoCache().GetRenderPipeline(key, r.vs, r.fs, input);
+        if (it->second && !key.motion_vectors) {
+            GraphicsSerialization serialized;
+            const auto attributes = pipeline.VertexAttributes();
+            serialized.vertex_attributes.assign(attributes.begin(), attributes.end());
+            VideoCore::RegisterPipelineData(key, std::hash<VideoCore::GraphicsPipelineKey>{}(key), serialized);
+        }
     }
     return it->second ? *it->second : r;
 }
@@ -1858,6 +1864,12 @@ std::optional<Rasterizer::VelocityDraw> Rasterizer::PrepareVelocity(const Graphi
         const RenderPipelineInput input{.vertex_attributes = pipeline.VertexAttributes(),
                                         .rect_list_triangles = r.rect_list && !r.primitive_emulated};
         entry->second = pipeline_cache->GetPsoCache().GetRenderPipeline(key,r.vs,r.fs,input);
+        if (entry->second && !key.motion_vectors) {
+            GraphicsSerialization serialized;
+            const auto attributes = pipeline.VertexAttributes();
+            serialized.vertex_attributes.assign(attributes.begin(), attributes.end());
+            VideoCore::RegisterPipelineData(key, std::hash<VideoCore::GraphicsPipelineKey>{}(key), serialized);
+        }
     }
     if (!entry->second) return reject();
     // Only consecutive draws of one guest pass can share a host mirror batch. Bound CPU
