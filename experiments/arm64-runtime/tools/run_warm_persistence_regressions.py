@@ -1,9 +1,11 @@
 """Serial authored persistence regressions; invoke through run_authored_controls_guard.py."""
 from pathlib import Path
-import json, subprocess, sys, time
+import argparse, json, subprocess, sys, time
 
 P=Path(__file__).resolve().parents[1]
-candidate=json.loads((P/'evidence/warm-stage-candidate-current.json').read_text())
+ap=argparse.ArgumentParser();ap.add_argument('--candidate',type=Path,default=P/'evidence/warm-stage-candidate-current.json');args=ap.parse_args()
+assert args.candidate.resolve(strict=True).is_relative_to(P/'evidence')
+candidate=json.loads(args.candidate.read_text())
 library=candidate['candidate']
 e=P/'evidence'/('warm-persistence-checkpoint-'+str(time.time_ns()));e.mkdir()
 steps=[]

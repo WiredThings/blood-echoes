@@ -163,3 +163,13 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 见 docs/warm-archive-game-validation.zh-CN.md。显式候选选择入口已补，不再用旧GPU app冒充新库。用户关闭部分后台后4×75秒原生1080p同设置静音站桩完成：PSO开启500/520实际命中，平均创建23ms对关闭178ms；仍538次Metal建库约0.8s。FPS趋势48.82对46.58（仅单组），内存平均差+20MiB但两配对方向相反，未证明稳定增减；继续实验、不默认启用。两轮先前保护中止保留，不清缓存/不放宽保护。缓存508完整特化/409键按当前布局解码无错，但不是全游戏覆盖。正式11671文件不变、普通QA和Release不变。
 
 用户新增要求已写入GOAL末尾：交付代码中的本机离线建库流程，各用户自己构建，不分发开发机游戏metallib/归档。当前只有本机PSO归档，新的本机离线库构建器尚未实现；不可把两者混称。后续以实际重写后MSL和完整兼容身份做准备期构建/命中验证，不直接恢复已撤销Toolchain实验。几何runtime特化等价问题由已有subagent只读审查，未应用草稿或声称白模修复。
+
+## 2026-10-25：本机离线库已有隔离代码和实测，未启用
+
+见 docs/local-metal-aot-validation.zh-CN.md 与JSON。当前GPU1ba32725（3实现/公共ABI不变），本机428请求→metallib约6分20/3.9MB，真游戏两轮538/538模块命中，暖prepare零重编。26builder/6policy/16native、真实BuildLibrary以及旧9专项/24纹理通过；11671正式文件不变。源码/产物不外传，只推dev，不更新普通QA/正式应用/Release。
+
+无确定收益：暖IR库856ms对source821ms，FPS49.48对51.49仅稀疏样本；首IR仍PSO5.84s。保留实验路径、默认OFF，不把record轮/驱动冷热当startup gain。后续先应用独立entry准入/原source回退/发布及根边界/中断恢复审查，再处理18处API覆盖（现在只接1处模块入口），重点推进最终PSO二进制和新场景完整组合。并行GS等价修复仍草稿；不得将它或白模问题标已解决。整轮记录和父进程启动时序已存在，首次编译真实峰值RSS尚缺。
+
+## 2026-10-25：本机AOT安全修正验证完毕，仍实验关闭
+
+见docs/local-metal-aot-validation.zh-CN.md末节。当前GPU a24a0569985495d79a78d02502052037517232f2ef92c4629916bd264e0e0f38，已补entry实际成功后准入/记录、memo失败绕过artifact回source、RENAME_EXCL、根相等拒绝、逐层创建前检查及只读中断恢复。26builder+9恢复+6policy、actual BuildLibrary假函数/路径负例、4真库/16真GPU负例、旧9专项/24保留通过；最终默认OFF游戏75秒进入场景正常退出。旧1ba32725性能表保留原版本，未冒充当前版本AOT性能。所有游戏编译产物留本机、旧428库保留。剩余：其它17个source API/defaults/constants、最终PSO和新场景覆盖、初次编译峰值记录、GUI与最终AOT验收；不可标整个目标完成。正式与普通QA、Release不变。

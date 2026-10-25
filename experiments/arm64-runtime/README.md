@@ -295,3 +295,18 @@ The requested offline-library delivery is code that builds locally from each use
 own game and complete effective shader combinations. Developer-generated game
 metallibs/PSO archives are not distributable project assets. A new local metallib
 builder is not yet implemented; the PSO archive alone must not be called one.
+
+## Local Metal library experiment (not default)
+
+See docs/local-metal-aot-validation.zh-CN.md. Effective-source capture, a bounded
+local-only serial toolchain builder, strict receipts, native library loading and
+startup preparation now exist in isolated code. Four authored libraries and 428
+local game requests were actually built; gameplay hit all 538 module loads twice.
+No user/game-generated source or compiled artifact is included in Git or packages.
+The first batch cost about 6m20s; warm library load was not faster than warm source,
+and final GPU PSO compilation remains. This is functional evidence, not an accepted
+performance gain. Entry admission, source fallback, exclusive publication and read-only recovery
+are hardened and tested. Other source call-site coverage, final PSO preparation,
+GUI integration and hardened-version AOT game performance remain pending. Normal QA/production apps and Release stay
+unchanged. Incremental tools require prepared local build metadata, not a claimed
+fresh-checkout clean build of this experiment.

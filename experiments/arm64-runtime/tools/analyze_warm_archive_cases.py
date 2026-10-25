@@ -12,6 +12,8 @@ def analyze(case):
  compilation={k:dict(events=len(v),total_ms=sum(x['us']for x in v)/1000,cache_hits=sum(x['cached']==1 for x in v),max_ms=max(x['us']for x in v)/1000,failures=sum(not x['ok']for x in v))for k,v in q.items()}
  samples=raw['samples'];assert samples
  result=dict(case=str(case),exit=raw['exit'],stopped=raw['stopped'],seconds=raw['seconds'],cleanup_warnings=raw['cleanup_warnings'],complete=raw['exit']==0 and raw['stopped']=='time budget'and not raw['cleanup_warnings']and not raw['generations'] and text.count('character ready; automatic menu input released')==1,ready_markers=text.count('character ready; automatic menu input released'),compilation=compilation,compile_log_truncated='Metal compile audit: truncated=1'in text,pressure_max=max(x['pressure']for x in samples),swap_change_mib=samples[-1]['swap_mib']-samples[0]['swap_mib'],peak_aggregate_footprint_mib=max(sum(u['footprint_bytes']for u in s['usage'])/2**20 for s in samples),startup_sha256=digest(case/'startup.bin'),settings_sha256=digest(Path(raw['state'])/'bbport.ini'),GPU_identity=json.loads((case/'gpu-candidate-identity.json').read_text()),frame_metrics=None)
+ result['local_aot_policy']=json.loads((case/'local-aot-policy.json').read_text())if(case/'local-aot-policy.json').exists()else dict(status='off')
+ result['local_aot_events']=dict(hits=len(re.findall(r'Metal local AOT: hit key=',text)),fallbacks=len(re.findall(r'Metal local AOT: (?!hit)',text)),recorded=text.count('recorded=1'))
  if(case/'warm-archive-compatibility.json').exists():result['archive_policy']=json.loads((case/'warm-archive-compatibility.json').read_text())
  else:result['archive_policy']=dict(mode='off')
  if not result['complete']:return result

@@ -32,10 +32,11 @@ def system():
     swap=float(re.search(r'used = ([\d.]+)M',subprocess.check_output(['sysctl','vm.swapusage'],text=True))[1])
     return dict(pressure=pressure,locked=locked,swap_mib=swap)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--launch-profile',type=Path);ap.add_argument('--gpu-candidate',type=Path);ap.add_argument('--extra-heaps-fresh',action='store_true');ap.add_argument('--extra-heaps',action='store_true');ap.add_argument('--allocation-audit',action='store_true');ap.add_argument('--dev-world-warper',action='store_true');ap.add_argument('--engine',choices=['arm64','rosetta'],default='arm64');ap.add_argument('--net-module-smoke',action='store_true');ap.add_argument('--qa-online',action='store_true');ap.add_argument('--qa-online-manual',action='store_true');ap.add_argument('--resource-hooks',action='store_true');ap.add_argument('--resource-fast-dispatch',action='store_true');ap.add_argument('--resource-leaf-dispatch',action='store_true');ap.add_argument('--lifetime-audit',action='store_true');ap.add_argument('--hardware-tso',choices=['0','1','2'],default='0');ap.add_argument('--stutter-audit',action='store_true');ap.add_argument('--coarse-audit',action='store_true');ap.add_argument('--native-observer',action='store_true');ap.add_argument('--slow-packet-audit',action='store_true');ap.add_argument('--guest-frame-audit',action='store_true');ap.add_argument('--guest-sync-audit',action='store_true');ap.add_argument('--pipeline-archive',action='store_true');ap.add_argument('--compile-audit',action='store_true');ap.add_argument('--staging-audit',action='store_true');ap.add_argument('--hot-staging-reuse',action='store_true');ap.add_argument('--packed-veneers',action='store_true');ap.add_argument('--fast-hle-lookup',action='store_true');ap.add_argument('--legacy-hle-lookup',action='store_true');ap.add_argument('--clone-private-session',type=Path);ap.add_argument('--settings-template',type=Path,default=P/'fixtures/launcher-settings.ini');ap.add_argument('--boot',type=Path,required=True);ap.add_argument('--app0',type=Path);ap.add_argument('--content-profile',type=Path);ap.add_argument('--gpu-state',type=Path);ap.add_argument('--capture-trigger',type=Path);ap.add_argument('--legacy-range-checks',action='store_true');ap.add_argument('--frame-timing',action='store_true');ap.add_argument('--texture-diag',action='store_true');ap.add_argument('--toggle-file',type=Path);ap.add_argument('--file-trace',action='store_true');ap.add_argument('--seed-user',type=Path);ap.add_argument('--pad-file',type=Path);ap.add_argument('--authored-fixture',action='store_true');ap.add_argument('--stop-before-submit',action='store_true');ap.add_argument('--memory-diag',action='store_true');ap.add_argument('--fex-mapping-audit',action='store_true');ap.add_argument('--cpu-code-map',action='store_true');ap.add_argument('--cpu-cache-control',action='store_true');ap.add_argument('--jit-reserve-mib',type=int,choices=[16,128],default=16);ap.add_argument('--cpu-cache',type=Path);ap.add_argument('--quicksave',action='store_true');ap.add_argument('--graphics',action='store_true');ap.add_argument('--modules-only',action='store_true');ap.add_argument('--seconds',type=int,default=30);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--launch-profile',type=Path);ap.add_argument('--gpu-candidate',type=Path);ap.add_argument('--local-aot',choices=['off','record','load'],default='off');ap.add_argument('--extra-heaps-fresh',action='store_true');ap.add_argument('--extra-heaps',action='store_true');ap.add_argument('--allocation-audit',action='store_true');ap.add_argument('--dev-world-warper',action='store_true');ap.add_argument('--engine',choices=['arm64','rosetta'],default='arm64');ap.add_argument('--net-module-smoke',action='store_true');ap.add_argument('--qa-online',action='store_true');ap.add_argument('--qa-online-manual',action='store_true');ap.add_argument('--resource-hooks',action='store_true');ap.add_argument('--resource-fast-dispatch',action='store_true');ap.add_argument('--resource-leaf-dispatch',action='store_true');ap.add_argument('--lifetime-audit',action='store_true');ap.add_argument('--hardware-tso',choices=['0','1','2'],default='0');ap.add_argument('--stutter-audit',action='store_true');ap.add_argument('--coarse-audit',action='store_true');ap.add_argument('--native-observer',action='store_true');ap.add_argument('--slow-packet-audit',action='store_true');ap.add_argument('--guest-frame-audit',action='store_true');ap.add_argument('--guest-sync-audit',action='store_true');ap.add_argument('--pipeline-archive',action='store_true');ap.add_argument('--compile-audit',action='store_true');ap.add_argument('--staging-audit',action='store_true');ap.add_argument('--hot-staging-reuse',action='store_true');ap.add_argument('--packed-veneers',action='store_true');ap.add_argument('--fast-hle-lookup',action='store_true');ap.add_argument('--legacy-hle-lookup',action='store_true');ap.add_argument('--clone-private-session',type=Path);ap.add_argument('--settings-template',type=Path,default=P/'fixtures/launcher-settings.ini');ap.add_argument('--boot',type=Path,required=True);ap.add_argument('--app0',type=Path);ap.add_argument('--content-profile',type=Path);ap.add_argument('--gpu-state',type=Path);ap.add_argument('--capture-trigger',type=Path);ap.add_argument('--legacy-range-checks',action='store_true');ap.add_argument('--frame-timing',action='store_true');ap.add_argument('--texture-diag',action='store_true');ap.add_argument('--toggle-file',type=Path);ap.add_argument('--file-trace',action='store_true');ap.add_argument('--seed-user',type=Path);ap.add_argument('--pad-file',type=Path);ap.add_argument('--authored-fixture',action='store_true');ap.add_argument('--stop-before-submit',action='store_true');ap.add_argument('--memory-diag',action='store_true');ap.add_argument('--fex-mapping-audit',action='store_true');ap.add_argument('--cpu-code-map',action='store_true');ap.add_argument('--cpu-cache-control',action='store_true');ap.add_argument('--jit-reserve-mib',type=int,choices=[16,128],default=16);ap.add_argument('--cpu-cache',type=Path);ap.add_argument('--quicksave',action='store_true');ap.add_argument('--graphics',action='store_true');ap.add_argument('--modules-only',action='store_true');ap.add_argument('--seconds',type=int,default=30);a=ap.parse_args()
     from launcher_language_policy import load as load_language
     language_env=load_language(a.launch_profile) if a.launch_profile else None
     assert 0<a.seconds<=600
+    assert a.local_aot=='off'or(a.engine=='arm64'and a.graphics and a.gpu_candidate),'local AOT requires explicit private ARM GPU candidate'
     if a.engine=='rosetta':assert a.clone_private_session and a.graphics and a.hardware_tso=='0','Rosetta requires fixed cloned QA and unchanged CPU policy'
     assert not(a.fast_hle_lookup and a.legacy_hle_lookup),'conflicting HLE policies'
     use_fast_hle=a.engine=='arm64' and not a.legacy_hle_lookup
@@ -203,8 +204,8 @@ def main():
         elif not a.qa_online:env['BB_QUICKLOAD_PENDING']='1'
     env['BB_ARM_RESTART_REQUEST']=str(state/'.arm-restart-request')
     env['BB_ARM_RESTART_NONCE']=secrets.token_hex(16)
-    if a.pipeline_archive:
-        # Once before process creation, only for the explicit archive experiment.
+    if a.pipeline_archive or a.local_aot!='off':
+        # Once before process creation for explicit local archive/library experiments.
         # The selected library SHA binds the actual compiled translator/rewrites.
         # Native PsoCache adds its actual GPU registry/name and OS build itself.
         from warm_archive_manifest import prepare_startup_archive_policy
@@ -221,7 +222,24 @@ def main():
             game_artifacts=inputs,options=options,
             profile={'engine':a.engine,'namespace':'arm64-srt1' if a.engine=='arm64' else 'rosetta','profile_abi':'SPV10-meta7-key5-msl3'})
         env.update(updates)
-        (e/'warm-archive-compatibility.json').write_text(json.dumps(archive_policy,indent=2)+'\n')
+        (e/'shader-compatibility.json').write_text(json.dumps(archive_policy,indent=2)+'\n')
+        if a.pipeline_archive:(e/'warm-archive-compatibility.json').write_text(json.dumps(archive_policy,indent=2)+'\n')
+    if a.local_aot!='off':
+        from local_aot_policy import prepare as prepare_local_aot
+        updates,local_policy=prepare_local_aot(mode=a.local_aot,gpu_root=gpu,cohort=archive_policy['token'],engine=a.engine,graphics=a.graphics)
+        (e/'local-aot-policy.json').write_text(json.dumps(local_policy,indent=2)+'\n')
+        if local_policy['status']not in('record','prepared'):raise RuntimeError('local AOT preparation refused: '+local_policy.get('error',local_policy['status']))
+        env.update(updates)
+        # Compiler preparation has its own continuous memory/lock supervision. Use
+        # a fresh burst history so an elapsed offline build is not reported as
+        # an instantaneous five-second swap burst; retain both stage observations
+        # and the original cumulative swap budget across both phases.
+        after_prepare=probe_system()
+        (e/'local-aot-memory-boundary.json').write_text(json.dumps(dict(before=before,after=after_prepare,preparation_policy=MemoryPolicy.MANIFEST,gameplay_policy=MemoryPolicy.MANIFEST),indent=2)+'\n')
+        assert not after_prepare['locked']and after_prepare['pressure']!=4,'protection after local AOT preparation'
+        from local_aot_policy import gameplay_guard
+        memory_policy=gameplay_guard(before,after_prepare)
+
     samples=[];generations=[];stop=None;start=time.monotonic();cleanup_warnings=[]
     def stop_owned(proc,sig):
         # Positive PIDs only. Darwin may refuse a whole process group after its

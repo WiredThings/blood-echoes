@@ -1,0 +1,296 @@
+{
+  "status": "experimental-local-code-functional-no-performance-gain-proven",
+  "body_units_rebuilt": 3,
+  "coherent_baseline_units": 230,
+  "public_headers_unchanged": true,
+  "source_artifacts_distributed": false,
+  "authored_builder_controls": 26,
+  "startup_policy_controls": 6,
+  "native_admission_output_controls": 16,
+  "actual_build_library_control": true,
+  "existing_regression_jobs": 9,
+  "existing_texture_cases": 24,
+  "known_game_requests": 428,
+  "effective_source_bytes": 6602992,
+  "library_bytes": 3901743,
+  "first_batch_interval_seconds": 379.591,
+  "first_batch_interval_scope": "build-manifest mtime to last library mtime; excludes initial tool identity queries",
+  "formal_preservation": {
+    "checked_files": 11671,
+    "unchanged": true,
+    "mismatches": [],
+    "read_only": true,
+    "checked_ns": 1792927353865169000
+  },
+  "default_enabled": false,
+  "formal_app_updated": false,
+  "Release_updated": false,
+  "new_scene_hitch_improvement_proven": false,
+  "all_source_compilation_removed": false,
+  "pending_audit": [
+    "17 other Metal source call sites/options/constants",
+    "final-PSO and unknown-scene coverage",
+    "first-batch peak process memory not recorded",
+    "hardened-version game-AOT rebenchmark",
+    "launcher GUI integration/default enable acceptance",
+    "hostile concurrent directory rename is not proven safe"
+  ],
+  "runs": [
+    {
+      "case": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/game-1792925691907215000",
+      "complete": true,
+      "compilation": {
+        "library": {
+          "events": 538,
+          "total_ms": 1311.405,
+          "cache_hits": 0,
+          "max_ms": 20.796,
+          "failures": 0
+        },
+        "shader": {
+          "events": 538,
+          "total_ms": 1399.16,
+          "cache_hits": 538,
+          "max_ms": 21.027,
+          "failures": 0
+        },
+        "pso": {
+          "events": 520,
+          "total_ms": 147.144,
+          "cache_hits": 0,
+          "max_ms": 52.935,
+          "failures": 0
+        }
+      },
+      "frame_metrics": {
+        "window": "last30s fixed scene",
+        "frames": 1480,
+        "fps": 49.305787833197186,
+        "p95_ms": 21.08,
+        "p99_ms": 21.79,
+        "max_frame_ms": 85.24,
+        "one_percent_low_fps": 36.935415787252005,
+        "gpu_ms": 18.971033783783785,
+        "late_compiles": 0,
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ],
+        "draws_median": 1366.0,
+        "median_aggregate_footprint_mib": 5928.20011138916,
+        "cpu_percent": {
+          "bb-game-arm64": 232.3172801360223,
+          "bb-gpu": 139.48197756370567
+        }
+      },
+      "pressure_max": 2,
+      "swap_change_mib": 248.875,
+      "peak_aggregate_footprint_mib": 5949.12198638916,
+      "local_aot_events": {
+        "hits": 0,
+        "fallbacks": 538,
+        "recorded": 538
+      }
+    },
+    {
+      "case": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/game-1792925833076390000",
+      "complete": true,
+      "compilation": {
+        "library": {
+          "events": 538,
+          "total_ms": 863.163,
+          "cache_hits": 538,
+          "max_ms": 19.134,
+          "failures": 0
+        },
+        "shader": {
+          "events": 538,
+          "total_ms": 965.746,
+          "cache_hits": 538,
+          "max_ms": 19.454,
+          "failures": 0
+        },
+        "pso": {
+          "events": 520,
+          "total_ms": 5841.21,
+          "cache_hits": 0,
+          "max_ms": 215.55,
+          "failures": 0
+        }
+      },
+      "frame_metrics": {
+        "window": "last30s fixed scene",
+        "frames": 1471,
+        "fps": 49.01970585510561,
+        "p95_ms": 21.3,
+        "p99_ms": 22.17,
+        "max_frame_ms": 26.15,
+        "one_percent_low_fps": 43.46881112801565,
+        "gpu_ms": 19.115615227736235,
+        "late_compiles": 0,
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ],
+        "draws_median": 1367.0,
+        "median_aggregate_footprint_mib": 6150.5752029418945,
+        "cpu_percent": {
+          "bb-game-arm64": 233.00497733489524,
+          "bb-gpu": 138.50660301460525
+        }
+      },
+      "pressure_max": 2,
+      "swap_change_mib": 90.875,
+      "peak_aggregate_footprint_mib": 6165.8408279418945,
+      "local_aot_events": {
+        "hits": 538,
+        "fallbacks": 0,
+        "recorded": 0
+      }
+    },
+    {
+      "case": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/game-1792926540517435000",
+      "complete": true,
+      "compilation": {
+        "library": {
+          "events": 538,
+          "total_ms": 821.081,
+          "cache_hits": 0,
+          "max_ms": 18.967,
+          "failures": 0
+        },
+        "shader": {
+          "events": 538,
+          "total_ms": 919.579,
+          "cache_hits": 538,
+          "max_ms": 19.304,
+          "failures": 0
+        },
+        "pso": {
+          "events": 520,
+          "total_ms": 227.795,
+          "cache_hits": 0,
+          "max_ms": 137.998,
+          "failures": 0
+        }
+      },
+      "frame_metrics": {
+        "window": "last30s fixed scene",
+        "frames": 1545,
+        "fps": 51.48736843227795,
+        "p95_ms": 20.34,
+        "p99_ms": 20.89,
+        "max_frame_ms": 23.2,
+        "one_percent_low_fps": 45.82531390340024,
+        "gpu_ms": 16.86546925566343,
+        "late_compiles": 0,
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ],
+        "draws_median": 1366.0,
+        "median_aggregate_footprint_mib": 5792.54386138916,
+        "cpu_percent": {
+          "bb-game-arm64": 245.43204890391272,
+          "bb-gpu": 151.15151524892588
+        }
+      },
+      "pressure_max": 2,
+      "swap_change_mib": 387.25,
+      "peak_aggregate_footprint_mib": 6995.497123718262,
+      "local_aot_events": {
+        "hits": 0,
+        "fallbacks": 0,
+        "recorded": 0
+      }
+    },
+    {
+      "case": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/game-1792926858209810000",
+      "complete": true,
+      "compilation": {
+        "library": {
+          "events": 538,
+          "total_ms": 856.158,
+          "cache_hits": 538,
+          "max_ms": 19.342,
+          "failures": 0
+        },
+        "shader": {
+          "events": 538,
+          "total_ms": 950.715,
+          "cache_hits": 538,
+          "max_ms": 19.65,
+          "failures": 0
+        },
+        "pso": {
+          "events": 520,
+          "total_ms": 206.193,
+          "cache_hits": 0,
+          "max_ms": 123.425,
+          "failures": 0
+        }
+      },
+      "frame_metrics": {
+        "window": "last30s fixed scene",
+        "frames": 1485,
+        "fps": 49.48424751454121,
+        "p95_ms": 21.04,
+        "p99_ms": 21.47,
+        "max_frame_ms": 22.04,
+        "one_percent_low_fps": 46.09964108136587,
+        "gpu_ms": 18.64349494949495,
+        "late_compiles": 0,
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ],
+        "draws_median": 1367.0,
+        "median_aggregate_footprint_mib": 5882.403350830078,
+        "cpu_percent": {
+          "bb-game-arm64": 237.71246927916758,
+          "bb-gpu": 147.12867433233316
+        }
+      },
+      "pressure_max": 1,
+      "swap_change_mib": 0.0,
+      "peak_aggregate_footprint_mib": 5896.215850830078,
+      "local_aot_events": {
+        "hits": 538,
+        "fallbacks": 0,
+        "recorded": 0
+      }
+    }
+  ],
+  "performance_measured_GPU_sha256": "1ba32725a5521b7828d023c144b73831ce0e5cd0fe3961b4680ecdc1493d07e1",
+  "exported_GPU_sha256": "a24a0569985495d79a78d02502052037517232f2ef92c4629916bd264e0e0f38",
+  "hardening": {
+    "implemented": true,
+    "body_units_rebuilt": 3,
+    "authoritative_controls": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/local-aot-authoritative-controls-1792928091324369000",
+    "native_admission_output_controls": 16,
+    "builder_controls": 26,
+    "request_recovery_controls": 9,
+    "startup_policy_controls": 6,
+    "entry_factory_and_path_controls": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/state/local-aot-entry-authored-1792928209660639000",
+    "entry_factories_mocked": true,
+    "real_gpu_output_separately_verified": true,
+    "existing_jobs": 9,
+    "texture_cases": 24,
+    "default_off_game_smoke": "game-1792928449049734000",
+    "default_off_game_smoke_seconds": 75.37617941608187,
+    "final_aot_gameplay_rebenchmark": false,
+    "public_headers_unchanged": true
+  }
+}

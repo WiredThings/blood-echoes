@@ -33,6 +33,7 @@
 #include "video_core/renderer_metal/mtl_device_impl.h"
 #include "video_core/renderer_metal/mtl_shader.h"
 #include "video_core/renderer_metal/mtl_library_memo.h"
+#include "video_core/renderer_metal/mtl_local_aot.h"
 #include "video_core/renderer_metal/mtl_vertex_math.h"
 #include "video_core/renderer_metal/mtl_spirv_geometry.h"
 #include "video_core/renderer_metal/mtl_spirv_pervertex.h"
@@ -939,11 +940,12 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
         options.languageVersion = MTLLanguageVersion3_1;
         if (@available(macOS 15.0, *)) {
             options.mathMode = relaxed_math ? MTLMathModeRelaxed : MTLMathModeSafe;
+            options.mathFloatingPointFunctions = MTLMathFloatingPointFunctionsFast;
         } else {
             options.fastMathEnabled = NO;
         }
         const auto compile = [&](const std::string& text) -> MetalObjects {
-            const auto build = [&]() -> MetalObjects {
+            const auto source_build = [&]() -> MetalObjects {
                 BbAudit::Scope actual_compile_audit{BbAudit::MetalLibraryBuild,0,100000};
                 NSError* error = nil;
                 id<MTLLibrary> library =
@@ -953,11 +955,42 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
                     return {nil, nil, "Metal: " + FirstMetalError(
                         error ? error.localizedDescription.UTF8String : "unknown error")};
                 }
+                id<MTLFunction> function = [library newFunctionWithName:
+                    [NSString stringWithUTF8String:entry.c_str()]];
+                if (!function) {
+                    // Return no accepted library: this also keeps a speculative rewrite's
+                    // original-source fallback and the weak memo's failure path intact.
+                    return {nil, nil, fmt::format("Metal: function '{}' not found in the library", entry)};
+                }
+                auto recorded=LocalAot::Try(device,text,entry,relaxed_math,true,false,function);
+                if(!recorded.key.empty())std::printf("Metal local AOT: source key=%s recorded=%d\n",recorded.key.c_str(),int(recorded.recorded));
                 library.label = [[NSString alloc] initWithBytes:label.data() length:label.size()
                                                       encoding:NSUTF8StringEncoding];
-                return {library, nil, {}};
+                return {library, function, {}};
             };
-            return memo ? memo->Get(text, entry, relaxed_math, build) : build();
+            const auto build = [&]() -> MetalObjects {
+                auto local=LocalAot::Try(device,text,entry,relaxed_math,false);
+                if(local.library&&local.function){
+                    std::printf("Metal local AOT: hit key=%s recorded=0\n",local.key.c_str());
+                    local.library.label=[[NSString alloc] initWithBytes:label.data() length:label.size() encoding:NSUTF8StringEncoding];
+                    return {local.library,local.function,{},true};
+                }
+                return source_build();
+            };
+            auto built = memo ? memo->Get(text, entry, relaxed_math, build) : build();
+            if (built.library && !built.function) {
+                // A memo owns only the library. Every module still requests its own
+                // function and retains independent reflection/binding metadata.
+                built.function = [built.library newFunctionWithName:
+                    [NSString stringWithUTF8String:entry.c_str()]];
+                if (!built.function) {
+                    // Do not retry the same artifact/memo after an entry rejection.
+                    // Compile this exact effective source once; its own entry gate
+                    // decides success before any request can be recorded.
+                    return source_build();
+                }
+            }
+            return built;
         };
         objects = compile(source);
         if (!objects.library && (helpers || uniforms || paired)) {
@@ -972,7 +1005,7 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
         if (!objects.error.empty()) return objects;
         // Keep a distinct function object and independent binding metadata for each module.
         // Function identity is part of existing PSO cache keys; library reuse must not merge it.
-        objects.function = [objects.library newFunctionWithName:
+        if (!objects.function) objects.function = [objects.library newFunctionWithName:
             [NSString stringWithUTF8String:entry.c_str()]];
         if (!objects.function) {
             objects.error = fmt::format("Metal: function '{}' not found in the library", entry);

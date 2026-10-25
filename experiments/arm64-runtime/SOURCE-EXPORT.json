@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792924016903239000,
+  "created_ns": 1792928690405194000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -325,7 +325,7 @@
     },
     {
       "path": "tools/build_first_upload_test.py",
-      "sha256": "0d8bec9ff8c13df2898bf329adee98afee504548858bff44f86977f0d7783452"
+      "sha256": "3a6eeb2c56d56d5fba5feec0116fc0589049e9c501d4592697306396632c224f"
     },
     {
       "path": "tools/build_heap_bridge.py",
@@ -641,7 +641,7 @@
     },
     {
       "path": "tools/run_game.py",
-      "sha256": "4cc491f3007f87784f31185078d9513b58a615c5f310e249e440bbc2b26de89c"
+      "sha256": "2520ad452c23903d1c29d689c5eced55135ba2c9c2a16e377b8f1215892ae1fc"
     },
     {
       "path": "tools/run_gpu_retention_pair.py",
@@ -32713,7 +32713,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.mm",
-      "sha256": "b097591be42234dd3428d526b4d3ffe220110fc9354900981aafecdafc929244"
+      "sha256": "70054069b2cf00190d20c35875205b598d59728eaabf7478981200af57358bb6"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_spirv_geometry.cpp",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "ecf94ede66d33532fd3d7bf4573c6082346becf517b0a5847378bcecedad4b7f"
+      "sha256": "991e7639716f9a5ffd3442828cf68bcfd140d3fda139d4f39d7336a50e038a1d"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "4d7da3ed14836aab3f643e2b347955cdcea84fbcdb65e19c8e566b1eca705185"
+      "sha256": "709dab5a0eb4114cb8abe135e085a908107f9041fd484e100f1e045be304bdb0"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39157,7 +39157,7 @@
     },
     {
       "path": "tools/build_warm_archive_candidate.py",
-      "sha256": "a691510b2f9a9d5877a793c4b933c63f6fe1e4daa384d367565effd7da53c9e5"
+      "sha256": "80a82e531e9f9c7be158c9aa3a9939ba10f557fc8e712104f7ae8bb1dc7f2262"
     },
     {
       "path": "tools/run_authored_controls_guard.py",
@@ -39165,7 +39165,7 @@
     },
     {
       "path": "tools/run_warm_persistence_regressions.py",
-      "sha256": "bc27418645bfc7ee377aca4495ecf07c6944f6f7dc645b62f59773e80c57e443"
+      "sha256": "90218bec2e6eefdad469ffeb09b9c1a09c96f9b948d476ca3d4c1a86e346e14e"
     },
     {
       "path": "tests/metal/test_warm_archive_process.mm",
@@ -39193,7 +39193,7 @@
     },
     {
       "path": "tools/analyze_warm_archive_cases.py",
-      "sha256": "4ef8be87672750fa87ac95453d8289e370b4701a5263bede931213efe2caadbe"
+      "sha256": "bc05404843abb015d8c9cdb91cde9323cc56dfcf4eb41f127f8c411852cf178a"
     },
     {
       "path": "docs/warm-archive-game-validation.zh-CN.md",
@@ -39202,6 +39202,70 @@
     {
       "path": "docs/warm-archive-game-validation.json",
       "sha256": "28fb0605d85e7b60c25325150335e3fb2faf54c87c9d462f13e8a17cd775ddda"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_local_aot.h",
+      "sha256": "196f7ca808dbbde8b88ee82303f90e55981fdfe5a40f0d4cdad1d11d024ddd2f"
+    },
+    {
+      "path": "tools/local_metal_builder.py",
+      "sha256": "5402ed7fdfed85794fe37ee035ece801ea38bc96f3818e37c9077fec546128e0"
+    },
+    {
+      "path": "tools/test_local_metal_builder.py",
+      "sha256": "bfc9f90f8a093f471e573301669bac5c64c9519c5d6a1680aa8bfc7d108c1bd0"
+    },
+    {
+      "path": "tools/record_local_aot_controls.py",
+      "sha256": "11eb156d75f5e204abeb2102ba48b8b6b52df1298b9180aa80df1c82fc6e1051"
+    },
+    {
+      "path": "tools/load_local_aot_controls.py",
+      "sha256": "aca2bad3a78449fdb4c386b6bbf311dbc7962cffafd0a1b574bda1eb767811cf"
+    },
+    {
+      "path": "tools/run_local_aot_phase.py",
+      "sha256": "c6f31251c922e49edb28641a0400e0a8f843b2ac0682845335546ce04dc5e576"
+    },
+    {
+      "path": "tools/run_local_aot_authored.py",
+      "sha256": "def30860fc58215c4f7818e6ffbebf4f0a63360741fc60b627bd6721a1d769ec"
+    },
+    {
+      "path": "tools/local_aot_policy.py",
+      "sha256": "9a902990f105823db42220497723ee9c4898b4caa0f612cab7086fc590fbcbbd"
+    },
+    {
+      "path": "tools/test_local_aot_policy.py",
+      "sha256": "8ab50c5c1d53f85b11829a0dc90fa8967af5e821a0dda359c80ce16899164417"
+    },
+    {
+      "path": "tests/metal/test_local_aot_library.mm",
+      "sha256": "67664f7d67c8b7cbbec1939d512f66d913355980d9f5e4cf60cdf9a18722962b"
+    },
+    {
+      "path": "docs/local-metal-aot-validation.zh-CN.md",
+      "sha256": "5acf03b179152b4e929770dc0e6e170b84187e55634566f32da29335762ebe67"
+    },
+    {
+      "path": "docs/local-metal-aot-validation.json",
+      "sha256": "e23f021f3477531ee1a2cb65eb236b50a0ee0f5560098b4323f4edb12bb3b1cd"
+    },
+    {
+      "path": "tools/test_local_aot_request_recovery.py",
+      "sha256": "e432e117f692b9b92c0b9e95b4215cae55955a35544d34bbe0334f5e2204df71"
+    },
+    {
+      "path": "tests/metal/test_local_aot_entry_fallback.mm",
+      "sha256": "02e41933f94af14810b3d59e6816e6819adf14f7475c45947aaf74e9385b8720"
+    },
+    {
+      "path": "tools/run_local_aot_entry_controls.py",
+      "sha256": "8aab921aa3b0fbb019d4dfdd236b62ed10c316daf517e7d88c1627f7e840e208"
+    },
+    {
+      "path": "docs/local-metal-source-api-coverage.md",
+      "sha256": "012f4d7bd49d0aba2b405cb560c6a820cdc55abdad53e3c0f253a278e6911bbf"
     }
   ],
   "excluded": [
@@ -39218,27 +39282,52 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "ca52e78db84cd299f0c0373ea105db55fc892d12",
+    "base": "cb4d65bdf60f1effd8fb12b39491c3b1a0fb43c7",
     "paths": [
-      "tools/gpu_candidate_identity.py",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.mm",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_local_aot.h",
+      "tools/build_warm_archive_candidate.py",
+      "tools/build_first_upload_test.py",
+      "tools/run_warm_persistence_regressions.py",
+      "tools/local_metal_builder.py",
+      "tools/test_local_metal_builder.py",
+      "tools/record_local_aot_controls.py",
+      "tools/load_local_aot_controls.py",
+      "tools/run_local_aot_phase.py",
+      "tools/run_local_aot_authored.py",
+      "tools/local_aot_policy.py",
+      "tools/test_local_aot_policy.py",
       "tools/run_game.py",
-      "tools/prepare_gpu_candidate_app.py",
-      "tests/test_gpu_candidate_selection.py",
       "tools/analyze_warm_archive_cases.py",
-      "GOAL.zh-CN.md",
+      "tests/metal/test_local_aot_library.mm",
       "CURRENT-PLAN.zh-CN.md",
       "NIGHT-HANDOFF.zh-CN.md",
-      "docs/warm-archive-game-validation.zh-CN.md",
-      "docs/warm-archive-game-validation.json"
+      "docs/local-metal-aot-validation.zh-CN.md",
+      "docs/local-metal-aot-validation.json"
     ],
-    "status": "matched-archive-cohort-only-opt-in",
-    "excluded_parallel_drafts": [
-      "GS equality review",
-      "R2 raw export",
-      "live payload leases",
-      "context restore",
-      "firstmiss async scheduler",
-      "future local metallib builder"
-    ]
+    "status": "experimental-local-aot-hardened-no-default-enable",
+    "excluded": [
+      "all game MSL/AIR/metallib/artifacts",
+      "admission/recovery patches",
+      "GS equality proposals",
+      "R2/live payload/context drafts"
+    ],
+    "hardening_paths": [
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_local_aot.h",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.mm",
+      "tools/local_metal_builder.py",
+      "tools/test_local_aot_request_recovery.py",
+      "tests/metal/test_local_aot_library.mm",
+      "tests/metal/test_local_aot_entry_fallback.mm",
+      "tools/run_local_aot_entry_controls.py",
+      "tools/run_local_aot_phase.py",
+      "tools/build_first_upload_test.py",
+      "CURRENT-PLAN.zh-CN.md",
+      "NIGHT-HANDOFF.zh-CN.md",
+      "docs/local-metal-aot-validation.zh-CN.md",
+      "docs/local-metal-aot-validation.json",
+      "docs/local-metal-source-api-coverage.md"
+    ],
+    "exported_GPU_sha256": "a24a0569985495d79a78d02502052037517232f2ef92c4629916bd264e0e0f38"
   }
 }
