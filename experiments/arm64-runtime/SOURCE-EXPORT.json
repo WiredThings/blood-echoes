@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792899750364561000,
+  "created_ns": 1792900642298195000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -141,7 +141,11 @@
     },
     {
       "path": "src/game_runtime.cpp",
-      "sha256": "7ffe02e507e16a5070c8081e22b177687cc1dec5202f01d13fea52b4f431442b"
+      "sha256": "428a50f2f67ca9e2a2e21ede4f3cbcc450fe3bba2ad677c48f5195c10913d348"
+    },
+    {
+      "path": "src/guest_process_parameters.h",
+      "sha256": "5c4d1add135a73bda1d10bdc388c534077ac5fc107dc7e3d2483339798d9eaed"
     },
     {
       "path": "src/guest_resource_detours.h",
@@ -737,7 +741,7 @@
     },
     {
       "path": "tests/game_fixture.py",
-      "sha256": "e5bfea7d9c2083c8cc265b1f95852f4fbb35f9dbfec37a23ef6e563cd6fee27b"
+      "sha256": "7c1c986b0068663056bb86cdcebfd5514cdece933fd714fce2264c63cf5fdebd"
     },
     {
       "path": "tests/heap_sites_original.cpp",
@@ -972,6 +976,10 @@
       "sha256": "40b4ad9338e24c504f964b7b8b3bdc6e9aab07cb0385830045748c30bbff0528"
     },
     {
+      "path": "tests/test_guest_process_parameters.cpp",
+      "sha256": "deaf0d98154697e25058b5d5f2cd91347e58960127d915f49a86436786d6bb41"
+    },
+    {
       "path": "tests/test_guest_resource_detours.cpp",
       "sha256": "ba779206107b159db47b4e57f739a0a857b00c31c8fc7225cba21e69df06f0d7"
     },
@@ -1122,6 +1130,10 @@
     {
       "path": "tests/test_producer_wait_policy.cpp",
       "sha256": "8da3a44f62ac3ea118d203c275a7348b52d8c09b767d0b8a5ac712a38fded72e"
+    },
+    {
+      "path": "tests/test_progname_fex.py",
+      "sha256": "344731714466edcefda81ecb8cbcc97789b8d02a72f659be1b0508bc83ddfb60"
     },
     {
       "path": "tests/test_published_ranges.cpp",
@@ -38541,15 +38553,15 @@
     },
     {
       "path": "GOAL.zh-CN.md",
-      "sha256": "007d75cde094e63d91a024edb55d9846ace55bc8e19b4e13e7e4a94fcafd00ee"
+      "sha256": "1ba998b3d8ec023058a76841bafc5ce1afb690672e0cc2101773217e32d6fef4"
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "491720bf24352319147d808dbcf43cc68fb3bb48d07d3727ed41c53a517a6568"
+      "sha256": "4dbfe42c582ec92be0bbdf2cdb151a7d7412cc57f8de71ef88c89f6914a6c843"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "98c46760ecea3c1237411033abe935507bf7df26e9e1f252e492d231b2e89e2a"
+      "sha256": "1ad8989a389b0e28543b69e3b45bc1589c7f56d9d67a3a0c45ccfc118c40fc88"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38638,6 +38650,10 @@
     {
       "path": "docs/semantic-cache-inputs.zh-CN.md",
       "sha256": "839122647a2150f1e24ed52def37a7df558f4240042c29baaccadf9ecae84378"
+    },
+    {
+      "path": "docs/guest-process-data-contracts.zh-CN.md",
+      "sha256": "fd3460014b5e75a2d5c3a642c8217cd1f28f1b948abd0a0ae55b66d2654457ce"
     }
   ],
   "excluded": [

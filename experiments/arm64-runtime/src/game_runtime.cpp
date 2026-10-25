@@ -33,6 +33,7 @@
 #include "core/fex/darwin_fault.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "boot_image.h"
+#include "guest_process_parameters.h"
 #include "remote/bb_memory_mirror.h"
 #include "core/guest_cpu/fex_guest_cpu.h"
 #include "core/guest_cpu/fex_hle_bridge.h"
@@ -388,6 +389,7 @@ int game_main(int argc,char** argv){
   if((runtime_net_enabled()||getenv("BB_DEV_WORLD_WARPER_DIR"))&&getenv("BB_ARM_AUTO_CONTINUE"))runtime_quicksave_begin_auto_continue();
   bbgpu_register_kernel();
   Mapping image(b.size),halt(Page),driver(Page),params(Page);s.image=image.at();s.image_size=b.size;s.libc=image.at()+b.modules.at(0).base;for(auto segment:b.segments)if(segment.flags&1)s.text_end=std::max<uintptr_t>(s.text_end,image.at()+segment.address+segment.size);s.halt=halt.at();b.load(image.ptr);*static_cast<uint8_t*>(halt.ptr)=0xf4;
+  const auto progname=BbGuestProcess::Initialize(std::span(static_cast<std::byte*>(params.ptr),params.size),params.at());
   uint64_t net_sdk{};memcpy(&net_sdk,static_cast<uint8_t*>(image.ptr)+b.procparam+16,8);runtime_net_configure(app0.c_str(),game_metadata.serial.c_str(),game_metadata.title.c_str(),game_metadata.version.c_str(),static_cast<unsigned char*>(image.ptr),b.size,uint32_t(net_sdk));
   std::vector<uintptr_t> imported(b.names.size());std::vector<uint64_t> kinds(b.names.size());for(auto x:b.relocs)if(x.kind){check(!kinds[x.value]||kinds[x.value]==x.kind,"mixed import kind");kinds[x.value]=x.kind;}
   if(graphics){
@@ -412,6 +414,7 @@ int game_main(int argc,char** argv){
    else if(net_adapter){auto net=std::shared_ptr<HleCallAdapter>(std::move(net_adapter));imported[i]=veneer(s,s.registry.Register(framed(net),std::string("net.")+runtime_import_name(b.names[i].c_str())));++native;route="native-net";}
    else if(av_adapter){
     imported[i]=veneer(s,s.registry.Register(framed(av_adapter),std::string("avplayer.")+runtime_import_name(b.names[i].c_str())));++native;route="native-avplayer";}
+   else if(!host&&!b.bindings.contains(i)&&BbGuestProcess::IsProgramName(b.names[i],kinds[i],b.caps)){imported[i]=progname;route="guest-process-data";}
    else if(host&&kinds[i]==2){imported[i]=host;route="native-data";auto page=host&~uintptr_t(Page-1);s.ranges.push_back({page,Page,false,true});}
    else if(host&&s.native.contains(host)){imported[i]=veneer(s,s.native.at(host));++native;route="native";}
    else if(host&&bb_arm_gpu_adapter(runtime_import_name(b.names[i].c_str()),host)){auto gpu_adapter=bb_arm_gpu_adapter(runtime_import_name(b.names[i].c_str()),host);
@@ -475,7 +478,7 @@ int game_main(int argc,char** argv){
   Driver d;d.bytes({0x48,0x83,0xec,0x08});
   for(size_t i=0;i<b.modules.size();++i){d.rdi(i);d.call(start);d.bytes({0x31,0xff,0x31,0xf6,0x31,0xd2});d.call(image.at()+b.modules[i].init);d.bytes({0x89,0xc7});d.call(finish);d.bytes({0x85,0xc0,0x0f,0x85});d.failures.push_back(d.code.size());d.bytes({0,0,0,0});}
   if(!modules_only){
-   uint64_t arguments[]={1,params.at()+64,0};memcpy(params.ptr,arguments,sizeof(arguments));strcpy(static_cast<char*>(params.ptr)+64,"/app0/eboot.bin");d.rdi(params.at());d.rsi(exit);std::printf("ARM ENTRY prepared offset=%#llx\n",b.entry);d.call(image.at()+b.entry);
+   d.rdi(params.at());d.rsi(exit);std::printf("ARM ENTRY prepared offset=%#llx\n",b.entry);d.call(image.at()+b.entry);
   }
   auto done=d.code.size();d.bytes({0x48,0x83,0xc4,0x08,0xc3});for(auto at:d.failures){int32_t relative=done-at-4;memcpy(d.code.data()+at,&relative,4);}check(d.code.size()<=driver.size,"driver overflow");memcpy(driver.ptr,d.code.data(),d.code.size());
   if(graphics)for(auto segment:b.segments)if(!(segment.flags&1)){

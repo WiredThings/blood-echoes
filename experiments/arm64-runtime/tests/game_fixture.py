@@ -99,6 +99,18 @@ def make(mode=None):
     if operation=='memcmp':z()
     else:r('8b 05',destination);q('3d',0x5a5a5a5a)
    data[0x4400:0x4420]=b'Z'*32;data[0x4500:0x4520]=b'Z'*32
+  elif mode in ['progname','progname-rewrite','progname-function']:
+   if '__progname' not in names:names.append('__progname')
+   if mode=='progname-function':c('__progname')
+   else:
+    # Relocation points to a char* slot, not directly to the string.
+    r('48 8b 05',0x4800+8*names.index('__progname'));e('48 8b 38')
+    e('81 3f 65 62 6f 6f');g();e('81 7f 04 74 2e 62 69');g();e('66 81 7f 08 6e 00');g()
+    c('__strlen_qa');q('48 3d',9)
+    if mode=='progname-rewrite':
+     r('48 8b 05',0x4800+8*names.index('__progname'));r('48 8d 3d',0x4500)
+     e('c7 07 51 41 00 00 48 89 38');c('__strlen_qa');q('48 3d',2)
+     r('48 8b 05',0x4800+8*names.index('__progname'));e('48 8b 38');c('__strlen_qa');q('48 3d',2)
   elif mode=='dialogs':
    for family in ['sceMsgDialog','sceSaveDataDialog','sceNpProfileDialog','sceNpCommerceDialog']:
     c(family+'Initialize');z()
@@ -307,7 +319,7 @@ def make(mode=None):
  if mode=='net-thd-path-bad':data[0x7ff8:0x8000]=b'x'*8
  if mode=='long-string':data[0x7000:0x7000+5001]=b'x'*5000+b'\0'
  for patch,target in fix:struct.pack_into('<i',data,patch,target-patch-4)
- for i,name in enumerate(names):relocs.append((0x4800+8*i,1,i,0))
+ for i,name in enumerate(names):relocs.append((0x4800+8*i,2 if name=='__progname' and mode!='progname-function' else 1,i,0))
  modules=[(0,512,0,0x4200,16,8,2),(0x200,512,0x200,0x4210,16,8,3)]
  header=b'BBPROBE5'+struct.pack('<6Q',len(data),0x400,2,len(relocs),len(names),1)
  header+=struct.pack('<6Q',0x4000,0x4100,8,16,16,2)
