@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792910734595944000,
+  "created_ns": 1792913734595882000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -673,7 +673,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "8b6851740f5e322baf179af2744f58700b8e559be2dd5463c3b4fe77629f39b9"
+      "sha256": "476f3a5c5631568a9be1b4312c55174e431d41a016b0e5f3a945268b675f4f9e"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -33197,7 +33197,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp",
-      "sha256": "641a763b9c6adf051c79fe74f7fb506e62e77993b4683d4b38a83c7e747bd57c"
+      "sha256": "1c9e138131084b64cbc5031a43e24733e345bc319de45d81be8a362e8bcff93c"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.h",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "1a69e943d0c56787a980ac15732f7ad511787c1a97ee2f0318751f95026dd730"
+      "sha256": "e3eff5919eaa3a7ee8c1778876e0cd55a058c6f9902a9c006ffe1e2e259ac359"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "9cdd0661d988faf7a92b079d21ee6d36c599b94a3843213afdbf07f268286200"
+      "sha256": "ffee93abaf1f54c5ef38baf8b3150a5226cbded4b114ecf41ad838e0d4776aa0"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38914,6 +38914,54 @@
     {
       "path": "docs/tiler-parameter-abi-review/source-identity-defaults-followup.json",
       "sha256": "f8d6cf2c915ccddd1f0b67e568b3e0db76dcba85f064efc469e3e99fef62665d"
+    },
+    {
+      "path": "src/bb_raw_write_audit.h",
+      "sha256": "81ad556f018614184e11188f39386bd16293df8d429a0b995b4d52f2e339e037"
+    },
+    {
+      "path": "tools/build_raw_write_observer.py",
+      "sha256": "800e581ad3121dccb401d08da0b169982336a54c1dd7356f4ba87061738e2bdb"
+    },
+    {
+      "path": "tools/prepare_raw_write_audit_gpu.py",
+      "sha256": "0743754de3f2d75df473686f04be7049a5e7812d9c96108f51eef91c8ce98495"
+    },
+    {
+      "path": "tests/test_texture_authority_order.py",
+      "sha256": "b65c34f5ca1c6f7a68ab9d19fccd6be72f2de2570daecc3b443998367671360a"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/texture_authority_order.mm",
+      "sha256": "0c5f8f3f003f2c7490021d9519c9ae28f8bf80548d7c8567836617f899af0a5e"
+    },
+    {
+      "path": "docs/raw-authority-review/report.zh-CN.md",
+      "sha256": "0489900717876a45a666c2cf8eebd9f0902b17924807db8b8bb5cafa379287ee"
+    },
+    {
+      "path": "docs/raw-authority-review/reviewed-excerpts.txt",
+      "sha256": "84bbc6aedbd8244d932806eb9580857c1996d7ca22fc7629c02cb9a7134ab300"
+    },
+    {
+      "path": "docs/raw-authority-review/source-identity.json",
+      "sha256": "fbed4402ae52b4308a0052fc17b35637d3cf784f7ecd82e1adee456925c38233"
+    },
+    {
+      "path": "docs/raw-authority-review/prewrite-design.zh-CN.md",
+      "sha256": "ee44daa25432951db2f9f02e5e380fa6ddb1ca447450401c29a98f9ffa2f64ab"
+    },
+    {
+      "path": "docs/raw-authority-review/prewrite-source-identity.json",
+      "sha256": "59d48ddb9fcb57c0a31f548be75fa6fc5f33cb70c297cb16d8a5e52173013b48"
+    },
+    {
+      "path": "docs/raw-write-order.zh-CN.md",
+      "sha256": "227c246ffe90041a9ac2f2caf50e64c2a92cbd79325513667eb89efd73c73dfe"
+    },
+    {
+      "path": "docs/raw-write-order-aggregate.json",
+      "sha256": "1181a1fb1c0151eaca4b677d98218881a3aa3820564165f6896798299d4b8422"
     }
   ],
   "excluded": [
@@ -38928,5 +38976,31 @@
     "credentials",
     "caches"
   ],
-  "standalone_clean_build_validated": false
+  "standalone_clean_build_validated": false,
+  "reviewed_overlay": {
+    "base": "f349bd44ed37bc2658ef1327f9e2a1ecba6ef5ef",
+    "paths": [
+      "src/bb_raw_write_audit.h",
+      "vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp",
+      "tools/build_raw_write_observer.py",
+      "tools/prepare_raw_write_audit_gpu.py",
+      "tools/run_launcher_engine_abba.py",
+      "tests/test_texture_authority_order.py",
+      "tests/texture_layout_contract_proposal/texture_authority_order.mm",
+      "CURRENT-PLAN.zh-CN.md",
+      "NIGHT-HANDOFF.zh-CN.md",
+      "docs/raw-authority-review/report.zh-CN.md",
+      "docs/raw-authority-review/reviewed-excerpts.txt",
+      "docs/raw-authority-review/source-identity.json",
+      "docs/raw-authority-review/prewrite-design.zh-CN.md",
+      "docs/raw-authority-review/prewrite-source-identity.json",
+      "docs/raw-write-order.zh-CN.md",
+      "docs/raw-write-order-aggregate.json"
+    ],
+    "excluded_parallel_drafts": [
+      "bounded Mlock integration",
+      "owned shader compiler context/scheduling"
+    ],
+    "excerpt_trailing_whitespace_normalized": true
+  }
 }

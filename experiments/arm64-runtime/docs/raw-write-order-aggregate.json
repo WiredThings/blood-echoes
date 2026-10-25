@@ -1,0 +1,101 @@
+{
+  "scope": "diagnostic only; actual invalidation and resource selection unchanged",
+  "game_runs": [
+    {
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/launcher-engine-abba-1792913010727142000",
+      "ready_seconds": 16.718796583008952,
+      "observed_seconds": 65.25898429204244,
+      "exit": 143,
+      "stop": "private action trace completed",
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 8081.6875
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9054.1875
+      },
+      "pressure_samples": {
+        "1": 26,
+        "2": 216
+      },
+      "swap_peak_mib": 9086.1875,
+      "records": 64,
+      "per_probe": {
+        "50": 2,
+        "57": 53,
+        "124": 2,
+        "131": 7
+      },
+      "safe_to_download": {
+        "1": 5,
+        "0": 59
+      },
+      "role_bits": {
+        "2": 6,
+        "3": 2,
+        "1": 56
+      },
+      "summary": [
+        "BB_RAW_WRITE_AUDIT_SUMMARY probes=256 records=64 skipped=86 limited=0"
+      ],
+      "per_probe_limit_validated": false
+    },
+    {
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/launcher-engine-abba-1792913477710650000",
+      "ready_seconds": 17.006825583055615,
+      "observed_seconds": 65.47641091700643,
+      "exit": 143,
+      "stop": "private action trace completed",
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 8806.125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 8863.625
+      },
+      "pressure_samples": {
+        "1": 65,
+        "2": 178
+      },
+      "swap_peak_mib": 8895.625,
+      "records": 16,
+      "per_probe": {
+        "4": 4,
+        "85": 2,
+        "92": 4,
+        "174": 2,
+        "181": 4
+      },
+      "safe_to_download": {
+        "0": 12,
+        "1": 4
+      },
+      "role_bits": {
+        "1": 12,
+        "2": 2,
+        "3": 2
+      },
+      "summary": [
+        "BB_RAW_WRITE_AUDIT_SUMMARY probes=256 records=16 skipped=85 limited=3"
+      ],
+      "per_probe_limit_validated": true
+    }
+  ],
+  "corrected_GPU": "c398a17046b990e2fc609bd29b27955b40389c04e7e3bbafc65408bc346cab34",
+  "controls_enabled": "texture-authority-order-1792913420988072000",
+  "controls_disabled": "texture-authority-order-1792913453233057000",
+  "authored_cases_each": 19,
+  "known_runtime_failure_cases": 5,
+  "distinct_invalidation_defects": 4,
+  "white_model_cause_proven": false,
+  "performance_evidence": false,
+  "formal_protected_files_unchanged": 11671,
+  "original_launcher_scripts_unchanged": 16,
+  "game_cache_captured_or_exported": false
+}

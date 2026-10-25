@@ -178,3 +178,20 @@ python3 tests/test_manual_qa_policy.py
 All live test helpers are QA tools. Review their explicit private-root checks and
 memory/lock policy before using them; never substitute a formal save or cache directory.
 Do not publish a Release from this snapshot until its remaining acceptance gates pass.
+
+## Bounded raw-write ordering investigation
+
+See docs/raw-write-order.zh-CN.md and docs/raw-authority-review/.
+Two 19-case real-Metal cohorts preserve four known invalidation defect patterns
+instead of declaring the broken runtime correct. GPU-only same-submission controls
+prove ordered export/partial-write composition, not actual BufferCache integration.
+The default-off bounded observer changes no selection, dirty state or cache budget.
+A corrected silent private scene run recorded 16 potentially missed overlap rows,
+with at most four images per probe, no critical pressure and 57.5 MiB final swap rise.
+Writable binding extent is not proof of every byte being written or of the reported
+white-model cause. The initial observer-limit failure remains documented.
+No FPS improvement, whole-game acceptance or safe production conversion is claimed.
+
+This is a reviewed overlay on f349bd44. Unbuilt Mlock integration and owned-shader
+parallel drafts are intentionally excluded from this source checkpoint. Neither is
+enabled. The latest ordinary local QA package remains c22970cc; no Release changes.

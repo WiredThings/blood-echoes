@@ -1,0 +1,20 @@
+{
+  "captured_utc": "2026-10-25T06:52:34.302980+00:00",
+  "read_only": true,
+  "game_started": false,
+  "compiled": false,
+  "sources": {
+    "vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp": "641a763b9c6adf051c79fe74f7fb506e62e77993b4683d4b38a83c7e747bd57c",
+    "vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.h": "baa561611a5fddcd44f57774aa65e2db7024f65af45285f4218ecc56f52c47ad",
+    "vendor/metal_api/shadps4/video_core/texture_cache/image.h": "35be3ff01450a3a91d7ff02ee0cbb33254b58d0627cd3ac2ff6bdf03d588cb19",
+    "vendor/metal_api/shadps4/video_core/buffer_cache/buffer_cache.cpp": "61630465b5e242561e26807a11fb5f332c8430f1bb63d092cd8e21694257a32a",
+    "vendor/metal_api/shadps4/video_core/buffer_cache/buffer_cache_layer.cpp": "c73d836601e47ba48c8e31c3bfa1de838e02052f43b7d589b06256854a7a7e33",
+    "vendor/metal_api/shadps4/video_core/buffer_cache/memory_tracker.h": "237d17e322eb9cb2658ceb168414bde1e0e07908f53dde781704dd973347d1e3",
+    "vendor/metal_api/shadps4/video_core/texture_cache/tile_manager.cpp": "5d92b1b0b2b344ce293f133f90ee98c7082ef37cd45ad9a4873fbff936f411c5",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime.mm": "dcea7ee5293945ebbb3e65389c11db5870e3f7c78a8b9d9e6e2e6a422954901f",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime.h": "92f3127990200aa9f0d8a332f00bcb60f5efd468b3ec79156d7bfba9418ff77b",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm": "c37801108b3a337d6b7490dc522cdd1bd2f023434598f2b0334895ff534d9e5a",
+    "vendor/metal_api/shadps4/video_core/rasterizer_core.cpp": "507817defcb97871a1ab48cd09cbe15b6cd891c6c9da5d11c1eb6db2ef673ea2",
+    "vendor/metal_api/shadps4/video_core/rasterizer_core_memory.cpp": "b760c9970196d04e9afedd49d10c9951a5f90b72d321b351175e98aaa8ece56d"
+  }
+}

@@ -1,4 +1,5 @@
 #include "bb_stutter_audit.h"
+#include "bb_raw_write_audit.h"
 #include "bb_layout_audit.h"
 #include "bbport_reclaim_mapping.h"
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
@@ -292,6 +293,21 @@ void TextureCache::WatchImage(const Image& image, const char* what) {
 
 void TextureCache::InvalidateMemoryFromGPU(VAddr address, size_t max_size) {
     std::scoped_lock lock{mutex};
+    if (const auto probe = BbRawWriteAudit::Begin()) {
+        unsigned inspected = 0;
+        if (BbRawWriteAudit::Range(address, max_size)) {
+            ForEachImageInRegion(address, max_size ? max_size : 1,
+                BbRawWriteAudit::BoundedVisitor{inspected, [&](ImageId id, Image& image) {
+                    const auto owner = guest_image_owners.find(id.index);
+                    const u64 allocation = owner == guest_image_owners.end() ? 0 : owner->second.generation;
+                    BbRawWriteAudit::Observe(probe, address, max_size, image,
+                        registry_generation.load(std::memory_order_relaxed), allocation,
+                        backend.CurrentTick());
+                    }});
+        }
+        BbRawWriteAudit::End(probe, inspected);
+    }
+
     // bbport: only an image starting at `address` is affected, so the images over its first byte
     // are all there is to look at (the whole range was walked for every GPU write binding).
     ForEachImageInRegion(address, 1, [&](ImageId image_id, Image& image) {

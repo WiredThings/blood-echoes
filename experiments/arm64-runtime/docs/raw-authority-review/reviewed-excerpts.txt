@@ -1,0 +1,1808 @@
+
+FILE vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp
+233: void TextureCache::MarkAsMaybeDirty(ImageId image_id, Image& image) {
+234:     if (image.hash == 0) {
+235:         // Initialize hash
+236:         const u8* addr = std::bit_cast<u8*>(image.info.guest_address);
+237:         image.hash = XXH3_64bits(addr, image.info.guest_size);
+238:     }
+239:     image.flags |= ImageFlagBits::MaybeCpuDirty;
+240:     UntrackImage(image_id);
+241: }
+242:
+243: void TextureCache::InvalidateMemory(VAddr addr, size_t size) {
+244:     std::scoped_lock lock{mutex};
+245:     const auto pages_start = PageManager::GetPageAddr(addr);
+246:     const auto pages_end = PageManager::GetNextPageAddr(addr + size - 1);
+247:     ForEachImageInRegion(pages_start, pages_end - pages_start, [&](ImageId image_id, Image& image) {
+248:         const auto image_begin = image.info.guest_address;
+249:         const auto image_end = image.info.guest_address + image.info.guest_size;
+250:         if (image.Overlaps(addr, size)) {
+251:             // Modified region overlaps image, so the image was definitely accessed by this fault.
+252:             // Untrack the image, so that the range is unprotected and the guest can write freely.
+253:             image.flags |= ImageFlagBits::CpuDirty;
+254:             PageManager::NoteImageFault(image.info.guest_address, image.info.guest_size,
+255:                                         image.info.size.width, image.info.size.height,
+256:                                         u32(image.info.pixel_format), u32(image.info.tile_mode));
+257:             UntrackImage(image_id);
+258:         } else if (pages_end < image_end) {
+259:             // This page access may or may not modify the image.
+260:             // We should not mark it as dirty now. If it really was modified
+261:             // it will receive more invalidations on its other pages.
+262:             // Remove tracking from this page only.
+263:             UntrackImageHead(image_id);
+264:         } else if (image_begin < pages_start) {
+265:             // This page access does not modify the image but the page should be untracked.
+266:             // We should not mark this image as dirty now. If it really was modified
+267:             // it will receive more invalidations on its other pages.
+268:             UntrackImageTail(image_id);
+269:         } else {
+270:             // Image begins and ends on this page so it can not receive any more invalidations.
+271:             // We will check it's hash later to see if it really was modified.
+272:             MarkAsMaybeDirty(image_id, image);
+273:         }
+274:     });
+275: }
+293: void TextureCache::InvalidateMemoryFromGPU(VAddr address, size_t max_size) {
+294:     std::scoped_lock lock{mutex};
+295:     // bbport: only an image starting at `address` is affected, so the images over its first byte
+296:     // are all there is to look at (the whole range was walked for every GPU write binding).
+297:     ForEachImageInRegion(address, 1, [&](ImageId image_id, Image& image) {
+298:         static const bool log = std::getenv("BB_IMAGE_SYNC_LOG") != nullptr;
+299:         if (log) {
+300:             static std::atomic<u32> printed{0};
+301:             if (printed.fetch_add(1) < 200) {
+302:                 std::printf("Image sync: GPU write %#llx+%#llx over image %#llx %ux%u fmt %u flags %#x%s\n",
+303:                             (unsigned long long)address, (unsigned long long)max_size,
+304:                             (unsigned long long)image.info.guest_address, image.info.size.width,
+305:                             image.info.size.height, u32(image.info.pixel_format), u32(image.flags),
+306:                             image.info.guest_address == address ? "" : " (not at its start: kept)");
+307:             }
+308:         }
+309:         // Only consider images that match base address.
+310:         // TODO: Maybe also consider subresources
+311:         if (image.info.guest_address != address) {
+312:             return;
+313:         }
+314:         // Ensure image is reuploaded when accessed again.
+315:         WatchImage(image, "GPU write (marked for refresh)");
+316:         image.flags |= ImageFlagBits::GpuDirty;
+317:     });
+318: }
+319:
+320: void TextureCache::UnmapMemory(VAddr cpu_addr, size_t size) {
+321:     std::scoped_lock lk{mutex};
+322:
+323:     ImageIds deleted_images;
+324:     ForEachImageInRegion(cpu_addr, size, [&](ImageId id, Image&) { deleted_images.push_back(id); });
+325:     for (const ImageId id : deleted_images) {
+326:         // TODO: Download image data back to host.
+327:         FreeImage(id);
+638: ImageId TextureCache::ExpandImage(const ImageInfo& info, ImageId image_id) {
+639:     const auto new_image_id = slot_images.insert(backend, slot_image_views, info);
+640:     RegisterImage(new_image_id);
+641:
+642:     auto& src_image = slot_images[image_id];
+643:     auto& new_image = slot_images[new_image_id];
+644:
+645:     RefreshImage(new_image);
+646:     // shadPS4 #5444 (699009c9): a newly refreshed CPU image is authoritative.
+647:     // Copy only genuine GPU contents, never a stale CPU-dirty backing. This
+648:     // preserves CopyImage's GPU ownership propagation without changing budgets.
+649:     const bool gpu_valid = True(src_image.flags & ImageFlagBits::GpuModified) &&
+650:         False(src_image.flags & (ImageFlagBits::CpuDirty | ImageFlagBits::MaybeCpuDirty));
+651:     if (gpu_valid) {
+652:         backend.CopyImage(&src_image, &new_image);
+653:     }
+654:     static const bool diagnostic = std::getenv("BB_ARM_TEXTURE_DIAG") != nullptr;
+655:     if (diagnostic) {
+656:         static std::atomic<u32> printed{0};
+657:         if (printed.fetch_add(1) < 128) {
+658:             std::printf("ARM texture expand: addr=%#llx old-flags=%#x gpu-copy=%u "
+659:                         "old=%ux%u levels=%u layers=%u new=%ux%u levels=%u layers=%u\n",
+660:                         (unsigned long long)info.guest_address, u32(src_image.flags), gpu_valid,
+661:                         src_image.info.size.width, src_image.info.size.height,
+662:                         src_image.info.resources.levels, src_image.info.resources.layers,
+663:                         info.size.width, info.size.height, info.resources.levels,
+664:                         info.resources.layers);
+665:         }
+666:     }
+667:
+668:     if (src_image.binding.is_bound || src_image.binding.is_target) {
+669:         src_image.binding.needs_rebind = 1u;
+670:     }
+671:
+672:     FreeImage(image_id);
+673:     TrackImage(new_image_id);
+674:     return new_image_id;
+712:     std::scoped_lock lock{mutex};
+713:
+714:     u64 key_hash = info.guest_address ^ info.guest_size << 17 ^ u64(info.pixel_format) << 40 ^
+715:                    u64(info.size.width) << 24 ^ info.size.height ^ u64(desc.type) << 58 ^
+716:                    u64(exact_fmt) << 63;
+717:     key_hash = (key_hash ^ key_hash >> 33) * 0xFF51AFD7ED558CCDull;
+718:     key_hash = (key_hash ^ key_hash >> 33) * 0xC4CEB9FE1A85EC53ull;
+719:     key_hash ^= key_hash >> 33;
+720:     auto& cached = find_image_cache[key_hash % find_image_cache.size()];
+721:     // An exact match stays valid while that image is registered with the same description;
+722:     // resolved overlaps (views into other images) only until any image registration changes.
+723:     const auto still_exact = [&] {
+724:         if (cached.view_mip >= 0 || cached.view_slice >= 0 || !cached.image_id ||
+725:             !slot_images.is_allocated(cached.image_id)) {
+726:             return false;
+727:         }
+728:         const Image& image = slot_images[cached.image_id];
+729:         return True(image.flags & ImageFlagBits::Registered) &&
+730:                image.info.guest_address == info.guest_address &&
+731:                image.info.guest_size == info.guest_size && image.info.size == info.size &&
+732:                image.info.pixel_format == info.pixel_format &&
+733:                CompatibleDimensionalLayout(info, image.info) &&
+734:                IsViewTypeCompatible(desc.view_info.type, image.info.type);
+735:     };
+736:     if (cached.image_id && slot_images.is_allocated(cached.image_id) &&
+737:         (cached.generation == registry_generation.load(std::memory_order_relaxed) || still_exact()) &&
+738:         cached.address == info.guest_address &&
+739:         cached.size == info.guest_size && cached.extent == info.size &&
+740:         cached.format == info.pixel_format && cached.type == info.type &&
+741:         cached.exact_fmt == exact_fmt && cached.binding == desc.type &&
+742:         cached.levels == info.resources.levels && cached.layers == info.resources.layers &&
+743:         CompatibleDimensionalLayout(info, slot_images[cached.image_id].info) &&
+744:         IsViewTypeCompatible(desc.view_info.type, slot_images[cached.image_id].info.type) &&
+745:         !BbToggle::Disabled(BbToggle::FindImageCache)) {
+766:     // Check for a perfect match first
+767:     for (const auto& cache_id : image_ids) {
+768:         auto& cache_image = slot_images[cache_id];
+769:         if (cache_image.info.guest_address != info.guest_address) {
+770:             continue;
+771:         }
+772:         if (cache_image.info.guest_size != info.guest_size) {
+773:             continue;
+774:         }
+775:         if (cache_image.info.size != info.size) {
+776:             continue;
+777:         }
+778:         if (!IsVulkanFormatCompatible(cache_image.info.pixel_format, info.pixel_format) ||
+779:             cache_image.info.type != info.type ||
+780:             !IsViewTypeCompatible(desc.view_info.type, cache_image.info.type)) {
+781:             if (cache_image.info.type != info.type && info.size == Extent3D{1, 1, 1}) {
+782:                 LogDimensionalReuse(info, cache_image, "exact-1x1-reject");
+783:             }
+784:             continue;
+785:         }
+786:         if (exact_fmt && info.pixel_format != cache_image.info.pixel_format) {
+787:             continue;
+788:         }
+789:         image_id = cache_id;
+790:         selection_path = "exact";
+791:     }
+792:
+793:     // Try to resolve overlaps (if any)
+794:     int view_mip{-1};
+795:     int view_slice{-1};
+796:     if (!image_id) {
+797:         for (const auto& cache_id : image_ids) {
+798:             view_mip = -1;
+799:             view_slice = -1;
+800:
+801:             const auto& merged_info = image_id ? slot_images[image_id].info : info;
+802:             auto [overlap_image_id, overlap_view_mip, overlap_view_slice] =
+803:                 ResolveOverlap(merged_info, desc.type, cache_id, image_id);
+804:             if (overlap_image_id) {
+805:                 image_id = overlap_image_id;
+806:                 selection_path = "overlap";
+807:                 view_mip = overlap_view_mip;
+808:                 view_slice = overlap_view_slice;
+809:             }
+810:         }
+811:     }
+812:
+813:     if (image_id) {
+814:         Image& image_resolved = slot_images[image_id];
+815:         if (exact_fmt && info.pixel_format != image_resolved.info.pixel_format) {
+816:             // Cannot reuse this image as we need the exact requested format.
+817:             image_id = {};
+818:         } else if (image_resolved.info.resources < info.resources) {
+819:             // The image was clearly picked up wrong.
+820:             FreeImage(image_id);
+821:             image_id = {};
+822:             LOG_WARNING(Render_Vulkan, "Image overlap resolve failed");
+823:         }
+824:     }
+825:     // Create and register a new image
+826:     if (!image_id) {
+827:         image_id = slot_images.insert(backend, slot_image_views, info);
+828:         RegisterImage(image_id);
+829:     }
+862: ImageId TextureCache::FindImageFromRange(VAddr address, size_t size, bool ensure_valid) {
+863:     ImageIds image_ids;
+864:     ForEachImageInRegion(address, size, [&](ImageId image_id, Image& image) {
+865:         if (image.info.guest_address != address) {
+866:             return;
+867:         }
+868:         if (ensure_valid && !image.SafeToDownload()) {
+869:             return;
+870:         }
+871:         image_ids.push_back(image_id);
+872:     });
+873:     if (image_ids.size() == 1) {
+874:         // Sometimes image size might not exactly match with requested buffer size
+875:         // If we only found 1 candidate image use it without too many questions.
+876:         return image_ids.back();
+877:     }
+878:     if (!image_ids.empty()) {
+879:         for (s32 i = 0; i < image_ids.size(); ++i) {
+880:             Image& image = slot_images[image_ids[i]];
+881:             if (image.info.guest_size == size) {
+882:                 return image_ids[i];
+883:             }
+884:         }
+885:         LOG_WARNING(Render_Vulkan,
+886:                     "Failed to find exact image match for copy addr={:#x}, size={:#x}", address,
+887:                     size);
+888:     }
+889:     return {};
+890: }
+924:     if (desc.type == BindingType::Storage) {
+925:         image.flags |= ImageFlagBits::GpuModified;
+926:         image.gpu_write_tick = backend.CurrentTick();
+927:         if (readback_linear_images && (!image.info.props.is_tiled || image.info.size.width <= 8) &&
+928:             image.info.guest_address != 0) {
+929:             std::unique_lock lk{download_images_mutex};
+930:             download_images.emplace(image_id);
+931:             downloads_queued.store(true, std::memory_order_release);
+932:         }
+933:         // bbport (P10.1): a storage binding of an image created without the storage usage
+934:         // promotes it here, before the refresh (which then uploads into the new backing) and
+935:         // before the view memo (which could return a view of the old one). FindView does the
+936:         // same for every other view that needs a usage; a memo hit needs none, it was made by a
+937:         // FindView of the same T# on this backing.
+938:         image.EnsureViewUsage(desc.view_info);
+939:     }
+940:     if (refresh) {
+941:         UpdateImage(image_id);
+942:     }
+943:     if (memo && !BbToggle::Disabled(BbToggle::TextureViewMemo)) {
+944:         if (memo->image_id == image_id && memo->backing == image.backing && memo->view_id) {
+945:             return slot_image_views[memo->view_id];
+946:         }
+947:         ImageView& view = image.FindView(desc.view_info);
+948:         const auto& ids = image.backing->image_view_ids;
+949:         const u32 last = image.backing->last_view;
+950:         memo->image_id = image_id;
+951:         memo->backing = image.backing;
+952:         memo->view_id = last < ids.size() && &slot_image_views[ids[last]] == &view ? ids[last]
+953:                                                                                     : ids.back();
+954:         return view;
+955:     }
+956:     return image.FindView(desc.view_info);
+957: }
+958:
+959: ImageView& TextureCache::FindRenderTarget(ImageId image_id, const ImageDesc& desc) {
+960:     Image& image = slot_images[image_id];
+961:     if(FrameCapture::NativeRecording())FrameCapture::NativeBufferUse(image.image_uid,0,0,
+962:         image.info.guest_size,image.guest_begin,7,0,true,"color_target");
+963:     WatchImage(image, "render target");
+964:     image.flags |= ImageFlagBits::GpuModified;
+965:     image.gpu_write_tick = backend.CurrentTick();
+966:     if (readback_linear_images && (!image.info.props.is_tiled || image.info.size.width <= 8)) {
+967:         std::unique_lock lk{download_images_mutex};
+968:         download_images.emplace(image_id);
+969:         downloads_queued.store(true, std::memory_order_release);
+970:     }
+971:     image.usage.render_target = 1u;
+972:     UpdateImage(image_id);
+973:
+974:     // Register meta data for this color buffer
+975:     if (desc.info.meta_info.cmask_addr) {
+976:         surface_metas.emplace(desc.info.meta_info.cmask_addr,
+977:                               MetaDataInfo{.type = MetaType::CMask});
+978:         image.info.meta_info.cmask_addr = desc.info.meta_info.cmask_addr;
+979:     }
+980:
+981:     if (desc.info.meta_info.fmask_addr) {
+982:         surface_metas.emplace(desc.info.meta_info.fmask_addr,
+983:                               MetaDataInfo{.type = MetaType::FMask});
+984:         image.info.meta_info.fmask_addr = desc.info.meta_info.fmask_addr;
+985:     }
+986:
+987:     return image.FindView(desc.view_info, false);
+988: }
+989:
+990: ImageView& TextureCache::FindDepthTarget(ImageId image_id, const ImageDesc& desc) {
+991:     Image& image = slot_images[image_id];
+992:     if(FrameCapture::NativeRecording())FrameCapture::NativeBufferUse(image.image_uid,0,0,
+993:         image.info.guest_size,image.guest_begin,7,0,true,"depth_target");
+994:     WatchImage(image, "depth target");
+995:     image.flags |= ImageFlagBits::GpuModified;
+996:     image.gpu_write_tick = backend.CurrentTick();
+997:     image.usage.depth_target = 1u;
+998:     UpdateImage(image_id);
+1033: void TextureCache::RefreshImage(Image& image) {
+1034:     WatchImage(image, "refresh entered");
+1035:     if (False(image.flags & ImageFlagBits::Dirty) || image.info.num_samples > 1) {
+1036:         return;
+1037:     }
+1038:     BbStats::Timer timer{BbStats::t_refresh};
+1039:
+1040:     RENDERER_TRACE;
+1041:     TRACE_HINT(fmt::format("{:x}:{:x}", image.info.guest_address, image.info.guest_size));
+1042:
+1043:     if (True(image.flags & ImageFlagBits::MaybeCpuDirty) &&
+1044:         False(image.flags & ImageFlagBits::CpuDirty)) {
+1045:         // The image size should be less than page size to be considered MaybeCpuDirty
+1046:         // So this calculation should be very uncommon and reasonably fast
+1047:         // For now we'll just check up to 64 first pixels
+1048:         const auto addr = std::bit_cast<u8*>(image.info.guest_address);
+1049:         const u32 w = std::min(image.info.size.width, u32(8));
+1050:         const u32 h = std::min(image.info.size.height, u32(8));
+1051:
+1052:         const u32 s_w = image.info.props.is_block ? Common::DivCeil(w, 4u) : w;
+1053:         const u32 s_h = image.info.props.is_block ? Common::DivCeil(h, 4u) : h;
+1054:         const u32 size = s_w * s_h * (image.info.num_bits / 8);
+1055:         const u64 hash = XXH3_64bits(addr, size);
+1056:         if (image.hash == hash) {
+1057:             image.flags &= ~ImageFlagBits::MaybeCpuDirty;
+1058:             return;
+1059:         }
+1060:         image.hash = hash;
+1061:     }
+1062:
+1063:     const u32 num_layers = image.info.resources.layers;
+1064:     const u32 num_mips = image.info.resources.levels;
+1065:     const bool is_gpu_modified = True(image.flags & ImageFlagBits::GpuModified);
+1066:     const bool is_gpu_dirty = True(image.flags & ImageFlagBits::GpuDirty);
+1067:     static const bool sync_log = std::getenv("BB_IMAGE_SYNC_LOG") != nullptr;
+1068:     if (sync_log && is_gpu_dirty) {
+1069:         static std::atomic<u32> printed{0};
+1070:         if (printed.fetch_add(1) < 100) {
+1071:             std::printf("Image sync: refresh of %#llx (%ux%u) from memory the GPU wrote, flags %#x\n",
+1072:                         (unsigned long long)image.info.guest_address, image.info.size.width,
+1073:                         image.info.size.height, u32(image.flags));
+1074:         }
+1075:     }
+1076:
+1077:     if (sync_log) {
+1078:         // BB_IMAGE_SYNC_LOG: the images refreshed most per 5 s (any reason), with their flags.
+1079:         struct Refreshes {
+1080:             u64 count = 0, bytes = 0;
+1081:             u32 width = 0, height = 0, format = 0, tiling = 0, flags = 0;
+1082:         };
+1083:         static std::mutex refresh_mutex;
+1084:         static std::unordered_map<VAddr, Refreshes> refreshes;
+1085:         static auto window_start = std::chrono::steady_clock::now();
+1086:         std::scoped_lock lk{refresh_mutex};
+1087:         auto& r = refreshes[image.info.guest_address];
+1088:         r = {r.count + 1,
+1089:              r.bytes + image.info.guest_size,
+1090:              image.info.size.width,
+1091:              image.info.size.height,
+1092:              u32(image.info.pixel_format),
+1093:              u32(image.info.tile_mode),
+1094:              r.flags | u32(image.flags)};
+1095:         if (const auto now = std::chrono::steady_clock::now();
+1096:             now - window_start >= std::chrono::seconds(5)) {
+1097:             std::vector<std::pair<VAddr, Refreshes>> top(refreshes.begin(), refreshes.end());
+1098:             std::ranges::sort(top, std::greater{}, [](const auto& e) { return e.second.bytes; });
+1099:             std::string text;
+1100:             for (size_t i = 0; i < std::min<size_t>(top.size(), 5); ++i) {
+1101:                 const auto& [address, e] = top[i];
+1102:                 text += fmt::format(" {:#x} {}x{} fmt {} tile {}: {}x {:.0f} MB flags {:#x};",
+1103:                                     address, e.width, e.height, e.format, e.tiling, e.count,
+1104:                                     e.bytes / 1e6, e.flags);
+1105:             }
+1106:             std::printf("Image refreshes (5 s, %zu images):%s\n", refreshes.size(), text.c_str());
+1107:             refreshes.clear();
+1108:             window_start = now;
+1109:         }
+1110:     }
+1111:     BbStats::image_upload_bytes.fetch_add(image.info.guest_size, std::memory_order_relaxed);
+1112:     boost::container::small_vector<vk::BufferImageCopy, 14> image_copies;
+1113:     for (u32 m = 0; m < num_mips; m++) {
+1114:         const u32 width = std::max(image.info.size.width >> m, 1u);
+1115:         const u32 height = std::max(image.info.size.height >> m, 1u);
+1116:         const u32 depth =
+1117:             image.info.props.is_volume ? std::max(image.info.size.depth >> m, 1u) : 1u;
+1118:         const auto [mip_size, mip_pitch, mip_height, mip_offset] = image.info.mips_layout[m];
+1119:
+1120:         // Protect GPU modified resources from accidental CPU reuploads.
+1121:         // Record the first upload too. Otherwise an unrelated CPU dirty mark
+1122:         // can upload unchanged old bytes over a subsequent GPU write.
+1123:         if (is_gpu_modified) {
+1124:             const u8* addr = std::bit_cast<u8*>(image.info.guest_address);
+1125:             const u64 hash = XXH3_64bits(addr + mip_offset, mip_size);
+1126:             if (!is_gpu_dirty && image.mip_hashes[m] == hash) {
+1127:                 continue;
+1128:             }
+1129:             image.mip_hashes[m] = hash;
+1130:         }
+1131:
+1132:         const u32 extent_width = mip_pitch ? std::min(mip_pitch, width) : width;
+1133:         const u32 extent_height = mip_height ? std::min(mip_height, height) : height;
+1134:         image_copies.push_back({
+1135:             .bufferOffset = mip_offset,
+1136:             .bufferRowLength = mip_pitch,
+1137:             .bufferImageHeight = mip_height,
+1138:             .imageSubresource{
+1139:                 .aspectMask = image.aspect_mask & ~vk::ImageAspectFlagBits::eStencil,
+1140:                 .mipLevel = m,
+1141:                 .baseArrayLayer = 0,
+1142:                 .layerCount = num_layers,
+1143:             },
+1144:             .imageOffset = {0, 0, 0},
+1145:             .imageExtent = {extent_width, extent_height, depth},
+1146:         });
+1147:     }
+1148:
+1149:     WatchImage(image, image_copies.empty() ? "refresh: nothing to copy" : "refresh: uploading");
+1150:     if (image_copies.empty()) {
+1151:         image.flags &= ~ImageFlagBits::Dirty;
+1152:         return;
+1153:     }
+1154:
+1155:     backend.EndRendering();
+1156:
+1157:     const auto [in_buffer, in_offset] =
+1158:         buffer_cache.ObtainBufferForImage(image.info.guest_address, image.info.guest_size);
+1159:     const auto [buffer, offset] = tile_manager.DetileImage(in_buffer, in_offset, image.info);
+1160:     for (auto& copy : image_copies) {
+1161:         copy.bufferOffset += offset;
+1162:     }
+1163:
+1164:     backend.UploadImage(&image, buffer, image_copies);
+1165: }
+1189: void TextureCache::RegisterImage(ImageId image_id) {
+1190:     BbStats::images_registered.fetch_add(1, std::memory_order_relaxed);
+1191:     Image& image = slot_images[image_id];
+1192:     ASSERT_MSG(False(image.flags & ImageFlagBits::Registered),
+1193:                "Trying to register an already registered image");
+1194:     image.flags |= ImageFlagBits::Registered;
+1195:     ++registry_generation;
+1196:     total_used_memory += Common::AlignUp(image.info.guest_size, 1024);
+1197:     BbStats::live_image_bytes.fetch_add(Common::AlignUp(image.info.guest_size, 1024),
+1198:                                         std::memory_order_relaxed);
+1199:     BbStats::live_images.fetch_add(1, std::memory_order_relaxed);
+1200:     image.lru_id = lru_cache.Insert(image_id, gc_tick);
+1201:     image.lru_touched_tick = gc_tick;
+1202:     AssociateGuestImage(image_id);
+1203:     ForEachPage(image.info.guest_address, image.info.guest_size,
+1204:                 [this, image_id](u64 page) { page_table[page].push_back(image_id); });
+1205: }
+1206:
+1207: void TextureCache::UnregisterImage(ImageId image_id) {
+1208:     Image& image = slot_images[image_id];
+1209:     ASSERT_MSG(True(image.flags & ImageFlagBits::Registered),
+1210:                "Trying to unregister an already unregistered image");
+1211:     guest_image_owners.erase(image_id.index);
+1212:     image.flags &= ~ImageFlagBits::Registered;
+1213:     ++registry_generation;
+1214:     lru_cache.Free(image.lru_id);
+1215:     total_used_memory -= Common::AlignUp(image.info.guest_size, 1024);
+1216:     BbStats::live_image_bytes.fetch_sub(Common::AlignUp(image.info.guest_size, 1024),
+1217:                                         std::memory_order_relaxed);
+1218:     BbStats::live_images.fetch_sub(1, std::memory_order_relaxed);
+1219:     ForEachPage(image.info.guest_address, image.info.guest_size, [this, image_id](u64 page) {
+1556: void TextureCache::AssociateGuestImage(ImageId image_id) {
+1557:     if (!BbResourceLifetime::Enabled()) return;
+1558:     const auto& image=slot_images[image_id];
+1559:     const auto tag=BbResourceLifetime::Get().Owner(image.info.guest_address,image.info.guest_size);
+1560:     guest_image_owners[image_id.index]=tag;
+1561:     for (const auto& backing:image.backing_images)
+1562:         backend.AssociateGuestImage(backing.image,image.info.guest_address,image.info.guest_size);
+1563: }
+1581:     for (const auto& [index,tag]:guest_image_owners) {
+1582:         const ImageId id{index};
+1583:         const auto& image=slot_images[id];
+1584:         const auto owner=lifetimes.Owner(image.info.guest_address,image.info.guest_size);
+1585:         if (owner && owner!=tag) { reassociate.push_back(id);continue; }
+1586:         if (lifetimes.Status(tag)!=BbResourceLifetime::State::Released) continue;
+1587:         // No writeback, no guest page decommit, no query/depth/velocity/proxy deletion.
+1588:         // The default path retains every GPU-written role. The optional storage-only
+1589:         // extension additionally requires both coldness and the locked generation proof.
+1590:         if (!backend.IsFreeKnown(image.tick_accessed_last) ||
+1591:             (image.gpu_write_tick && !backend.IsFreeKnown(image.gpu_write_tick))) {
+1592:             ++waiting;continue;
+1593:         }
+1594:         // Range-family unknown frees show additional allocation paths; keep it diagnostic
+1595:         // until those are paired too. Only the fully wrapped TLSF heap authorizes removal.
+1596:         const bool extra_storage=dead_storage && !BbToggle::Disabled(BbToggle::TextureCollector) &&
+1597:             cold_cutoff && image.lru_touched_tick<cold_cutoff && image.CanReleaseFreedStorageBacking();
+1598:         if (tag.domain!=BbResourceLifetime::Domain::Heap ||
+1599:             (!image.CanReleaseGuestBacking() && !extra_storage)) {
+1600:             ++protected_images;continue;
+1601:         }
+1602:         // Do not end a render pass for candidates which the interval proof
+1603:         // already rejects. Removal below repeats the proof atomically; allocations
+1604:         // are allowed to race with this read-only preflight.
+1605:         if (extra_storage && !lifetimes.ReleasedRangeUnused(tag,image.info.guest_address,
+1606:                                                           image.info.guest_size,2000)) continue;
+1607:         if (candidates.size()<16) candidates.push_back({id,tag,extra_storage});
+1608:     }
+1609:     for(const auto id:reassociate) AssociateGuestImage(id);
+1610:     lifetimes.NoteScan(waiting,protected_images);
+1611:     if (!BbResourceLifetime::ReclaimReady() || candidates.empty()) return;
+1612:     backend.EndRendering(); // release held pass references through the existing backend path
+1613:     u64 storage_images=0,storage_bytes=0;
+1614:     for(const auto& [id,tag,storage]:candidates) {
+1615:         const auto& image=slot_images[id];
+1616:         const u64 address=image.info.guest_address, size=image.info.guest_size;
+1617:         // Both allocator domains must have no replacement overlap. A dropped record disables
+1618:         // reclamation. Keep the generation locked through unregistration; never wait for GPU.
+1619:         u64 removed_bytes=0;
+1620:         const auto commit=[&] {
+1621:             return lifetimes.WithReleased(tag,address,size,2000,[&]() -> BbResourceLifetime::u64 {
+1622:                 u64 bytes=0;for(const auto& backing:image.backing_images)bytes+=backing.image.size_bytes;
+1623:                 removed_bytes=bytes;
+1624:                 FreeImage(id); // normal unwatch/unregister/deferred destruction; no GPU wait
+1625:                 return bytes;
+1626:             });
+1627:         };
+1628:         bool removed=false;
+1629:         if(storage) {
+1630:             // Virtual heap ownership alone does not exclude another guest mapping of
+1631:             // the same physical bytes. Keep mapping and allocation proof through removal.
+1632:             struct Context {const decltype(commit)* action;};
+1633:             Context context{&commit};
+1634:             removed=BbReclaimMapping::WithUnaliasedMapping(address,size,[](void* opaque) noexcept {
+1635:                 return (*static_cast<Context*>(opaque)->action)() ? 1 : 0;
+1636:             },&context);
+1637:         } else removed=commit();
+1818: void TextureCache::DeleteImage(ImageId image_id) {
+1819:     Image& image = slot_images[image_id];
+1820:     ASSERT_MSG(!image.IsTracked(), "Image was not untracked");
+1821:     ASSERT_MSG(False(image.flags & ImageFlagBits::Registered), "Image was not unregistered");
+1822:
+1823:     // Remove any registered meta areas.
+1824:     const auto& meta_info = image.info.meta_info;
+1825:     if (meta_info.cmask_addr) {
+1826:         surface_metas.erase(meta_info.cmask_addr);
+1827:     }
+1828:     if (meta_info.fmask_addr) {
+1829:         surface_metas.erase(meta_info.fmask_addr);
+1830:     }
+1831:     if (meta_info.htile_addr) {
+1832:         surface_metas.erase(meta_info.htile_addr);
+1833:     }
+1834:
+1835:     {
+1836:         std::unique_lock lk{download_images_mutex};
+1837:         if (download_images.contains(image_id)) {
+1838:             download_images.erase(image_id);
+1839:         }
+1840:     }
+1841:
+1842:     // Reclaim image and any image views it references.
+1843:     backend.DeferOperation([this, image_id] {
+1844:         Image& image = slot_images[image_id];
+1845:         for (auto& backing : image.backing_images) {
+1846:             for (const ImageViewId image_view_id : backing.image_view_ids) {
+1847:                 slot_image_views.erase(image_view_id);
+1848:             }
+1849:         }
+1850:         slot_images.erase(image_id);
+1851:     });
+
+FILE vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.h
+145:     /// bbport: whether UpdateImage has nothing to do for this image (its fast path).
+146:     [[nodiscard]] bool IsUpToDate(ImageId image_id) const {
+147:         const Image& image = slot_images[image_id];
+148:         const u32 flags = std::atomic_ref<u32>(const_cast<u32&>(reinterpret_cast<const u32&>(image.flags)))
+149:                               .load(std::memory_order_acquire);
+150:         constexpr u32 Dirty = static_cast<u32>(ImageFlagBits::Dirty);
+151:         constexpr u32 Registered = static_cast<u32>(ImageFlagBits::Registered);
+152:         return (flags & (Dirty | Registered)) == Registered &&
+153:                image.track_addr == image.guest_begin && image.track_addr_end == image.guest_end &&
+154:                image.lru_touched_tick == gc_tick;
+155:     }
+156:
+157:     /// Updates image contents if it was modified by CPU.
+158:     void UpdateImage(ImageId image_id) {
+159:         // bbport: a clean image already tracked and touched in this GC period needs nothing.
+160:         // Every texture binding comes here; the mutex (shared with the fault handlers of the
+161:         // guest threads) was ~3% of the GPU thread. Flags are read atomically: an invalidation
+162:         // racing with this check races the same way with the locked path.
+163:         if (!BbToggle::Disabled(BbToggle::UpdateImageFastPath)) {
+164:             const Image& image = slot_images[image_id];
+165:             const u32 flags = std::atomic_ref<u32>(const_cast<u32&>(reinterpret_cast<const u32&>(image.flags)))
+166:                                   .load(std::memory_order_acquire);
+167:             constexpr u32 Dirty = static_cast<u32>(ImageFlagBits::Dirty);
+168:             constexpr u32 Registered = static_cast<u32>(ImageFlagBits::Registered);
+169:             if ((flags & (Dirty | Registered)) == Registered &&
+170:                 image.track_addr == image.guest_begin && image.track_addr_end == image.guest_end &&
+171:                 image.lru_touched_tick == gc_tick) {
+172:                 return;
+173:             }
+174:         }
+175:         std::scoped_lock lock{mutex};
+176:         Image& image = slot_images[image_id];
+177:         TrackImage(image_id);
+178:         WatchImage(image, "update image (slow path)");
+179:         TouchImage(image);
+180:         RefreshImage(image);
+398:     /// Touch the image in the LRU cache.
+399:     void TouchImage(const Image& image);
+400:
+401:     void FreeImage(ImageId image_id) {
+402:         UntrackImage(image_id);
+403:         UnregisterImage(image_id);
+404:         DeleteImage(image_id);
+405:     }
+445:     Common::LeastRecentlyUsedCache<ImageId, u64> lru_cache;
+446:     Common::LeastRecentlyUsedCache<u64, u64> sampler_lru_cache;
+447:     const bool readback_linear_images;
+448:     PageTable page_table;
+449:     std::mutex mutex;
+450:     static inline std::atomic<u64> vram_short_until{0}; ///< steady seconds (NoteVramShort)
+451:     // bbport: FindImage results for unchanged image registrations (guarded by `mutex`).
+
+FILE vendor/metal_api/shadps4/video_core/texture_cache/image.h
+29: enum ImageFlagBits : u32 {
+30:     Empty = 0,
+31:     MaybeCpuDirty = 1 << 0, ///< The page this image is in was touched before the image address
+32:     CpuDirty = 1 << 1,      ///< Contents have been modified from the CPU
+33:     GpuDirty = 1 << 2, ///< Contents have been modified from the GPU (valid data in buffer cache)
+34:     Dirty = MaybeCpuDirty | CpuDirty | GpuDirty,
+35:     GpuModified = 1 << 3, ///< Contents have been modified from the GPU
+36:     Registered = 1 << 6,  ///< True when the image is registered
+37:     Picked = 1 << 7,      ///< Temporary flag to mark the image as picked
+38: };
+130:     bool CanReleaseGuestBacking() const;
+131:     bool CanReleaseInvalidBacking() const;
+132:     // Additional state gates only: the caller MUST also hold a released heap
+133:     // generation transaction excluding every overlapping live allocation.
+134:     bool CanReleaseFreedStorageBacking() const;
+135:
+136:     bool SafeToDownload() const {
+137:         return True(flags & ImageFlagBits::GpuModified) && False(flags & (ImageFlagBits::Dirty));
+138:     }
+165:     // bbport: fields every binding of the image reads, together ahead of the large ImageInfo
+166:     // (they were spread over several cache lines: one miss each per texture per draw).
+167:     ImageFlagBits flags = ImageFlagBits::Dirty;
+168:     struct {
+169:         u32 is_bound : 1;
+170:         u32 is_target : 1;
+171:         u32 needs_rebind : 1;
+172:         u32 force_general : 1;
+173:     } binding{};
+174:     struct {
+175:         u32 texture : 1;
+176:         u32 storage : 1;
+177:         u32 render_target : 1;
+178:         u32 depth_target : 1;
+179:         u32 vo_surface : 1;
+180:     } usage{};
+181:     bool scene_proxy = false; ///< bbport: SceneTargets holds a reduced-size proxy of it
+182:     VAddr track_addr = 0;
+183:     VAddr track_addr_end = 0;
+184:     VAddr guest_begin = 0; ///< info.guest_address
+185:     VAddr guest_end = 0;   ///< info.guest_address + info.guest_size
+186:     BackingImage* backing{};
+187:     /// bbport: gc tick of the last LRU touch; skips the LRU list (a cache miss) when current.
+188:     mutable u64 lru_touched_tick = ~0ULL;
+189:     u64 tick_accessed_last{};
+190:     /// bbport: scheduler tick of the last binding that lets the GPU write it (render or depth target,
+191:     /// storage image); 0 never.
+192:     u64 gpu_write_tick{};
+193:     ImageId depth_id{};
+194:     u64 depth_uid{};
+195:     u64 image_uid{};
+
+FILE vendor/metal_api/shadps4/video_core/buffer_cache/buffer_cache.cpp
+889: std::pair<const Buffer*, u64> BufferCache::ObtainBuffer(VAddr device_addr, u32 size,
+890:                                                         bool is_written, bool is_texel_buffer) {
+891:     BB_SECTION(ObtainBuffer);
+892:     const bool stats = BufferStatsEnabled();
+893:     if (stats) {
+894:         PrintBufferStats();
+895:         NoteHotUse(device_addr, size);
+896:     }
+897:     // bbport BB_GUEST_IN_PLACE: buffers in the game's direct memory are used where they are. Small
+898:     // read-only ones (constants) are still copied when bound (the stream path below): commands
+899:     // decoded later (WriteData, constant RAM dumps) change them on the CPU in decode order, and
+900:     // a draw decoded before must keep its values (buffer renaming). GPU writes are noted for
+901:     // that: a range the GPU has yet to write is not copied.
+902:     if (is_written && !shadows.empty()) {
+903:         DropShadows(device_addr, size);
+904:     }
+905:     // bbport: a read-only binding of blocks that were resident and in place the last time, with
+906:     // the residency unchanged since (most bindings in place, constants with
+907:     // BB_CONSTANTS_IN_PLACE): the arena where it is, without the residency walk.
+908:     struct InPlaceMemo {
+909:         u64 first = ~0ULL, last = 0, generation = 0;
+910:         const Buffer* arena = nullptr;
+911:     };
+912:     // bbport BB_LAYER_MEMORY: the game's memory in place through its chunk buffer (the module
+913:     // says which); what is not whole in one chunk takes the paths below (VRAM copies).
+914:     if (LayerMode() && (is_written || size > STREAM_THRESHOLD || ConstantsInPlace() ||
+915:                         IsRegionGpuModified(device_addr, size) || LayerMirrored(device_addr, size))) {
+916:         if (const auto bound = LayerBind(device_addr, size, is_written, is_texel_buffer)) {
+917:             return *bound;
+918:         }
+919:         NoteLayerMiss(device_addr, size, is_written);
+955:             ++gather_copies;
+956:             if (backend.IsRendering()) ++gather_open_passes;
+957:             const auto gathered = GatherGuestRead(backend, stream_buffer, device_addr, size,
+958:                 [this](VAddr at, u64 remaining) -> std::optional<GuestReadPiece> {
+959:                     const auto span = BbLayer::GpuMemory::Get().ResolvePrefix(at, remaining);
+960:                     if (!span) return std::nullopt;
+961:                     const auto source = LayerInPlace(at, span->size);
+962:                     if (!source) return std::nullopt;
+963:                     return GuestReadPiece{source->first, source->second, span->size};
+964:                 },
+965:                 [this, is_texel_buffer](const GuestReadPiece& piece, VAddr at) {
+966:                     if (is_texel_buffer)
+967:                         SynchronizeMemoryFromImage(piece.buffer, piece.offset, at,
+968:                                                    static_cast<u32>(piece.size));
+969:                 });
+970:             ASSERT_MSG(gathered, "No complete guest chunk coverage for read {:#x}+{:#x}",
+971:                        device_addr, size);
+972:             if (reuse && !is_texel_buffer)
+973:                 read_snapshots.Remember(device_addr, size, gathered->second, before, stamp());
+974:             report();
+975:             static std::atomic<u32> reports{0};
+976:             if (reports.fetch_add(1, std::memory_order_relaxed) < 8)
+977:                 std::printf("Metal cross-chunk read: %#llx+%#x gathered in existing stream ring\n",
+978:                             (unsigned long long)device_addr, size);
+979:             return *gathered;
+998:     if (GuestInPlace() && (is_written || size > STREAM_THRESHOLD || ConstantsInPlace() ||
+999:                            IsRegionGpuModified(device_addr, size))) {
+1000:         const u64 first_block = device_addr >> block_shift;
+1001:         const u64 last_block = (device_addr + size - 1) >> block_shift;
+1002:         const auto* arena = GetArena(first_block, last_block);
+1003:         // GPU-written buffers: in place with write tracking (CPU reads of them stay coherent, as
+1004:         // before). Without it the GPU is a writer we hear of, like the loaders: VRAM wherever whole
+1005:         // blocks are known data, as a default heap. The CPU does not read what the GPU wrote there
+1006:         // (no readbacks: BB_READBACKS was relaxed before too); BB_GPU_WRITES_IN_PLACE=1 keeps them
+1007:         // in place (PCIe, ~9 ms a frame on an RX 7800 XT).
+1008:         static const bool writes_in_place_forced = [] {
+1009:             const char* env = std::getenv("BB_GPU_WRITES_IN_PLACE");
+1010:             return env && env[0] == '1';
+1011:         }();
+1012:         const bool writes_in_place = WriteTracking() || writes_in_place_forced || force_writes_in_place;
+1013:         if (is_written && !writes_in_place) {
+1014:             NoteGpuWrite(device_addr, size);
+1015:         }
+1016:         EnsureResident(arena, first_block, last_block, is_written && writes_in_place);
+1017:         if (MixStats()) {
+1018:             NoteResidencyMix(first_block, last_block, size, is_written);
+1019:         }
+1020:         if (is_written && size > 64_KB && BbStats::enabled) {
+1021:             NoteLargeGpuWrite(device_addr, size);
+1022:         }
+1023:         if (IsInPlace(device_addr, size)) {
+1024:             if (is_written) {
+1025:                 WriteTicks().Note(device_addr, size, backend.CurrentTick());
+1026:             }
+1027:             BbStats::bound_in_place_bytes.fetch_add(size, std::memory_order_relaxed);
+1028:             if (is_written) {
+1029:                 BbStats::bound_in_place_written_bytes.fetch_add(size, std::memory_order_relaxed);
+1030:             }
+1031:             if (is_texel_buffer && !is_written) {
+1032:                 SynchronizeMemoryFromImage(arena, arena->Offset(device_addr), device_addr, size);
+1033:             }
+1034:             TraceBinding(device_addr, size, is_written, is_written ? 0 : 2);
+1035:             if (!is_written && !is_texel_buffer) {
+1036:                 if (const auto shadow = ShadowCopy(device_addr, size)) {
+1037:                     return *shadow;
+1038:                 }
+1039:             }
+1040:             if (memo_candidate) {
+1041:                 read_memo = {memo_first, memo_last, ResidencyGeneration(), arena};
+1042:             }
+1043:             return {arena, arena->Offset(device_addr)};
+1078:     const u64 first_block = device_addr >> block_shift;
+1079:     const u64 last_block = (device_addr + size - 1) >> block_shift;
+1080:     const auto* arena = GetArena(first_block, last_block);
+1081:     EnsureResident(arena, first_block, last_block);
+1082:     BB_SECTION(ObtainVram);
+1083:     if (!is_written) {
+1084:     }
+1085:     const u64 uploaded_before = BbStats::buffer_upload_bytes.load(std::memory_order_relaxed);
+1086:     if (GuestInPlace()) {
+1087:         BbStats::bound_vram_bytes.fetch_add(size, std::memory_order_relaxed);
+1088:     }
+1089:     SynchronizeMemory(arena, device_addr, size, is_written, is_texel_buffer);
+1090:     if (stats) {
+1091:         auto& region = Stats().regions[RegionKey(device_addr)];
+1092:         ++region.arena_count;
+1093:         region.arena_bytes += size;
+1094:         region.upload_bytes +=
+1095:             BbStats::buffer_upload_bytes.load(std::memory_order_relaxed) - uploaded_before;
+1096:     }
+1097:     if (is_written) {
+1098:         gpu_modified_ranges.Add(device_addr, size);
+1099:         WriteTicks().Note(device_addr, size, backend.CurrentTick());
+1100:         if (Readbacks()) {
+1101:             written_bindings[written_head.fetch_add(1) % written_bindings.size()] =
+1102:                 WrittenBinding{device_addr, size, backend.CurrentTick()};
+1103:         }
+1104:     }
+1105:     TraceBinding(device_addr, size, is_written, is_written ? 1 : 4);
+1106:     return {arena, arena->Offset(device_addr)};
+1159: std::pair<const Buffer*, u64> BufferCache::ObtainBufferForImage(VAddr device_addr, u32 size) {
+1160:     // bbport BB_GUEST_IN_PLACE: texture data is read by the GPU from the game's memory itself:
+1161:     // through the arena where it is bound in place, else (BB_CHUNK_TEXTURES) from its guest
+1162:     // memory chunk.
+1163:     if (LayerMode()) {
+1164:         // From its mirror where the data is in VRAM (the GPU may have written it there), else
+1165:         // in place (a mixed range: the GPU's data in mirrors copied back first, LayerBind). No
+1166:         // mirror is made for an upload: the image holds the data in VRAM.
+1167:         if (const auto source = LayerBind(device_addr, size, false, false, false)) {
+1168:             TraceBinding(device_addr, size, false, 6);
+1169:             return *source;
+1170:         }
+1171:         NoteLayerMiss(device_addr, size, false);
+1172:     } else if (GuestInPlace()) {
+1173:         const u64 first_block = device_addr >> block_shift;
+1174:         const u64 last_block = (device_addr + size - 1) >> block_shift;
+1175:         if (InPlaceTextures()) {
+1176:             EnsureResident(GetArena(first_block, last_block), first_block, last_block, true);
+1177:         }
+1178:         if (IsInPlace(device_addr, size)) {
+1179:             const auto* arena = GetArena(first_block, last_block);
+1180:             TraceBinding(device_addr, size, false, 5);
+1181:             return {arena, arena->Offset(device_addr)};
+1182:         }
+1183:         if (ChunkTextures() && !IsRegionGpuModified(device_addr, size)) {
+1184:             if (const auto source = GuestChunkSource(device_addr, size)) {
+1185:                 TraceBinding(device_addr, size, false, 6);
+1186:                     return *source;
+1187:             }
+1188:         }
+1189:     }
+1190:     if (IsRegionGpuModified(device_addr, size)) {
+1191:         TraceBinding(device_addr, size, false, 7);
+1192:         return ObtainBuffer(device_addr, size, false);
+1193:     }
+1194:     // bbport: BB_PREUPLOAD — texture data comes from the arena (device-local): only the pages
+1195:     // the CPU changed since are uploaded into it, and the background pre-upload keeps it
+1196:     // current, so a streaming burst detiles from VRAM instead of copying everything through
+1197:     // the CPU and the PCIe bus in that frame.
+1198:     if (PreuploadEnabled()) {
+1199:         const u64 first_block = device_addr >> block_shift;
+1200:         const u64 last_block = (device_addr + size - 1) >> block_shift;
+1201:         // Mode 1 (no new VRAM): only where the arena already holds the range.
+1202:         bool resident = true;
+1203:         if (PreuploadMode() != 2) {
+1204:             resident_ranges.ForEachGap(first_block, last_block + 1,
+1205:                                        [&](u64, u64) { resident = false; });
+1206:         }
+1207:         if (resident) {
+1208:             const auto* arena = GetArena(first_block, last_block);
+1209:             EnsureResident(arena, first_block, last_block);
+1210:             SynchronizeMemory(arena, device_addr, size, false, false);
+1211:             TraceBinding(device_addr, size, false, 8);
+1212:             return {arena, arena->Offset(device_addr)};
+1213:         }
+1214:     }
+1215:     TraceBinding(device_addr, size, false, 9);
+1216:     const auto staging = backend.StagingRequest(size, VideoCore::MemoryType::HostUncached,
+1217:                                               backend.Limits().storage_min_alignment);
+1218:     if (!BbToggle::Disabled(BbToggle::DeferredUploads)) {
+1219:         // bbport: texture data is copied on the copy threads (streaming: 100+ MB per frame);
+1220:         // the upload reads the staging only after submission, which waits for the copies.
+1221:         constexpr u64 Chunk = 1_MB;
+1222:         for (u64 offset = 0; offset < staging.size; offset += Chunk) {
+1223:             const BbCopy::Item item{
+1224:                 .run = &RunGuestCopy,
+1225:                 .context = this,
+1226:                 .source = device_addr + offset,
+1227:                 .destination = reinterpret_cast<u64>(staging.mapped + offset),
+1228:                 .size = std::min(Chunk, staging.size - offset),
+1229:                 .extra = reinterpret_cast<u64>(staging.buffer),
+1230:             };
+1231:             if (staging.size < Chunk) {
+1232:                 SmallGuestCopy(item);
+1233:             } else {
+1234:                 BbCopy::Async([item] { item.run(item); });
+1235:                 backend.NoteHostCopySource(item.source, item.size);
+1236:             }
+1237:         }
+1238:         return {staging.buffer, staging.offset};
+1239:     }
+1240:     memory->CopySparseMemory(device_addr, staging.mapped, staging.size);
+1241:     staging.Flush();
+1242:     return {staging.buffer, staging.offset};
+1245: bool BufferCache::IsRegionCpuModified(VAddr addr, size_t size) {
+1246:     return memory_tracker->IsRegionCpuModified(addr, size);
+1247: }
+1248:
+1249: bool BufferCache::IsRegionGpuModified(VAddr addr, size_t size) {
+1250:     if (memory_tracker->IsRegionGpuModified(addr, size)) {
+1251:         return true;
+1252:     }
+1253:     // bbport BB_GUEST_IN_PLACE: GPU writes are not tracked per page; one not done yet counts.
+1254:     // So does what the GPU wrote into a VRAM copy (NoteGpuWrite: its data, as a default heap):
+1255:     // the game's memory under it is older (issue #122). BB_GPU_DATA_CHECK=0: not counted.
+1256:     static const bool gpu_data_check = [] {
+1257:         const char* env = std::getenv("BB_GPU_DATA_CHECK");
+1258:         return !(env && env[0] == '0');
+1259:     }();
+1260:     if (gpu_data_check && GuestInPlace() && !LayerMode() && gpu_written_bytes.Overlaps(addr, addr + size) &&
+1261:         !IsInPlace(addr, size)) {
+1262:         return true;
+1263:     }
+1264:     if (GuestInPlace()) {
+1265:         const u64 tick = WriteTicks().Newest(addr, size);
+1266:         if (tick == 0 || backend.IsFreeKnown(tick)) {
+1267:             return false;
+1268:         }
+1269:         // Asking the driver is a system call, and the GPU command thread asks for thousands of
+1270:         // constant bindings a frame: at most every ~250 us per thread (until then the write
+1271:         // counts as not done, which only takes the slower, always correct path; the GPU signal
+1272:         // thread refreshes the known tick on every fence anyway).
+1273:         thread_local u64 last_refresh = 0;
+1274:         if (const u64 now = BbCpu::Ticks(); now - last_refresh > BbCpu::TicksFromUs(250)) {
+1275:             last_refresh = now;
+2474: void BufferCache::NoteGpuWrite(VAddr addr, u64 size) {
+2475:     if (size == 0 || gpu_written_bytes.Contains(addr, addr + size)) {
+2476:         return;
+2477:     }
+2478:     // Only what the GPU writes regularly (in 3 frames of 60) is its data, like a default heap: a
+2479:     // buffer the GPU writes only now and then stays in place, where writes by the CPU are seen
+2480:     // (0x104ff30000, 192 KiB, written by the GPU every few seconds: in VRAM the picture smeared
+2481:     // while moving).
+2482:     constexpr u32 Frames = 3, Window = 60;
+2483:     const u32 frame = static_cast<u32>(BbStats::frame_number.load(std::memory_order_relaxed));
+2484:     auto& [last, frames] = gpu_write_frames[addr ^ (size << 40)];
+2485:     if (last != frame || frames == 0) {
+2486:         frames = frame - last > Window ? 1 : frames + 1;
+2487:         last = frame;
+2488:     }
+2489:     if (frames < Frames) {
+2490:         if (gpu_write_frames.size() > 65536) {
+2491:             std::erase_if(gpu_write_frames,
+2492:                           [frame](const auto& entry) { return frame - entry.second.first > Window; });
+2493:         }
+2494:         return;
+2495:     }
+2496:     gpu_written_bytes.Add({addr, addr + size});
+2497:     // Blocks the GPU already writes in place move to VRAM once they are all known data.
+2498:     for (u64 block = addr >> block_shift; block <= (addr + size - 1) >> block_shift; ++block) {
+2499:         const bool in_place =
+2500:             LayerMode() ? !BbLayer::GpuMemory::Get().AnyValid(block, block + 1)
+2501:                         : in_place_blocks.Contains(block) && resident_ranges.Contains(block);
+2502:         if (in_place && VramEligible(block)) {
+2503:             promote_candidates.Add({block, block + 1});
+2504:         }
+2505:     }
+2989: bool BufferCache::SynchronizeMemory(const Buffer* arena, VAddr device_addr, u32 size,
+2990:                                     bool is_written, bool is_texel_buffer) {
+2991:     boost::container::small_vector<std::pair<u64, vk::BufferCopy>, 4> chunk_copies;
+2992:     // bbport BB_GUEST_IN_PLACE: the arena is the game's memory there: nothing to upload, no
+2993:     // write tracking, and GPU writes need no readback. Images aliasing it still sync.
+2994:     if (!LayerMode() && IsInPlace(device_addr, size)) {
+2995:         return is_texel_buffer && !is_written &&
+2996:                SynchronizeMemoryFromImage(arena, arena->Offset(device_addr), device_addr, size);
+2997:     }
+2998:     // Partly in place: only the parts in VRAM are synced. An upload over a block in place would
+2999:     // write an older copy of the game's memory back into it after the game wrote it again.
+3000:     if (GuestInPlace() && in_place_blocks.Overlaps(device_addr >> block_shift,
+3001:                                                   ((device_addr + size - 1) >> block_shift) + 1)) {
+3002:         const VAddr end = device_addr + size;
+3003:         bool image = false;
+3004:         in_place_blocks.ForEachGap(
+3005:             device_addr >> block_shift, ((end - 1) >> block_shift) + 1, [&](u64 first, u64 last) {
+3006:                 const VAddr from = std::max<VAddr>(device_addr, first << block_shift);
+3007:                 const VAddr to = std::min<VAddr>(end, last << block_shift);
+3008:                 if (from < to) {
+3009:                     image |= SynchronizeMemory(arena, from, static_cast<u32>(to - from),
+3010:                                                is_written, is_texel_buffer);
+3011:                 }
+3012:             });
+3013:         return image;
+3014:     }
+3015:     boost::container::small_vector<vk::BufferCopy, 4> copies;
+3016:     size_t total_size_bytes{};
+3017:     const Buffer* src_buffer{};
+3018:     memory_tracker->ForEachUploadRange(
+3019:         device_addr, size, is_written,
+3020:         [&](u64 addr, u64 size) {
+3021:             copies.emplace_back(total_size_bytes, addr, size);
+3022:             total_size_bytes += size;
+3023:         },
+3024:         [&] {
+3025:             // bbport (BB_GPU_WRITE_TWINS): bytes whose guest copy still matches its twin keep the
+3026:             // GPU's data in the arena; twin bytes the guest wrote since are uploaded and no
+3027:             // longer GPU-modified.
+3028:             if (TwinsEnabled() && !copies.empty()) {
+3029:                 std::scoped_lock lk{twins_mutex};
+3030:                 if (!twins.empty()) {
+3031:                     boost::container::small_vector<vk::BufferCopy, 4> kept;
+3032:                     boost::container::small_vector<std::pair<VAddr, VAddr>, 4> changed;
+3033:                     u64 offset = 0;
+3034:                     for (const auto& copy : copies) {
+3035:                         ForEachTwinRun(copy.dstOffset, copy.dstOffset + copy.size,
+3036:                                        [&](VAddr from, VAddr to, TwinRun run) {
+3037:                                            if (run == TwinRun::Unchanged) {
+3038:                                                twin_kept_bytes.fetch_add(to - from);
+3039:                                                return;
+3040:                                            }
+3041:                                            if (run == TwinRun::Changed) {
+3042:                                                twin_guest_bytes.fetch_add(to - from);
+3043:                                                gpu_modified_ranges.Subtract(from, to - from);
+3044:                                                changed.emplace_back(from, to);
+3045:                                            }
+3046:                                            kept.push_back({offset, from, to - from});
+3047:                                            offset += to - from;
+3048:                                        });
+3049:                     }
+3050:                     // Changed parts are uploaded now: their twins are done.
+3051:                     for (const auto& [from, to] : changed) {
+3052:                         EraseTwins(from, to);
+3053:                     }
+3054:                     copies.assign(kept.begin(), kept.end());
+3055:                     total_size_bytes = offset;
+3056:                 }
+3057:             }
+3058:             // bbport BB_GUEST_IN_PLACE: what lies in a guest memory chunk is copied by the GPU
+3059:             // straight from it (no CPU copy into staging); the rest goes through staging.
+3060:             if (GuestInPlace() && ChunkUploads() && !copies.empty()) {
+3061:                 boost::container::small_vector<vk::BufferCopy, 4> staged;
+3062:                 u64 staged_bytes = 0;
+3063:                 for (const auto& copy : copies) {
+3064:                     const VAddr address = copy.dstOffset;
+3065:                     u64 phys = 0;
+3066:                     uintptr_t mapping_end = 0;
+3067:                     std::optional<GuestChunks::Chunk> chunk;
+3068:                     if (runtime_memory_direct_phys(address, &phys, &mapping_end) &&
+3069:                         address + copy.size <= mapping_end &&
+3070:                         (chunk = GuestChunks::Find(phys)) &&
+3071:                         phys + copy.size <= chunk->phys + chunk->size) {
+3072:                         chunk_copies.push_back({chunk->phys,
+3073:                                                 {phys - chunk->phys, address - arena->cpu_addr,
+3074:                                                  copy.size}});
+3075:                         continue;
+3076:                     }
+3077:                     staged.push_back({staged_bytes, copy.dstOffset, copy.size});
+3078:                     staged_bytes += copy.size;
+3079:                 }
+3080:                 copies.assign(staged.begin(), staged.end());
+3081:                 total_size_bytes = staged_bytes;
+3082:             }
+3083:             src_buffer = UploadCopies(arena, copies, total_size_bytes);
+3084:         });
+3085:
+3086:     if (src_buffer) {
+3087:         backend.CopyBuffer(src_buffer, arena, copies);
+3088:     }
+3089:     for (const auto& [chunk_phys, copy] : chunk_copies) {
+3090:         BbStats::buffer_upload_bytes.fetch_add(copy.size, std::memory_order_relaxed);
+3091:         // bbport BB_LAYER_MEMORY: the GPU writes the game's memory too (through the chunk's
+3092:         // buffer wrapper): a copy from it waits for those writes like any buffer copy.
+3093:         if (LayerMode()) {
+3094:             const VAddr address = arena->cpu_addr + copy.dstOffset;
+3095:             if (const auto source = LayerInPlace(address, copy.size)) {
+3096:                 const vk::BufferCopy wrapped{source->second, copy.dstOffset, copy.size};
+3097:                 backend.CopyBuffer(source->first, arena, std::span{&wrapped, 1});
+3098:                 continue;
+3099:             }
+3100:         }
+3101:         backend.CopyFromGuestChunk(chunk_phys, arena, std::span{&copy, 1});
+3102:     }
+3103:     if (is_texel_buffer && !is_written) {
+3104:         return SynchronizeMemoryFromImage(arena, arena->Offset(device_addr), device_addr, size);
+3105:     }
+3106:     return false;
+3190: bool BufferCache::SynchronizeMemoryFromImage(const Buffer* arena, u64 arena_offset,
+3191:                                              VAddr device_addr, u32 size) {
+3192:     if (auto type = texture_cache.IsMeta(device_addr)) {
+3193:         if (*type == TextureCache::MetaType::HTile) {
+3194:             static constexpr u32 ZmaskUncompressed = 0xf;
+3195:             backend.FillBuffer(arena, arena_offset, size, ZmaskUncompressed);
+3196:             return true;
+3197:         } else {
+3198:             LOG_WARNING(Render_Vulkan, "Unhandled metadata type {}", magic_enum::enum_name(*type));
+3199:         }
+3200:     }
+3201:     // bbport: most texel buffers alias no image; remember misses until images change.
+3202:     const u64 generation = texture_cache.RegistryGeneration();
+3203:     auto& miss = image_miss_cache[((device_addr >> 6) ^ size * 0x9E3779B1u) % image_miss_cache.size()];
+3204:     if (miss.address == device_addr && miss.size == size && miss.generation == generation &&
+3205:         !BbToggle::Disabled(BbToggle::TextureBindingMemo)) {
+3206:         return false;
+3207:     }
+3208:     const ImageId image_id = texture_cache.FindImageFromRange(device_addr, size);
+3209:     if (!image_id) {
+3210:         miss = {device_addr, size, generation};
+3211:         return false;
+3212:     }
+3213:     // bbport: the lookups above only read what the texture binding helper leaves alone; the
+3214:     // copy below changes image state, so the helper finishes first.
+3215:     backend.BeforeImageAccess();
+3216:     Image& image = texture_cache.GetImage(image_id);
+3217:     ASSERT_MSG(device_addr == image.info.guest_address,
+3218:                "Texel buffer aliases image subresources {:x} : {:x}", device_addr,
+3219:                image.info.guest_address);
+3220:     boost::container::small_vector<vk::BufferImageCopy, 8> buffer_copies;
+3221:     for (u32 mip = 0; mip < image.info.resources.levels; mip++) {
+3222:         const auto& mip_info = image.info.mips_layout[mip];
+3223:         const u32 width = std::max(image.info.size.width >> mip, 1u);
+3224:         const u32 height = std::max(image.info.size.height >> mip, 1u);
+3225:         const u32 depth = std::max(image.info.size.depth >> mip, 1u);
+3226:         if (arena_offset + mip_info.offset + mip_info.size > arena->size_bytes) {
+3227:             break;
+3228:         }
+3229:         buffer_copies.push_back(vk::BufferImageCopy{
+3230:             .bufferOffset = mip_info.offset,
+3231:             .bufferRowLength = mip_info.pitch,
+3232:             .bufferImageHeight = mip_info.height,
+3233:             .imageSubresource{
+3234:                 .aspectMask = image.aspect_mask & ~vk::ImageAspectFlagBits::eStencil,
+3235:                 .mipLevel = mip,
+3236:                 .baseArrayLayer = 0,
+3237:                 .layerCount = image.info.resources.layers,
+3238:             },
+3239:             .imageOffset = {0, 0, 0},
+3240:             .imageExtent = {width, height, depth},
+3241:         });
+3242:     }
+3243:     if (buffer_copies.empty()) {
+3244:         return false;
+3245:     }
+3246:     // bbport BB_TILE_BACK_LOG=1 (diagnostics): each image written back into the game's memory
+3247:     // because a texel buffer reads it, with the age of its last GPU write in submissions.
+3248:     static const bool tile_back_log = std::getenv("BB_TILE_BACK_LOG") != nullptr;
+3249:     if (tile_back_log) {
+3250:         static std::atomic<u32> printed{0};
+3251:         if (printed.fetch_add(1) < 400) {
+3252:             std::printf("Tile back: image %#llx %ux%u fmt %u tile %u size %llu, read %#llx+%u; last "
+3253:                         "GPU write %lld submissions ago, flags %#x\n",
+3254:                         (unsigned long long)image.info.guest_address, image.info.size.width,
+3255:                         image.info.size.height, u32(image.info.pixel_format),
+3256:                         u32(image.info.tile_mode), (unsigned long long)image.info.guest_size,
+3257:                         (unsigned long long)device_addr, size,
+3258:                         image.gpu_write_tick ? (long long)(backend.CurrentTick() -
+3259:                                                            image.gpu_write_tick)
+3260:                                              : -1ll,
+3261:                         u32(image.flags));
+3262:         }
+3263:     }
+3264:     auto& tile_manager = texture_cache.GetTileManager();
+3265:     tile_manager.TileImage(image, buffer_copies, arena, arena_offset);
+3266:     DropShadows(device_addr, size);
+3267:     // A GPU write like any other: what the GPU copies there each frame (a render target read as a
+3268:     // texel buffer) goes to VRAM instead of crossing PCIe twice (written there, read back).
+3269:     if (GuestInPlace() && !WriteTracking()) {
+3270:         NoteGpuWrite(device_addr, size);
+3271:     }
+3272:     return true;
+
+FILE vendor/metal_api/shadps4/video_core/buffer_cache/buffer_cache_layer.cpp
+307:     if (resolution.kind == Kind::Mirror && vram_allowed && !is_written && volatile_in_place &&
+308:         backend.IsRendering() && layer_volatile.Overlaps(first, end)) {
+309:         if (const auto in_place = LayerInPlace(address, size, true)) {
+310:             BbStats::bound_in_place_bytes.fetch_add(size, std::memory_order_relaxed);
+311:             layer_volatile_in_pass_bytes += size;
+312:             if (is_texel_buffer) {
+313:                 SynchronizeMemoryFromImage(in_place->first, in_place->second, address,
+314:                                            static_cast<u32>(size));
+315:             }
+316:             TraceBinding(address, size, false, 2);
+317:             return in_place;
+318:         }
+319:     }
+320:     if (resolution.kind == Kind::Mirror && vram_allowed) {
+321:         auto* mirror = static_cast<Buffer*>(resolution.span.source->owner);
+322:         BbStats::bound_vram_bytes.fetch_add(size, std::memory_order_relaxed);
+323:         NoteDirectUse(address, size); // stale copies yield first (LayerYieldToImages)
+324:         if (layer_volatile.Overlaps(first, end)) {
+325:             // Experiment bit 16 (diagnostics, while the game runs): no refreshes, the range read
+326:             // in place instead.
+327:             if (BbToggle::Experiment(16) && !is_written) {
+328:                 if (const auto in_place = LayerInPlace(address, size, true)) {
+329:                     return in_place;
+330:                 }
+331:             }
+332:             LayerRefreshVolatile(address, size);
+333:         }
+334:         // Uploads what the CPU changed there since (announced writes), images aliasing it.
+335:         SynchronizeMemory(mirror, address, static_cast<u32>(size), is_written, is_texel_buffer);
+336:         if (is_written) {
+337:             // The GPU's data is in VRAM only: copied back before the blocks go in place.
+338:             gpu_modified_ranges.Add(address, size);
+339:             NoteWriteTick(address, size);
+340:             LayerArmReadTraps(address, size); // and before the CPU reads it
+341:         }
+342:         TraceBinding(address, size, is_written, is_written ? 1 : 4);
+343:         return std::pair<const Buffer*, u64>{mirror, mirror->Offset(address)};
+344:     }
+345:     if (resolution.kind == Kind::Mirror || resolution.kind == Kind::Mixed) {
+346:         // One buffer range must hold it: in place. Ranges over nearly all memory in shaders are
+347:         // paged instead (LayerPagedRecord). Written: its blocks in VRAM go back in place (the
+348:         // GPU's data there copied back first). Read: only the GPU's data is copied back; the
+349:         // blocks stay in VRAM for the bindings that lie whole in their mirror.
+350:         if (is_written) {
+351:             LayerDemote(first, end, true, resolution.kind == Kind::Mirror ? 0 : 1);
+352:             // The GPU writes this range in place: its blocks stay in place (moving them back
+353:             // would only bring them here again; the arena mixed them). All in one mirror: from
+354:             // the second time (a reading binding brought it back every frame meanwhile: ~200 MiB/s
+355:             // each way and traps set and cleared, the recording thread saturated at 42 FPS).
+356:             if (resolution.kind == Kind::Mixed || layer_write_bounces.Overlaps(first, end)) {
+357:                 dynamic_blocks.Add({first, end});
+358:             } else {
+359:                 layer_write_bounces.Add({first, end});
+360:             }
+361:         } else {
+362:             LayerCopyBack(first, end);
+363:         }
+364:     }
+365:     // In place (huge bindings over several chunks are cut at the end of the first).
+366:     const auto in_place = LayerInPlace(address, size, true);
+367:     if (!in_place) {
+368:         return std::nullopt;
+369:     }
+370:     // Its blocks of known data go to VRAM at the next submission (as the arena gave VRAM to such
+371:     // blocks when first bound): once per range while the residency is unchanged.
+372:     if (may_promote) {
+373:         LayerQueuePromotion(first, end);
+374:     }
+375:     const auto [buffer, offset] = *in_place;
+376:     if (is_written) {
+377:         NoteWriteTick(address, size);
+378:         BbStats::bound_in_place_written_bytes.fetch_add(size, std::memory_order_relaxed);
+379:         // What the GPU writes often moves to VRAM once its blocks are all known data
+380:         // (NoteGpuWrite: written in 3 of 60 frames). Some writers stay in place (the copy
+381:         // shader's destinations: force_writes_in_place).
+382:         if (!force_writes_in_place) {
+383:             NoteGpuWrite(address, size);
+384:         }
+385:     }
+386:     BbStats::bound_in_place_bytes.fetch_add(size, std::memory_order_relaxed);
+387:     if (is_texel_buffer && !is_written) {
+388:         SynchronizeMemoryFromImage(buffer, offset, address, static_cast<u32>(size));
+389:     }
+390:     TraceBinding(address, size, is_written, is_written ? 0 : 2);
+391:     return in_place;
+1133: std::pair<const Buffer*, u64> BufferCache::LayerPagedRecord(VAddr address, u64 size,
+1134:                                                             bool is_written) {
+1135:     if (maintained_epoch != packet_epoch) {
+1136:         Maintain();
+1137:     }
+1138:     LayerProcessTraps();
+1139:     LayerFlushUploads();
+1140:     const u64 first = address >> block_shift;
+1141:     const u64 end = ((address + size - 1) >> block_shift) + 1;
+1142:     NoteUse(address, size);
+1143:     // Page table entries for the blocks not published yet (those mapped now: an unmapped block
+1144:     // is tried again next time).
+1145:     std::vector<std::pair<u64, u64>> gaps;
+1146:     layer_published.ForEachGap(first, end, [&](u64 a, u64 b) { gaps.emplace_back(a, b); });
+1147:     for (const auto& [a, b] : gaps) {
+1148:         u64 run = a;
+1149:         for (u64 block = a; block <= b; ++block) {
+1150:             const bool mapped = block < b && Layer().ResolvePrefix(block << block_shift, 1);
+1151:             if (!mapped) {
+1152:                 if (run < block) {
+1153:                     LayerWriteEntries(run, block);
+1154:                     layer_published.Add({run, block});
+1155:                 }
+1156:                 run = block + 1;
+1157:             }
+1158:         }
+1159:     }
+1160:     if (is_written) {
+1161:         NoteWriteTick(address, size);
+1162:         // Where it writes is unknown: what is in VRAM there may now differ from the game's
+1163:         // memory; it is copied back before it goes in place (LayerDemote).
+1164:         if (!force_writes_in_place) {
+1165:             Layer().ForEachValid(first, end, [&](u64 a, u64 b) {
+1166:                 gpu_modified_ranges.Add(a << block_shift, (b - a) << block_shift);
+1167:             });
+1251: void BufferCache::LayerCopyBack(u64 first, u64 end) {
+1252:     LayerForgetGpuData();
+1253:     // The GPU's data in mirrors over [first, end) into the game's memory; the blocks stay valid
+1254:     // in VRAM (both copies equal now).
+1255:     std::vector<std::pair<u64, u64>> runs;
+1256:     Layer().ForEachValid(first, end, [&](u64 a, u64 b) { runs.emplace_back(a, b); });
+1257:     for (const auto& [a, b] : runs) {
+1258:         const VAddr from = a << block_shift;
+1259:         const u64 bytes = (b - a) << block_shift;
+1260:         if (!gpu_modified_ranges.Intersects(from, bytes)) {
+1261:             continue;
+1262:         }
+1263:         const auto mirror = Layer().MirrorAt(from);
+1264:         if (!mirror) {
+1265:             continue;
+1266:         }
+1267:         auto* buffer = static_cast<Buffer*>(mirror->owner);
+1268:         gpu_modified_ranges.ForEachInRange(from, bytes, [&](VAddr w_from, VAddr w_to) {
+1269:             if (const auto target = LayerInPlace(w_from, w_to - w_from)) {
+1270:                 const vk::BufferCopy copy{buffer->Offset(w_from), target->second, w_to - w_from};
+1271:                 backend.CopyBuffer(buffer, target->first, std::span{&copy, 1});
+1272:                 layer_copied_back_bytes += w_to - w_from;
+1273:                 layer_copy_back_tick = backend.CurrentTick();
+1274:             }
+1275:         });
+1276:         gpu_modified_ranges.Subtract(from, bytes);
+1277:     }
+
+FILE vendor/metal_api/shadps4/video_core/buffer_cache/memory_tracker.h
+101:     /// Removes all protection from a page and ensures GPU data has been flushed if requested
+102:     void InvalidateRegion(VAddr cpu_addr, u64 size, auto&& on_flush) noexcept {
+103:         IteratePages<false>(
+104:             cpu_addr, size, [&on_flush](RegionManager* manager, u64 offset, size_t size) {
+105:                 const bool should_flush = [&] {
+106:                     // Perform both the GPU modification check and CPU state change with the lock
+107:                     // in case we are racing with GPU thread trying to mark the page as GPU
+108:                     // modified. If we need to flush the flush function is going to perform CPU
+109:                     // state change.
+110:                     std::scoped_lock lk{manager->lock};
+111:                     if (EmulatorSettings.GetReadbacksMode() != GpuReadbacksMode::Disabled &&
+112:                         manager->template IsRegionModified<Type::GPU>(offset, size)) {
+113:                         return true;
+114:                     }
+115:                     manager->template ChangeRegionState<Type::CPU, true>(
+116:                         manager->GetCpuAddr() + offset, size);
+117:                     return false;
+118:                 }();
+119:                 if (should_flush) {
+120:                     on_flush();
+121:                 }
+122:             });
+125:     /// Call 'func' for each CPU modified range and unmark those pages as CPU modified
+126:     void ForEachUploadRange(VAddr query_cpu_range, u64 query_size, bool is_written, auto&& func,
+127:                             auto&& on_upload) {
+128:         // bbport: a write binding over pages the CPU did not change and the GPU already owns
+129:         // needs neither an upload nor a state change (it ran under the region lock for every
+130:         // GPU write binding, twice per page). Racing guest writes are as in the read path.
+131:         if (is_written && !BbToggle::Disabled(BbToggle::LockFreeUploadCheck)) {
+132:             bool settled = true;
+133:             IteratePages<true>(query_cpu_range, query_size,
+134:                                [&settled](RegionManager* manager, u64 offset, size_t size) {
+135:                                     settled = settled &&
+136:                                               !manager->template IsRegionModified<Type::CPU>(offset, size) &&
+137:                                               manager->template IsRegionFullyModified<Type::GPU>(offset, size);
+138:                                 });
+139:             if (settled) {
+140:                 on_upload();
+141:                 return;
+142:             }
+143:         }
+144:         IteratePages<true>(query_cpu_range, query_size,
+145:                            [&func, is_written](RegionManager* manager, u64 offset, size_t size) {
+146:                                // bbport: read-only bindings skip the region lock when no page
+147:                                // in range is CPU-modified. A guest write sets its bit in the
+148:                                // fault handler before the store, and the draw that uses the
+149:                                // data reaches this thread through the submission queue lock.
+150:                                if (!is_written &&
+151:                                    !BbToggle::Disabled(BbToggle::LockFreeUploadCheck) &&
+152:                                    !manager->template IsRegionModified<Type::CPU>(offset, size)) {
+153:                                    return;
+154:                                }
+155:                                manager->lock.lock();
+156:                                manager->template ForEachModifiedRange<Type::CPU, true>(
+157:                                    manager->GetCpuAddr() + offset, size, func);
+158:                                if (!is_written) {
+159:                                    manager->lock.unlock();
+160:                                }
+161:                            });
+162:         on_upload();
+163:         if (!is_written) {
+164:             return;
+165:         }
+166:         IteratePages<false>(query_cpu_range, query_size,
+167:                             [&func, is_written](RegionManager* manager, u64 offset, size_t size) {
+168:                                 manager->template ChangeRegionState<Type::GPU, true>(
+169:                                     manager->GetCpuAddr() + offset, size);
+170:                                 manager->lock.unlock();
+171:                             });
+
+FILE vendor/metal_api/shadps4/video_core/texture_cache/tile_manager.cpp
+127:                                                        u64 in_offset, const ImageInfo& info) {
+128:     if (!info.props.is_tiled) {
+129:         return {in_buffer, in_offset};
+130:     }
+131:
+132:     const TilingInfo params = MakeTilingInfo(info, info.resources.levels);
+133:
+134:     const KernelBuffer params_buffer_info{
+135:         .buffer = &stream_buffer,
+136:         .offset =
+137:             stream_buffer.Copy(&params, sizeof(params), backend.Limits().uniform_min_alignment),
+138:         .range = sizeof(params),
+139:     };
+140:
+141:     const auto staging = backend.StagingRequest(info.guest_size, MemoryType::DeviceLocal);
+142:
+143:     backend.EndRendering();
+144:     backend.FlushBarriers();
+145:
+146:     const KernelBuffer tiled_buffer_info{
+147:         .buffer = in_buffer,
+148:         .offset = in_offset,
+149:         .range = info.guest_size,
+150:     };
+151:     const KernelBuffer linear_buffer_info{
+152:         .buffer = staging.buffer,
+153:         .offset = staging.offset,
+154:         .range = info.guest_size,
+155:     };
+156:     // bbport: the backend records with copies of the buffer ranges (threaded recording).
+157:     backend.DispatchTiling(
+158:         MakeDispatch(info, false, tiled_buffer_info, linear_buffer_info, params_buffer_info));
+159:     // bbport: the source may be the arena (BB_PREUPLOAD), which later uploads write: a copy into
+160:     // it must wait for this read.
+161:     backend.AccessBuffer(in_buffer, in_offset, info.guest_size,
+162:                          vk::PipelineStageFlagBits2::eComputeShader,
+163:                          vk::AccessFlagBits2::eShaderRead);
+164:
+165:     backend.AccessBuffer(staging.buffer, staging.offset, info.guest_size,
+166:                          vk::PipelineStageFlagBits2::eComputeShader,
+167:                          vk::AccessFlagBits2::eShaderWrite);
+168:
+169:     return {staging.buffer, staging.offset};
+172: void TileManager::TileImage(Image& in_image, std::span<vk::BufferImageCopy> buffer_copies,
+173:                             const VideoCore::Buffer* out_buffer, u64 out_offset) {
+174:     const auto& info = in_image.info;
+175:     if (!info.props.is_tiled) {
+176:         for (auto& copy : buffer_copies) {
+177:             copy.bufferOffset += out_offset;
+178:         }
+179:         backend.DownloadImage(&in_image, out_buffer, buffer_copies);
+180:         return;
+181:     }
+182:
+183:     const TilingInfo params = MakeTilingInfo(info, static_cast<u32>(buffer_copies.size()));
+184:     TilerBounds::ParamsV1 bounded{params};
+185:     static const bool requested = [] {
+186:         const auto* value = std::getenv("BB_ARM_TILER_BOUNDS");
+187:         return value && std::strcmp(value, "1") == 0;
+188:     }();
+189:     const bool use_bounds = requested && TilerBounds::Describe(info, buffer_copies, bounded);
+190:     const void* parameter_data = use_bounds ? static_cast<const void*>(&bounded) : &params;
+191:     const u64 parameter_bytes = use_bounds ? sizeof(bounded) : sizeof(params);
+192:     const KernelBuffer params_buffer_info{
+193:         .buffer = &stream_buffer,
+194:         .offset = stream_buffer.Copy(parameter_data, parameter_bytes,
+195:                                     backend.Limits().uniform_min_alignment),
+196:         .range = parameter_bytes,
+197:     };
+198:
+199:     // Give a capable backend the same tiling description before allocating a linear snapshot.
+200:     // Other backends and unsupported formats keep the original path without extra resources.
+201:     const auto direct = MakeDispatch(info, true,
+202:         {out_buffer, out_offset, info.guest_size}, {}, params_buffer_info);
+203:     if (backend.DownloadTiledImage(&in_image, direct)) {
+204:         backend.AccessBuffer(out_buffer, out_offset, info.guest_size,
+205:                              vk::PipelineStageFlagBits2::eComputeShader,
+206:                              vk::AccessFlagBits2::eShaderWrite);
+207:         return;
+208:     }
+209:     const auto staging = backend.StagingRequest(info.guest_size, MemoryType::DeviceLocal);
+210:     for (auto& copy : buffer_copies) {
+211:         copy.bufferOffset += staging.offset;
+212:     }
+213:
+214:     backend.DownloadImage(&in_image, staging.buffer, buffer_copies);
+215:     backend.FlushBarriers();
+216:
+217:     const KernelBuffer tiled_buffer_info{
+218:         .buffer = out_buffer,
+219:         .offset = out_offset,
+220:         .range = info.guest_size,
+221:     };
+222:     const KernelBuffer linear_buffer_info{
+223:         .buffer = staging.buffer,
+224:         .offset = staging.offset,
+225:         .range = info.guest_size,
+226:     };
+227:     // bbport: the backend records with copies of the buffer ranges (threaded recording).
+228:     backend.DispatchTiling(
+229:         MakeDispatch(info, true, tiled_buffer_info, linear_buffer_info, params_buffer_info));
+230:
+231:     backend.AccessBuffer(out_buffer, out_offset, info.guest_size,
+232:                          vk::PipelineStageFlagBits2::eComputeShader,
+233:                          vk::AccessFlagBits2::eShaderWrite);
+234: }
+
+FILE vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime.mm
+977: void Runtime::AccessBuffer(const Buffer* handle, u64 offset, u64 size,
+978:                            vk::PipelineStageFlags2 src_stage, vk::AccessFlags2 src_access) {
+979:     if(barrier_audit)barrier_audit->Note(false,handle,offset,size,src_stage,src_access);
+980:     if(FrameCapture::NativeRecording() && (src_access&(ReadMask|WriteMask)))FrameCapture::NativeBufferUse(uintptr_t(handle),
+981:         handle?uintptr_t(handle->buffer.native):0,offset,size,0,7,0,bool(src_access&WriteMask),
+982:         "runtime",u64(VkPipelineStageFlags2(src_stage)));
+983:     u64 start = offset;
+984:     u64 end = offset + std::max<u64>(size, 1) - 1;
+985:     u8 access = 0;
+986:     if (src_access & WriteMask) {
+987:         ++buffer_write_epoch;
+988:         access |= BufferAccessTracker::Write;
+989:     } else {
+990:         // Reads at 4 KiB granularity (Vulkan::Runtime does the same): constants come from ring
+991:         // allocations at a new offset every draw.
+992:         start &= ~u64{0xFFF};
+993:         end |= 0xFFF;
+994:     }
+995:     if (src_access & ReadMask) {
+996:         access |= BufferAccessTracker::Read;
+997:     }
+998:     if (access) {
+999:         tracker.Insert(handle, start, end, access);
+1000:     }
+1001:     // Reads by blit commands need no barrier: buffers are hazard tracked (D7) and the writer
+1002:     // that follows is another encoder command on a bound buffer.
+1003:     if (src_stage && src_access != vk::AccessFlagBits2::eTransferRead) {
+1004:         memory_pending = true;
+1005:     }
+1006: }
+1007:
+1008: bool Runtime::IsBufferAccessed(const Buffer* handle, u64 offset, u64 size, bool check_read_access) {
+1009:     if (global_write) {
+1010:         return true; // bbport: a paged write may have touched it (AccessGlobal)
+1011:     }
+1012:     const u64 end = offset + std::max<u64>(size, 1) - 1;
+1013:     u8 access = BufferAccessTracker::Write;
+1014:     if (check_read_access) {
+1015:         access |= BufferAccessTracker::Read;
+1016:     }
+1017:     return tracker.Find(handle, offset, end, access);
+1018: }
+1019:
+1020: void Runtime::NoteOrderedGuestBufferWrite() noexcept {
+1021:     static const bool enabled = [] {
+1022:         const char* value = std::getenv("BB_MTL_QUERY_WRITE_EPOCH");
+1023:         return !value || value[0] != '0'; // diagnostic old-behavior reference only
+1024:     }();
+1025:     if (enabled) ++buffer_write_epoch;
+1026: }
+1027:
+1028: void Runtime::AccessGlobal(vk::PipelineStageFlags2 src_stage, vk::AccessFlags2 src_access) {
+1029:     if(barrier_audit)barrier_audit->Note(true,nullptr,0,0,src_stage,src_access);
+1030:     if(FrameCapture::NativeRecording() && (src_access&(ReadMask|WriteMask)))FrameCapture::NativeBufferUse(0,0,0,0,0,7,0,
+1031:         bool(src_access&WriteMask),"global",u64(VkPipelineStageFlags2(src_stage)));
+1032:     if (src_stage) {
+1033:         memory_pending = true;
+1034:     }
+1035:     if (src_access & vk::AccessFlagBits2::eShaderWrite) {
+1036:         ++buffer_write_epoch;
+1037:         global_write = true;
+1038:     }
+1039: }
+1040:
+1041: bool Runtime::Transit(Image* image, vk::ImageLayout dst_layout, vk::PipelineStageFlags2 dst_stage,
+1042:                       vk::AccessFlags2 dst_access, std::optional<SubresourceRange> subres_range) {
+1043:     BeforeImageAccess();
+1044:     // bbport (P7.5): a native use of a proxied scene image resolves its proxy first (this records
+1045:     // a copy pass, which ends the open render pass: Transit comes before the pass of a draw is
+1046:     // opened, the core's BindResources and BeginRendering order).
+1047:     if (scene_targets) scene_targets->NativeAccess(*image, dst_access, bool(dst_stage & vk::PipelineStageFlagBits2::eClear));
+1048:     // The bookkeeping of the shared image state only: Metal tracks the hazards of textures
+1049:     // itself and has no layouts.
+1050:     scratch_barriers.clear();
+1051:     image->GetBarriers(scratch_barriers, dst_layout, dst_access, dst_stage, subres_range);
+1052:     const bool changed = !scratch_barriers.empty();
+1053:     scratch_barriers.clear();
+1054:     return changed;
+1055: }
+1056:
+1057: void Runtime::FlushImageBarriers() {
+1058:     BeforeImageAccess();
+1059: }
+1060:
+1061: void Runtime::FlushBarriers() {
+1062:     BeforeImageAccess();
+1063:     if (memory_pending) {
+1064:         if(barrier_audit && FrameCapture::NativeRecording())barrier_audit->Capture(uintptr_t(&scheduler));
+1065:         scheduler.MemoryBarrier();
+1066:     }
+1067:     memory_pending = false;
+1068:     global_write = false;
+1069:     tracker.Clear();
+1818: void Runtime::UploadImage(Image* dst, const Buffer* src,
+1819:                           std::span<const vk::BufferImageCopy> upload_copies) {
+1820:     if (!dst->backing) {
+1821:         return;
+1822:     }
+1823:     SetBackingSamples(dst, dst->info.num_samples, false);
+1824:
+1825:     bool needs_flush = Transit(dst, vk::ImageLayout::eTransferDstOptimal,
+1826:                                vk::PipelineStageFlagBits2::eCopy,
+1827:                                vk::AccessFlagBits2::eTransferWrite);
+1828:     for (const auto& copy : upload_copies) {
+1829:         const auto copy_size = BufferImageCopySize(copy, dst->info.pixel_format);
+1830:         needs_flush |= IsBufferAccessed(src, copy.bufferOffset, copy_size);
+1831:     }
+1832:     if (needs_flush) {
+1833:         FlushBarriers();
+1834:     }
+1835:
+1836:     id<MTLTexture> texture = NativeTexture(*dst);
+1837:     if (CopyCompatible(*dst, "image upload") && texture.sampleCount == 1) {
+1838:         UploadCopies({*this, scheduler, *impl}, texture,
+1839:                      dst->info.pixel_format, dst->backing->image.image_ci.format,
+1840:                      NativeBuffer(*src), upload_copies, __func__);
+1841:         if(!upload_copies.empty())MemoryStats::NoteContent((__bridge const void*)texture,MemoryStats::Content::Upload);
+1842:     }
+1843:
+1844:     for (const auto& copy : upload_copies) {
+1845:         const auto copy_size = BufferImageCopySize(copy, dst->info.pixel_format);
+1846:         AccessBuffer(src, copy.bufferOffset, copy_size, vk::PipelineStageFlagBits2::eCopy,
+1847:                      vk::AccessFlagBits2::eTransferRead);
+1848:     }
+1849:
+1850:     dst->flags &= ~ImageFlagBits::Dirty;
+1851: }
+1852:
+1853: void Runtime::DownloadImage(Image* src, const Buffer* dst,
+1854:                             std::span<const vk::BufferImageCopy> download_copies) {
+1855:     if (!src->backing) {
+1856:         return;
+1857:     }
+1858:     SetBackingSamples(src, src->info.num_samples);
+1859:
+1860:     bool needs_flush = Transit(src, vk::ImageLayout::eTransferSrcOptimal,
+1861:                                vk::PipelineStageFlagBits2::eCopy,
+1862:                                vk::AccessFlagBits2::eTransferRead);
+1863:     for (const auto& copy : download_copies) {
+1864:         const auto copy_size = BufferImageCopySize(copy, src->info.pixel_format);
+1865:         needs_flush |= IsBufferAccessed(dst, copy.bufferOffset, copy_size, true);
+1866:     }
+1867:     if (needs_flush) {
+1868:         FlushBarriers();
+1869:     }
+1870:
+1871:     id<MTLTexture> texture = NativeTexture(*src);
+1872:     if (CopyCompatible(*src, "image download") && texture.sampleCount == 1) {
+1873:         DownloadCopies({*this, scheduler, *impl}, texture,
+1874:                        src->info.pixel_format, src->backing->image.image_ci.format,
+1875:                        NativeBuffer(*dst), download_copies, __func__);
+1876:     }
+1877:
+1878:     for (const auto& copy : download_copies) {
+1879:         const auto copy_size = BufferImageCopySize(copy, src->info.pixel_format);
+1880:         AccessBuffer(dst, copy.bufferOffset, copy_size, vk::PipelineStageFlagBits2::eCopy,
+1881:                      vk::AccessFlagBits2::eTransferWrite);
+1882:     }
+
+FILE vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime.h
+189:     void FlushBarriers() override;
+190:     u64 RenderUpdateCount() const;
+191:     void FlushImageBarriers() override;
+192:     void BeforeImageAccess() override {
+193:         if (image_access_hook) {
+194:             image_access_hook(image_access_context);
+195:         }
+196:     }
+
+FILE vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm
+357: void Runtime::DispatchTiling(const VideoCore::TilingDispatch& dispatch) {
+358:     if (dispatch.group_count_x == 0) {
+359:         return;
+360:     }
+361:     const H::Shader* shader = nullptr;
+362:     id<MTLComputePipelineState> pipeline = impl->kernels.Tiling(dispatch, shader);
+363:     const u32 tiled_slot = HostKernels::BufferSlot(*shader, 0);
+364:     const u32 linear_slot = HostKernels::BufferSlot(*shader, 1);
+365:     const u32 params_slot = HostKernels::BufferSlot(*shader, 2);
+366:     scheduler.ComputeEncoder(__func__, true);
+367:     id<MTLComputeCommandEncoder> compute = impl->sched.compute;
+368:     [compute setComputePipelineState:pipeline];
+369:     [compute setBuffer:NativeBuffer(*dispatch.tiled.buffer)
+370:                 offset:dispatch.tiled.offset
+371:                atIndex:tiled_slot];
+372:     [compute setBuffer:NativeBuffer(*dispatch.linear.buffer)
+373:                 offset:dispatch.linear.offset
+374:                atIndex:linear_slot];
+375:     [compute setBuffer:NativeBuffer(*dispatch.params.buffer)
+376:                 offset:dispatch.params.offset
+377:                atIndex:params_slot];
+378:     [compute dispatchThreadgroups:MTLSizeMake(dispatch.group_count_x, 1, 1)
+379:             threadsPerThreadgroup:MTLSizeMake(shader->local_size[0], 1, 1)];
+380: }
+381:
+382: bool Runtime::DownloadTiledImage(VideoCore::Image* image, const VideoCore::TilingDispatch& dispatch) {
+383:     static const bool enabled=[] {const char* v=std::getenv("BB_MTL_TEXTURE_TILING");return v&&v[0]=='1';}();
+384:     if(!enabled || !image || !image->backing || !dispatch.is_macro ||
+385:        !dispatch.key.is_tiler || (dispatch.key.num_bits!=32 && dispatch.key.num_bits!=64) || dispatch.key.num_samples!=1 ||
+386:        dispatch.num_constants!=12 || dispatch.constants[3]!=1 || dispatch.group_count_x==0 ||
+387:        !dispatch.tiled.buffer || !dispatch.params.buffer)return false;
+388:     const auto& info=image->info;
+389:     static const bool half_enabled=[] {const char* v=std::getenv("BB_MTL_TEXTURE_TILING_HALF");return v&&v[0]=='1';}();
+390:     const bool half=info.pixel_format==vk::Format::eR16G16B16A16Sfloat;
+391:     // Native RGBA16F uses an exact bitcast of texture2d<half>. All other formats,
+392:     // arrays, mip chains and padded linear rows retain the original path.
+393:     if(!((!half && info.pixel_format==vk::Format::eR8G8B8A8Unorm && dispatch.key.num_bits==32) ||
+394:          (half && half_enabled && dispatch.key.num_bits==64)) || info.num_samples!=1 ||
+395:        info.resources.levels!=1 || info.resources.layers!=1 || info.size.depth!=1 ||
+396:        info.pitch!=info.size.width || info.mips_layout[0].pitch!=info.size.width ||
+397:        info.size.width%8!=0 || image->backing->num_samples!=1 ||
+398:        dispatch.tiled.offset>dispatch.tiled.buffer->SizeBytes() ||
+399:        info.guest_size>dispatch.tiled.buffer->SizeBytes()-dispatch.tiled.offset ||
+400:        dispatch.tiled.range<info.guest_size)return false;
+401:     auto source=NativeTexture(*image);
+402:     if(source.pixelFormat!=(half?MTLPixelFormatRGBA16Float:MTLPixelFormatRGBA8Unorm) || source.textureType!=MTLTextureType2D ||
+403:        source.sampleCount!=1 || source.mipmapLevelCount!=1 || source.arrayLength!=1 ||
+404:        source.width!=info.size.width || source.height!=info.size.height || source.buffer ||
+405:        !(source.usage&MTLTextureUsageShaderRead))return false;
+406:     BeforeImageAccess();
+407:     const void* proxy=scene_targets?scene_targets->ExistingTilingProxy(*image):nullptr;
+408:     auto pipeline=impl->kernels.TextureTiling(dispatch,proxy!=nullptr);if(!pipeline)return false;
+409:     // Resolve reduced proxies exactly as the old DownloadImage did before reading native data.
+410:     bool flush=false;
+411:     if(proxy) source=(__bridge id<MTLTexture>)proxy; // native remains dirty until a real native reader
+412:     else flush=Transit(image,vk::ImageLayout::eShaderReadOnlyOptimal,
+413:                        vk::PipelineStageFlagBits2::eComputeShader,vk::AccessFlagBits2::eShaderRead);
+414:     flush|=IsBufferAccessed(dispatch.tiled.buffer,dispatch.tiled.offset,info.guest_size,true);
+415:     if(flush)FlushBarriers();
+416:     scheduler.ComputeEncoder("Texture to guest tiling", true);
+417:     auto compute=impl->sched.compute;
+418:     [compute setComputePipelineState:pipeline];
+419:     [compute setTexture:source atIndex:0];
+420:     [compute setBuffer:NativeBuffer(*dispatch.tiled.buffer) offset:dispatch.tiled.offset atIndex:1];
+421:     [compute setBuffer:NativeBuffer(*dispatch.params.buffer) offset:dispatch.params.offset atIndex:3];
+422:     [compute dispatchThreadgroups:MTLSizeMake(dispatch.group_count_x,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
+423:     AccessBuffer(dispatch.tiled.buffer,dispatch.tiled.offset,info.guest_size,
+424:                  vk::PipelineStageFlagBits2::eComputeShader,vk::AccessFlagBits2::eShaderWrite);
+425:     if(VideoCore::FrameCapture::NativeRecording())
+426:         VideoCore::FrameCapture::Native(std::format("{{\"op\":\"texture_tiling\",\"queue\":{},\"bits\":{},\"proxy\":{},\"width\":{},\"height\":{},\"linear_bytes\":{}}}",(uintptr_t)&scheduler,dispatch.key.num_bits,proxy!=nullptr,info.size.width,info.size.height,info.guest_size));
+427:     static u64 count=0,bytes=0,proxies=0;++count;bytes+=info.guest_size;proxies+=proxy!=nullptr;
+428:     if(count==1 || count%600==0)std::printf("Metal texture tiling: copies=%llu linear-staging-avoided=%llu bytes proxy-resolves-avoided=%llu; exact RGBA8/half-bit reads, original tiled addresses\n",(unsigned long long)count,(unsigned long long)bytes,(unsigned long long)proxies);
+429:     return true;
+
+FILE vendor/metal_api/shadps4/video_core/rasterizer_core.cpp
+2327:                 push_data.AddOffset(binding.buffer, 0);
+2328:                 infos.push_back({record, record_offset, 32, false});
+2329:                 bound_buffers.emplace_back(nullptr, 0, 0, desc.is_written, u32(stage.sw_stage), stage.pgm_hash, 0);
+2330:                 pending_untracked = true;
+2331:                 if (desc.is_written) {
+2332:                     texture_cache.InvalidateMemoryFromGPU(
+2333:                         vsharp.base_address,
+2334:                         memory->ClampRangeSize(vsharp.base_address, vsharp.GetSize()));
+2335:                 }
+2336:                 needs_barrier = true;
+2337:             } else {
+2338:                 const u64 size = memory->ClampRangeSize(vsharp.base_address, vsharp.GetSize());
+2339:                 if (size != vsharp.GetSize()) {
+2340:                     LOG_ERROR(Render, "Clamped size from {} to {} for stage {:#x}",
+2341:                               vsharp.GetSize(), size, stage.pgm_hash);
+2342:                 }
+2343:                 const auto [buffer, offset] = buffer_cache.ObtainBuffer(
+2344:                     vsharp.base_address, size, desc.is_written, desc.is_formatted);
+2345:                 TraceShaderBinding(stage, vsharp.base_address, size, desc.is_written, buffer_cache);
+2346:                 const u64 offset_aligned = Common::AlignDown(offset, alignment);
+2347:                 const u64 adjust = offset - offset_aligned;
+2348:                 if (adjust % 4 != 0) {
+2349:                     LOG_WARNING(Render_Vulkan, "Buffer binding in shader {:#x} isn't dword aligned",
+2350:                                 stage.pgm_hash);
+2351:                 }
+2352:                 push_data.AddOffset(binding.buffer, adjust);
+2353:                 // bbport BB_LAYER_MEMORY: a huge binding may come back cut at the end of its
+2354:                 // guest chunk's buffer.
+2355:                 infos.push_back({buffer, offset_aligned,
+2356:                                  std::min<u64>(size + adjust, buffer->SizeBytes() - offset_aligned),
+2357:                                  false});
+2358:                 bound_buffers.emplace_back(buffer, offset, size, desc.is_written, u32(stage.sw_stage), stage.pgm_hash, vsharp.base_address);
+2359:                 NoteGuestAccess(vsharp.base_address, size, desc.is_written);
+2360:                 if (desc.is_written) {
+2361:                     // Raw storage-buffer writes can also make an aliased cached image stale.
+2362:                     texture_cache.InvalidateMemoryFromGPU(vsharp.base_address, size);
+2363:                 }
+2364:                 needs_barrier |= backend.IsBufferAccessed(buffer, offset, size, desc.is_written);
+
+FILE vendor/metal_api/shadps4/video_core/rasterizer_core_memory.cpp
+195: void RasterizerCore::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, bool src_gds) {
+196:     DrainDrawPipe();
+197:     if(FrameCapture::NativeRecording()) {
+198:         if(!src_gds)FrameCapture::NativeBufferUse(0,0,0,num_bytes,src,7,0,false,"dma_copy");
+199:         if(!dst_gds)FrameCapture::NativeBufferUse(0,0,0,num_bytes,dst,7,0,true,"dma_copy");
+200:     }
+201:     // bbport BB_GUEST_IN_PLACE: see FillBuffer (in place: the GPU, in stream order).
+202:     if (!dst_gds && !buffer_cache.IsAnyInPlace(dst, num_bytes) &&
+203:         !buffer_cache.IsRegionGpuModified(dst, num_bytes) &&
+204:         !VideoCore::BufferCache::LayerMirrored(dst, num_bytes)) {
+205:         // bbport BB_LAYER_MEMORY: a VRAM copy of the source may hold newer data than the game's memory.
+206:         if (!src_gds && !buffer_cache.IsRegionGpuModified(src, num_bytes) &&
+207:             !VideoCore::BufferCache::LayerMirrored(src, num_bytes) &&
+208:             !texture_cache.FindImageFromRange(src, num_bytes)) {
+209:             // Both buffers were not transferred to GPU yet. Can safely copy in host memory.
+210:             BbFreeCheck::Check(dst, num_bytes, std::bit_cast<const void*>(src), BbFreeCheck::DmaCopy);
+211:             std::memcpy(std::bit_cast<void*>(dst), std::bit_cast<void*>(src), num_bytes);
+212:             BbWriteLog::Note(dst, std::bit_cast<const void*>(dst), num_bytes, BbWriteLog::Dma);
+213:             if (!VideoCore::WriteTracking()) {
+214:                 NoteAssetWrite(dst, num_bytes);
+215:             }
+216:             return;
+217:         }
+218:     }
+219:     texture_cache.InvalidateMemoryFromGPU(dst, num_bytes);
