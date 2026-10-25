@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792888824691735000,
+  "created_ns": 1792891552690081000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -76,6 +76,10 @@
       "sha256": "6136c2410ea0c8f19a36e9e3641fb4c94bc97142da06751c55ebddeb54eb1ff8"
     },
     {
+      "path": "src/bb_shader_phase_audit.h",
+      "sha256": "5160fb13624afa8ad1fbe67dc7607fe732f7e96f456b2be732b0c36df001713b"
+    },
+    {
       "path": "src/bb_signal_audit.h",
       "sha256": "6eb1fdcf8df10e0fcea563e1c41c6d56a21be516668b83474808b75aa6c29424"
     },
@@ -93,7 +97,7 @@
     },
     {
       "path": "src/bb_stutter_audit.h",
-      "sha256": "faa474bf64a1e746225cca11870c50fadbe58326def2af1c6c950ced55d823dc"
+      "sha256": "d11872b5d096a73afc5f6748b7ba86eaf0164eb1c2413ed6055421b30a5d8fb7"
     },
     {
       "path": "src/boot_image.h",
@@ -253,7 +257,7 @@
     },
     {
       "path": "tools/analyze_stutter.py",
-      "sha256": "35755f713a99b8ad9778afcbcb9adc96438ed1ca83e986ffa656b06e9988ceb4"
+      "sha256": "8d9e0116bf6ea975069e207d53f4a9a3b714c7fff77b8bdbbafa87854484a713"
     },
     {
       "path": "tools/analyze_texture_bindings.py",
@@ -281,7 +285,7 @@
     },
     {
       "path": "tools/build_first_upload_test.py",
-      "sha256": "ef2e13c42e3acc84ea0036e55fdf4b6e9b871f07a2c97410b2d91b9f74a5b83f"
+      "sha256": "24ddd5002b3b8f10df16326dd7f78cf1f15ce4a7164a723b87d2dc63f19e46d6"
     },
     {
       "path": "tools/build_heap_bridge.py",
@@ -313,7 +317,7 @@
     },
     {
       "path": "tools/build_present_image_candidate.py",
-      "sha256": "83035383dd61f38faabef8df687bb0ce5efc00f5e9661abcd52deaeaf4c3e0ba"
+      "sha256": "5e5c921338b0b694f72a43708db192cccac689f351be250491f184c9624492cf"
     },
     {
       "path": "tools/build_submit_diagnostic.py",
@@ -569,7 +573,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "c69810d714cd75e5afeae5d51c33109e847b393c5a76e12cfeb5682a3e1d0e36"
+      "sha256": "df34e342442848d902bcc3da968cabcca24d34c96d153e05a32b9e5a1b022719"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -581,7 +585,7 @@
     },
     {
       "path": "tools/run_observed_combat_probe.py",
-      "sha256": "ecb31ee0549e6b2bf12a0c9912e1c708443a373c79604d4555dc76b5e0bd34d5"
+      "sha256": "cd343e35eb37364d3925cd65f24aff2a4b51ad1b4dd8822e4a93270b448acc47"
     },
     {
       "path": "tools/run_pmr_abba.py",
@@ -632,6 +636,10 @@
       "sha256": "4d05e598a2e4044d3e2bc80a4f53b5a02fdae486c31e6ae2b524defdb96a724e"
     },
     {
+      "path": "tools/shader_phase_analysis.py",
+      "sha256": "91abe95fa788fe158cb8cac000dbe5cad985517fe2b248d6059ab36dbe7fbff9"
+    },
+    {
       "path": "tools/validate_local_qa_package.py",
       "sha256": "f90ec2ac1b4344608450d4a5deb9df6b2a759d720787a5948cd1a4dd5cc88e50"
     },
@@ -680,6 +688,10 @@
       "sha256": "f493ea6ac3e3645b56d06c623832872ba89a49ebd6419d0d50ada769457608eb"
     },
     {
+      "path": "tests/metal/test_fragment_uniforms.mm",
+      "sha256": "bc522aea0eec81b365cf082d00dc1f1035398650ed7ecbeba2bfb89f335492ec"
+    },
+    {
       "path": "tests/metal/test_gpu_runtime_stubs.cpp",
       "sha256": "ec98a86be72d544ef91c8892ec231beb5ae377f34f85ffde566dbfabf91846ae"
     },
@@ -694,6 +706,10 @@
     {
       "path": "tests/metal/test_present_dump.mm",
       "sha256": "ead977c358f2c90f282485475233813fc2380b631fd26089398dfcc4dc5a87ae"
+    },
+    {
+      "path": "tests/metal/test_shader_compile_phases.mm",
+      "sha256": "92420353cd70eb84074bb7544aa7fa247c8007b485621c5e4150c1ee356349cf"
     },
     {
       "path": "tests/metal/test_texture_expansion.mm",
@@ -754,6 +770,10 @@
     {
       "path": "tests/test_abi.cpp",
       "sha256": "fa54cc7377e8fe082406431390c06adaa483f7fdf60a8f2b38fd09be1d49e0c3"
+    },
+    {
+      "path": "tests/test_actual_shader_phases.py",
+      "sha256": "832942948d1ea7f24f8b30a8e4de985b24f3ea02104dc5c8fb7eb74f63eb2f49"
     },
     {
       "path": "tests/test_allocation_probe.cpp",
@@ -834,6 +854,14 @@
     {
       "path": "tests/test_fex_map_provenance.py",
       "sha256": "4ee42d7e44f5e0b0aaf65a54c3ccf71eb2fd9bff641f0682a96cda010f898ca4"
+    },
+    {
+      "path": "tests/test_fragment_uniform_range.cpp",
+      "sha256": "64ef3354ef86b33959299891e030f2ba2208410034f8056b05585430d1857f83"
+    },
+    {
+      "path": "tests/test_fragment_uniform_range.py",
+      "sha256": "145f3cb45e8a9846c25ceb2ec26db2175060967c1f0665a684ed0ccb3cda789e"
     },
     {
       "path": "tests/test_game_menu_bridge.cpp",
@@ -1038,6 +1066,18 @@
     {
       "path": "tests/test_session_state.cpp",
       "sha256": "abf1d23a0a66f9c73814546a856e809f8619133ce789f2a86ca59cb7b695f964"
+    },
+    {
+      "path": "tests/test_shader_phase_analysis.py",
+      "sha256": "252adaa5d5087e3d5f287d3d96f703bc47aa72382baa33094529e87babe650ad"
+    },
+    {
+      "path": "tests/test_shader_phase_audit.cpp",
+      "sha256": "7ff47428646a8493831a9894700f49da4283e4863770a2de59160fcb51d19cc8"
+    },
+    {
+      "path": "tests/test_shader_phase_audit.py",
+      "sha256": "01459489a0fcbbdef9f9890c26dd2ddeb133c865a96e06502d25b741a15339a8"
     },
     {
       "path": "tests/test_signal_audit.cpp",
@@ -32085,7 +32125,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
-      "sha256": "00c6669a1354010a7e76683ef09b59fb7353a9be0fa3c2c2678a0e6e70544e35"
+      "sha256": "4d43195fe42aa635428acc4889f30f2f9bd4145c2b622f72ed4ddc77978890aa"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.h",
@@ -32201,7 +32241,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_fragment_uniforms.h",
-      "sha256": "f46864e8dfcce6cd6d87e172bfbb8e7c45cb2a4af097765d0760091a6dead196"
+      "sha256": "30676f88baf94430c2b1ebddfe8c497e02289c8197f11ea3a13e4aac0228023c"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_frame_interpolator.h",
@@ -38397,11 +38437,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "3298cef6a2d2ee02e00d59f5b3b64fd3b4c29817a89b73075456d8cf00e0fb4a"
+      "sha256": "56cf4d531b1aad9d2f0c2bb8bfad1b8af2d15f296137e10c766089c5644678e6"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "708869bd7918acc88a580046b59a6571c20935da0afcb470114d778de06baf4b"
+      "sha256": "a169c5215bab8d07d1a90a37f87713f5c83a1039776e61e9d534942a7379a2ad"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38470,6 +38510,10 @@
     {
       "path": "docs/combined-combat-and-load-identity.zh-CN.md",
       "sha256": "8d0780595cd4aee4edc32250452a245fe8bb5e4bc99807004accc9e41eb87314"
+    },
+    {
+      "path": "docs/shader-phase-and-uniform-range.zh-CN.md",
+      "sha256": "18e7917488be82bc6a95661e9792fed0b2b977b9f99794d49e66fa5b9be33c07"
     }
   ],
   "excluded": [

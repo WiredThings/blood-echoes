@@ -15,6 +15,7 @@
 #include <thread>
 #include <unordered_set>
 
+#include "bb_shader_phase_audit.h"
 #include "common/hash.h"
 #include "common/io_file.h"
 #include "common/path_util.h"
@@ -1046,14 +1047,19 @@ bool PipelineCacheCore::RefreshComputeKey() {
 ShaderModuleHandle PipelineCacheCore::CompileModule(Shader::Info& info, Shader::RuntimeInfo& runtime_info,
                                               const std::span<const u32>& code, size_t perm_idx,
                                               Shader::Backend::Bindings& binding) {
+    BbShaderPhaseAudit::Module phases{info.pgm_hash,static_cast<u32>(info.hw_stage),perm_idx};
     LOG_INFO(Render_Vulkan, "Compiling {} shader {:#x} {}", info.hw_stage, info.pgm_hash,
              perm_idx != 0 ? "(permutation)" : "");
     DumpShader(code, info.pgm_hash, info.hw_stage, perm_idx, "bin");
     CompileTimer timer{fmt::format("{} shader {:#x} permutation {}", info.hw_stage, info.pgm_hash,
                                    perm_idx)};
 
+    BbShaderPhaseAudit::Phase ir_phase{phases,BbAudit::ShaderGcnToIR};
     const auto ir_program = Shader::TranslateProgram(code, pools, info, runtime_info, profile);
+    ir_phase.End();
+    BbShaderPhaseAudit::Phase spirv_phase{phases,BbAudit::ShaderIRToSpirv};
     auto spv = Shader::Backend::SPIRV::EmitSPIRV(profile, runtime_info, ir_program, binding);
+    spirv_phase.End();
     DumpShader(spv, info.pgm_hash, info.hw_stage, perm_idx, "spv");
 
     ShaderModuleHandle module;
@@ -1061,6 +1067,7 @@ ShaderModuleHandle PipelineCacheCore::CompileModule(Shader::Info& info, Shader::
     auto patch = GetShaderPatch(info.pgm_hash, info.hw_stage, perm_idx, "spv");
     const bool is_patched = patch && EmulatorSettings.IsPatchShaders();
     const auto name = GetShaderName(info.hw_stage, info.pgm_hash, perm_idx);
+    BbShaderPhaseAudit::Phase backend_phase{phases,BbAudit::ShaderModuleBackend};
     if (is_patched) {
         LOG_INFO(Loader, "Loaded patch for {} shader {:#x}", info.hw_stage, info.pgm_hash);
         module = CreateShaderModule(*patch, name, false);
@@ -1068,12 +1075,14 @@ ShaderModuleHandle PipelineCacheCore::CompileModule(Shader::Info& info, Shader::
         module = CreateShaderModule(spv, name, false);
     }
 
+    backend_phase.End();
     RegisterShaderBinary(std::move(spv), info.pgm_hash, perm_idx);
 
     if (EmulatorSettings.IsShaderCollect()) {
         CollectShader(name, info.sw_stage, module, spv, code,
                       patch ? *patch : std::span<const u32>{}, is_patched);
     }
+    phases.Returned(bool(module));
     return module;
 }
 

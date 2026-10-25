@@ -48,8 +48,10 @@ inline FragmentUniformRewrite RewriteFragmentUniforms(const std::string& msl) {
         const std::regex access("^"+name+R"(\.data\[(?:([0-9]+)u)(?: \+ (buf[0-9]+_(?:dword_)?off))?\])");
         bool valid=true;unsigned accesses=0;
         for(std::sregex_iterator j(code.begin(),code.end(),use);j!=end;++j) {
-            const std::string tail=code.substr(j->position());std::smatch match;
-            if(!std::regex_search(tail,match,access)) {valid=false;break;}
+            // Match the same anchored expression directly against the original suffix.
+            // Avoid a full suffix allocation/copy for every read; no match flags change.
+            std::match_results<std::string::const_iterator> match;
+            if(!std::regex_search(code.cbegin()+j->position(),code.cend(),match,access)) {valid=false;break;}
             std::uint64_t upper=0;
             try {upper=std::stoull(match[1]);}catch(...) {valid=false;break;}
             if(upper>=1024) {valid=false;break;}

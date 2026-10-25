@@ -4,7 +4,7 @@
 
 目标是替换 Rosetta CPU 组件，复用 Blood Echoes 原启动器、Metal 后端与现有补丁。正式应用、存档、设置和缓存保持不变。仅使用 Shared 隔离配置、已有 QA 进度的新副本和私有 GPU 缓存；不降低分辨率/特效，不缩小缓存。
 
-按用户最新指令，死亡重生、在线和菜单实测本轮暂缓，醒后统一验收；不把历史通过当作本构建通过。所有游戏测试静音，无持续录屏/Cua。严重压力、快速 swap 增长和锁屏保护未放宽。源码只推送 `dev/arm64-runtime-audit`，不更新 Release。用量任一相关可读窗口剩余低于15%即停止开发/测试，整理交接和最新测试包；最近可读窗口剩余52%，其它窗口不可用。
+按用户最新指令，死亡重生、在线和菜单实测本轮暂缓，醒后统一验收；不把历史通过当作本构建通过。所有游戏测试静音，无持续录屏/Cua。严重压力、快速 swap 增长和锁屏保护未放宽。源码只推送 `dev/arm64-runtime-audit`，不更新 Release。用量任一相关可读窗口剩余低于15%即停止开发/测试，整理交接和最新测试包；最近可读窗口剩余41%，其它窗口不可用。
 
 ## 已修复并有定向证据
 
@@ -451,3 +451,9 @@ FEX相同guest PC的跨线程IR重复已有上游CompileCode的二次LookupCache
 launcher-engine-abba-1792888283578587000：新装载准入接入后的原冻结包90秒静音、无Cua/抓图冒烟通过，17.51秒出现scene camera，末段48.39FPS、p99 22.73ms、GPU19.45ms，聚合footprint5828MiB，最高warning2，系统swap约+105MiB。实际GPU direct load edge和签名/SHA均记录在result，没改封装包或设置。这是启动路径/新验证器不破坏正常入口的回归，不是新增性能收益、去重RAM或完整游戏正确性验收。
 
 补充准入回归gpu-candidate-identity-1792888744088525000：最终12项真实Mach-O控制通过。新增代码页篡改后重新声明正确文件哈希仍被严格签名拒绝的负例；签名失败现在带出有界实际原因，避免只见笼统CalledProcessError。未改游戏执行或封装包。
+
+## 当前优先交接：分段编译证据
+
+最新实测和回归见docs/shader-phase-and-uniform-range.zh-CN.md：已真实抓到片元37a8af3d的232ms驱动建库+84ms PSO，与338ms长帧和337ms提交阻塞吻合，FEX仅0.407ms；GCN重编译与驱动阻塞已经可分开。另有冷启动compute的34ms IR转换，不宜只修驱动。新小优化只消除片元源码后缀复制，生成文本/实际24像素用例不变，不能当FPS收益。
+
+诊断候选present-image-candidate-1792890975879404000（新增mtl_shader对象）已运行隔离路线通过；正常手动QA仍使用冻结的signal-checkpoint包，未加诊断库。第三轮同hash预加载0.206ms，但AI/内容偏差与缓存变暖不允许归因小优化。正式快照shader-phase-finish-20261025.json与native-runtime-goal-current.json完全相等。Cua仅按用户追加授权用于测试前收起Codex，服务关闭后才跑三轮；无需再启动Cua。限额41%，目标保持进行中。

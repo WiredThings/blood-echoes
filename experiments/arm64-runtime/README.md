@@ -39,6 +39,13 @@ ARM64 architecture, declared hashes and strict signatures, with 12 authored
 Mach-O controls. The combined range/image route observed bloodied character
 textures but did not reproduce the intermittent white model. No performance
 benefit is claimed. See docs/combined-combat-and-load-identity.zh-CN.md.
+Default-off phase probes now distinguish GCN-to-IR, SPIR-V and backend work.
+One real 338 ms gameplay frame overlapped a 232 ms new Metal library and 84 ms
+PSO creation, with only 0.407 ms of FEX block translation. See
+docs/shader-phase-and-uniform-range.zh-CN.md for complete trace qualifications.
+A source-suffix-copy reduction retains byte-identical generated text on 367
+inputs and 24 actual Metal sampling pixel cases. Its host microbenchmark is
+not a measured game FPS improvement; normal QA packaging remains frozen.
 
 ## Development build limitations
 

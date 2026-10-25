@@ -1,12 +1,23 @@
 """Private silent route through the unchanged launcher; capture outside audit gates."""
 from pathlib import Path
 import argparse,subprocess,time,re,json,sys
-p=Path(__file__).resolve().parents[1];ap=argparse.ArgumentParser();ap.add_argument('--save-seed',type=Path,required=True);ap.add_argument('--library-reuse',choices=['0','1']);a=ap.parse_args();seed=a.save_seed.absolute()
+p=Path(__file__).resolve().parents[1];ap=argparse.ArgumentParser();ap.add_argument('--save-seed',type=Path,required=True);ap.add_argument('--library-reuse',choices=['0','1']);ap.add_argument('--shader-phases',action='store_true');ap.add_argument('--startup-shader-phases',action='store_true');ap.add_argument('--fresh-app-cache',action='store_true');ap.add_argument('--reuse-app-cache',type=Path);a=ap.parse_args();seed=a.save_seed.absolute()
 assert seed==seed.resolve()and seed.is_relative_to(p/'state')and(seed/'savedata').is_dir(),'existing private QA seed required'
 tag=str(time.time_ns());driver_e=p/'evidence'/('observed-combat-driver-'+tag);driver_e.mkdir();logpath=driver_e/'console.log'
 command=['python3',str(p/'tools/run_launcher_engine_abba.py'),'--order','arm64','--seconds','180','--action-trace','--producer-trace','--producer-waits','--unaligned-audit','--compile-audit','--exploration-diagnostic','--gpu-variant','present-image','--game-images','--external-image-control','--save-seed',str(seed)]
 if a.library_reuse is not None:command+=['--library-reuse',a.library_reuse]
+assert not a.startup_shader_phases or a.shader_phases
+assert not(a.fresh_app_cache and a.reuse_app_cache)
+if a.shader_phases:command+=['--shader-phases']
+if a.startup_shader_phases:command+=['--startup-shader-phases']
+if a.fresh_app_cache or a.reuse_app_cache:
+ assert a.shader_phases,'separate application cache only for phase diagnostics'
+ cache=(p/'state'/('gpu-diagnostic-shader-phase-'+tag))if a.fresh_app_cache else a.reuse_app_cache.absolute()
+ assert cache==cache.resolve()and cache.parent==p/'state'and cache.name.startswith('gpu-diagnostic-')
+ if a.reuse_app_cache:assert cache.is_dir()and not cache.is_symlink()
+ command+=['--diagnostic-app-cache',str(cache)]
 recipe=[(0,'move','lx=128 ly=0'),(2.16,'move','lx=128 ly=0'),(4.26,'move','lx=128 ly=0'),(6.37,'move','lx=128 ly=0'),(8.48,'move','lx=0 ly=128'),(11,'capture',''),(28,'gate','on'),(32.02,'move','lx=255 ly=0'),(34.17,'move','lx=128 ly=0'),(40,'gate','off'),(60.76,'move','lx=255 ly=0'),(62.88,'move','lx=255 ly=0'),(100,'gate','on'),(104.07,'move','lx=128 ly=0'),(108,'attack','r1'),(110,'attack','r2'),(112,'gate','off'),(130,'gate','on'),(132,'attack','r1'),(134,'attack','r1'),(136,'attack','r2'),(140,'gate','off'),(142,'capture','')]
+if a.startup_shader_phases:recipe.insert(0,(0,'gate','off'))
 case=None;rows=[];failure=None
 with logpath.open('w')as log:
  proc=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT);print('LOG',logpath,flush=True)
