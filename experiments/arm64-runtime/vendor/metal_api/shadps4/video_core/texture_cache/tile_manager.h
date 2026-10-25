@@ -53,6 +53,11 @@ public:
     std::pair<const Buffer*, u64> DetileImage(const VideoCore::Buffer* in_buffer, u64 in_offset,
                                               const ImageInfo& info);
 
+    // No raw write until token.Record(). At most one attempt per scheduler tick.
+    std::unique_ptr<PreparedExactImageExport> PrepareExactImageExport(
+        Image& image, const Buffer* existing_raw, u64 raw_offset,
+        const std::function<void()>& release_input_lease = {});
+
     /// The first `num_mips` mips of `info` as the kernel gets them.
     static TilingInfo MakeTilingInfo(const ImageInfo& info, u32 num_mips);
 

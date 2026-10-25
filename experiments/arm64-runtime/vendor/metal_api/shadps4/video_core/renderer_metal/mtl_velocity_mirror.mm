@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Velocity shader identities, RGBA16F mirror and packing decode follow IFreemz, commit
 // 149f63645bbb40fa587daa68fbf003b1f6dbcd7d. Camera fallback, Metal hazards/residency and
@@ -70,7 +71,7 @@ VelocityMirror::VelocityMirror(Device& d, Scheduler& s, SceneTargets& t, bool en
     NSError* error = nil;
     auto* options = [MTLCompileOptions new];
     options.mathMode = MTLMathModeSafe;
-    auto library = [d.GetImpl().device newLibraryWithSource:source options:options error:&error];
+    auto library = Metal::LocalLibrary::Build(d.GetImpl().device, source, options, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"merge_velocity"}); });
     if (library) impl->pipeline = [d.GetImpl().device newComputePipelineStateWithFunction:[library newFunctionWithName:@"merge_velocity"] error:&error];
     impl->packing = [d.GetImpl().device newBufferWithLength:8 options:MTLResourceStorageModePrivate];
     if (impl->packing) { MemoryStats::Track((__bridge const void*)impl->packing, MemoryStats::Kind::Velocity); d.GetImpl().AddResident(impl->packing); }

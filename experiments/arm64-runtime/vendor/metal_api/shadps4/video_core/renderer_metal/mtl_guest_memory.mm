@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <array>
@@ -55,7 +56,7 @@ void SelfTest(Device::Impl& impl, id<MTLBuffer> buffer, std::uint8_t* host, u64 
         "    out[0] = p[0]; out[1] = p[last]; out[2] = bound[0]; out[3] = bound[last];\n"
         "}\n";
     NSError* error = nil;
-    id<MTLLibrary> library = [impl.device newLibraryWithSource:source options:nil error:&error];
+    id<MTLLibrary> library = Metal::LocalLibrary::Build(impl.device, source, nil, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"probe"}); });
     id<MTLComputePipelineState> pipeline =
         library ? [impl.device newComputePipelineStateWithFunction:[library newFunctionWithName:@"probe"]
                                                              error:&error]

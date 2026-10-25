@@ -172,12 +172,14 @@ void RasterizerCore::FillBuffer(VAddr address, u32 num_bytes, u32 value, bool is
             return;
         }
     }
-    const auto [buffer, offset] = [&] -> std::pair<const VideoCore::Buffer*, u64> {
+    auto [buffer, offset] = [&] -> std::pair<const VideoCore::Buffer*, u64> {
         if (is_gds) {
             return {buffer_cache.GetGdsBuffer(), address};
         }
         return buffer_cache.ObtainBuffer(address, num_bytes, true);
     }();
+    if(!is_gds&&buffer_cache.PrepareImageAliasesForRawWrite(address,num_bytes,buffer,offset)==BufferCache::RawPrewriteResult::Rebind)
+        std::tie(buffer,offset)=buffer_cache.ObtainBuffer(address,num_bytes,true);
     backend.FillBuffer(buffer, offset, num_bytes, value);
 }
 
@@ -216,7 +218,7 @@ void RasterizerCore::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gd
             return;
         }
     }
-    texture_cache.InvalidateMemoryFromGPU(dst, num_bytes);
+
     const auto* gds_buffer = buffer_cache.GetGdsBuffer();
     const auto [src_buffer, src_offset] = [&] -> std::pair<const VideoCore::Buffer*, u64> {
         if (src_gds) {
@@ -224,12 +226,15 @@ void RasterizerCore::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gd
         }
         return buffer_cache.ObtainBuffer(src, num_bytes, false, true);
     }();
-    const auto [dst_buffer, dst_offset] = [&] -> std::pair<const VideoCore::Buffer*, u64> {
+    auto [dst_buffer, dst_offset] = [&] -> std::pair<const VideoCore::Buffer*, u64> {
         if (dst_gds) {
             return {gds_buffer, dst};
         }
         return buffer_cache.ObtainBuffer(dst, num_bytes, true, true);
     }();
+    if(!dst_gds&&buffer_cache.PrepareImageAliasesForRawWrite(dst,num_bytes,dst_buffer,dst_offset)==BufferCache::RawPrewriteResult::Rebind)
+        std::tie(dst_buffer,dst_offset)=buffer_cache.ObtainBuffer(dst,num_bytes,true,true);
+    texture_cache.InvalidateMemoryFromGPU(dst, num_bytes);
     const vk::BufferCopy copy = {
         .srcOffset = src_offset,
         .dstOffset = dst_offset,

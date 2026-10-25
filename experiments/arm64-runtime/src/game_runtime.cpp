@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include "bbport_guest_hooks.h"
 #include "bbport_resource_lifetime.h"
+#include "bbport_payload_gate.h"
 #include "static_range_index.h"
 #include "session_state.h"
 #include "thread_bootstrap_ranges.h"
@@ -471,6 +472,8 @@ int game_main(int argc,char** argv){
    else if(heap_fixture&&b.names[i]=="bb.prototype.extra_heap_during"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmExtraHeaps::FixtureDuring)),"fixture.extra_heap_during"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.travel_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmTravel::FixtureCheck)),"fixture.travel_check"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.resource_bad_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmResourceRuntime::FixtureBadCheck)),"fixture.resource_bad_check"));++native;route="authored-fixture";}
+   else if(heap_fixture&&b.names[i]=="bb.prototype.payload_arm"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmResourceRuntime::FixturePayloadArm)),"fixture.payload_arm"));++native;route="authored-fixture";}
+   else if(heap_fixture&&b.names[i]=="bb.prototype.payload_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmResourceRuntime::FixturePayloadCheck)),"fixture.payload_check"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.resource_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmResourceRuntime::FixtureCheck)),"fixture.resource_check"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.avplayer_boundary"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(fixture_avplayer_boundary)),"fixture.avplayer_boundary"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.net_workers"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(fixture_net_workers)),"fixture.net_workers"));++native;route="authored-fixture";}

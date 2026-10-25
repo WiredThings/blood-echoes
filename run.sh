@@ -254,6 +254,14 @@ if [[ ${BB_RENDERER:-} == metal && -f .packaged && -x $game_app ]]; then
     echo "Game application: $probe"
 fi
 probe_args=("$out/boot-linked.bin" --content-profile "$out/content.bin" --patches "$out/patches.bin" --app0 "$game" --user "${BB_USER_DIR:-$data/user}" --timeout "${BB_TIMEOUT:-0}" "$@")
+# Native-runtime component preparation happens after the original patch/mod
+# pipeline, before either game process exists. The wrapper execs this same probe.
+if [[ ${BB_ARM_LAUNCHER_COMPAT:-0} == 1 && ${BB_RENDERER:-} == metal ]]; then
+    local_metal_startup=$PWD/tools/macos/local_metal_startup.py
+    [[ -f $local_metal_startup ]] || { echo "STOP: native Metal preparation component is missing" >&2; exit 1; }
+    probe_args=("$local_metal_startup" "$probe" "${probe_args[@]}")
+    probe=$PYTHON
+fi
 if [[ -n ${mod_game:-} ]]; then
     "$probe" "${probe_args[@]}" &
     mod_pid=$!

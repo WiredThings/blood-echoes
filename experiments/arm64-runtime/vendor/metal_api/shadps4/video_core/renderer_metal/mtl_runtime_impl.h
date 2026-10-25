@@ -71,7 +71,7 @@ public:
     void ColorToMsDepth(id<MTLTexture> src, id<MTLTexture> dst);
 
     /// The MTLLibrary of a host shader (compiled once).
-    id<MTLLibrary> Library(const HostShaders::Shader& shader);
+    id<MTLLibrary> Library(const HostShaders::Shader& shader, MTLFunctionConstantValues* values, bool source_only=false, id<MTLFunction> __strong* prepared=nullptr);
     /// The function of a host shader with the function constants of `constants` (indexed by the
     /// constant's id; ids beyond `count` keep the shader's default).
     id<MTLFunction> Function(const HostShaders::Shader& shader, const u32* constants, u32 count);

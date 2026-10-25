@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #import <Metal/Metal.h>
@@ -227,9 +228,7 @@ IndirectKernels::IndirectKernels(Device& device) {
         NSError* ns_error = nil;
         const std::string source = IndirectSource();
         id<MTLLibrary> library =
-            [mtl_device newLibraryWithSource:[NSString stringWithUTF8String:source.c_str()]
-                                     options:options
-                                       error:&ns_error];
+            Metal::LocalLibrary::Build(mtl_device, [NSString stringWithUTF8String:source.c_str()], options, &ns_error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"bb_gs_prep", @"bb_gs_copy_indices"}); });
         if (!library) {
             error = fmt::format("indirect geometry kernels: {}",
                                 ns_error ? ns_error.localizedDescription.UTF8String : "?");
@@ -481,9 +480,7 @@ const CompiledShader* PassThroughCache::Get(const GeometryInfo& info,
         }
         NSError* ns_error = nil;
         id<MTLLibrary> library =
-            [mtl_device newLibraryWithSource:[NSString stringWithUTF8String:source.c_str()]
-                                     options:options
-                                       error:&ns_error];
+            Metal::LocalLibrary::Build(mtl_device, [NSString stringWithUTF8String:source.c_str()], options, &ns_error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"bb_gs_pass"}); });
         id<MTLFunction> function =
             library ? [library newFunctionWithName:@"bb_gs_pass"] : nil;
         if (!function) {

@@ -3,6 +3,7 @@
 #pragma once
 
 #include <optional>
+#include <memory>
 #include <array>
 #include <span>
 #include <string>
@@ -248,6 +249,21 @@ public:
                                          u64 tick) = 0;
 };
 
+enum class ExactImageExportResult { Recorded, Stale, Consumed };
+// One-shot command token. Preparation may compile/allocate/join replay and record
+// a read-only image snapshot. Record never calls an image-access hook or creates
+// an encoder/pipeline/staging allocation. It grants NO payload/mapping lease.
+class ExactImageExportAttempt {
+public:
+    virtual ~ExactImageExportAttempt() = default;
+    virtual const void* OwnerCookie() const noexcept = 0;
+};
+class PreparedExactImageExport {
+public:
+    virtual ~PreparedExactImageExport() = default;
+    virtual ExactImageExportResult Record() noexcept = 0;
+};
+
 class CacheBackend {
 public:
     virtual ~CacheBackend() = default;
@@ -448,6 +464,16 @@ public:
 
     /// Optional fused texture-to-guest tiler. False leaves the caller's original staging path.
     virtual bool DownloadTiledImage(Image* image, const TilingDispatch& dispatch) { return false; }
+    // Claim precedes EVERY user hook, stream copy and staging request. A failed
+    // prepare still consumes the attempt. CanPrepare is a predicate, not a claim.
+    virtual std::unique_ptr<ExactImageExportAttempt> ClaimExactImageExportAttempt() { return {}; }
+    virtual bool CanPrepareExactImageExport(const Image&) const { return false; }
+    virtual std::unique_ptr<PreparedExactImageExport> PrepareExactImageExport(
+        std::unique_ptr<ExactImageExportAttempt>, Image*, const Buffer*, u64,
+        std::span<const vk::BufferImageCopy>, std::span<const u8>,
+        const std::function<void()>& release_input_lease = {}) { return {}; }
+    // Managed image invalidation/retirement notifies tokens BEFORE slot reuse.
+    virtual void InvalidatePreparedImageExport(u64) noexcept {}
 
     /// Creates the fault buffer parser: a kernel for fault bitmaps of 1 bit per page of
     /// `1 << page_bits` bytes that lists at most `max_faults` addresses. Called once, before the

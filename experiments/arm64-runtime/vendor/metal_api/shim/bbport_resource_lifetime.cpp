@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bbport_resource_lifetime.h"
+#include "bbport_payload_gate.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -327,3 +328,68 @@ void Report() {
               (unsigned long long)s.gc_protected);
 }
 } // namespace BbResourceLifetime
+
+namespace BbResourceLifetime {
+bool Tracker::TryWithLiveHeap(Tag expected,u64 address,u64 size,
+                              const std::function<bool(Tag)>& callback) {
+  if(!callback||!Valid(address,size)||(expected&&expected.domain!=Domain::Heap))return false;
+  std::unique_lock held{mutex,std::try_to_lock};if(!held.owns_lock())return false;
+  for(const auto& c:counters.domains)if(c.dropped)return false;
+  const auto& heaps=live[unsigned(Domain::Heap)];auto it=heaps.upper_bound(address);
+  if(it==heaps.begin())return false;--it;const auto actual=it->second;
+  if(!actual||actual.address>address||size>actual.size||address-actual.address>actual.size-size||
+     (expected&&expected!=actual))return false;
+  // A containing coarse Range is normal; partial/crossing live Range owners
+  // cannot be used as an absence proof. No new history/storage allocation here.
+  const auto& ranges=live[unsigned(Domain::Range)];auto range=ranges.upper_bound(address);
+  if(range!=ranges.begin())--range;
+  for(;range!=ranges.end()&&range->first<address+size;++range) {
+    const auto t=range->second;if(!Overlap(address,size,t.address,t.size))continue;
+    if(t.address>address||size>t.size||address-t.address>t.size-size)return false;
+  }
+  return callback(actual);
+}
+} // namespace BbResourceLifetime
+namespace BbPayload {
+namespace {thread_local Gate* writer_owner{};thread_local unsigned writer_depth{},fault_pause_depth{};}
+Gate& Get(){static auto* gate=new Gate;return *gate;}
+Gate::Mutation::Mutation(Gate& g):gate(&g) {
+  if(writer_depth) {if(writer_owner!=&g||fault_pause_depth)std::abort();++writer_depth;return;}
+  g.waiting.fetch_add(1,std::memory_order_release);
+  g.mutator_serial.lock();
+  try{g.mutex.lock();}catch(...){g.mutator_serial.unlock();throw;}
+  g.waiting.fetch_sub(1,std::memory_order_release);
+  writer_owner=&g;writer_depth=1;outer=true;
+  g.held.fetch_add(1,std::memory_order_relaxed);g.entered.fetch_add(1,std::memory_order_relaxed);
+}
+Gate::Mutation::~Mutation(){
+  if(!gate||writer_owner!=gate||!writer_depth||fault_pause_depth)std::abort();
+  if(--writer_depth)return;
+  writer_owner=nullptr;gate->held.fetch_sub(1,std::memory_order_relaxed);
+  gate->completed.fetch_add(1,std::memory_order_release);gate->mutex.unlock();gate->mutator_serial.unlock();
+}
+bool Gate::CurrentMutation() noexcept {return writer_owner&&writer_depth;}
+Gate::FaultPause::FaultPause(Gate& g) {
+  if(!writer_depth)return;
+  if(writer_owner!=&g)std::abort();gate=&g;
+  if(!fault_pause_depth++)g.mutex.unlock();
+}
+Gate::FaultPause::~FaultPause(){
+  if(!gate)return;
+  if(writer_owner!=gate||!writer_depth||!fault_pause_depth)std::abort();
+  if(!--fault_pause_depth){try{gate->mutex.lock();}catch(...){std::abort();}}
+}
+void Gate::Configure(bool covered) noexcept {ready.store(covered,std::memory_order_release);}
+bool Gate::TryWithLiveHeap(BbResourceLifetime::Tracker& tracker,BbResourceLifetime::Tag tag,
+                          std::uint64_t address,std::uint64_t size,
+                          const std::function<bool(BbResourceLifetime::Tag)>& callback) {
+  if(writer_depth||!Ready())return false;
+  std::shared_lock held{mutex,std::try_to_lock};if(!held.owns_lock()||!Ready())return false;
+  readers.fetch_add(1,std::memory_order_relaxed);
+  struct Count {std::atomic<std::uint64_t>& n;~Count(){n.fetch_sub(1,std::memory_order_relaxed);}} count{readers};
+  return tracker.TryWithLiveHeap(tag,address,size,callback);
+}
+Gate::Stats Gate::Read() const noexcept {
+ return {entered.load(),waiting.load(),held.load(),completed.load(),readers.load()};
+}
+} // namespace BbPayload

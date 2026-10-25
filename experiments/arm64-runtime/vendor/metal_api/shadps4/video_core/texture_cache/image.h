@@ -4,6 +4,7 @@
 #pragma once
 
 #include "common/enum.h"
+#include "bbport_image_provenance.h"
 #include "common/incremental_id.h"
 #include "common/types.h"
 #include "video_core/renderer_vulkan/vk_common.h"
@@ -193,6 +194,9 @@ public:
     ImageId depth_id{};
     u64 depth_uid{};
     u64 image_uid{};
+    // Constructor-only original identity. AssociateGuestImage/reuse must never update this.
+    BbPayload::Origin original_payload_origin{};
+    const void* original_payload_native{}; // factory also requires the original backing
 
     ImageInfo info;
     CacheBackend* backend;

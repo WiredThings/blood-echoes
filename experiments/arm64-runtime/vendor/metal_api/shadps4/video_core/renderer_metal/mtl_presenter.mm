@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Counterpart: renderer_vulkan/vk_presenter.cpp (cut down: no FSR, HDR).
 
@@ -267,9 +268,7 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
     {
         MTLCompileOptions* options = [MTLCompileOptions new];
         options.languageVersion = MTLLanguageVersion3_1;
-        id<MTLLibrary> library = [dev.device newLibraryWithSource:PresentSource
-                                                          options:options
-                                                            error:&error];
+        id<MTLLibrary> library = Metal::LocalLibrary::Build(dev.device, PresentSource, options, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"present_main"}); });
         ASSERT_MSG(library, "Present shader did not compile: {}", ErrorText(error));
         MTLRenderPipelineDescriptor* descriptor = [MTLRenderPipelineDescriptor new];
         descriptor.label = @"Present";

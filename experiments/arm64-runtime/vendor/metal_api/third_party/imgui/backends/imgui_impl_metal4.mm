@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // dear imgui: Renderer Backend for Metal 4
 // This needs to be used along with a Platform Backend (e.g. OSX)
 // Metal 4 requires Apple Silicon and macOS 26+.
@@ -683,7 +684,7 @@ fragment half4 fragment_main(VertexOut in [[stage_in]],
 {
     NSError* error = nil;
 
-    id<MTLLibrary> library = [device newLibraryWithSource:[NSString stringWithUTF8String:shaderCode] options:nil error:&error];
+    id<MTLLibrary> library = Metal::LocalLibrary::Build(device, [NSString stringWithUTF8String:shaderCode], nil, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"vertex_main", @"fragment_main"}); });
     if (library == nil)
     {
         NSLog(@"Error: failed to create Metal library: %@", error);

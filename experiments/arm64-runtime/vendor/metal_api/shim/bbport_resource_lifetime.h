@@ -50,6 +50,10 @@ public:
   Tag Owner(u64 address, u64 size) const;
   bool Release(Tag);
   State Status(Tag) const;
+  // Payload gate must already be held. Nonblocking actual live-Heap metadata
+  // check; never Released authorization. Empty expected is a capture query.
+  bool TryWithLiveHeap(Tag expected,u64 address,u64 size,
+                       const std::function<bool(Tag)>& callback);
   // Holds the allocation lock through metadata removal. A replacement
   // allocation cannot publish the same address halfway through removal of the
   // old cache entry.

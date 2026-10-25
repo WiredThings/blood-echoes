@@ -2340,8 +2340,10 @@ void RasterizerCore::BindBuffers(const Shader::Info& stage, const PreparedStage*
                     LOG_ERROR(Render, "Clamped size from {} to {} for stage {:#x}",
                               vsharp.GetSize(), size, stage.pgm_hash);
                 }
-                const auto [buffer, offset] = buffer_cache.ObtainBuffer(
+                auto [buffer, offset] = buffer_cache.ObtainBuffer(
                     vsharp.base_address, size, desc.is_written, desc.is_formatted);
+                if(desc.is_written&&buffer_cache.PrepareImageAliasesForRawWrite(vsharp.base_address,size,buffer,offset)==BufferCache::RawPrewriteResult::Rebind)
+                    std::tie(buffer,offset)=buffer_cache.ObtainBuffer(vsharp.base_address,size,true,desc.is_formatted);
                 TraceShaderBinding(stage, vsharp.base_address, size, desc.is_written, buffer_cache);
                 const u64 offset_aligned = Common::AlignDown(offset, alignment);
                 const u64 adjust = offset - offset_aligned;

@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 #include "bb_stutter_audit.h"
 #include "video_core/renderer_metal/mtl_compile_audit.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -1134,9 +1135,7 @@ const CompiledShader* DebugFragment(PsoCache::Impl& impl, Vulkan::GraphicsPipeli
     @autoreleasepool {
         NSError* ns_error = nil;
         id<MTLLibrary> library =
-            [impl.mtl_device newLibraryWithSource:[NSString stringWithUTF8String:source.c_str()]
-                                          options:nil
-                                            error:&ns_error];
+            Metal::LocalLibrary::Build(impl.mtl_device, [NSString stringWithUTF8String:source.c_str()], nil, &ns_error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"bb_gs_debug"}); });
         id<MTLFunction> function = library ? [library newFunctionWithName:@"bb_gs_debug"] : nil;
         if (!function) {
             error = fmt::format("debug fragment function: {}", FirstLine(ns_error));

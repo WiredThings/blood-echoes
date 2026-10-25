@@ -228,6 +228,17 @@ public:
     // The caches' own GPU work: compute kernels from the D11 host shaders
     void DispatchTiling(const VideoCore::TilingDispatch& dispatch) override;
     bool DownloadTiledImage(VideoCore::Image* image, const VideoCore::TilingDispatch& dispatch) override;
+    std::unique_ptr<VideoCore::ExactImageExportAttempt> ClaimExactImageExportAttempt() override;
+    bool CanPrepareExactImageExport(const VideoCore::Image&) const override;
+    std::unique_ptr<VideoCore::PreparedExactImageExport> PrepareExactImageExport(
+        std::unique_ptr<VideoCore::ExactImageExportAttempt>, VideoCore::Image*,
+        const VideoCore::Buffer*,u64,std::span<const vk::BufferImageCopy>,std::span<const u8>,
+        const std::function<void()>& release_input_lease = {}) override;
+    void InvalidatePreparedImageExport(u64) noexcept override;
+    u64 PreparedExactPoolRequests() const noexcept {
+        return exact_export_pool_requests.load(std::memory_order_relaxed);
+    }
+
     void CreateFaultParser(u32 page_bits, u32 max_faults) override;
     void ParseFaultBuffer(const VideoCore::FaultParseDispatch& dispatch) override;
 
@@ -262,6 +273,17 @@ public:
     bool GuestMemoryUsable() override;
 
 private:
+    struct ExactExportOwner;
+    struct PreparedExportState;
+    struct ExportAttemptToken;
+    class ExactExportToken;
+    VideoCore::ExactImageExportResult RecordExactExport(PreparedExportState&,ExactExportOwner&) noexcept;
+    void InvalidateExactExports() noexcept;
+    void CloseExactExportOwner() noexcept;
+    void PrepareExactSnapshot(const void*,const void*,std::span<const vk::BufferImageCopy>);
+    std::atomic<u64> exact_export_attempt_tick{0};
+    std::atomic<u64> exact_export_pool_requests{0};
+    std::shared_ptr<ExactExportOwner> exact_export_owner{};
     /// Whether the texels of the image's Metal texture are laid out as its guest format says
     /// (same texel size, no depth conversion); logs once per format when not.
     bool CopyCompatible(const VideoCore::Image& image, const char* what);

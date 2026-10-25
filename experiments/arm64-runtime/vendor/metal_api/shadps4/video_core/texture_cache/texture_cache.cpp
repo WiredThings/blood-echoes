@@ -232,6 +232,7 @@ void TextureCache::DownloadImageMemory(ImageId image_id, bool sync) {
 }
 
 void TextureCache::MarkAsMaybeDirty(ImageId image_id, Image& image) {
+    backend.InvalidatePreparedImageExport(image.image_uid);
     if (image.hash == 0) {
         // Initialize hash
         const u8* addr = std::bit_cast<u8*>(image.info.guest_address);
@@ -251,6 +252,7 @@ void TextureCache::InvalidateMemory(VAddr addr, size_t size) {
         if (image.Overlaps(addr, size)) {
             // Modified region overlaps image, so the image was definitely accessed by this fault.
             // Untrack the image, so that the range is unprotected and the guest can write freely.
+            backend.InvalidatePreparedImageExport(image.image_uid);
             image.flags |= ImageFlagBits::CpuDirty;
             PageManager::NoteImageFault(image.info.guest_address, image.info.guest_size,
                                         image.info.size.width, image.info.size.height,
@@ -329,6 +331,7 @@ void TextureCache::InvalidateMemoryFromGPU(VAddr address, size_t max_size) {
         }
         // Ensure image is reuploaded when accessed again.
         WatchImage(image, "GPU write (marked for refresh)");
+        backend.InvalidatePreparedImageExport(image.image_uid);
         image.flags |= ImageFlagBits::GpuDirty;
     });
 }
@@ -938,6 +941,7 @@ ImageView& TextureCache::FindTexture(ImageId image_id, const ImageDesc& desc, Vi
     }
 
     if (desc.type == BindingType::Storage) {
+        backend.InvalidatePreparedImageExport(image.image_uid);
         image.flags |= ImageFlagBits::GpuModified;
         image.gpu_write_tick = backend.CurrentTick();
         if (readback_linear_images && (!image.info.props.is_tiled || image.info.size.width <= 8) &&
@@ -974,6 +978,7 @@ ImageView& TextureCache::FindTexture(ImageId image_id, const ImageDesc& desc, Vi
 
 ImageView& TextureCache::FindRenderTarget(ImageId image_id, const ImageDesc& desc) {
     Image& image = slot_images[image_id];
+    backend.InvalidatePreparedImageExport(image.image_uid);
     if(FrameCapture::NativeRecording())FrameCapture::NativeBufferUse(image.image_uid,0,0,
         image.info.guest_size,image.guest_begin,7,0,true,"color_target");
     WatchImage(image, "render target");
@@ -1005,6 +1010,7 @@ ImageView& TextureCache::FindRenderTarget(ImageId image_id, const ImageDesc& des
 
 ImageView& TextureCache::FindDepthTarget(ImageId image_id, const ImageDesc& desc) {
     Image& image = slot_images[image_id];
+    backend.InvalidatePreparedImageExport(image.image_uid);
     if(FrameCapture::NativeRecording())FrameCapture::NativeBufferUse(image.image_uid,0,0,
         image.info.guest_size,image.guest_begin,7,0,true,"depth_target");
     WatchImage(image, "depth target");
@@ -1222,6 +1228,7 @@ void TextureCache::RegisterImage(ImageId image_id) {
 
 void TextureCache::UnregisterImage(ImageId image_id) {
     Image& image = slot_images[image_id];
+    backend.InvalidatePreparedImageExport(image.image_uid);
     ASSERT_MSG(True(image.flags & ImageFlagBits::Registered),
                "Trying to unregister an already unregistered image");
     guest_image_owners.erase(image_id.index);

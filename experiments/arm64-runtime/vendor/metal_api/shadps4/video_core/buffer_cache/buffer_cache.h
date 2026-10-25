@@ -4,6 +4,7 @@
 #pragma once
 
 #include "bbport_copy.h"
+#include "video_core/buffer_cache/preserved_writeback.h"
 
 #include <atomic>
 #include <deque>
@@ -25,6 +26,7 @@
 #include "video_core/buffer_cache/range_set.h"
 #include "video_core/buffer_cache/residency_use_memo.h"
 #include "video_core/cache_backend.h"
+#include "remote/bb_live_payload.h"
 
 namespace AmdGpu {
 struct Liverpool;
@@ -66,6 +68,7 @@ public:
 };
 
 class BufferCache {
+    friend struct RawPrewriteAuthorControl;
     static constexpr u64 ADDRESS_SPACE_BITS = 40;
     static constexpr u64 ARENA_PAGE_BITS = 32;
     static constexpr u64 ARENA_PAGE_SIZE = u64{1} << ARENA_PAGE_BITS;
@@ -136,6 +139,26 @@ public:
     [[nodiscard]] std::pair<const Buffer*, u64> ObtainBuffer(VAddr device_addr, u32 size,
                                                              bool is_written,
                                                              bool is_texel_buffer = false);
+
+    enum class RawPrewriteResult { Legacy, Recorded, Rebind };
+    using RawLiveBody=std::function<bool(const BbRemote::LivePayloadReceipt&)>;
+    using RawArmRead=std::function<bool(const RuntimeReadArmArgs&,RuntimeReadArmReceipt&)>;
+    using RawFinishArm=std::function<bool(uint64_t,bool,RuntimeReadArmReceipt&)>;
+    using RawLiveLease=std::function<bool(BbPayload::Origin,VAddr,u64,const RawLiveBody&)>;
+    struct RawWritebackServices {
+        std::function<int(uintptr_t,uintptr_t*,uintptr_t*,int*)> region;
+        std::function<bool(VAddr,u64,const RawLiveBody&)> capture;
+        RawLiveLease protected_lease;
+        RawLiveLease retire; // scalar-only conditional frontend retirement
+    };
+    // Same flush implementation; production owns real Back services, controls
+    // supply the actual isolated frontend protocol, never GPU completion mocks.
+    bool TryFlushPreservedWritebacksWithServices(VAddr,u64,const RawWritebackServices&,bool* touched_preserved=nullptr);
+    RawPrewriteResult PrepareImageAliasesForRawWrite(VAddr,u64,const Buffer*,u64);
+    // Dependency injection of the real protected frontend protocol for authored
+    // controls. Production passes BbRemote::Back::WithProtectedLivePayload.
+    RawPrewriteResult PrepareImageAliasesForRawWriteWithLease(VAddr,u64,const Buffer*,u64,
+                                                            const RawLiveLease&,const RawArmRead&,const RawFinishArm&);
 
     /// Attempts to obtain a buffer without modifying the cache contents.
     [[nodiscard]] std::pair<const Buffer*, u64> ObtainBufferForImage(VAddr device_addr, u32 size);
@@ -464,6 +487,8 @@ private:
     StreamBuffer stream_buffer;
     Buffer gds_buffer;
     RangeSet gpu_modified_ranges;
+    PreservedWritebackLedger preserved_writebacks;
+    bool TryFlushPreservedWritebacks(VAddr address,u64 size,bool* touched_preserved=nullptr);
 
     std::unique_ptr<FaultManager> fault_manager;
     std::unique_ptr<BdaPageTable> bda_page_table;
@@ -525,7 +550,7 @@ private:
     std::atomic<u64> layer_read_trap_hits{0}, layer_read_trap_bytes{0};
     static bool LayerReadTrapsOn();
     void LayerArmReadTraps(VAddr address, u64 size);
-    void LayerCopyBackForCpu(VAddr address);
+    bool LayerCopyBackForCpu(VAddr address);
     u64 layer_watch_refreshes = 0;        ///< statistics: watched blocks uploaded again
     /// Statistics: trap hits announced; by the game's code on watched / other blocks; by other
     /// code on watched / other blocks.

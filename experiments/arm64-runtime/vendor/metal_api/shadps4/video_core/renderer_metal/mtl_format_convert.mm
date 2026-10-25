@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Guest formats Metal has no texture for: the table, and the kernels that convert the bytes of a
 // transfer (design in mtl_format_convert.h).
@@ -236,7 +237,7 @@ id<MTLComputePipelineState> Converter::Pipeline(Kind kind) {
     MTLCompileOptions* options = [MTLCompileOptions new];
     options.languageVersion = MTLLanguageVersion3_1;
     options.mathMode = MTLMathModeSafe;
-    id<MTLLibrary> library = [device newLibraryWithSource:Source options:options error:&error];
+    id<MTLLibrary> library = Metal::LocalLibrary::Build(device, Source, options, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"rgb_convert", @"depth_convert"}); });
     ASSERT_MSG(library, "Format conversion kernels did not compile: {}",
                error ? error.localizedDescription.UTF8String : "unknown");
     NSString* name = kind == Kind::RgbPad ? @"rgb_convert" : @"depth_convert";

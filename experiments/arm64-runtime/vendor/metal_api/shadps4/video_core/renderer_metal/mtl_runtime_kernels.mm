@@ -1,9 +1,13 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // The caches' own GPU work on Metal (plan P2.4, docs/metal/cache_backend_design.md group C): the
 // D11 host shaders for detiling/tiling and the fault buffer parser, and the fullscreen passes of
 // the MSAA copies. Counterparts: vk_tile_kernels.cpp, vk_fault_parser.cpp, vk_blit_helper.cpp.
 
 #include <string>
+#include <cstring>
+#include <memory>
+#include "video_core/texture_cache/tile_manager.h"
 #include "bb_tiler_bounds.h"
 
 #include "common/assert.h"
@@ -91,31 +95,42 @@ u32 HostKernels::BufferSlot(const H::Shader& shader, u32 binding) {
     UNREACHABLE_MSG("Host shader without buffer binding {}", binding);
 }
 
-id<MTLLibrary> HostKernels::Library(const H::Shader& shader) {
-    if (const auto it = libraries.find(&shader); it != libraries.end()) {
+id<MTLLibrary> HostKernels::Library(const H::Shader& shader, MTLFunctionConstantValues* values, bool source_only, id<MTLFunction> __strong* prepared) {
+    if (const auto it = libraries.find(&shader); !source_only && it != libraries.end()) {
         return it->second;
     }
     NSString* source = [[NSString alloc] initWithBytes:shader.msl.data()
                                                 length:shader.msl.size()
                                               encoding:NSUTF8StringEncoding];
     NSError* error = nil;
-    id<MTLLibrary> library = [dev.device newLibraryWithSource:source
-                                                      options:CompileOptions()
-                                                        error:&error];
+    id<MTLLibrary> library = LocalLibrary::Build(dev.device, source, CompileOptions(), &error,
+        [&](id<MTLLibrary> local) {
+            NSString* entry = [[NSString alloc] initWithBytes:shader.entry.data()
+                length:shader.entry.size() encoding:NSUTF8StringEncoding];
+            id<MTLFunction> function = shader.spec_constants.empty()
+                ? [local newFunctionWithName:entry]
+                : [local newFunctionWithName:entry constantValues:values error:nil];
+            if (prepared) *prepared = function;
+            return bool(function);
+        }, !source_only);
     ASSERT_MSG(library, "Host shader '{}' did not compile: {}", std::string(shader.entry),
                ErrorText(error));
-    libraries.emplace(&shader, library);
+    libraries.insert_or_assign(&shader, library);
     return library;
 }
 
 id<MTLFunction> HostKernels::Function(const H::Shader& shader, const u32* constants, u32 count) {
-    id<MTLLibrary> library = Library(shader);
     NSString* entry = [[NSString alloc] initWithBytes:shader.entry.data()
                                                length:shader.entry.size()
                                              encoding:NSUTF8StringEncoding];
     id<MTLFunction> function = nil;
     if (shader.spec_constants.empty()) {
-        function = [library newFunctionWithName:entry];
+        id<MTLLibrary> library = Library(shader, nil, false, &function);
+        if (!function) function = [library newFunctionWithName:entry];
+        if (!function) {
+            library = Library(shader, nil, true, &function);
+            if (!function) function = [library newFunctionWithName:entry];
+        }
         ASSERT_MSG(function, "Host shader function '{}' not found", std::string(shader.entry));
         return function;
     }
@@ -143,7 +158,12 @@ id<MTLFunction> HostKernels::Function(const H::Shader& shader, const u32* consta
         }
     }
     NSError* error = nil;
-    function = [library newFunctionWithName:entry constantValues:values error:&error];
+    id<MTLLibrary> library = Library(shader, values, false, &function);
+    if (!function) function = [library newFunctionWithName:entry constantValues:values error:&error];
+    if (!function) {
+        library = Library(shader, values, true, &function);
+        if (!function) function = [library newFunctionWithName:entry constantValues:values error:&error];
+    }
     ASSERT_MSG(function, "Host shader function '{}' with constants failed: {}",
                std::string(shader.entry), ErrorText(error));
     return function;
@@ -195,8 +215,6 @@ id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDi
     const auto source=TextureTilingSource(shader.msl,dispatch.key.num_bits==64);
     if(source.empty()) {texture_tiling.emplace(key,nil);return nil;}
     NSError* error=nil;
-    auto library=[dev.device newLibraryWithSource:[NSString stringWithUTF8String:source.c_str()]
-                                         options:CompileOptions() error:&error];
     MTLFunctionConstantValues* values=[MTLFunctionConstantValues new];
     for(const auto& spec:shader.spec_constants) {
         if(spec.id>=dispatch.num_constants)continue;
@@ -211,7 +229,13 @@ id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDi
     const bool bounded=VideoCore::TilerBounds::Enabled(dispatch);
     [values setConstantValue:&bounded type:MTLDataTypeBool atIndex:13];
     const u32 scale=proxy?2u:1u;[values setConstantValue:&scale type:MTLDataTypeUInt atIndex:12];
-    auto function=library?[library newFunctionWithName:@"main0" constantValues:values error:&error]:nil;
+    id<MTLFunction> function=nil;
+    auto library=LocalLibrary::Build(dev.device, @(source.c_str()), CompileOptions(), &error,
+        [&](id<MTLLibrary> local) {
+            function=[local newFunctionWithName:@"main0" constantValues:values error:nil];
+            return bool(function);
+        });
+    if(!function&&library)function=[library newFunctionWithName:@"main0" constantValues:values error:&error];
     auto pipeline=function?[dev.device newComputePipelineStateWithFunction:function error:&error]:nil;
     if(!pipeline)LOG_WARNING(Render,"Texture tiling unavailable; original staging retained: {}",ErrorText(error));
     texture_tiling.emplace(key,pipeline);
@@ -233,7 +257,7 @@ id<MTLComputePipelineState> HostKernels::InlineUpdate() {
                 "kernel void inline_update(device uint* dst [[buffer(0)]], "
                 "constant uint* src [[buffer(1)]], uint i [[thread_position_in_grid]]) "
                 "{ dst[i] = src[i]; }\n";
-            auto library = [dev.device newLibraryWithSource:source options:CompileOptions() error:&error];
+            auto library = Metal::LocalLibrary::Build(dev.device, source, CompileOptions(), &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"inline_update"}); });
             auto function = library ? [library newFunctionWithName:@"inline_update"] : nil;
             inline_update = function ? [dev.device newComputePipelineStateWithFunction:function error:&error] : nil;
             if (!inline_update) LOG_WARNING(Render, "Inline update unavailable; retaining staging copy: {}", ErrorText(error));
@@ -246,7 +270,7 @@ id<MTLRenderPipelineState> HostKernels::RenderInlineUpdate() {
         render_inline_update_tried=true;
         @autoreleasepool {
             NSError* error=nil;
-            auto library=[dev.device newLibraryWithSource:@"#include <metal_stdlib>\nusing namespace metal;\nvertex void update(device uint* dst[[buffer(0)]],constant uint* src[[buffer(1)]],uint i[[vertex_id]]){dst[i]=src[i];}\n" options:CompileOptions() error:&error];
+            auto library=Metal::LocalLibrary::Build(dev.device, @"#include <metal_stdlib>\nusing namespace metal;\nvertex void update(device uint* dst[[buffer(0)]],constant uint* src[[buffer(1)]],uint i[[vertex_id]]){dst[i]=src[i];}\n", CompileOptions(), &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"update"}); });
             auto descriptor=[MTLRenderPipelineDescriptor new];
             descriptor.vertexFunction=library ? [library newFunctionWithName:@"update"] : nil;
             descriptor.rasterizationEnabled=NO;
@@ -260,9 +284,7 @@ id<MTLRenderPipelineState> HostKernels::RenderInlineUpdate() {
 id<MTLComputePipelineState> HostKernels::FillU32() {
     if (!fill_u32) {
         NSError* error = nil;
-        id<MTLLibrary> library = [dev.device newLibraryWithSource:FillSource
-                                                          options:CompileOptions()
-                                                            error:&error];
+        id<MTLLibrary> library = Metal::LocalLibrary::Build(dev.device, FillSource, CompileOptions(), &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"fill_u32"}); });
         ASSERT_MSG(library, "fill_u32 did not compile: {}", ErrorText(error));
         fill_u32 = [dev.device newComputePipelineStateWithFunction:[library newFunctionWithName:@"fill_u32"]
                                                              error:&error];
@@ -460,4 +482,207 @@ void Runtime::ParseFaultBuffer(const VideoCore::FaultParseDispatch& dispatch) {
     scheduler.MemoryBarrier();
 }
 
+} // namespace Metal
+
+namespace Metal {
+struct Runtime::ExactExportOwner {
+    std::mutex gate;
+    Runtime* runtime{};
+    std::atomic<u64> epoch{0};
+    explicit ExactExportOwner(Runtime* r):runtime(r){}
+};
+struct Runtime::ExportAttemptToken final : VideoCore::ExactImageExportAttempt {
+    std::shared_ptr<ExactExportOwner> owner;
+    u64 tick{},epoch{};
+    bool consumed{};
+    ExportAttemptToken(std::shared_ptr<ExactExportOwner> o,u64 t)
+        :owner(std::move(o)),tick(t),epoch(owner->epoch.load(std::memory_order_acquire)){}
+    const void* OwnerCookie() const noexcept override {return owner.get();}
+};
+struct Runtime::PreparedExportState {
+    Scheduler::PreparedComputeStamp stamp{};
+    u64 owner_epoch{},uid{},write_epoch{};
+    u64 raw_offset{},linear_offset{},params_offset{};
+    u32 groups{},tiled_slot{},linear_slot{},params_slot{},threads{};
+    id<MTLComputePipelineState> pipeline=nil;
+    id<MTLBuffer> raw=nil,linear=nil,params=nil;
+    id<MTLTexture> texture=nil;
+    id<MTLComputeCommandEncoder> encoder=nil;
+    // No Image*, StreamBuffer*, Buffer* or Runtime* survives preparation.
+};
+class Runtime::ExactExportToken final : public VideoCore::PreparedExactImageExport {
+    std::weak_ptr<ExactExportOwner> owner;
+    std::weak_ptr<PreparedExportState> state;
+    std::atomic<bool> consumed{false};
+public:
+    ExactExportToken(const std::shared_ptr<ExactExportOwner>& o,
+                    const std::shared_ptr<PreparedExportState>& s):owner(o),state(s){}
+    ~ExactExportToken() override {
+        const auto o=owner.lock();const auto s=state.lock();
+        if(!o||!s||!s->stamp.epoch)return;
+        std::unique_lock lk{o->gate,std::try_to_lock};
+        if(lk.owns_lock()&&o->runtime)o->runtime->scheduler.CancelPreparedCompute(s->stamp);
+    }
+    VideoCore::ExactImageExportResult Record() noexcept override {
+        using R=VideoCore::ExactImageExportResult;
+        if(consumed.exchange(true,std::memory_order_acq_rel))return R::Consumed;
+        const auto o=owner.lock();const auto s=state.lock();
+        if(!o||!s)return R::Stale;
+        // No blocking acquisition in Record. Shutdown holds the same gate before
+        // nulling runtime and touching scheduler/fields, preventing owner UAF.
+        std::unique_lock lk{o->gate,std::try_to_lock};
+        if(!lk.owns_lock()||!o->runtime)return R::Stale;
+        return o->runtime->RecordExactExport(*s,*o);
+    }
+};
+std::unique_ptr<VideoCore::ExactImageExportAttempt> Runtime::ClaimExactImageExportAttempt() {
+    const u64 tick=CurrentTick();
+    auto prior=exact_export_attempt_tick.load(std::memory_order_acquire);
+    do {if(prior>=tick)return {};} while(!exact_export_attempt_tick.compare_exchange_weak(
+        prior,tick,std::memory_order_acq_rel,std::memory_order_acquire));
+    // The attempt is already spent before all validation, hooks and allocations.
+    auto owner=std::atomic_load_explicit(&exact_export_owner,std::memory_order_acquire);
+    if(!owner) {
+        auto fresh=std::make_shared<ExactExportOwner>(this);
+        std::shared_ptr<ExactExportOwner> empty;
+        if(std::atomic_compare_exchange_strong_explicit(&exact_export_owner,&empty,fresh,std::memory_order_acq_rel,std::memory_order_acquire))owner=std::move(fresh);
+        else owner=std::move(empty);
+    }
+    return std::make_unique<ExportAttemptToken>(std::move(owner),tick);
+}
+void Runtime::InvalidateExactExports() noexcept {
+    if(const auto owner=std::atomic_load_explicit(&exact_export_owner,std::memory_order_acquire))
+        owner->epoch.fetch_add(1,std::memory_order_acq_rel);
+}
+void Runtime::InvalidatePreparedImageExport(u64) noexcept {InvalidateExactExports();}
+void Runtime::CloseExactExportOwner() noexcept {
+    if(const auto owner=std::atomic_load_explicit(&exact_export_owner,std::memory_order_acquire)) {
+        std::scoped_lock lk{owner->gate};
+        owner->runtime=nullptr;
+        owner->epoch.fetch_add(1,std::memory_order_acq_rel);
+    }
+}
+bool Runtime::CanPrepareExactImageExport(const VideoCore::Image& image) const {
+    static const bool enabled=[] {const auto* e=std::getenv("BB_ARM_TILER_BOUNDS");
+        return e && std::strcmp(e,"1")==0;}();
+    if(!enabled || scheduler.HasPreparedCompute() || VideoCore::FrameCapture::NativeRecording() ||
+       !image.backing || !image.SafeToDownload() || False(image.flags&VideoCore::ImageFlagBits::Registered) ||
+       image.scene_proxy || image.depth_id || image.usage.render_target || image.usage.depth_target ||
+       image.usage.vo_surface || image.usage.storage || image.binding.is_bound || image.binding.is_target ||
+       image.binding.needs_rebind || image.binding.force_general || image.info.num_samples!=1 ||
+       image.info.num_bits!=32 || !image.info.props.is_tiled || image.info.props.is_block ||
+       image.info.props.is_volume || image.info.props.is_depth || image.info.props.has_stencil ||
+       !image.info.guest_size || image.info.guest_size>(8ull<<20) ||
+       image.info.pixel_format!=vk::Format::eR8G8B8A8Unorm || !image.info.resources.levels ||
+       image.info.resources.levels>16 || !image.info.resources.layers || image.info.resources.layers>4 ||
+       image.backing->retired || image.backing->num_samples!=1 ||
+       image.backing->image.image_ci.format!=vk::Format::eR8G8B8A8Unorm)return false;
+    const auto native=NativeTexture(image);
+    return native&&native.pixelFormat==MTLPixelFormatRGBA8Unorm&&native.sampleCount==1&&
+        (native.textureType==MTLTextureType2D||native.textureType==MTLTextureType2DArray)&&
+        native.width==image.info.size.width&&native.height==image.info.size.height&&
+        native.mipmapLevelCount==image.info.resources.levels&&native.arrayLength==image.info.resources.layers&&
+        !native.buffer&&!native.parentTexture&&!native.iosurface&&!native.heap;
+}
+std::unique_ptr<VideoCore::PreparedExactImageExport> Runtime::PrepareExactImageExport(
+    std::unique_ptr<VideoCore::ExactImageExportAttempt> generic,VideoCore::Image* image,
+    const VideoCore::Buffer* raw,u64 raw_offset,std::span<const vk::BufferImageCopy> copies,
+    std::span<const u8> parameter_bytes,const std::function<void()>& release_input_lease) {
+    const auto owner=std::atomic_load_explicit(&exact_export_owner,std::memory_order_acquire);
+    if(!generic||!owner||generic->OwnerCookie()!=owner.get())return {};
+    auto& attempt=static_cast<ExportAttemptToken&>(*generic);
+    if(attempt.consumed||attempt.tick!=CurrentTick())return {};
+    attempt.consumed=true;
+    std::unique_lock owner_lock{owner->gate}; // preparation may block; never a guest payload lock
+    if(owner->runtime!=this||owner->epoch.load(std::memory_order_acquire)!=attempt.epoch||
+       !image||!raw||!CanPrepareExactImageExport(*image))return {};
+    // Freeze native ownership and scalar metadata while input references are valid.
+    // Nothing below the first hook dereferences any caller cache slot again.
+    const auto info=image->info;
+    auto state=std::make_shared<PreparedExportState>();
+    state->uid=image->image_uid;state->texture=NativeTexture(*image);state->raw=NativeBuffer(*raw);
+    state->raw_offset=raw_offset;state->owner_epoch=attempt.epoch;
+    const auto bytes=info.guest_size;
+    if(!state->raw||raw_offset>raw->SizeBytes()||bytes>raw->SizeBytes()-raw_offset||
+       raw_offset>state->raw.length||bytes>state->raw.length-raw_offset||
+       copies.size()!=info.resources.levels||parameter_bytes.size()!=652)return {};
+    VideoCore::TilerBounds::ParamsV1 bounds{
+        VideoCore::TileManager::MakeTilingInfo(info,info.resources.levels)};
+    if(!VideoCore::TilerBounds::Describe(info,copies,bounds)||
+       std::memcmp(&bounds,parameter_bytes.data(),sizeof(bounds)))return {};
+    const auto unchanged=[&]{return CurrentTick()==attempt.tick&&
+        owner->epoch.load(std::memory_order_acquire)==attempt.epoch;};
+    // All caller slot/native/scalar reads are finished. Drop the caller cache
+    // lock before any hook, pool/driver work or pipeline compilation.
+    if(release_input_lease)release_input_lease();
+    // Drain all callbacks/replay/tails BEFORE allocating private pool ranges.
+    BeforeImageAccess();
+    if(!unchanged())return {};
+    FlushBarriers();
+    if(!unchanged())return {};
+    scheduler.BeginOrderedHostCompute("Exact export cold preparation");
+    if(!unchanged())return {};
+    exact_export_pool_requests.fetch_add(1,std::memory_order_relaxed);
+    const auto params=StagingRequest(sizeof(bounds),VideoCore::MemoryType::HostUncached,
+                                     Limits().uniform_min_alignment);
+    if(!unchanged()||!params.buffer||!params.mapped)return {};
+    std::memcpy(params.mapped,&bounds,sizeof(bounds));params.Flush();
+    exact_export_pool_requests.fetch_add(1,std::memory_order_relaxed);
+    const auto linear=StagingRequest(bytes,VideoCore::MemoryType::DeviceLocal);
+    if(!unchanged()||!linear.buffer)return {};
+    state->params=NativeBuffer(*params.buffer);state->linear=NativeBuffer(*linear.buffer);
+    state->params_offset=params.offset;state->linear_offset=linear.offset;
+    if(!state->params||!state->linear||state->raw==state->params||state->raw==state->linear||
+       params.offset>state->params.length||652>state->params.length-params.offset||
+       linear.offset>state->linear.length||bytes>state->linear.length-linear.offset)return {};
+    // HostKernels::Tiling uses only value keys/ranges, not Buffer pointers.
+    const auto dispatch=VideoCore::TileManager::MakeDispatch(info,true,
+        {nullptr,raw_offset,bytes},{nullptr,linear.offset,bytes},{nullptr,params.offset,652});
+    const HostShaders::Shader* shader=nullptr;
+    state->pipeline=impl->kernels.Tiling(dispatch,shader);
+    if(!unchanged()||!state->pipeline||!shader)return {};
+    state->groups=dispatch.group_count_x;state->threads=shader->local_size[0];
+    state->tiled_slot=HostKernels::BufferSlot(*shader,0);
+    state->linear_slot=HostKernels::BufferSlot(*shader,1);
+    state->params_slot=HostKernels::BufferSlot(*shader,2);
+    std::array<vk::BufferImageCopy,16> snapshot_copies{};
+    std::copy(copies.begin(),copies.end(),snapshot_copies.begin());
+    for(auto& c:std::span(snapshot_copies).first(copies.size()))c.bufferOffset+=linear.offset;
+    PrepareExactSnapshot((__bridge const void*)state->texture,(__bridge const void*)state->linear,
+                          std::span(snapshot_copies).first(copies.size()));
+    if(!unchanged())return {};
+    state->encoder=scheduler.GetImpl().compute;
+    if(!state->encoder)return {};
+    // Only deferred scheduler ownership keeps resources through this tick. An
+    // escaped token holds weak state, so it cannot retain old snapshot pools forever.
+    scheduler.DeferOperation([state]{(void)state;});
+    state->write_epoch=buffer_write_epoch;
+    auto token=std::make_unique<ExactExportToken>(owner,state);
+    const auto stamp=scheduler.ArmPreparedCompute();
+    if(!stamp||!unchanged())return {};
+    state->stamp=*stamp;
+    return token;
+}
+VideoCore::ExactImageExportResult Runtime::RecordExactExport(
+    PreparedExportState& s,ExactExportOwner& owner) noexcept {
+    using R=VideoCore::ExactImageExportResult;
+    const auto stale=[&]{scheduler.CancelPreparedCompute(s.stamp);return R::Stale;};
+    // Native strong refs + scalar values only. No caller Image/StreamBuffer/
+    // Buffer slot is read even when it has already been destroyed/reused.
+    if(owner.runtime!=this||owner.epoch.load(std::memory_order_acquire)!=s.owner_epoch||
+       buffer_write_epoch!=s.write_epoch||
+       CurrentTick()!=s.stamp.tick||std::this_thread::get_id()!=s.stamp.thread||
+       VideoCore::FrameCapture::NativeRecording())return stale();
+    if(!scheduler.ConsumePreparedCompute(s.stamp))return stale();
+    const auto compute=s.encoder;
+    [compute setComputePipelineState:s.pipeline];
+    [compute setBuffer:s.raw offset:s.raw_offset atIndex:s.tiled_slot];
+    [compute setBuffer:s.linear offset:s.linear_offset atIndex:s.linear_slot];
+    [compute setBuffer:s.params offset:s.params_offset atIndex:s.params_slot];
+    [compute dispatchThreadgroups:MTLSizeMake(s.groups,1,1)
+            threadsPerThreadgroup:MTLSizeMake(s.threads,1,1)];
+    [compute memoryBarrierWithScope:MTLBarrierScopeBuffers|MTLBarrierScopeTextures];
+    ++buffer_write_epoch;global_write=true;memory_pending=true;
+    return R::Recorded;
+}
 } // namespace Metal

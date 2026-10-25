@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Counterpart: renderer_vulkan/vk_temporal_upscaler.cpp (the UI composition of a scaled session and
 // its temporal background, RunScaled; MetalFX instead of FSR 3, no FSR 4, TAA or DLSS: D10).
@@ -276,7 +277,7 @@ struct Upscaler::Impl {
         NSError* error = nil;
         MTLCompileOptions* options = [MTLCompileOptions new];
         options.languageVersion = MTLLanguageVersion3_1;
-        library = [dev.device newLibraryWithSource:UiSource options:options error:&error];
+        library = Metal::LocalLibrary::Build(dev.device, UiSource, options, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"ui_tri_main", @"ui_copy_main", @"ui_depth_copy_main"}); });
         ASSERT_MSG(library, "UI composition shaders did not compile: {}", ErrorText(error));
         const auto sampler = [&](MTLSamplerMinMagFilter filter) {
             MTLSamplerDescriptor* descriptor = [MTLSamplerDescriptor new];

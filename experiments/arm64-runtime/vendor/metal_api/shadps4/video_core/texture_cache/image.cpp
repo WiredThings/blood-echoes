@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "bbport_toggles.h"
+#include "remote/bb_remote.h"
 #include <ranges>
 #include "common/assert.h"
 #include "video_core/cache_backend.h"
@@ -200,7 +201,26 @@ Image::Image(CacheBackend& backend_, Common::SlotVector<ImageView>& slot_image_v
 
     backing = &backing_images.emplace_back();
     backing->num_samples = info.num_samples;
-    backend_.CreateImage(backing->image, image_ci);
+    // Metadata-only pre-capture. Never keep frontend allocator/VMA/Tracker
+    // locks across the driver allocation, resident-set insertion or format map.
+    BbPayload::Origin captured{};
+    bool observed=false;
+    if (BbRemote::BackActive()) {
+        observed=BbRemote::Back::CaptureLivePayload(info.guest_address,info.guest_size,
+            [&](const BbRemote::LivePayloadReceipt& receipt) {
+                captured={receipt.owner,receipt.mapping};return true;
+            });
+    }
+    backend_.CreateImage(backing->image,image_ci);
+    // A free/reallocation or remap during native construction changes Tag or
+    // mapping generation, so post-validation cannot bless a replacement owner.
+    // Failure leaves the successfully created native image usable as normal,
+    // with unknown provenance. No later collector/association may fill it in.
+    if(observed&&BbRemote::Back::WithLivePayload(captured,info.guest_address,info.guest_size,
+            [](const BbRemote::LivePayloadReceipt&){return true;})) {
+        original_payload_origin=captured;
+        original_payload_native=backing->image.native;
+    }
 
     backend_.SetImageName(
         backing->image,

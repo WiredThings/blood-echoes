@@ -18,6 +18,7 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <optional>
 #include <spawn.h>
 #include <string>
 #include <sys/mman.h>
@@ -46,6 +47,7 @@
 #include "core/platform.h"
 #include "remote/bb_control.h"
 #include "remote/bb_lifetime_reclaim.h"
+#include "remote/bb_live_payload_front.h"
 #include "remote/bb_peer_exit.h"
 #include "remote/bb_protocol.h"
 #include "remote/bb_remote.h"
@@ -174,6 +176,16 @@ void LifetimeLeaseThread() {
         if(!ServeLifetimeLease(g.control->lifetime,BbResourceLifetime::Get(),BbResourceLifetime::ReclaimReady()))
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+}
+
+// Started only for the explicit ARM allocator gate experiment.
+void LivePayloadThread(){
+ Common::SetCurrentThreadName("bb:live-payload");
+ while(!g.child_exited.load(std::memory_order_acquire)){
+  if(!ServeLivePayload(g.control->live_payload,g.control->lifetime.journal,
+      BbResourceLifetime::Get(),[]{return g.child_exited.load(std::memory_order_acquire);}))
+   std::this_thread::sleep_for(std::chrono::microseconds(100));
+ }
 }
 
 // ---- the runtime's memory events -----------------------------------------------------------
@@ -402,6 +414,12 @@ void ProtectThread() {
     for (;;) {
         g.protect->ReceiveOne(
             [](const Message& message, auto&& reply) {
+                if(message.type==MsgArmRead){RuntimeReadArmReceipt receipt{};
+                    const auto args=Payload<RuntimeReadArmArgs>(message);
+                    (void)runtime_memory_arm_read(&args,&receipt);reply(&receipt,sizeof(receipt));return;}
+                if(message.type==MsgCommitReadArm||message.type==MsgCancelReadArm){RuntimeReadArmReceipt receipt{};
+                    (void)runtime_memory_finish_read_arm(Payload<ValueArgs>(message).value,message.type==MsgCommitReadArm,&receipt);
+                    reply(&receipt,sizeof(receipt));return;}
                 if (message.type == MsgProtect) {
                     ApplyProtect(Payload<ProtectArgs>(message));
                 }
@@ -416,8 +434,8 @@ void ProtectThread() {
 void WatchThread() {
     Common::SetCurrentThreadName("bb:remote-watch");
     int status = 0;
-    if (!WaitForConfirmedPeerExit(g.child, status)) {
-        std::perror("GPU process wait failed; backend death unconfirmed");
+    if (!WaitForConfirmedPeerExit(g.child,status)) {
+        std::perror("GPU process wait failed; live payload death unconfirmed");
         std::fflush(stderr);
         std::_Exit(BB_ARM_EXIT_HLE_FAULT);
     }
@@ -578,6 +596,7 @@ bool Init(const BbGpuConfig& config) {
     Channel::Init(&g.control->protect);
     new (&g.control->state) SharedState{};
     new (&g.control->lifetime) LifetimeShared{};
+    new (&g.control->live_payload) LivePayloadShared{};
     BbResourceLifetime::Get().SetObserver(PublishLifetime);
     g.channel = std::make_unique<Channel>(&g.control->channel, Side::Frontend);
     g.protect = std::make_unique<Channel>(&g.control->protect, Side::Frontend);
@@ -589,6 +608,8 @@ bool Init(const BbGpuConfig& config) {
     std::thread(ProtectThread).detach();
     std::thread(WatchThread).detach();
     std::thread(LifetimeLeaseThread).detach();
+    if(const char* e=std::getenv("BB_ARM_PAYLOAD_GATE");e&&e[0]=='1')
+        std::thread(LivePayloadThread).detach();
 
     HelloArgs hello{};
     hello.protocol = ProtocolVersion;
@@ -882,7 +903,21 @@ int HandleFault(void* context, void* address) {
                              Common::IsWriteError(context) ? 1u : 0u,
                              runtime_memory_lock_held() ? 1u : 0u};
         FaultReply reply{};
-        g.channel->Call(MsgWriteFault, &args, sizeof(args), &reply, sizeof(reply));
+        {
+            // Only the synchronous RPC wait delegates payload access. The
+            // original mutator serial remains held and unique is reacquired
+            // on this same thread before applying the reply or resuming.
+            std::optional<BbPayload::Gate::FaultPause> payload_fault_pause;
+            static const bool payload_gate=[] {const char* e=std::getenv("BB_ARM_PAYLOAD_GATE");return e&&e[0]=='1';}();
+            if(payload_gate&&BbPayload::Gate::CurrentMutation()) {
+                if(!runtime_memory_live_fault_can_delegate()) {
+                    std::fputs("ARM live writeback: allocator fault inside unfinished VMA writer; data retained\n",stderr);
+                    return 0;
+                }
+                payload_fault_pause.emplace(BbPayload::Get());
+            }
+            g.channel->Call(MsgWriteFault, &args, sizeof(args), &reply, sizeof(reply));
+        }
         for (u32 i = 0; i < std::min(reply.count, MaxFaultProtects); ++i) {
             ApplyProtect(reply.protects[i]);
         }

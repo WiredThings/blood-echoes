@@ -8,10 +8,11 @@
 #pragma once
 
 #include <cstdint>
+#include "../../../bb_runtime/src/runtime_read_arm.h"
 
 namespace BbRemote {
 
-inline constexpr std::uint32_t ProtocolVersion = 0x4d540001;
+inline constexpr std::uint32_t ProtocolVersion = 0x4d540007;
 
 enum Msg : std::uint32_t {
     // ---- game process -> GPU process ----
@@ -58,6 +59,9 @@ enum Msg : std::uint32_t {
     MsgTextInputPoll = 61,  ///< call -> TextInputReply
 
     // ---- GPU process -> game process ----
+    MsgArmRead = 111, ///< bounded transactional reason32 acquisition
+    MsgCommitReadArm = 112, ///< ValueArgs token -> authoritative receipt
+    MsgCancelReadArm = 113, ///< ValueArgs token -> selective rollback receipt
     MsgProtect = 100,       ///< call: ProtectArgs -> ResultReply (the game process applies it)
     MsgIrq = 101,           ///< ValueArgs: Platform::InterruptId
     MsgFramesRetired = 102, ///< ValueArgs (Libraries::GnmDriver::NoteFramesRetired)

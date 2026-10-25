@@ -52,8 +52,11 @@ struct Emitter {
 struct Patch {U offset;std::vector<B> bytes;};
 struct Plan {std::vector<B> stubs;std::vector<Patch> patches;std::array<U,3> originals{};};
 inline Plan Prepare(std::span<const B> image,U image_base,U stub_base,size_t stub_capacity,
-                    std::span<const Site> sites,const std::array<U,unsigned(Kind::Count)>& veneers,bool conflict=false,bool fast_dispatch=false,bool leaf_dispatch=false){
+                    std::span<const Site> sites,const std::array<U,unsigned(Kind::Count)>& veneers,bool conflict=false,bool fast_dispatch=false,bool leaf_dispatch=false,bool payload_gate=false){
  Require(!leaf_dispatch||fast_dispatch,"leaf dispatch requires guarded resource dispatch");
+ // Protect before the original allocator, not after a guest leaf already ran.
+ // All requested dispatch modes use full host wrapping in this experiment.
+ if(payload_gate){fast_dispatch=false;leaf_dispatch=false;}
  Require(!conflict,"conflicting guest diagnostic hooks");
  Require(image_base&&image.size()<=UINT64_MAX-image_base,"image address overflow");
  Require(stub_base&&stub_capacity<=UINT64_MAX-stub_base,"stub address overflow");

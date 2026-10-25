@@ -71,6 +71,7 @@ public:
 
     struct Impl;
     Impl& GetImpl() const {
+        InvalidatePreparedCompute();
         return *impl;
     }
 
@@ -84,7 +85,7 @@ public:
     // Recording-thread host work after the current guest encoder, before the next encoder,
     // barrier, hoist, query snapshot or submission. Never invoked on the replay thread.
     void SetRenderTail(std::function<void()> callback);
-    void RequestRenderTail() noexcept { render_tail_pending = true; }
+    void RequestRenderTail() noexcept { InvalidatePreparedCompute(); render_tail_pending = true; }
     void FlushRenderTail() { if (render_tail_pending && !running_render_tail) EndEncoder(); }
 
     // Encoders. At most one is open; asking for another kind (or a new render pass) ends the
@@ -103,6 +104,7 @@ public:
     /// while IsRendering() after such a RenderEncoder. Passes begun without a state (the
     /// upscaler, the presenter, the runtime's kernels) use Impl::render directly.
     [[nodiscard]] RenderList& Commands() noexcept {
+        InvalidatePreparedCompute();
         return commands;
     }
     /// The open compute encoder, or a new one (dispatches of one encoder run in order). `label`
@@ -156,6 +158,19 @@ public:
     [[nodiscard]] bool NeedFenceWait() const noexcept {
         return need_fence_wait;
     }
+
+    // Exclusive recording-thread one-shot reservation, not a guest lifetime lease.
+    // Any subsequent scheduler/native access cancels it, even in the same encoder/tick.
+    struct PreparedComputeStamp {
+        u64 epoch{},tick{};
+        void* encoder{};
+        void* command_buffer{};
+        std::thread::id thread;
+    };
+    std::optional<PreparedComputeStamp> ArmPreparedCompute() noexcept;
+    bool ConsumePreparedCompute(const PreparedComputeStamp&) noexcept;
+    void CancelPreparedCompute(const PreparedComputeStamp&) noexcept;
+    bool HasPreparedCompute() const noexcept { return prepared_armed.load(std::memory_order_acquire); }
 
     // Labels. Groups and signposts go to the open encoder; groups pushed while none is open
     // apply to the encoders that follow. Off unless BB_MTL_LABELS=1 (the strings cost per draw).
@@ -221,10 +236,12 @@ public:
     bool ContinueConsumedClear(const VideoCore::RenderState& next);
     /// Commands recorded from now on until EndHoist go before the held render pass.
     void BeginHoist() noexcept override {
+        InvalidatePreparedCompute();
         FlushRenderTail();
         hoisting = holding;
     }
     void EndHoist() noexcept override {
+        InvalidatePreparedCompute();
         hoisting = false;
     }
     /// Makes the held pass's render encoder and replays its commands; it stays open, unheld.
@@ -289,6 +306,13 @@ private:
     void RunReplayJob(u32 slot);
     void ReplayThread(std::stop_token stoken);
 
+    void InvalidatePreparedCompute() const noexcept {
+        if(prepared_armed.load(std::memory_order_relaxed) &&
+           prepared_armed.exchange(false,std::memory_order_acq_rel))
+            prepared_epoch.fetch_add(1,std::memory_order_relaxed);
+    }
+    mutable std::atomic<bool> prepared_armed{false};
+    mutable std::atomic<u64> prepared_epoch{0};
     Device& device;
     std::unique_ptr<Impl> impl;
     std::string name;

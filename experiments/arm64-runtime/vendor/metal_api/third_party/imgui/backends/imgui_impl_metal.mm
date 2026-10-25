@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // dear imgui: Renderer Backend for Metal
 // This needs to be used along with a Platform Backend (e.g. OSX)
 
@@ -625,7 +626,7 @@ void ImGui_ImplMetal_Shutdown()
     "    return half4(in.color) * texColor;\n"
     "}\n";
 
-    id<MTLLibrary> library = [device newLibraryWithSource:shaderSource options:nil error:&error];
+    id<MTLLibrary> library = Metal::LocalLibrary::Build(device, shaderSource, nil, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"vertex_main", @"fragment_main"}); });
     if (library == nil)
     {
         NSLog(@"Error: failed to create Metal library: %@", error);

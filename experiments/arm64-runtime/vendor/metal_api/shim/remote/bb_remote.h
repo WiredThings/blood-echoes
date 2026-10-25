@@ -8,6 +8,9 @@
 
 #include <cstdint>
 #include <span>
+#include <functional>
+#include "remote/bb_live_payload.h"
+#include "../../../bb_runtime/src/runtime_read_arm.h"
 
 #include "../../bbgpu.h"
 #include "common/types.h"
@@ -108,6 +111,25 @@ void RequestRestart();
 /// ARM requests x86 guest hooks, keeping executable patches in the game process.
 void InstallGuestHooks(void (*fresh)(u64,u64));
 int MemorySnapshot(u64* out,u64 count);
+// Explicit experiment only. The synchronous callback is metadata/encoding-only,
+// with real frontend + mirror read ownership; it cannot wait/compile/allocate/RPC.
+// A caller-owned cache lock may already be held: all local table/Tracker grants
+// use try-lock and the independent frontend worker never enters cache/driver code.
+// Validate requires an original identity; empty origins cannot request capture.
+bool WithLivePayload(BbPayload::Origin expected,u64 address,u64 size,
+                     const std::function<bool(const LivePayloadReceipt&)>&);
+// Production raw commit requires this form after LayerArmReadTraps completed
+// outside the lease. The frontend verifies and freezes actual VramData protection.
+bool WithProtectedLivePayload(BbPayload::Origin expected,u64 address,u64 size,
+                     const std::function<bool(const LivePayloadReceipt&)>&);
+// Successful committed slices only. Performs conditional frontend retirement and
+// synchronizes the backend trap copy locally; never forwards a trap-clear RPC.
+bool RetireReadProtection(BbPayload::Origin expected,u64 address,u64 size,
+ const std::function<bool(const LivePayloadReceipt&)>&,LivePayloadRetirement* out=nullptr);
+// Metadata-only pre-capture before first native construction; caller must then
+// validate the same Origin after cold CreateImage. Unknown remains unknown.
+bool CaptureLivePayload(u64 address,u64 size,
+                        const std::function<bool(const LivePayloadReceipt&)>&);
 void SetGuestChunkWhole(int whole);
 void SetGuestChunkAllocator(int (*allocate)(u64,u64));
 /// After the frame stats: the game process prints its threads' CPU time and the guest's waits.
@@ -128,6 +150,8 @@ void MemoryReadBacking(uintptr_t address, void* data, u64 size);
 void MemoryGpuProtect(uintptr_t address, u64 size, int read, int write);
 void MemoryTrap(uintptr_t address, u64 size, unsigned reason, int on);
 unsigned MemoryTrapReasons(uintptr_t address);
+bool ArmRead(const RuntimeReadArmArgs&,RuntimeReadArmReceipt&);
+bool FinishReadArm(uint64_t token,bool commit,RuntimeReadArmReceipt&);
 using GpuRange = void (*)(uintptr_t address, u64 size);
 void SetGpuHooks(GpuRange map, GpuRange unmap, GpuRange invalidate);
 void SetNoteWriteHook(GpuRange hook);

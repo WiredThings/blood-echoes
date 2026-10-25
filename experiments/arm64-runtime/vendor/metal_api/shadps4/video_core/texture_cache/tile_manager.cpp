@@ -234,3 +234,33 @@ void TileManager::TileImage(Image& in_image, std::span<vk::BufferImageCopy> buff
 }
 
 } // namespace VideoCore
+
+namespace VideoCore {
+std::unique_ptr<PreparedExactImageExport> TileManager::PrepareExactImageExport(
+    Image& image, const Buffer* raw, u64 raw_offset,
+    const std::function<void()>& release_input_lease) {
+    // This is the FIRST operation: no hook, stream write or pool allocation before
+    // the backend atomically consumes one attempt, even if validation later fails.
+    auto attempt=backend.ClaimExactImageExportAttempt();
+    if(!attempt || !raw || !backend.CanPrepareExactImageExport(image)) return {};
+    const auto& info=image.info;
+    if(!info.props.is_tiled || !info.guest_size || info.guest_size>(8ull<<20) ||
+       info.resources.levels==0 || info.resources.levels>16 ||
+       raw_offset>raw->SizeBytes() || info.guest_size>raw->SizeBytes()-raw_offset)return {};
+    std::array<vk::BufferImageCopy,16> copies{};
+    for(u32 mip=0;mip<info.resources.levels;++mip){
+        const auto& m=info.mips_layout[mip];
+        copies[mip]={.bufferOffset=m.offset,.bufferRowLength=m.pitch,.bufferImageHeight=m.height,
+            .imageSubresource={.aspectMask=vk::ImageAspectFlagBits::eColor,.mipLevel=mip,
+                .baseArrayLayer=0,.layerCount=info.resources.layers},
+            .imageOffset={0,0,0},.imageExtent={std::max(info.size.width>>mip,1u),
+                std::max(info.size.height>>mip,1u),1}};
+    }
+    auto span=std::span(copies).first(info.resources.levels);
+    TilerBounds::ParamsV1 params{MakeTilingInfo(info,info.resources.levels)};
+    if(!TilerBounds::Describe(info,span,params))return {};
+    // No stream/pool allocation here: Runtime owns both private staging spans.
+    return backend.PrepareExactImageExport(std::move(attempt),&image,raw,raw_offset,span,
+        std::span<const u8>{reinterpret_cast<const u8*>(&params),sizeof(params)},release_input_lease);
+}
+} // namespace VideoCore

@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <unordered_set>
 #include "common/serdes.h"
+#include "common/scope_exit.h"
 #include "core/emulator_settings.h"
 #include "shader_recompiler/frontend/fetch_shader.h"
 #include "shader_recompiler/info.h"
@@ -150,6 +151,13 @@ bool GraphicsPipelineKey::Deserialize(Serialization::Archive& ar) {
 }
 
 bool PipelineCacheCore::LoadComputePipeline(Serialization::Archive& ar) {
+    const auto clear_selection = [&] {
+        sel.infos.fill(nullptr);
+        sel.modules.fill({});
+        sel.fetch_shader.reset();
+    };
+    clear_selection();
+    SCOPE_EXIT { clear_selection(); };
     compute_key.Deserialize(ar);
 
     const auto sdata = NewComputeSerialization();
@@ -183,6 +191,13 @@ bool PipelineCacheCore::LoadComputePipeline(Serialization::Archive& ar) {
 }
 
 bool PipelineCacheCore::LoadGraphicsPipeline(Serialization::Archive& ar) {
+    const auto clear_selection = [&] {
+        sel.infos.fill(nullptr);
+        sel.modules.fill({});
+        sel.fetch_shader.reset();
+    };
+    clear_selection();
+    SCOPE_EXIT { clear_selection(); };
     sel.graphics_key.Deserialize(ar);
 
     const auto sdata = NewGraphicsSerialization();

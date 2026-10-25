@@ -1,3 +1,4 @@
+#include "video_core/renderer_metal/mtl_local_library.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Counterpart: renderer_vulkan/vk_scene_resolution.cpp (the Metal part of the reduced scene
 // targets: proxy textures, the copies between a proxy and the native image, views). The
@@ -235,7 +236,7 @@ struct SceneTargets::Impl {
         NSError* error = nil;
         MTLCompileOptions* options = [MTLCompileOptions new];
         options.languageVersion = MTLLanguageVersion3_1;
-        library = [dev.device newLibraryWithSource:CopySource options:options error:&error];
+        library = Metal::LocalLibrary::Build(dev.device, CopySource, options, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"scene_tri", @"scene_copy_float", @"scene_copy_uint", @"scene_copy_sint", @"scene_copy_depth", @"scene_copy_depth_stencil", @"scene_upscale_alpha"}); });
         ASSERT_MSG(library, "Scene proxy copy shaders did not compile: {}", ErrorText(error));
     }
 

@@ -80,7 +80,7 @@ static uint64_t pool_size_bytes(void) {
 #define MAP_NO_OVERWRITE 0x80
 enum { KIND_RESERVED=1, KIND_DIRECT, KIND_FLEXIBLE };
 typedef struct { uint64_t start, size; int type, used; } Block;
-typedef struct { uintptr_t start, end; int kind, prot, type; uint64_t phys; int private_mem, host_owned; } Vma;
+typedef struct { uintptr_t start, end; int kind, prot, type; uint64_t phys; int private_mem, host_owned; uint64_t live_generation; } Vma;
 typedef struct {
     uintptr_t start, end; uint64_t offset; int32_t protection, memory_type;
     uint32_t flags; char name[32];
@@ -128,6 +128,9 @@ static void read_lock(void) { ++read_depth; if (!exclusive_depth) pthread_rwlock
 static void read_unlock(void) { --read_depth; if (!exclusive_depth) pthread_rwlock_unlock(&lock); }
 /* bbport (native GPU process): this thread holds the lock (it faulted inside the runtime). */
 int runtime_memory_lock_held(void) { return exclusive_depth || read_depth; }
+/* A paused mutation may borrow frontend readers only outside an unfinished
+ * mapping writer transaction. This is observed on the actual faulting thread. */
+int runtime_memory_live_fault_can_delegate(void){return !exclusive_depth;}
 static Block blocks[LIMIT];
 static Vma *vmas; static size_t vma_count, vma_capacity;
 /* Optional storage-retirement proof: one first guest-page address per physical
@@ -428,7 +431,16 @@ static size_t vma_index(uintptr_t a) { /* first VMA with end > a */
     while (lo<hi) { size_t mid=(lo+hi)/2; if (vmas[mid].end<=a) lo=mid+1; else hi=mid; }
     return lo;
 }
+/* Durable mapping identity, distinct from whole-table cache invalidation.
+ * New map/replacement gets a fresh ID; split_at copies preserve their origin.
+ * Internal metadata only: no guest ABI or page-sized tracking table. */
+static uint64_t live_mapping_generation;
+static uint64_t vma_new_live_generation(void) {
+    if(live_mapping_generation==UINT64_MAX)mlock_mapping_incomplete("live mapping generation exhausted");
+    return ++live_mapping_generation;
+}
 static int vma_insert(size_t at, Vma v) {
+    if(!v.live_generation)v.live_generation=vma_new_live_generation();
     if (vma_count==vma_capacity) {
         size_t capacity=vma_capacity ? vma_capacity*2 : 256;
         Vma *next=realloc(vmas,capacity*sizeof(*vmas));
@@ -1157,6 +1169,18 @@ void runtime_memory_note_cpu_write(uintptr_t address, uint64_t size) {
 #define TRAP_NO_ACCESS 0xf0u
 static uint8_t *trap_reasons; /* one byte per 4 KiB page below TRAP_LIMIT (reserved, not committed) */
 static pthread_mutex_t trap_mutex=PTHREAD_MUTEX_INITIALIZER;
+#include "runtime_read_arm.h"
+static struct {uint64_t token,sequence,first,last;RuntimeReadArmArgs args;
+ uint64_t old32[RUNTIME_READ_ARM_WORDS],superseded[RUNTIME_READ_ARM_WORDS];} read_arm;
+/* Called only under trap_mutex. Ordinary owners reasserting even the SAME bit
+ * supersede our rollback right; mapping retirement does so before clearing. */
+static void read_arm_supersede(uintptr_t begin,uintptr_t end){
+ if(!read_arm.token||begin>=end)return;
+ uint64_t first=begin>>12,last=(end-1)>>12;
+ if(first<read_arm.first)first=read_arm.first;if(last>read_arm.last)last=read_arm.last;
+ for(uint64_t p=first;p<=last;++p){uint64_t n=p-read_arm.first;read_arm.superseded[n>>6]|=UINT64_C(1)<<(n&63);}
+}
+
 /* A page's trap level: 0 none, 1 read-only, 2 no access. */
 static int trap_level(uint8_t reasons) { return !reasons ? 0 : (reasons & TRAP_NO_ACCESS) ? 2 : 1; }
 #include "native_host_protection.h"
@@ -1179,6 +1203,7 @@ static void trap_forget(uintptr_t start, uintptr_t end) {
 #endif
     if (end>TRAP_LIMIT) end=TRAP_LIMIT;
     pthread_mutex_lock(&trap_mutex);
+    read_arm_supersede(start,end);
 #ifdef BB_NATIVE_HOST_PROTECTION
     if(native_gpu_deny)memset(native_gpu_deny+(start>>12),0,((end+4095)>>12)-(start>>12));
 #endif
@@ -1216,6 +1241,7 @@ void runtime_memory_trap(uintptr_t address, uint64_t size, unsigned reason, int 
     uintptr_t end=address+size>TRAP_LIMIT ? TRAP_LIMIT : address+size;
     read_lock();
     pthread_mutex_lock(&trap_mutex);
+    if(reason&32)read_arm_supersede(address,end);
     /* Runs of pages whose trap level changes, one mprotect each. */
     uintptr_t run=0; int run_level=0;
     const uintptr_t first=address>>12, last=(end-1)>>12;
@@ -1334,6 +1360,142 @@ int runtime_memory_vma_info(uintptr_t address, int *prot, int *type, uintptr_t *
     read_unlock();
     return ok;
 }
+/* Opt-in live-payload worker lease. Unlike reclaim-v2 this does not retire
+ * memory and allows a remote mirror: it holds a real nonblocking VMA read lock. */
+#include "runtime_live_mapping.h"
+static __thread unsigned live_mapping_held,live_read_protection_held;
+static __thread uintptr_t live_mapping_begin,live_mapping_end;
+int runtime_memory_try_live_mapping(uintptr_t address,uint64_t size,RuntimeLiveMapping* out) {
+ if(!out||read_depth||exclusive_depth||live_mapping_held||!size||size>(UINT64_C(8)<<20)||
+    address<USER_MIN||address>=USER_MAX||size>USER_MAX-address)return 0;
+ if(pthread_rwlock_tryrdlock(&lock))return 0;
+ const size_t i=vma_index(address);
+ int ok=i<vma_count&&vmas[i].start<=address&&size<=vmas[i].end-address&&
+    vmas[i].kind==KIND_DIRECT&&!vmas[i].private_mem&&!vmas[i].host_owned&&
+    (vmas[i].prot&0x30)==0x30&&vmas[i].type>=0&&vmas[i].live_generation&&vma_count<=8192;
+ if(ok) {
+  const Vma* v=&vmas[i];const uint64_t first=v->phys+address-v->start,last=first+size;
+  if(v->phys>POOL_SIZE||v->end-v->start>POOL_SIZE-v->phys)ok=0;
+  for(size_t j=0;ok&&j<vma_count;++j){const Vma* alias=&vmas[j];
+   if(alias->kind!=KIND_DIRECT||alias->end<=alias->start)continue;
+   if(alias->phys>POOL_SIZE||alias->end-alias->start>POOL_SIZE-alias->phys){ok=0;break;}
+   const uint64_t a=first>alias->phys?first:alias->phys;
+   const uint64_t b=last<alias->phys+alias->end-alias->start?last:alias->phys+alias->end-alias->start;
+   if(a<b&&alias->start+a-alias->phys!=address+a-first)ok=0;
+  }
+  if(ok)*out=(RuntimeLiveMapping){v->start,v->end,v->phys,v->live_generation,v->prot,v->type};
+ }
+ if(!ok){pthread_rwlock_unlock(&lock);return 0;}
+ ++read_depth;live_mapping_held=1;live_mapping_begin=address;live_mapping_end=address+size;return 1;
+}
+void runtime_memory_end_live_mapping(void){
+ if(!live_mapping_held||live_read_protection_held||read_depth!=1||exclusive_depth){fputs("ARM live mapping wrong-thread/nested release\n",stderr);_Exit(BB_ARM_EXIT_HLE_FAULT);}
+ live_mapping_held=0;live_mapping_begin=live_mapping_end=0;--read_depth;pthread_rwlock_unlock(&lock);
+}
+
+/* Cold Arm and finish run on protect worker, outside any export/payload lease.
+ * Arm owns the actual VMA read lock and trap owner itself; never reenters the
+ * public trap API under that lease. Finish may see VMA splits or replacement. */
+static void read_arm_receipt(RuntimeReadArmReceipt*out){
+ *out=(RuntimeReadArmReceipt){.token=read_arm.token,.address=read_arm.args.address,
+  .size=read_arm.args.size,.pages=(uint32_t)(read_arm.last-read_arm.first+1),.ok=1};
+ for(uint64_t p=read_arm.first;p<=read_arm.last;++p)
+  if(trap_reasons&&(trap_reasons[p]&32)){uint64_t n=p-read_arm.first;out->actual32[n>>6]|=UINT64_C(1)<<(n&63);}
+}
+int runtime_memory_arm_read(const RuntimeReadArmArgs*args,RuntimeReadArmReceipt*out){
+ if(!out)return 0;*out=(RuntimeReadArmReceipt){0};
+#ifdef BB_NATIVE_HOST_PROTECTION
+ if(!args||!args->size||args->size>(UINT64_C(8)<<20)||args->address>=TRAP_LIMIT||args->size>TRAP_LIMIT-args->address)return 0;
+ const uint64_t first=args->address>>12,last=(args->address+args->size-1)>>12;
+ if(last-first+1>RUNTIME_READ_ARM_PAGES)return 0;
+ if(!trap_reasons){void*bytes=mmap(NULL,TRAP_LIMIT>>12,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE,-1,0);
+  if(bytes==MAP_FAILED)return 0;uint8_t*expected=NULL;
+  if(!__atomic_compare_exchange_n(&trap_reasons,&expected,(uint8_t*)bytes,0,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))munmap(bytes,TRAP_LIMIT>>12);
+ }
+ RuntimeLiveMapping mapping;
+ if(!runtime_memory_try_live_mapping(args->address,args->size,&mapping))return 0;
+ if(!runtime_live_mapping_same_slice(&mapping,&args->mapping,args->address,args->size)||pthread_mutex_trylock(&trap_mutex)){
+  runtime_memory_end_live_mapping();return 0;}
+ if(read_arm.token){pthread_mutex_unlock(&trap_mutex);runtime_memory_end_live_mapping();return 0;}
+ if(read_arm.sequence==UINT64_MAX){fputs("ARM read arm sequence exhausted\n",stderr);_Exit(BB_ARM_EXIT_HLE_FAULT);}
+ read_arm.token=++read_arm.sequence;read_arm.args=*args;read_arm.first=first;read_arm.last=last;
+ memset(read_arm.old32,0,sizeof(read_arm.old32));memset(read_arm.superseded,0,sizeof(read_arm.superseded));
+ for(uint64_t p=first;p<=last;++p){uint64_t n=p-first;if(trap_reasons[p]&32)read_arm.old32[n>>6]|=UINT64_C(1)<<(n&63);trap_reasons[p]|=32;}
+ native_protect_apply(args->address,args->address+args->size,-1);read_arm_receipt(out);
+ pthread_mutex_unlock(&trap_mutex);runtime_memory_end_live_mapping();return 1;
+#else
+ (void)args;return 0;
+#endif
+}
+int runtime_memory_finish_read_arm(uint64_t token,int commit,RuntimeReadArmReceipt*out){
+ if(!out)return 0;*out=(RuntimeReadArmReceipt){0};if(!token||read_depth||exclusive_depth)return 0;
+ read_lock();pthread_mutex_lock(&trap_mutex);
+ if(read_arm.token!=token){pthread_mutex_unlock(&trap_mutex);read_unlock();return 0;}
+ if(!commit){for(uint64_t p=read_arm.first;p<=read_arm.last;++p){
+  uint64_t n=p-read_arm.first,bit=UINT64_C(1)<<(n&63);if((read_arm.old32[n>>6]|read_arm.superseded[n>>6])&bit)continue;
+  const uintptr_t at=p<<12;const size_t i=vma_index(at);if(i==vma_count)continue;const Vma*v=&vmas[i];
+  if(v->kind!=KIND_DIRECT||v->private_mem||v->host_owned)continue;
+  const RuntimeLiveMapping now={v->start,v->end,v->phys,v->live_generation,v->prot,v->type};
+  // Rollback owns only its newly added reason32, not guest permission policy.
+  // A legitimate mprotect/type update keeps insertion+physical identity. Match
+  // those while native_protect_apply below still obeys CURRENT permissions.
+  RuntimeLiveMapping expected=read_arm.args.mapping;expected.prot=now.prot;expected.type=now.type;
+  if(runtime_live_mapping_same_slice(&now,&expected,at,4096)&&trap_reasons)trap_reasons[p]&=(uint8_t)~32u;
+ }
+#ifdef BB_NATIVE_HOST_PROTECTION
+ native_protect_apply(read_arm.args.address,read_arm.args.address+read_arm.args.size,-1);
+#endif
+ }
+ read_arm_receipt(out);read_arm.token=0;pthread_mutex_unlock(&trap_mutex);read_unlock();return 1;
+}
+
+
+/* Read-trap receipt, held on the SAME dedicated worker as its VMA lease.
+ * VMA read alone does not exclude runtime_memory_trap/gpu_protect: both also
+ * use VMA read, and serialize their real host changes with trap_mutex. */
+static int try_live_trap_lease(uintptr_t address,uint64_t size,unsigned reasons) {
+#ifdef BB_NATIVE_HOST_PROTECTION
+ if(!live_mapping_held||read_depth!=1||exclusive_depth||live_read_protection_held||
+    (reasons!=32&&reasons!=0)||!size||size>(UINT64_C(8)<<20)||address>=TRAP_LIMIT||size>TRAP_LIMIT-address||
+    address<live_mapping_begin||address>=live_mapping_end||size>live_mapping_end-address)return 0;
+ if(pthread_mutex_trylock(&trap_mutex))return 0;
+ int ok=!reasons||trap_reasons!=NULL;
+ for(uintptr_t page=address>>12;ok&&page<=(address+size-1)>>12;++page)
+  if(reasons&&(trap_reasons[page]&reasons)!=reasons)ok=0;
+ if(!ok){pthread_mutex_unlock(&trap_mutex);return 0;}
+ /* native_protect_apply fails closed on mprotect error. While trap_mutex and
+  * VMA remain held no owner can clear reasons or replace the actual mapping. */
+ live_read_protection_held=1;return 1;
+#else
+ (void)address;(void)size;(void)reasons;return 0;
+#endif
+}
+int runtime_memory_try_live_read_protection(uintptr_t a,uint64_t n,unsigned reasons){
+ return reasons==32&&try_live_trap_lease(a,n,reasons);
+}
+int runtime_memory_try_live_read_retirement(uintptr_t a,uint64_t n){return try_live_trap_lease(a,n,0);}
+int runtime_memory_retire_live_read_protection(uintptr_t address,uint64_t size,RuntimeLiveRetirement*out){
+ if(!out)return 0;*out=(RuntimeLiveRetirement){0};
+#ifdef BB_NATIVE_HOST_PROTECTION
+ if(!live_read_protection_held||!live_mapping_held||read_depth!=1||exclusive_depth||
+    !size||address<live_mapping_begin||address>=live_mapping_end||size>live_mapping_end-address)return 0;
+ const uintptr_t begin=(address+4095)&~(uintptr_t)4095,end=(address+size)&~(uintptr_t)4095;
+ if(begin>=end)return 1; /* Edge pages may contain newer bytes outside this slice. */
+ read_arm_supersede(begin,end);
+ if(trap_reasons)for(uintptr_t page=begin>>12;page<end>>12;++page)trap_reasons[page]&=(uint8_t)~32u;
+ native_protect_apply(begin,end,-1); /* Retains all other reasons and current permissions. */
+ *out=(RuntimeLiveRetirement){begin,end-begin};return 1;
+#else
+ (void)address;(void)size;return 0;
+#endif
+}
+void runtime_memory_end_live_read_protection(void) {
+ if(!live_read_protection_held||!live_mapping_held||read_depth!=1||exclusive_depth){
+  fputs("ARM live read protection wrong-thread/nested release\n",stderr);_Exit(BB_ARM_EXIT_HLE_FAULT);
+ }
+ live_read_protection_held=0;pthread_mutex_unlock(&trap_mutex);
+}
+
 /* Development metadata queries, also covered by the runtime table lock. */
 #include "native_memory_inspection.h"
 int runtime_memory_inspect_mapping(uintptr_t address,RuntimeMappingSnapshot* out) {
@@ -1541,6 +1703,13 @@ void runtime_memory_report(void) {
     pthread_mutex_unlock(&mlock_ledger.gate);
 }
 #else
+#include "runtime_live_mapping.h"
+int runtime_memory_try_live_mapping(uintptr_t a,uint64_t n,RuntimeLiveMapping* o){(void)a;(void)n;(void)o;return 0;}
+void runtime_memory_end_live_mapping(void){}
+int runtime_memory_try_live_read_protection(uintptr_t a,uint64_t n,unsigned r){(void)a;(void)n;(void)r;return 0;}
+int runtime_memory_try_live_read_retirement(uintptr_t a,uint64_t n){(void)a;(void)n;return 0;}
+void runtime_memory_end_live_read_protection(void){}
+int runtime_memory_retire_live_read_protection(uintptr_t a,uint64_t n,RuntimeLiveRetirement*out){(void)a;(void)n;if(out)*out=(RuntimeLiveRetirement){0};return 0;}
 void *runtime_low_map(size_t size, int prot) { (void)size; (void)prot; return NULL; }
 uintptr_t runtime_memory_resolve(const char *name) { (void)name; return 0; }
 int runtime_memory_is_mapped(uintptr_t address, uint64_t size) { (void)address; (void)size; return 0; }

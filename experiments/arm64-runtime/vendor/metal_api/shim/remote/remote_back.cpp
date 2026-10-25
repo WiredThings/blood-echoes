@@ -1,3 +1,4 @@
+#include "runtime_exit_codes.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // bbport: the native GPU process, bb-gpu (docs/macos-native-gpu.md). It reserves the guest's
 // address ranges, maps the game process's memory pool at the same addresses, and runs the GPU
@@ -982,6 +983,70 @@ void InstallGuestHooks(void (*fresh)(u64,u64)) {
     fresh_range_callback.store(fresh,std::memory_order_release);
     g.control->lifetime.hooks_requested.store(1,std::memory_order_release);
 }
+static bool LivePayloadRequest(LivePurpose purpose,BbPayload::Origin expected,u64 address,u64 size,
+                     const std::function<bool(const LivePayloadReceipt&)>& body,unsigned required_traps=0,LivePayloadRetirement* retirement=nullptr,
+ const std::function<bool(const LivePayloadRetirement&)>& sync_retirement={}){
+ static const bool enabled=[] {const auto* e=std::getenv("BB_ARM_PAYLOAD_GATE");return e&&e[0]=='1';}();
+ if(!enabled||!g.control||!body)return false;
+ if(required_traps||purpose==LiveWritebackRetire){const auto* traps=std::getenv("BB_LAYER_READ_TRAPS");
+  if(!traps||traps[0]!='1')return false;}
+ static std::mutex single;std::unique_lock held{single,std::try_to_lock};if(!held.owns_lock())return false;
+ auto& journal=g.control->lifetime.journal;
+ if(journal.lost.load(std::memory_order_acquire))return false;
+ // Existing parent watcher terminates this owned backend on parent death. No
+ // Released-lease mutex/state or new launcher restart statuses are used.
+ const pid_t parent=getppid();
+ return BbRemote::WithLivePayloadRequest(g.control->live_payload,purpose,expected,address,size,
+  [parent]{return getppid()!=parent;},[&](const LivePayloadReceipt& receipt){
+   if(receipt.protected_reasons!=required_traps||journal.lost.load(std::memory_order_acquire)||
+      journal.consumed.load(std::memory_order_acquire)<receipt.journal_frontier)return false;
+   return g.table.TryWithLiveDirect(receipt.mapping,address,size,[&](u64){
+    return BbResourceLifetime::Get().TryWithLiveHeap(receipt.owner,address,size,[&](auto actual){
+     return actual==receipt.owner&&body(receipt);
+    });
+   });
+  },required_traps,retirement,sync_retirement);
+}
+
+bool WithLivePayload(BbPayload::Origin origin,u64 address,u64 size,
+                     const std::function<bool(const LivePayloadReceipt&)>& body){
+ return LivePayloadRequest(LiveValidateOrigin,origin,address,size,body);
+}
+bool WithProtectedLivePayload(BbPayload::Origin origin,u64 address,u64 size,
+                     const std::function<bool(const LivePayloadReceipt&)>& body){
+ return LivePayloadRequest(LiveValidateOrigin,origin,address,size,body,32);
+}
+bool RetireReadProtection(BbPayload::Origin origin,u64 address,u64 size,
+ const std::function<bool(const LivePayloadReceipt&)>& body,LivePayloadRetirement* out){
+ if(out)*out={};
+ // Serialize local reason owners until the authoritative retirement is applied.
+ // Never call MemoryTrap/ForwardProtect here: a later frontend owner may already
+ // have reasserted 32 as soon as its original lease ended.
+ if(collected_protects)return false;
+ u8*table=TrapTable();if(!table)return false;
+ std::unique_lock held{trap_mutex,std::try_to_lock};if(!held.owns_lock())return false;
+ // Preconstruct the synchronization callback before the frontend lease starts.
+ const std::function<bool(const LivePayloadRetirement&)> sync=[&](const auto& retired){
+  const u64 begin=(address+4095)&~u64(4095),end=(address+size)&~u64(4095);
+  if(retired.applied!=1||retired.reserved||
+     (begin<end?(retired.address!=begin||retired.size!=end-begin):(retired.address||retired.size))){
+   std::fputs("ARM live retirement receipt invalid\n",stderr);std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+  }
+  for(u64 page=retired.address>>12;retired.size&&page<(retired.address+retired.size)>>12;++page){
+   const u8 old=__atomic_load_n(&table[page],__ATOMIC_ACQUIRE);
+   __atomic_store_n(&table[page],u8(old&~32u),__ATOMIC_RELEASE);
+  }
+  return true;
+ };
+ LivePayloadRetirement retired{};
+ const bool ok=LivePayloadRequest(LiveWritebackRetire,origin,address,size,body,0,&retired,sync);
+ if(ok&&out)*out=retired;return ok;
+}
+bool CaptureLivePayload(u64 address,u64 size,
+                        const std::function<bool(const LivePayloadReceipt&)>& body){
+ return LivePayloadRequest(LiveCaptureCreation,{},address,size,body);
+}
+
 int MemorySnapshot(u64* out,u64 count) {
     if(!out || count<16)return 0;
     u64 snapshot[16]{};
@@ -1076,6 +1141,32 @@ void MemoryTrap(uintptr_t address, u64 size, unsigned reason, int on) {
         }
     }
     ForwardProtect(ProtectArgs{address, end - address, ProtectTrap | reason, on ? 1u : 0u});
+}
+
+// Frontend receipt is authoritative. Do not reassert with MemoryTrap: that
+// would supersede our own rollback reservation in the frontend reason owner.
+static bool SyncReadArm(const RuntimeReadArmReceipt&r){
+ if(!r.ok||!r.token||!r.size||r.address>=TrapLimit||r.size>TrapLimit-r.address||
+    r.pages!=((r.address+r.size-1)>>12)-(r.address>>12)+1||r.pages>RUNTIME_READ_ARM_PAGES)return false;
+ u8*table=TrapTable();if(!table)return false;
+ std::scoped_lock held{trap_mutex};for(uint64_t n=0;n<r.pages;++n){const uint64_t p=(r.address>>12)+n;
+  const u8 old=table[p],now=(r.actual32[n>>6]>>(n&63)&1)?u8(old|32):u8(old&~32u);
+  __atomic_store_n(&table[p],now,__ATOMIC_RELEASE);
+ }return true;
+}
+bool ArmRead(const RuntimeReadArmArgs&args,RuntimeReadArmReceipt&out){
+ out={};if(collected_protects||!g.protect||!TrapTable())return false;
+ g.protect->Call(MsgArmRead,&args,sizeof(args),&out,sizeof(out));
+ if(!out.ok)return false;
+ if(out.address!=args.address||out.size!=args.size||!SyncReadArm(out)){
+  // A malformed/unsynchronizable successful grant cannot be replayed as legacy.
+  std::fputs("ARM read arm receipt invalid\n",stderr);std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+ }return true;
+}
+bool FinishReadArm(uint64_t token,bool commit,RuntimeReadArmReceipt&out){
+ out={};if(collected_protects||!g.protect||!token)return false;const ValueArgs args{token};
+ g.protect->Call(commit?MsgCommitReadArm:MsgCancelReadArm,&args,sizeof(args),&out,sizeof(out));
+ return out.token==token&&SyncReadArm(out);
 }
 
 unsigned MemoryTrapReasons(uintptr_t address) {

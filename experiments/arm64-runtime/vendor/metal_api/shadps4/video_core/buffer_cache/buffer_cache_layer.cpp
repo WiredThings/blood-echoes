@@ -13,6 +13,8 @@
 #include <array>
 #include <atomic>
 #include <mutex>
+#include <chrono>
+#include <thread>
 #include <unordered_set>
 #include <sys/mman.h>
 #include <ucontext.h>
@@ -26,6 +28,7 @@
 #include "bbport_toggles.h"
 #include "video_core/buffer_cache/buffer_cache.h"
 #include "video_core/buffer_cache/memory_tracker.h"
+#include "video_core/buffer_cache/preserved_producer_barrier.h"
 #include "common/signal_context.h"
 #include "core/signals.h"
 #include "video_core/cache_backend.h"
@@ -33,6 +36,7 @@
 // After the Vulkan headers of the video core (their configuration).
 #include "bblayer_gpu_memory.h"
 #include "bblayer_write_traps.h"
+#include "runtime_exit_codes.h"
 
 extern "C" int runtime_memory_vma_info(uintptr_t address, int* prot, int* type, uintptr_t* end);
 
@@ -73,6 +77,19 @@ std::optional<std::pair<const Buffer*, u64>> BufferCache::LayerBind(VAddr addres
                                                                     bool is_texel_buffer,
                                                                     bool may_promote) {
     BB_SECTION(LayerBind);
+    // A new writer may not reuse the page's reason32/dirty metadata while an
+    // old preserved Origin still owns it. This precedes Maintain, Resolve,
+    // mirror refresh, dirty marking and trap arming. Empty ledger is O(1).
+    if(is_written&&preserved_writebacks.Count()){
+        const bool ready=WaitPreservedProducerBarrier(
+            [&]{return TryFlushPreservedWritebacks(address,size);},
+            []{return std::chrono::steady_clock::now();},
+            []{std::this_thread::sleep_for(std::chrono::milliseconds(1));});
+        if(!ready){
+            std::fputs("ARM preserved producer admission timed out; new write not recorded\n",stderr);
+            std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+        }
+    }
     // Residency changes queued since the last packet: loads, demotions, unmaps, idle blocks.
     if (maintained_epoch != packet_epoch) {
         Maintain();
@@ -533,6 +550,13 @@ u64 BufferCache::LayerPromoteRun(u64 first, u64 end) {
             }
         }
     }
+    // A merge may retire the original destination mirror. Flush any provenance
+    // in every touching mirror before changing ownership or native identity.
+    const auto& prior=touching;
+    for(const auto&m:prior)if(!TryFlushPreservedWritebacks(m.base,m.size)) {
+        std::fputs("ARM preserved writeback incomplete before mirror merge; data retained\n",stderr);
+        std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+    }
     // Page table entries that change: the run, and the blocks of mirrors replaced by a new one.
     std::vector<std::pair<u64, u64>> moved;
     Buffer* target = nullptr;
@@ -634,6 +658,10 @@ u64 BufferCache::LayerGrowthEnd(u64 lo, u64 hi) {
 static std::array<std::atomic<u64>, 7> layer_demoted_bytes{};
 
 void BufferCache::LayerDemote(u64 first, u64 end, bool copy_back, int reason) {
+    if(!TryFlushPreservedWritebacks(first<<block_shift,(end-first)<<block_shift)) {
+        std::fputs("ARM preserved writeback incomplete before mirror demotion; data retained\n",stderr);
+        std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+    }
     BbStats::Timer timer{BbStats::t_layer[2]};
     LayerForgetGpuData();
     std::vector<std::pair<u64, u64>> runs;
@@ -835,6 +863,11 @@ u64 BufferCache::LayerCompactMirrors(u64 wanted) {
     for (const auto& [waste, start] : wasteful) {
         if (freed >= wanted) {
             break;
+        }
+        const auto original=Layer().MirrorAt(start);
+        if(original&&!TryFlushPreservedWritebacks(original->base,original->size)) {
+            std::fputs("ARM preserved writeback incomplete before mirror compaction; data retained\n",stderr);
+            std::_Exit(BB_ARM_EXIT_HLE_FAULT);
         }
         auto node = layer_mirrors.extract(start);
         Buffer* old_buffer = node.mapped().get();
@@ -1249,6 +1282,10 @@ bool BufferCache::LayerGpuWriteToVram(VAddr address, u64 size) {
 
 namespace VideoCore {
 void BufferCache::LayerCopyBack(u64 first, u64 end) {
+    if(!TryFlushPreservedWritebacks(first<<block_shift,(end-first)<<block_shift)) {
+        std::fputs("ARM preserved writeback incomplete before mirror copyback; data retained\n",stderr);
+        std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+    }
     LayerForgetGpuData();
     // The GPU's data in mirrors over [first, end) into the game's memory; the blocks stay valid
     // in VRAM (both copies equal now).

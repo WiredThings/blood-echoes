@@ -10,6 +10,7 @@ import argparse,fcntl,hashlib,json,os,re,signal,stat,subprocess,tempfile,time
 
 PROJECT=Path(__file__).resolve().parents[1]
 RECIPE='bb-metal-local-aot-v1'
+LIBRARY_RECIPE='bb-metal-local-library-v2'
 HEX=re.compile(r'^[0-9a-f]{64}$')
 SOURCE_MAX=1024*1024
 LIBRARY_MAX=32*1024*1024
@@ -20,6 +21,7 @@ LOG_MAX=1024*1024
 STAGE_TIMEOUT=60.0
 TOTAL_TIMEOUT=1800.0
 REQUEST_FIELDS={'schema','key','cohort','source_sha256','entry','language','math_mode','math_fp32','recipe'}
+LIBRARY_REQUEST_FIELDS=REQUEST_FIELDS-{'entry'}
 
 class Refused(RuntimeError):pass
 class Stopped(Refused):pass
@@ -27,7 +29,7 @@ class Stopped(Refused):pass
 def digest(data):return hashlib.sha256(data).hexdigest()
 def canonical(value):return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
 def derive_key(request):
-    fields=[request[k]for k in ('recipe','cohort','source_sha256','entry','language','math_mode','math_fp32')]
+    fields=[request[k]for k in (('recipe','cohort','source_sha256','language','math_mode','math_fp32') if request.get('schema')==2 else ('recipe','cohort','source_sha256','entry','language','math_mode','math_fp32'))]
     encoded=b''.join(str(len(value.encode('utf-8'))).encode()+b':'+value.encode('utf-8')for value in fields)
     return digest(encoded)
 def _identity(st):return st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns
@@ -132,13 +134,17 @@ def request_keys(folder,*,recovery=None,pins=None):
 def load_request(folder,key,cohort,*,pins=None):
     pin=lambda suffix:None if pins is None else pins[key+suffix]
     request=read_json(folder/(key+'.json'),request_pin=pin('.json'))
-    if type(request)is not dict or set(request)!=REQUEST_FIELDS:raise Refused('request fields do not match schema')
-    if type(request['schema'])is not int or request['schema']!=1:raise Refused('unsupported request schema')
-    if any(type(request[k])is not str for k in REQUEST_FIELDS-{'schema'}):raise Refused('request field type mismatch')
+    if type(request)is not dict or type(request.get('schema'))is not int or request['schema']not in(1,2):raise Refused('unsupported request schema')
+    fields=REQUEST_FIELDS if request['schema']==1 else LIBRARY_REQUEST_FIELDS
+    if set(request)!=fields:raise Refused('request fields do not match schema')
+    if any(type(request[k])is not str for k in fields-{'schema'}):raise Refused('request field type mismatch')
     if request['key']!=key or request['cohort']!=cohort or not HEX.fullmatch(request['source_sha256']):raise Refused('request key/cohort/source identity mismatch')
-    if request['recipe']!=RECIPE or request['language']!='metal3.1' or request['math_mode']not in('safe','relaxed')or request['math_fp32']!='fast':raise Refused('unsupported fixed compile recipe')
-    entry=request['entry']
-    if not entry or len(entry.encode('utf-8'))>256 or '\0'in entry:raise Refused('invalid entry name')
+    if request['schema']==1:
+        if request['recipe']!=RECIPE or request['language']!='metal3.1' or request['math_mode']not in('safe','relaxed')or request['math_fp32']!='fast':raise Refused('unsupported fixed compile recipe')
+        entry=request['entry']
+        if not entry or len(entry.encode('utf-8'))>256 or '\0'in entry:raise Refused('invalid entry name')
+    else:
+        if request['recipe']!=LIBRARY_RECIPE or request['language']not in {'metal1.0','metal1.1','metal1.2','metal2.0','metal2.1','metal2.2','metal2.3','metal2.4','metal3.0','metal3.1','metal3.2','metal4.0','metal4.1'} or request['math_mode']not in('safe','relaxed','fast')or request['math_fp32']not in('fast','precise'):raise Refused('unsupported complete library recipe')
     if derive_key(request)!=key:raise Refused('recomputed request key mismatch')
     source=regular_bytes(folder/(key+'.metal'),SOURCE_MAX,request_pin=pin('.metal'))
     try:source.decode('utf-8')
@@ -231,8 +237,10 @@ class FixedRunner:
         finally:
             if proc is not None and proc.poll()is None:
                 os.killpg(proc.pid,signal.SIGTERM)
-                try:proc.wait(timeout=3)
-                except subprocess.TimeoutExpired:os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=3)
+                # The unchanged launcher escalates an unresponsive game after
+                # three seconds. Reap compiler children within that interval.
+                try:proc.wait(timeout=.75)
+                except subprocess.TimeoutExpired:os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=.75)
             log.close()
 
 def tool_fingerprint(path):
@@ -271,8 +279,8 @@ class NativeToolchain:
             if list(_identity(Path(row['path']).stat()))!=row['stat']:raise Refused('tool binary changed during build')
     def compile(self,source,air,library,request,guard):
         self.unchanged(guard)
-        command=['/usr/bin/xcrun','metal','-std=metal3.1',
-                 '-fmetal-math-mode='+request['math_mode'],'-fmetal-math-fp32-functions=fast',
+        command=['/usr/bin/xcrun','metal','-std='+request['language'],
+                 '-fmetal-math-mode='+request['math_mode'],'-fmetal-math-fp32-functions='+request['math_fp32'],
                  '-c',str(source),'-o',str(air)]
         self.runner.run(command,STAGE_TIMEOUT,guard,cwd=source.parent,outputs=((air,AIR_MAX),))
         row=air.lstat()
@@ -283,7 +291,7 @@ class NativeToolchain:
 
 def real_services(private_tmp):
     import sys
-    sys.path.insert(0,str(PROJECT/'tools'))
+    sys.path.insert(0,str(Path(__file__).resolve().parent))
     from native_observer import NativeObserver
     from qa_memory_policy import MemoryPolicy
     from qa_build_guard import require_no_games
@@ -352,7 +360,11 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None):
     finally:
         if summary_path is not None:
             try:atomic_json(summary_path,summary)
-            except Exception as error:summary['status']='failed';summary['summary_write_error']=str(error)[:512]
+            except Exception as error:
+                # Preserve a lock/memory stop even when its diagnostic cannot be
+                # written; auto fallback must not launch after a safety stop.
+                if summary['status']!='stopped':summary['status']='failed'
+                summary['summary_write_error']=str(error)[:512]
         if lock_fd is not None:os.close(lock_fd)
         if observer is not None:observer.close()
     return summary

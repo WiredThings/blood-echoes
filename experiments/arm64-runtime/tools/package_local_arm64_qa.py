@@ -12,6 +12,7 @@ if P.name!='arm64-runtime-prototype':
 sys.path.insert(0,str(P/'tools'))
 from qa_build_guard import require_no_games
 from manual_qa_policy import validate_manual_environment
+from prepare_local_aot_stage import build_stage
 
 def sha(p):
     with Path(p).open('rb')as f:return hashlib.file_digest(f,'sha256').hexdigest()
@@ -27,10 +28,34 @@ def freeze_consumer(executable,old_library,new_library):
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(executable)],check=True)
     assert target in deps(executable)and old not in deps(executable)
 
+def load_cpu_runtime_manifest(path,expected_gpu_sha256=None):
+    assert not path.is_symlink(), 'CPU manifest must be a regular Shared file'
+    path=path.resolve(strict=True)
+    assert path.is_relative_to(P/'evidence') and path.is_file(), 'Shared CPU runtime manifest required'
+    record=json.loads(path.read_text())
+    assert record.get('schema')==1 and record.get('kind')=='blood-echoes-isolated-cpu-runtime'
+    assert record.get('production') is False
+    root=Path(record['execution_root']).resolve(strict=True)
+    assert root.parent==(P/'evidence').resolve() and root.name.startswith('resource-cpu-execution-')
+    assert root.name.removeprefix('resource-cpu-execution-').isdigit() and path.is_relative_to(root)
+    assert type(record['protocol_version']) is int and record['protocol_version']>0
+    assert type(record['live_payload_version']) is int and record['live_payload_version']>0
+    for name in ('game','host'):
+        item=record[name];source=Path(item['path'])
+        assert source.is_absolute() and not source.is_symlink() and source.is_file()
+        assert source.resolve(strict=True).is_relative_to(root)
+        assert len(item['sha256'])==64 and sha(source)==item['sha256'], (name,'CPU runtime hash mismatch')
+    assert len(record['gpu_library_sha256'])==64
+    if expected_gpu_sha256 is not None:assert record['gpu_library_sha256']==expected_gpu_sha256, 'CPU/GPU admitted build mismatch'
+    return record
+
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,required=True);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,required=True);ap.add_argument('--source-repository',type=Path,required=True);ap.add_argument('--gpu-app-manifest',type=Path,required=True);ap.add_argument('--cpu-runtime-manifest',type=Path,required=True);ap.add_argument('--runtime-tools',type=Path);a=ap.parse_args()
     require_no_games()
-    output=a.output.resolve();output.mkdir(parents=True,exist_ok=True)
+    output=a.output.absolute();assert not output.exists(), 'Preserve old QA outputs; use a fresh directory'
+    output.mkdir(parents=True)
+    prepared=build_stage(project=P,repository=a.source_repository,runtime_tools=a.runtime_tools)
+    admitted_stage=Path(prepared['stage'])
     raw=subprocess.check_output([sys.executable,str(P/'tools/prepare_launcher_gui_qa.py')],text=True)
     case=json.loads(raw);app=Path(case['app']);resources=app/'Contents/Resources'
     prefs=plistlib.loads(Path(case['preferences']).read_bytes())
@@ -38,26 +63,46 @@ def main():
     validate_manual_environment(extra)
     assert prefs['online']is False and prefs['cloudSaves']is False and prefs['userFolder']==case['user']
     alias=resources/'bbport';assert alias.is_symlink()and alias.resolve()==P/'launcher-component-stage'
-    alias.unlink();stage=alias;stage.mkdir();original=P/'launcher-component-stage'
-    source=json.loads((original/'SOURCE-PARITY.json').read_text())['original_sources']
+    alias.unlink();stage=alias;stage.mkdir();original=admitted_stage
+    baseline=prepared['parity']['original_sources'];source=prepared['parity']['effective_sources']
     for rel,digest in source.items():
         src=original/rel;dst=stage/rel;assert sha(src)==digest
         dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
     shutil.copy2(original/'.packaged',stage/'.packaged')
+    for metadata in ('SOURCE-PARITY.json','ARM64-LOCAL-PREPARATION.json'):
+        shutil.copy2(original/metadata,stage/metadata)
+    shutil.copytree(original/'native-runtime-tools',stage/'native-runtime-tools',symlinks=False)
+    shutil.copy2(original/'tools/macos/local_metal_startup.py',stage/'tools/macos/local_metal_startup.py')
+    # Keep a new cache/data target; preserve the previous QA cache and all formal data.
+    old_gpu=Path(extra['BB_GPU_USER_DIR']).resolve(strict=True)
+    assert old_gpu.is_relative_to(P/'state') and old_gpu!=P/'state'
+    new_gpu=P/'state'/('gui-gpu-local-aot-'+str(time.time_ns()))
+    assert not new_gpu.exists();shutil.copytree(old_gpu,new_gpu,symlinks=False)
+    extra['BB_GPU_USER_DIR']=str(new_gpu)
+    extra.pop('BB_MTL_LOCAL_AOT_MODE',None)
+    prefs['extraEnv']='\n'.join(k+'='+v for k,v in extra.items())
+    Path(case['preferences']).write_bytes(plistlib.dumps(prefs))
+    validate_manual_environment(extra)
     for name in ['python','deps-metal-arm64','bin/gpu-net']:
         dst=stage/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copytree((original/name).resolve(),dst,symlinks=False)
     cpu=stage/'bin/bb-probe-metal';cpu.parent.mkdir(exist_ok=True)
-    shutil.copy2(P/'build/fex/Bin/bb-game-arm64',cpu)
+    cpu_runtime=load_cpu_runtime_manifest(a.cpu_runtime_manifest)
+    cpu_game_source=Path(cpu_runtime['game']['path'])
+    shutil.copy2(cpu_game_source,cpu)
     cpu_lib=stage/'bin/gpu-metal/libbbgpu.dylib';cpu_lib.parent.mkdir()
-    # Freeze the library the current CPU actually imports; never silently select
-    # the older menu checkpoint after AV/callback runtime changes.
-    host=json.loads((P/'evidence/avplayer-host-candidate-current.json').read_text())
-    cpu_source=Path(host['candidate']);assert sha(cpu_source)==host['sha256']
+    # Explicitly bind the new CPU and its exact same-build host. Never select
+    # P/build/fex or an old AvPlayer checkpoint implicitly.
+    cpu_source=Path(cpu_runtime['host']['path'])
     assert str(cpu_source)in deps(cpu),'CPU load edge does not match the admitted host library'
     shutil.copy2(cpu_source,cpu_lib)
     freeze_consumer(cpu,cpu_source,cpu_lib)
-    variant=json.loads((P/'evidence/first-upload-gpu-app.json').read_text())
+    gpu_manifest=a.gpu_app_manifest.resolve(strict=True)
+    assert gpu_manifest.is_relative_to(P/'evidence'), 'admitted private GPU manifest required'
+    variant=json.loads(gpu_manifest.read_text())
+    from gpu_candidate_identity import verify
+    verify(variant,P/'backend')
     gpu_source=Path(variant['library']);assert sha(gpu_source)==variant['library_sha256']
+    assert cpu_runtime['gpu_library_sha256']==variant['library_sha256'], 'CPU/GPU admitted build mismatch'
     gpu_lib=stage/'bin/gpu-metal-arm64/libbbgpu.dylib';gpu_lib.parent.mkdir();shutil.copy2(gpu_source,gpu_lib)
     gpu_app=stage/'bin/Bloodborne Metal.app';source_app=Path(variant['target']).parents[2]
     shutil.copytree(source_app,gpu_app,symlinks=True)
@@ -88,10 +133,14 @@ def main():
     (stage/'NATIVE-METAL.json').write_text(json.dumps(native,indent=2)+'\n')
     manifest=dict(schema=2,created_ns=time.time_ns(),app=str(app),private_case=case,
         host_local_only=True,portable_installer=False,formal_data_modified=False,
-        frozen_runtime=native['frozen_runtime'],upstream_inputs=dict(cpu=sha(P/'build/fex/Bin/bb-game-arm64'),cpu_library=sha(cpu_source),gpu_library=sha(gpu_source),net_library=sha(original/'bin/gpu-net/libbbnet.dylib')),
-        original_scripts=source,manual_physical_input=True,silent=True,
+        default_local_metal_preparation=True,new_component_stage=str(admitted_stage),
+        local_metal_preparation=prepared['manifest'],
+        private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,
+        frozen_runtime=native['frozen_runtime'],cpu_runtime_manifest=dict(path=str(a.cpu_runtime_manifest.resolve()),sha256=sha(a.cpu_runtime_manifest),protocol_version=cpu_runtime['protocol_version'],live_payload_version=cpu_runtime['live_payload_version'],author_instrumentation=cpu_runtime.get('author_instrumentation',False)),
+        upstream_inputs=dict(cpu=sha(cpu_game_source),cpu_library=sha(cpu_source),gpu_library=sha(gpu_source),net_library=sha(original/'bin/gpu-net/libbbnet.dylib')),
+        original_scripts=baseline,effective_scripts=source,controlled_changes=['run.sh final-exec hook','local Metal preparation runtime tools'],manual_physical_input=True,silent=True,
         diagnostic_capture=False,performance_logging=False,
-        external_dependencies=['prepared Shared dependency tree','private Shared QA paths','locally dumped game and Chinese assets','existing QA GPU cache'],
+        external_dependencies=['prepared Shared dependency tree','private Shared QA paths','locally dumped game and Chinese assets','new cloned private QA GPU cache'],
         known_limits=['combat white models not yet reproduced','remaining import/context contracts are tracked in GOAL.zh-CN.md','death, online and menu live retests deferred'])
     for rel,digest in source.items():assert sha(stage/rel)==digest
     for binary in [cpu,cpu_lib,gpu,gpu_lib,net_lib]:
@@ -101,24 +150,18 @@ def main():
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(app)],check=True)
     subprocess.run(['/usr/bin/codesign','--verify','--strict',str(app)],check=True)
     for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib]:subprocess.run(['/usr/bin/codesign','--verify','--strict',str(f)],check=True)
-    instructions='''Blood Echoes ARM64 本机隔离测试包（2026-10-25）
+    instructions='''Blood Echoes ARM64 本机隔离测试包
 
-这是本机 QA 入口，不能在其它 Mac 独立运行，不是正式安装包。
-解压打开其中的 .app；也可直接打开清单所列 Shared/apps 下的同一应用。
-CPU、CPU 侧宿主库和纹理修复 GPU 已冻结在包内；依赖、游戏资源和隔离配置仍引用本机 Shared 开发树。
+这是本机 QA，依赖 Shared 开发树、游戏/汉化资产和新建的独立 QA 数据目录，不能在其它 Mac 独立运行；不是正式安装包。
+沿用现有启动器界面、键鼠/手柄、中文、F2/F3、网络和退出协议；不注入自动输入。默认离线、静音，不参与正式存档选择。
 
-默认离线、静音、独立 QA 进度；键鼠和手柄沿用原启动器，不注入自动输入。
-F2 若被系统拦截，请用 Fn+F2。F3 仍按原协议以离线模式恢复。
-本轮不要求死亡、联网和菜单验收。正式应用、正式存档、设置和缓存未改。
+本机 Metal 离线准备默认开启：已收集输入在游戏进程启动前按原选项串行建库；后续启动验证复用，不分发开发机游戏着色器产物。
+缺少 Metal Toolchain 时明确回退原运行时编译；损坏/不兼容缓存不会被删除。严重内存/锁屏保护停止仍保留。
+源码覆盖和定向控制不等于白模已解决、所有场景零编译或已证明帧率提升；完整游戏/内存验收状态以runtime-manifest为准。
 
-已确认并修复：错误退出码与 75/76 重启协议冲突；ABI 宏漏接；未实现数据导入保护页；完整 libc 访问范围校验；GpuModified 首次上传未记 hash 导致旧 CPU 数据覆盖 GPU 内容的定向错误。
-未宣称战斗白模已解决。AvPlayer 桥接、程序名、模块信息与 msync 契约已有定向控制；Mlock、模块终结和信号上下文仍待接入。
-本次 CPU 完成了原启动器隔离场景短测，不能作为白模、长时间内存或 FPS 收益验收。死亡、联网、菜单和完整 F3 实测仍留待后续。
-
-本包不带逐帧诊断、布局审查日志、自动输入或QoS实验；renderer仍冻结在原first-upload候选，不安装尚未验证的布局转换。新源码中的GPU覆盖合并只是自造控制证明，未启用到游戏。
-
-源码：WiredThings/blood-echoes 的 dev/arm64-runtime-audit 分支。未更新 Release。
-包不包含游戏、存档、缓存、汉化资源、账号凭据或截图。不要删除本机 Shared 依赖目录。
+正式应用、存档、设置和缓存不改，旧 QA stage/包保留。Release不更新。
+包不含游戏、存档、缓存、汉化资产、账号凭据或截图；不要删除 Shared 外部依赖和隔离数据。
+源码：WiredThings/blood-echoes 的 dev/arm64-runtime-audit 分支。
 '''
     (output/'runtime-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     (output/'使用说明.txt').write_text(instructions)

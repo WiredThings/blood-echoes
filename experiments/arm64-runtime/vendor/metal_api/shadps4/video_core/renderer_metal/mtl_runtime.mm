@@ -809,6 +809,7 @@ Runtime::Runtime(Device& device_, Scheduler& scheduler_)
 }
 
 Runtime::~Runtime() {
+    CloseExactExportOwner(); // blocks only shutdown, makes escaped tokens harmless
     // Pipelines and the objects the caches still hold may be in use by the last command buffers.
     scheduler.Finish();
     ImageUsageLog::Flush();
@@ -1163,6 +1164,7 @@ BufferMemory Runtime::ImportBuffer(UniqueBuffer& out, u64 size, u64 chunk_phys) 
 }
 
 void Runtime::DestroyBuffer(UniqueBuffer& buffer) {
+    InvalidateExactExports(); // logical wrapper retirement precedes deferred native release
     void* native = std::exchange(buffer.native, nullptr);
     // Buffers with a device address (or all, ResidentAll) were made resident (CreateBuffer).
     const bool resident = (ResidentAll() || buffer.bda_addr != 0) && !MemoryStats::IsDiscarded(native);
@@ -1288,6 +1290,7 @@ void Runtime::CreateImage(UniqueImage& out, const vk::ImageCreateInfo& info) {
 }
 
 void Runtime::DestroyImage(UniqueImage& image) {
+    InvalidateExactExports();
     void* native = std::exchange(image.native, nullptr);
     image.image = VK_NULL_HANDLE;
     if (!native) {
@@ -2707,4 +2710,21 @@ void Runtime::PromoteImageUsage(Image* image, ImageUsagePromotion usage) {
     }
 }
 
+} // namespace Metal
+
+namespace Metal {
+void Runtime::PrepareExactSnapshot(const void* source,const void* target,
+    std::span<const vk::BufferImageCopy> copies) {
+    // Source and target are retained native objects, not cache-slot pointers.
+    // Prelude already drained image helpers before pool allocation. No guest
+    // memory access, format substitution, conversion or void-copy success guess.
+    scheduler.EndWithBarrier();
+    scheduler.BlitEncoder("Prepared exact native snapshot");
+    const auto blit=scheduler.GetImpl().blit;
+    for(const auto& copy:copies)
+        EncodeTextureToBuffer(blit,(__bridge id<MTLTexture>)source,
+            (__bridge id<MTLBuffer>)target,vk::Format::eR8G8B8A8Unorm,copy);
+    scheduler.BeginOrderedHostCompute("Prepared exact image export");
+    scheduler.OrderAfterHostCompute();
+}
 } // namespace Metal

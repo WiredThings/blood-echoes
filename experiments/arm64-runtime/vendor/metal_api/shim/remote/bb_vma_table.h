@@ -139,6 +139,20 @@ public:
         }
         return 1;
     }
+    // Actual mirrored-table read lease; no mmap, promotion, RPC or wait.
+    // Frontend generation is not compared to the independent backend counter.
+    template<class Mapping,class Body>
+    bool TryWithLiveDirect(const Mapping& expected,std::uint64_t address,
+                           std::uint64_t size,Body body) const {
+        if(!address||!size||size>(8ull<<20)||address>UINT64_MAX-size)return false;
+        std::shared_lock held{mutex,std::try_to_lock};if(!held.owns_lock())return false;
+        const auto it=Containing(address);
+        if(it==map.end()||it->second.kind!=MapDirect||it->first!=expected.begin||
+           it->second.end!=expected.end||it->second.phys!=expected.physical||
+           it->second.prot!=expected.prot||it->second.type!=expected.type||
+           size>it->second.end-address)return false;
+        return body(generation); // must not reenter table, protection or IPC
+    }
     const std::uint64_t* Generation() const {
         return &generation;
     }

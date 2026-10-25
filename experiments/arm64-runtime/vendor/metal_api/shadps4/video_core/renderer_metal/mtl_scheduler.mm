@@ -290,11 +290,13 @@ bool Scheduler::HasOpenCommandBuffer() const noexcept {
 }
 
 void Scheduler::SetRenderTail(std::function<void()> callback) {
+    InvalidatePreparedCompute();
     EndEncoder();
     render_tail = std::move(callback);
 }
 
 void Scheduler::SetVisibilityQuery(VisibilityQuery query, VisibilityMergePolicy policy) {
+    InvalidatePreparedCompute();
     EndEncoder(); // joins replay before the callback or its buffers can change
     visibility_query = std::move(query);
     visibility_merge_policy = policy;
@@ -402,12 +404,14 @@ void Scheduler::OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool
 }
 
 void Scheduler::RenderEncoder(const void* pass_descriptor) {
+    InvalidatePreparedCompute();
     ASSERT_MSG(pass_descriptor, "RenderEncoder without a pass descriptor");
     BeginEncoder(EncoderKind::Render, pass_descriptor);
     render_state.reset();
 }
 
 void Scheduler::HostRenderEncoder(const void* pass_descriptor) {
+    InvalidatePreparedCompute();
     ASSERT_MSG(pass_descriptor, "HostRenderEncoder without a pass descriptor");
     BeginEncoder(EncoderKind::Render,pass_descriptor,false,true);
     render_state.reset();
@@ -417,6 +421,7 @@ bool Scheduler::CanInlineBufferUpdate() const noexcept {
         !hoisting && !render_tail_pending && !running_render_tail && !impl->pending_clears;
 }
 bool Scheduler::InlineBufferUpdate(void* pipeline,void* buffer,u64 offset,const void* data,u32 bytes) {
+    InvalidatePreparedCompute();
     if(!CanInlineBufferUpdate())return false;
     if(!holding) {JoinReplay();WaitOutstandingFences(*impl,EncoderKind::Render);}
     commands.VertexBufferUpdate(pipeline,buffer,offset,data,bytes);
@@ -424,6 +429,7 @@ bool Scheduler::InlineBufferUpdate(void* pipeline,void* buffer,u64 offset,const 
 }
 
 void Scheduler::RenderEncoder(const void* pass_descriptor, const VideoCore::RenderState& state, bool guest, bool bound_only) {
+    InvalidatePreparedCompute();
     ASSERT_MSG(pass_descriptor, "RenderEncoder without a pass descriptor");
     // Experiment bit MtlNoHold switches holding off while the game runs (taken at a pass begin).
     hold_passes = hold_env && !BbToggle::Experiment(BbToggle::MtlNoHold);
@@ -468,6 +474,7 @@ u32 Scheduler::ContinuationBlockers() const noexcept {
 }
 
 bool Scheduler::ContinueDepthLayout(const VideoCore::RenderState& next) {
+    InvalidatePreparedCompute();
     if (!PassContinuation::DepthLayoutEnabled() || ContinuationBlockers() ||
         !commands.CanContinueDepthLayout() ||
         !PassContinuation::DepthLayoutWritePromotion(*render_state, next)) return false;
@@ -493,6 +500,7 @@ bool Scheduler::ContinueDepthLayout(const VideoCore::RenderState& next) {
 }
 
 bool Scheduler::ContinueConsumedClear(const VideoCore::RenderState& next) {
+    InvalidatePreparedCompute();
     if (!PassContinuation::Enabled() || !commands_active || !OpenRenderState() ||
         !commands.CanContinueConsumedClear() || commands.HasBarrier() || need_fence_wait || hoisting || hoisted ||
         render_tail_pending || running_render_tail || impl->pending_clears || impl->folded_clears ||
@@ -506,6 +514,7 @@ bool Scheduler::ContinueConsumedClear(const VideoCore::RenderState& next) {
 }
 
 void Scheduler::RequireGuestRender() {
+    InvalidatePreparedCompute();
     commands.InvalidateConsumedClear();
     if(!PreciseHostResidency())return;
     if(holding) {held_bound_only=false;return;}
@@ -516,6 +525,7 @@ void Scheduler::RequireGuestRender() {
 }
 
 void Scheduler::ReleaseHeldPass() {
+    InvalidatePreparedCompute();
     JoinReplay();
     if (!holding) {
         return;
@@ -667,6 +677,7 @@ void Scheduler::ReplayThread(std::stop_token stoken) {
 }
 
 void Scheduler::ComputeEncoder(const char* label, bool bound_only) {
+    InvalidatePreparedCompute();
     JoinReplay();
     if (holding && hoisting) {
         RestoreFoldedClears(); // a dispatch may read ANY queued color, including indirect aliases
@@ -694,6 +705,7 @@ void Scheduler::ComputeEncoder(const char* label, bool bound_only) {
 }
 
 void Scheduler::BlitEncoder(const char* label) {
+    InvalidatePreparedCompute();
     JoinReplay();
     if (open_encoder != EncoderKind::Blit) {
         BeginEncoder(EncoderKind::Blit, nullptr);
@@ -704,6 +716,7 @@ void Scheduler::BlitEncoder(const char* label) {
 }
 
 bool Scheduler::QueueColorClear(void* handle, const std::array<double,4>& color) {
+    InvalidatePreparedCompute();
     static const bool enabled=[]{const char* v=std::getenv("BB_MTL_BATCH_CLEARS");return v&&v[0]=='1';}();
     if(!enabled)return false;
     id<MTLTexture> texture=(__bridge id<MTLTexture>)handle;
@@ -832,6 +845,7 @@ void Scheduler::FlushColorClears() {
 }
 
 void Scheduler::EndEncoder() {
+    InvalidatePreparedCompute();
     JoinReplay();
     FlushColorClears();
     if (open_encoder != EncoderKind::None) {
@@ -904,6 +918,7 @@ void Scheduler::CloseNative(EncoderKind kind) {
 }
 
 void Scheduler::EndRendering() {
+    InvalidatePreparedCompute();
     if(VideoCore::FrameCapture::NativeMode()&&VideoCore::FrameCapture::Active())JoinReplay();
     if (open_encoder == EncoderKind::Render || impl->pending_clears) {
         EndEncoder();
@@ -911,6 +926,7 @@ void Scheduler::EndRendering() {
 }
 
 void Scheduler::BeginOrderedHostCompute(const char* label) {
+    InvalidatePreparedCompute();
     EndRendering();
     FlushRenderTail();
     JoinReplay(); // query count/scales may have been produced on the replay thread
@@ -919,6 +935,7 @@ void Scheduler::BeginOrderedHostCompute(const char* label) {
 }
 
 void Scheduler::OrderAfterHostCompute() {
+    InvalidatePreparedCompute();
     ASSERT_MSG(open_encoder == EncoderKind::Compute && !holding,
                "Ordered host compute requires an unheld compute encoder");
     MemoryBarrier();
@@ -926,6 +943,7 @@ void Scheduler::OrderAfterHostCompute() {
 }
 
 void Scheduler::MemoryBarrier() {
+    InvalidatePreparedCompute();
     if(VideoCore::FrameCapture::NativeRecording())VideoCore::FrameCapture::Native(std::format("{{\"op\":\"barrier\",\"kind\":{},\"holding\":{},\"hoisting\":{}}}",unsigned(open_encoder),holding?"true":"false",hoisting?"true":"false"));
     impl->profile->Barrier();
     if(impl->pending_clears) {
@@ -979,6 +997,7 @@ void Scheduler::MemoryBarrier() {
 }
 
 void Scheduler::PushDebugGroup(const char* group) {
+    InvalidatePreparedCompute();
     if (!labels_enabled) {
         return;
     }
@@ -1001,6 +1020,7 @@ void Scheduler::PushDebugGroup(const char* group) {
 }
 
 void Scheduler::PopDebugGroup() {
+    InvalidatePreparedCompute();
     if (!labels_enabled || debug_groups.empty()) {
         return;
     }
@@ -1022,6 +1042,7 @@ void Scheduler::PopDebugGroup() {
 }
 
 void Scheduler::InsertDebugSignpost(const char* text) {
+    InvalidatePreparedCompute();
     if (!labels_enabled) {
         return;
     }
@@ -1051,6 +1072,7 @@ void Scheduler::InsertDebugSignpost(const char* text) {
 }
 
 void Scheduler::LabelEncoder(const char* text) {
+    InvalidatePreparedCompute();
     if (!pass_labels) {
         return;
     }
@@ -1094,6 +1116,7 @@ void AdvanceTo(std::atomic<u64>& counter, u64 value) {
 } // namespace
 
 void Scheduler::SetSubmitCallback(VideoCore::SubmitFunc&& callback) {
+    InvalidatePreparedCompute();
     on_submit = std::move(callback);
 }
 
@@ -1114,6 +1137,7 @@ void Scheduler::ReportStuck(const char* where) {
 }
 
 void Scheduler::Flush() {
+    InvalidatePreparedCompute();
     JoinReplay();
     if (on_submit && !in_submit_callback) {
         // The rasterizer flushes its barriers and hands the queue operations that go out with the
@@ -1323,4 +1347,29 @@ void Scheduler::ReportFailure(u64 tick, const std::string& label, const std::str
     ASSERT_MSG(false, "GPU lost during submit: {}", report);
 }
 
+} // namespace Metal
+
+namespace Metal {
+std::optional<Scheduler::PreparedComputeStamp> Scheduler::ArmPreparedCompute() noexcept {
+    if(HasPreparedCompute() || holding || hoisting || hoisted || render_tail_pending ||
+       open_encoder!=EncoderKind::Compute || !impl->compute || !impl->cmdbuf) return {};
+    const auto epoch=prepared_epoch.fetch_add(1,std::memory_order_relaxed)+1;
+    PreparedComputeStamp stamp{epoch,CurrentTick(),(__bridge void*)impl->compute,
+        (__bridge void*)impl->cmdbuf,std::this_thread::get_id()};
+    prepared_armed.store(true,std::memory_order_release);
+    return stamp;
+}
+bool Scheduler::ConsumePreparedCompute(const PreparedComputeStamp& s) noexcept {
+    if(s.thread!=std::this_thread::get_id() || s.tick!=CurrentTick() ||
+       s.epoch!=prepared_epoch.load(std::memory_order_acquire) || holding || hoisting || hoisted ||
+       render_tail_pending || open_encoder!=EncoderKind::Compute ||
+       s.encoder!=(__bridge void*)impl->compute || s.command_buffer!=(__bridge void*)impl->cmdbuf)
+        return false;
+    bool expected=true;
+    return prepared_armed.compare_exchange_strong(expected,false,std::memory_order_acq_rel);
+}
+void Scheduler::CancelPreparedCompute(const PreparedComputeStamp& s) noexcept {
+    if(s.epoch==prepared_epoch.load(std::memory_order_acquire))
+        prepared_armed.store(false,std::memory_order_release);
+}
 } // namespace Metal

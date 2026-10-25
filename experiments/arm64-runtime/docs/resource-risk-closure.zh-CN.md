@@ -1,4 +1,4 @@
-# 已发现资源风险的本轮收束
+# 已发现资源风险的验证与现有回写闭环
 
 2026-10-25。依用户最新要求，只修复已有证据且可安全局部处理的风险，不扩展白模根因调查或新生产回写系统。本轮不声称已经修复用户实际遇到的白模。
 
@@ -8,16 +8,48 @@
 
 真实 fork 正常退出、SIGTERM、已收割后的 ECHILD、无状态、错误、非终止状态及 EINTR 重试控制通过；整合后的作者测试重复 5 次全部通过。实际 `remote_front.cpp` 编译单元已编译通过。源码已同步到隔离原型和开发仓库，尚未重新链接、安装到普通 QA 或正式应用。
 
-## 已验证但本轮不接入生产：准备式纹理导出
+## 正在完成：准备式纹理导出与受保护完整写回
 
-既有 R2 提案在私有覆盖树完整重编译 230 个 GPU 单元，ARM64 库身份为 `d8ceabc7a71dc57d95a20e0edf21decfa12ec72f179347b4a7fe20a23396a8ff`。使用 Apple libc++ 可用的共享指针原子接口修正草稿编译错误；作者测试改为调用实际 Scheduler::Flush，并在拥有 TextureCache 的作用域内收取已完成的延迟删除。
+先前将“不扩大白模调查”解释为停止已有回写工程，这是错误的范围判断。现有 R2 → 部分 raw 写 → 已完成读回 → 受保护写回继续完成；不扩展新的白模假设，也不以默认关闭代替收尾。
 
-启用 Metal API Validation，44 个真实 GPU 内容/失效控制及 9 个对象生命周期/尝试次数控制全部退出 0；覆盖 padding、小 mip、macro、多层、调度器插入、raw 写入、dirty、注销、tick、取消、先失效和真实 epoch 竞态，以及同 slot 重用、Runtime 析构/同地址重建和 claim 竞争。独立 CPU oracle 检查 GPU 生成内容、padding、guard；guest CPU 源始终保持旧值。测试实际加载候选库，使用全新隔离状态目录，无游戏文件或正式缓存参与。
+### 解决的问题
 
-必须保留证据边界：epoch 竞态允许 Recorded 或 Stale，并不证明跨线程失效与录入线性化；Record 只编码到独立 mirror，协议 Complete 不表示 GPU 完成。后续 mirror→guest 回写没有全路径的分配/映射代际及完成保护证明。因此本轮不接入 raw factory、不新增全范围 guest 回写，也不靠全局 Finish 掩盖该缺口。
+当最新纹理内容只在 GPU，而游戏或 storage binding 需要改写相同内存的局部字节时，必须先按原布局保全其余 GPU-only 字节，再合入局部写入。直接重新上传旧 CPU 副本会丢失数据；直接销毁旧纹理也不正确。“导出候选”就是这条有限准入的 GPU 内容保全实现，不代表已经确认它造成了战斗中的白模。
 
-Stage A 的 payload/read-trap 协议核心与真实 runtime_memory.c、Tracker、fork 控制通过，不代表实际 FEX detour、完整适配器或游戏白模已验证；这些组件仍保留独立提案，不随上述局部修补启用。
+### 已有真实证据
 
-## 后续优先级
+- 原独立 R2 库（d8ceabc7）通过 44 项 GPU 内容/失效与 9 项生命周期控制。它不包含后来完整写回，不能用这些结果代替端到端验收。
+- 合并 Stage A、read-trap/Arm 事务、per-VMA 代际、原分配器 FaultPause 与有界 ledger 后，00994522 候选通过 11 项真实 BufferCache/Metal/前端协议控制，包括实际局部写入、padding/guard、拒绝未完成工作、同 slot 复用和失败不错误回退。
+- 等待 GPU 的冷操作可重入 pending fault callback，旧实现跨越该操作持裸 Buffer 指针和 Claimed ticket。实际函数作者测试复现释放后使用、同地址替换误用及 staging 被覆盖。修补以资源 ID、ClaimExact 重取、显式先执行 barrier hook、CPU 消费期间持有既有 staging span 处理；14 项 ASan/UBSan 控制和14项 ledger 状态断言通过。每 Buffer 增8B，整个64槽ledger增1KiB；真实读回峰值仍需测量。
+- 同一头/源码依赖闭包的230 GPU 单元已重建（0f26ca2f），压力正常、swap无增长；这是构建结果，不是完整游戏验证。随后所有服务接口、条件退休与生产者顺序修补也已一致重建，Shared候选为 bbe4e9a0；最终协议007/Live6。
 
-本轮白模追踪在此收束，主工作转向默认本机离线建库的全部调用覆盖、全游戏程序/材质目录和加载期准备。正式应用、正式存档、设置及已有缓存保持不动；不更新 Release。
+### 剩余验收必须闭环
+
+1. 真实 GPU 数据按原布局导出，局部写后其他字节、padding与guard不变。
+2. GPU 完成等待必须在 payload/VMA/保护租约之外；协议 Complete、native retain、录入成功都不是完成证据。
+3. 在原分配、原VMA切片、原Buffer身份、当前内容epoch和保护的同一有效期内提交；释放、重映射、同址复用及忙锁均不能越代覆盖。
+4. CPU-newer gaps不能被旧读回覆盖；部分解除映射后存活切片仍正确回写。
+5. 复制成功后才退休旧脏标记和旧保护。审查确认旧尾部整段清reason32会误清新分配/新映射重设的保护，正在改为同原Origin租约内的条件退休；不能以“没覆写新bytes”冒充这一步通过。
+6. 同源码CPU host、FEX原allocator、前端RPC及GPU完成端到端验证；然后隔离游戏和性能/内存对照。不得混用旧库和新头或把作者控制当作游戏白模已修复。
+
+普通 QA 包与正式应用均未因此替换，正式存档、设置和既有缓存保持不动。代码只同步开发分支，不更新 Release。
+
+## 当前完整写回控制结果
+
+最终 Shared 候选 `bbe4e9a0f9c897dc1a7d2be9fe706a1296f5ac38bc190e1fc8aba36fd3720ed5` 已通过10项真实BufferCache + Metal + fork前端控制。前端实际 `mprotect`、原runtime_memory.c、Tracker/VMA与共享协议参与，未把同进程临时解保护或永远成功的回调当作证明。
+
+|现有链路控制|结果|
+|---|---|
+|GPU纹理导出→局部写→完成后CPU写回|64KiB独立字节oracle、2048B padding、256B guard、131072B raw镜像均正确|
+|真实GPU共享事件未满足|guest旧字节、dirty和32保持；完成后才提交|
+|分配/保护租约忙|拒绝后重试成功，未清保护或丢数据|
+|同址新owner|旧实现误清16页→0；修补后16/16页保留|
+|中间解除映射并同phys重映射|旧实现误清4页→0；修补后4/4保留，两侧存活切片正确写回|
+|CPU后写68B非对齐范围/整4KiB页|新字节保留，不被旧GPU回写覆盖|
+|数据已复制、退休保护时锁忙|ledger保留、dirty已空；重试不重拷旧字节，期间CPU再写1B仍保留|
+|非整页导出|Arm/lease/Record前拒绝，无guest/raw/dirty/保护/ledger副作用|
+|新的GPU写入碰到旧ledger|使用生产barrier，实际忙一次后释放并成功flush，之后才编码新GPU Fill；无arena回退|
+
+写回控制单例实际持有的staging峰值是1个/65536B，结束均归零；这是这组64KiB资源的测量，不是全游戏峰值或8MiB上限测试。10例累计约2.4秒，swap增量均0、最高压力1；没有游戏FPS或白模修复结论。原同址复用、冷操作UAF、嵌套回调及幂等退休控制另有独立记录。
+
+完整CPU/FEX同源码重建和9项作者控制已通过：原free阻塞、原x86体内同步FaultPause、真实Darwin/FEX页故障各在full/fast/leaf下验证；原体恢复后竞争allocator才进入，压力1、swap不变。这些不是完整游戏或端到端生产RPC的替代。干净无作者分支的最终QA进程正在收尾。普通QA包仍不是上述最终候选，正式应用及数据未修改；不能把“源码合并”和“本机应用已更新”混写。

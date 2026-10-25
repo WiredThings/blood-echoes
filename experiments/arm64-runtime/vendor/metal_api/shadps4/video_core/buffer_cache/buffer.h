@@ -6,6 +6,7 @@
 #include <atomic>
 #include <bit>
 #include <cstddef>
+#include <cstdlib>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -132,6 +133,19 @@ struct Buffer {
         return addr >= cpu_addr && addr + size <= cpu_addr + SizeBytes();
     }
 
+    // Native resource lifetime, separate from its reusable wrapper/native address.
+    // Default Buffer move carries this identity with the moved UniqueBuffer.
+    struct LifetimeIdentity {
+        static u64 Allocate(std::atomic<u64>& counter) noexcept {
+            const u64 value = counter.fetch_add(1, std::memory_order_relaxed);
+            if (!value) std::abort(); // wrap cannot authorize an ABA identity
+            return value;
+        }
+        inline static std::atomic<u64> next{1};
+        u64 value = Allocate(next);
+    };
+    [[nodiscard]] u64 Identity() const noexcept { return lifetime_identity.value; }
+
     [[nodiscard]] VAddr CpuAddr() const noexcept {
         return cpu_addr;
     }
@@ -172,6 +186,7 @@ struct Buffer {
     bool is_coherent{};
     MemoryType mem_type{MemoryType::DeviceLocal};
     UniqueBuffer buffer;
+    LifetimeIdentity lifetime_identity;
 };
 
 struct StreamBuffer : public Buffer {

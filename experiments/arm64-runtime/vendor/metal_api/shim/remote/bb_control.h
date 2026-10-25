@@ -10,6 +10,7 @@
 
 #include "remote/bb_channel.h"
 #include "remote/bb_lifetime.h"
+#include "remote/bb_live_payload.h"
 
 namespace BbRemote {
 
@@ -40,6 +41,8 @@ struct ControlBlock {
     ChannelLayout protect;
     alignas(4096) SharedState state;
     alignas(4096) LifetimeShared lifetime;
+    // Appended, old Released fields retain their meaning and offsets.
+    alignas(64) LivePayloadShared live_payload;
 };
 static_assert(sizeof(ControlBlock) <= ControlBytes);
 static_assert(ControlBytes % 16384 == 0 && HostSpanBytes % 16384 == 0);

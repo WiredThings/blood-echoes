@@ -10,7 +10,9 @@
 #include <cstdlib>
 #include <magic_enum/magic_enum.hpp>
 #include "bbport_copy.h"
+#include "remote/bb_remote.h"
 #include "bbport_toggles.h"
+#include "runtime_exit_codes.h"
 #include "bbport_flush_reason.h"
 #include "bbport_sections.h"
 #include "bbport_free_check.h"
@@ -101,6 +103,16 @@ struct GpuWriteTicks {
                 }
             }
             leaf[page & LeafMask].store(tick, std::memory_order_release);
+        }
+    }
+    void Prepare(u64 address,u64 size) {
+        if(!size||(address+size-1)>>AddressBits)return;
+        auto& table=size<=FineLimit?fine:coarse;
+        for(u64 page=address>>table.shift;page<=(address+size-1)>>table.shift;++page){
+            if(table.Leaf(page))continue;
+            std::scoped_lock lk{mutex};
+            if(!table.Leaf(page))table.leaves[page>>LeafBits].store(
+                new std::atomic<u64>[1ull<<LeafBits]{},std::memory_order_release);
         }
     }
     /// The newest write tick in the range, 0 when none is known.
@@ -614,17 +626,24 @@ bool BufferCache::LayerReadTrapHit(VAddr address, bool assume_locks) {
     }
     layer_read_trap_hits.fetch_add(1, std::memory_order_relaxed);
     if (assume_locks) {
-        LayerCopyBackForCpu(address);
-    } else {
-        liverpool->SendCommand<true>([this, address] { LayerCopyBackForCpu(address); });
+        return LayerCopyBackForCpu(address);
     }
-    return true;
+    bool handled=false;
+    liverpool->SendCommand<true>([this,address,&handled] {handled=LayerCopyBackForCpu(address);});
+    return handled;
 }
 
-void BufferCache::LayerCopyBackForCpu(VAddr address) {
+bool BufferCache::LayerCopyBackForCpu(VAddr address) {
     if (!(BbLayer::WriteTraps::Reasons(address) & BbLayer::WriteTraps::VramData)) {
-        return; // copied back meanwhile
+        return true; // copied back meanwhile
     }
+    const VAddr preserved_from=Common::AlignDown(address,block_size);
+    bool touched_preserved=false;
+    if(!TryFlushPreservedWritebacks(preserved_from,block_size,&touched_preserved))return false;
+    // This invocation belongs to the old preserved transaction. A replacement
+    // owner's reason32 must survive it: if still protected, the CPU retries and
+    // the next fault starts the current owner's ordinary transaction afresh.
+    if(touched_preserved||!(BbLayer::WriteTraps::Reasons(address)&BbLayer::WriteTraps::VramData))return true;
     // The GPU's data in the block's VRAM copy (one readback for the block, not for each page),
     // once the GPU has written it: on the readback queue, without waiting for the queued frames.
     const VAddr from = Common::AlignDown(address, block_size);
@@ -672,9 +691,14 @@ void BufferCache::LayerCopyBackForCpu(VAddr address) {
     std::scoped_lock lk{layer_read_trap_mutex};
     BbLayer::WriteTraps::Set(from, block_size, BbLayer::WriteTraps::VramData, false);
     layer_read_trapped.Subtract(from, block_size);
+    return true;
 }
 
 void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 size) {
+    if(!TryFlushPreservedWritebacks(device_addr,size)) {
+        std::fputs("ARM preserved writeback incomplete before legacy download; data retained\n",stderr);
+        std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+    }
     boost::container::small_vector<vk::BufferCopy, 1> copies;
     u64 total_size_bytes = 0;
     const VAddr arena_base = arena->cpu_addr;
@@ -2910,6 +2934,11 @@ void BufferCache::Maintain() {
 }
 
 void BufferCache::ProcessPendingUnmaps() {
+    auto preserved_owner=preserved_writebacks.TryAcquire();
+    if(preserved_writebacks.Count()&&!preserved_owner) {
+        std::fputs("ARM preserved unmap owner is still active; data retained\n",stderr);
+        std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+    }
     if (!unmaps_pending.load(std::memory_order_acquire)) {
         return;
     }
@@ -2919,9 +2948,25 @@ void BufferCache::ProcessPendingUnmaps() {
         unmaps.swap(pending_unmaps);
         unmaps_pending.store(false, std::memory_order_release);
     }
+    // These ordered notifications prove the removed byte slices are dead. Do
+    // this for all queued events first, so a later event is not mistaken for an
+    // unexplained gap while flushing survivors of the first event.
+    if(preserved_writebacks.Count())for(const auto&[addr,size]:unmaps){
+        gpu_modified_ranges.Subtract(addr,size);
+        memory_tracker->UnmarkRegionAsGpuModified(addr,size);
+    }
     // The blocks bound to memory the game no longer maps there: unbound, and bound again (to
     // whatever is mapped then) when next used. Partly unmapped blocks go too.
     for (const auto& [addr, size] : unmaps) {
+        // Actual ordered unmap retires only its exact byte range. Surviving
+        // slices must be written back under the original mapping identity before
+        // the existing block-granularity demotion can discard the mirror.
+        const u64 touched_first=addr>>block_shift;
+        const u64 touched_end=(addr+size+block_size-1)>>block_shift;
+        if(!TryFlushPreservedWritebacks(touched_first<<block_shift,(touched_end-touched_first)<<block_shift)) {
+            std::fputs("ARM surviving unmap slices need writeback retry; data retained\n",stderr);
+            std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+        }
         const u64 first = addr >> block_shift, end = (addr + size + block_size - 1) >> block_shift;
         IntervalList<> unbind;
         if (LayerMode()) {
@@ -3513,3 +3558,161 @@ bool BufferCache::VramPromotionsPaused() {
     return full;
 }
 } // namespace VideoCore
+
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Included by buffer_cache.cpp, after GpuWriteTicks and TextureCache definitions.
+namespace VideoCore {
+BufferCache::RawPrewriteResult BufferCache::PrepareImageAliasesForRawWrite(
+    VAddr at,u64 bytes,const Buffer* raw,u64 binding_offset) {
+    static const bool on=[] {const char* e=std::getenv("BB_ARM_RAW_PREWRITE");return e&&e[0]=='1';}();
+    if(!on||!BbRemote::BackActive()||!LayerMode()||!LayerReadTrapsOn())return RawPrewriteResult::Legacy;
+    return PrepareImageAliasesForRawWriteWithLease(at,bytes,raw,binding_offset,
+        BbRemote::Back::WithProtectedLivePayload,
+        BbRemote::Back::ArmRead,BbRemote::Back::FinishReadArm);
+}
+
+BufferCache::RawPrewriteResult BufferCache::PrepareImageAliasesForRawWriteWithLease(
+    VAddr at,u64 bytes,const Buffer* raw,u64 binding_offset,
+    const RawLiveLease& lease,const RawArmRead& arm,const RawFinishArm& finish) {
+    using Result=RawPrewriteResult;
+    if(!lease||!arm||!finish||!raw||!bytes||at>UINT64_MAX-bytes)return Result::Legacy;
+    const auto binding_mirror=BbLayer::GpuMemory::Get().SnapshotStableMirror(at,bytes);
+    if(!binding_mirror||binding_mirror->source.owner!=raw)return Result::Legacy;
+    const auto binding_still_live=[&]{const auto now=BbLayer::GpuMemory::Get().SnapshotStableMirror(at,bytes);
+        return now&&now->source_version==binding_mirror->source_version&&now->valid_version==binding_mirror->valid_version&&
+            PreservedWritebackLedger::SameMirror(now->source,binding_mirror->source);};
+    // Join preparation before entering the cache, never wait for it under a
+    // payload or cache lease. R2 repeats the hook only after releasing inputs.
+    Maintain(); // pending old unmap/fresh events cannot retire a new ticket later
+    backend.BeforeImageAccess();
+    if(!binding_still_live())return Result::Rebind;
+    std::unique_lock cache{texture_cache.mutex};
+    constexpr size_t MaxOverlaps=64;
+    struct Ref {ImageId id;u64 uid;};
+    std::array<Ref,MaxOverlaps> overlaps{};size_t count=0;
+    Image* source=nullptr;ImageId source_id{};bool ambiguous=false;
+    texture_cache.ForEachImageInRegion(at,bytes,[&](ImageId id,Image& image){
+        if(True(image.flags&ImageFlagBits::GpuModified)){
+            if(source||!image.SafeToDownload()){ambiguous=true;return true;}
+            source=&image;source_id=id;
+        }
+        return false;
+    });
+    if(!source||ambiguous||!source->original_payload_origin||!source->backing||
+       source->backing->image.native!=source->original_payload_native||source->backing->retired||
+       !backend.CanPrepareExactImageExport(*source))return Result::Legacy;
+    const auto begin=source->info.guest_address;const u64 size=source->info.guest_size;
+    // Whole protection pages must be owned by this export. Reject unsupported
+    // edges before any cold preparation/Arm/Record; legacy remains authoritative.
+    if((begin&4095)||(size&4095)||!size||size>(8ull<<20)||begin>UINT64_MAX-size||at<begin||bytes>begin+size-at||
+       begin<raw->CpuAddr())return Result::Legacy;
+    const u64 offset=begin-raw->CpuAddr();
+    if(offset>raw->SizeBytes()||size>raw->SizeBytes()-offset||
+       at-begin>UINT64_MAX-offset||binding_offset!=offset+(at-begin))return Result::Legacy;
+    const auto mirror=BbLayer::GpuMemory::Get().SnapshotStableMirror(begin,size);
+    if(!mirror||mirror->source.owner!=raw||mirror->source.handle!=raw->LayerHandle()||
+       mirror->source.base!=raw->CpuAddr()||mirror->source.size!=raw->SizeBytes())return Result::Legacy;
+    // Enumerate ALL full-export overlaps now; no allocating visitor runs after
+    // GPU recording. A second GPU-authoritative alias is never resolved by order.
+    texture_cache.ForEachImageInRegion(begin,size,[&](ImageId id,Image& image){
+        if(count==MaxOverlaps){ambiguous=true;return true;}
+        if(id!=source_id&&True(image.flags&ImageFlagBits::GpuModified)){ambiguous=true;return true;}
+        overlaps[count++]={id,image.image_uid};return false;
+    });
+    if(ambiguous)return Result::Legacy;
+    const auto uid=source->image_uid,registry=texture_cache.RegistryGeneration();
+    const auto origin=source->original_payload_origin;
+    const auto* native=source->original_payload_native;
+    const auto* backing=source->backing;
+    const auto flags=source->flags;
+    std::array<unsigned char,sizeof(ImageInfo)> info{};
+    memcpy(info.data(),&source->info,info.size());
+    auto token=texture_cache.tile_manager.PrepareExactImageExport(*source,raw,offset,
+        [&]{cache.unlock();});
+    // Early validation failures retain the lock; a prepared attempt released it
+    // before hooks/driver work. All caller slot accesses below require re-lock.
+    if(cache.owns_lock())cache.unlock();
+    if(!token)return binding_still_live()?Result::Legacy:Result::Rebind;
+    ProcessPendingUnmaps();ProcessPendingAssets();
+    if(!binding_still_live())return Result::Rebind;
+    const u64 tick=backend.CurrentTick();
+    // Cold metadata allocations precede Record. Failure cannot mark a fake write.
+    RangeSet committed_ranges=gpu_modified_ranges;committed_ranges.Add(begin,size);
+    WriteTicks().Prepare(begin,size);
+    const auto epoch=read_source_epoch.load(std::memory_order_acquire);
+    // Prepare an interval-set replacement cold, then prove it is still the same
+    // under a try-lock at Record. No interval allocation under frontend leases.
+    RangeSet old_traps,new_traps;
+    {std::scoped_lock held{layer_read_trap_mutex};old_traps=layer_read_trapped;new_traps=old_traps;}
+    new_traps.Add(Common::AlignDown(begin,u64(4096)),Common::AlignUp(begin+size,u64(4096))-Common::AlignDown(begin,u64(4096)));
+    std::optional<PreservedWritebackLedger::Ticket> ticket;
+    bool recorded=false;
+    // Construct callbacks before asking the frontend for ownership/protection.
+    const std::function<bool(const BbLayer::Span&)> commit=[&](const BbLayer::Span& span){
+        if(span.source->owner!=raw||span.source->handle!=mirror->source.handle||span.offset!=offset||
+           span.va!=begin||span.size!=size)return false;
+        // StableMirror already verified full-image AllValid while holding its
+        // shared lock. Do NOT reenter MarkValid (a unique-lock deadlock).
+        if(token->Record()!=ExactImageExportResult::Recorded)return false;
+        recorded=true;
+        // Past this point no legacy fallback is legal. Container nodes and tick
+        // leaves are ready; the fixed overlap list needs no new enumeration.
+        try {
+            gpu_modified_ranges.m_ranges_set.swap(committed_ranges.m_ranges_set);
+            NoteWriteTick(begin,size);DropShadows(begin,size);
+            for(size_t i=0;i<count;++i){auto& image=texture_cache.slot_images[overlaps[i].id];
+                image.flags|=ImageFlagBits::GpuDirty;
+                backend.InvalidatePreparedImageExport(image.image_uid);
+            }
+            layer_read_trapped.m_ranges_set.swap(new_traps.m_ranges_set);
+            preserved_writebacks.CommitRecorded(*ticket);
+        }catch(...){std::terminate();}
+        return true;
+    };
+    const RawLiveBody protected_commit=[&](const BbRemote::LivePayloadReceipt& receipt){
+        if(receipt.owner!=origin.owner||!BbPayload::SameMapping(receipt.mapping,origin.mapping)||
+           receipt.address!=begin||receipt.size!=size||receipt.protected_reasons!=32)return false;
+        std::unique_lock held{texture_cache.mutex,std::try_to_lock};
+        if(!held.owns_lock()||texture_cache.RegistryGeneration()!=registry||
+           read_source_epoch.load(std::memory_order_acquire)!=epoch||backend.CurrentTick()!=tick)return false;
+        std::unique_lock trap_held{layer_read_trap_mutex,std::try_to_lock};
+        if(!trap_held.owns_lock()||layer_read_trapped.m_ranges_set!=old_traps.m_ranges_set)return false;
+        auto* image=texture_cache.TryGetImage(source_id,uid);
+        if(!image||image->flags!=flags||image->backing!=backing||!image->backing||image->backing->retired||
+           image->backing->image.native!=native||image->original_payload_native!=native||
+           image->original_payload_origin.owner!=origin.owner||
+           !BbPayload::SameMapping(image->original_payload_origin.mapping,origin.mapping)||
+           memcmp(info.data(),&image->info,info.size()))return false;
+        for(size_t i=0;i<count;++i)if(!texture_cache.TryGetImage(overlaps[i].id,overlaps[i].uid))return false;
+        return BbLayer::GpuMemory::Get().WithStableMirror(*mirror,commit);
+    };
+    auto owner=preserved_writebacks.TryAcquire();
+    if(!owner)return Result::Legacy;
+    ticket=preserved_writebacks.Reserve({origin,*mirror,begin,size,tick,raw->Identity()});
+    if(!ticket)return binding_still_live()?Result::Legacy:Result::Rebind;
+    RuntimeReadArmReceipt armed{};
+    // All R2 hooks, driver work and metadata allocations are over. Reserved
+    // ledger entries now make concurrent CPU readback return pending, never
+    // clearing the trap before raw data exists.
+    try {
+        if(!arm(RuntimeReadArmArgs{origin.mapping,begin,size},armed)){
+            preserved_writebacks.Cancel(*ticket);return binding_still_live()?Result::Legacy:Result::Rebind;}
+        (void)lease(origin,begin,size,protected_commit);
+    }catch(...){
+        if(recorded)std::terminate();
+        if(armed.token){RuntimeReadArmReceipt restored{};if(!finish(armed.token,false,restored))std::terminate();}
+        preserved_writebacks.Cancel(*ticket);throw;
+    }
+    // RPC is after the frontend export lease, never under trap/cache/mirror
+    // ownership. Failed early candidates undo only newly armed unsuperseded32.
+    RuntimeReadArmReceipt final{};
+    if(!finish(armed.token,recorded,final))std::terminate();
+    if(!recorded){preserved_writebacks.Cancel(*ticket);return binding_still_live()?Result::Legacy:Result::Rebind;}
+    // A transport completion failure after actual encoding cannot turn this
+    // into a legacy replay. Provenance was committed; normal peer-death policy
+    // and the separate GPU-completed writeback ledger own subsequent handling.
+    return Result::Recorded;
+}
+} // namespace VideoCore
+
+#include "video_core/buffer_cache/buffer_cache_preserved.inc"
