@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -67,6 +68,13 @@ struct Resolution {
 /// end of the mapping (one physically contiguous run) it lies in. False: not direct memory.
 using GuestTranslate = bool (*)(std::uint64_t va, std::uint64_t* phys, std::uint64_t* end);
 
+// Owned value, never a borrowed pointer into mirrors. Every source mutation and
+// every valid-range mutation participates in the lease identity.
+struct StableMirrorSnapshot {
+    MemorySource source;
+    std::uint64_t va{}, size{}, source_version{}, valid_version{};
+};
+
 class GpuMemory {
 public:
     static GpuMemory& Get();
@@ -97,6 +105,16 @@ public:
 
     /// Where [va, va + size) is: in place, in one mirror, or mixed (see Resolution).
     Resolution Resolve(std::uint64_t va, std::uint64_t size) const;
+
+    // No promotion, arena allocation, or guest copy. Complete single-mirror only.
+    std::optional<StableMirrorSnapshot> SnapshotStableMirror(std::uint64_t va,
+                                                            std::uint64_t size) const;
+    // Nonblocking read lease. callback MUST NOT reenter GpuMemory or request
+    // protection/IPC, compile pipelines, wait for GPU, or mutate mappings.
+    // Span::source lives only for the callback. This lease protects registration,
+    // not the native object or allocator payload owned outside this table.
+    bool WithStableMirror(const StableMirrorSnapshot& expected,
+                          const std::function<bool(const Span&)>& callback) const;
 
     // --- Mirrors (VRAM copies). The caller allocates and frees their buffers; the module keeps
     // which guest range each covers and which blocks hold current data. ---
@@ -176,6 +194,7 @@ private:
 
     mutable std::shared_mutex mirror_mutex;
     std::atomic<std::uint64_t> valid_version{0};
+    std::uint64_t source_version{}; // mirror_mutex; includes Add/Remove even at identical base
     std::map<std::uint64_t, MemorySource> mirrors;   ///< by start (guest address)
     std::map<std::uint64_t, std::uint64_t> valid;    ///< valid block runs: first -> end
     std::uint64_t valid_blocks = 0;

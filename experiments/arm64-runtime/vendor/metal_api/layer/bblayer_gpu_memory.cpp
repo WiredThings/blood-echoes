@@ -110,12 +110,14 @@ Resolution GpuMemory::Resolve(std::uint64_t va, std::uint64_t size) const {
 void GpuMemory::AddMirror(std::uint64_t start, std::uint64_t size, std::uint64_t handle,
                           std::uint64_t device_address, void* owner) {
     std::unique_lock lk{mirror_mutex};
+    ++source_version;
     mirrors[start] = MemorySource{MemorySource::Kind::Mirror, start, size, handle, device_address,
                                   owner};
 }
 
 void GpuMemory::RemoveMirror(std::uint64_t start) {
     std::unique_lock lk{mirror_mutex};
+    ++source_version;
     mirrors.erase(start);
 }
 
@@ -231,4 +233,39 @@ std::uint64_t GpuMemory::ValidBytes() const {
     return valid_blocks << block_shift;
 }
 
+} // namespace BbLayer
+
+namespace BbLayer {
+std::optional<StableMirrorSnapshot> GpuMemory::SnapshotStableMirror(
+    std::uint64_t va, std::uint64_t size) const {
+    if (!size || size > UINT64_MAX-va) return std::nullopt;
+    std::shared_lock lk{mirror_mutex, std::try_to_lock};
+    if (!lk.owns_lock()) return std::nullopt;
+    auto it=mirrors.upper_bound(va);
+    if (it==mirrors.begin()) return std::nullopt;
+    const auto& m=(--it)->second;
+    if (va<m.base || va-m.base>m.size || size>m.size-(va-m.base) ||
+        !m.owner || !m.handle || !AllValidLocked(va>>block_shift,((va+size-1)>>block_shift)+1))
+        return std::nullopt;
+    return StableMirrorSnapshot{m,va,size,source_version,valid_version.load(std::memory_order_relaxed)};
+}
+bool GpuMemory::WithStableMirror(const StableMirrorSnapshot& e,
+    const std::function<bool(const Span&)>& callback) const {
+    if (!callback || e.source.kind!=MemorySource::Kind::Mirror ||
+        !e.size || e.size>UINT64_MAX-e.va) return false;
+    std::shared_lock lk{mirror_mutex,std::try_to_lock};
+    if (!lk.owns_lock() || source_version!=e.source_version ||
+        valid_version.load(std::memory_order_relaxed)!=e.valid_version) return false;
+    auto it=mirrors.find(e.source.base);
+    if (it==mirrors.end()) return false;
+    const auto& m=it->second;
+    if (m.kind!=MemorySource::Kind::Mirror || m.base!=e.source.base || m.size!=e.source.size ||
+        m.owner!=e.source.owner || m.handle!=e.source.handle ||
+        m.device_address!=e.source.device_address || e.va<m.base || e.va-m.base>m.size ||
+        e.size>m.size-(e.va-m.base) ||
+        !AllValidLocked(e.va>>block_shift,((e.va+e.size-1)>>block_shift)+1)) return false;
+    // Pass an owned stack copy; the protected table cannot remove/replace its owner.
+    const MemorySource owned=m;
+    return callback(Span{&owned,e.va-m.base,e.va,e.size});
+}
 } // namespace BbLayer

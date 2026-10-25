@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792917355673430000,
+  "created_ns": 1792917808603791000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -31109,11 +31109,11 @@
     },
     {
       "path": "vendor/metal_api/layer/bblayer_gpu_memory.cpp",
-      "sha256": "47c90aa55846dc5192873458f4cb298881e4b568f014926784033beca5b7faae"
+      "sha256": "b8344f836a6d1bf45525752546aaaebf2d926985842088335bdc650797eebef6"
     },
     {
       "path": "vendor/metal_api/layer/bblayer_gpu_memory.h",
-      "sha256": "b6911950ebb0360c70e029298e7e418508a0aca76cfd1553dc0b98e8608b0fe9"
+      "sha256": "14de97e9aae01d46b8f06622c41272ef75ad48f109a920ebc33a83ab46841a44"
     },
     {
       "path": "vendor/metal_api/layer/bblayer_write_traps.h",
@@ -39062,6 +39062,22 @@
     {
       "path": "docs/shader-guest-capture-validation.json",
       "sha256": "371832a9f29ed7022115f6a9e8bf91a013e2ae88ac8f384297ad5444deaf26ac"
+    },
+    {
+      "path": "tests/test_stable_mirror_lease.cpp",
+      "sha256": "b3aca95e5e6a2252c56e7f910a98cc73fe0e3a5ecf2cf08e513b68ad88d1bbdb"
+    },
+    {
+      "path": "tests/test_stable_mirror_lease.py",
+      "sha256": "2b3a7aa8044aab77d762e2403399636463d9568c7759f9a8e65326eae7a0348d"
+    },
+    {
+      "path": "docs/stable-mirror-validation.zh-CN.md",
+      "sha256": "26d48929ba9c82cfc48dadbedd7cbf399e0e41dcf782ec7afdeb29690ffe5b69"
+    },
+    {
+      "path": "docs/stable-mirror-validation.json",
+      "sha256": "b66700c7da376c8630b9b00b664f324c638cb42521e3a7ec73dffcae81d97b9d"
     }
   ],
   "excluded": [
@@ -39078,23 +39094,18 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "c2c5bdc1428cc816193e934276837c79452ee9ce",
+    "base": "734a34ce59174cd708f91f57456f475b5b928163",
     "paths": [
-      "vendor/metal_api/shadps4/common/guest_capture.h",
-      "vendor/metal_api/shadps4/video_core/amdgpu/shader_capture.h",
-      "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.h",
-      "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
-      "tests/metal/test_shader_guest_capture.mm",
-      "tools/build_first_upload_test.py",
-      "tests/test_shader_guest_capture.py",
-      "CURRENT-PLAN.zh-CN.md",
-      "NIGHT-HANDOFF.zh-CN.md",
-      "docs/shader-guest-capture-validation.zh-CN.md",
-      "docs/shader-guest-capture-validation.json"
+      "vendor/metal_api/layer/bblayer_gpu_memory.h",
+      "vendor/metal_api/layer/bblayer_gpu_memory.cpp",
+      "tests/test_stable_mirror_lease.cpp",
+      "tests/test_stable_mirror_lease.py",
+      "docs/stable-mirror-validation.zh-CN.md",
+      "docs/stable-mirror-validation.json"
     ],
     "excluded_parallel_drafts": [
+      "prepared exact export R2",
       "remaining speculative read set",
-      "prepared exact export",
       "module finalizer"
     ]
   }

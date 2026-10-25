@@ -1,0 +1,35 @@
+{
+  "status": "real-layer-controls-passed-GPU-rebuild-pending",
+  "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/stable-mirror-controls-1792917709586974000",
+  "result": {
+    "passed": true,
+    "game_started": false,
+    "GPU_started": false,
+    "physical_payload_bytes": 0,
+    "source_sha256": {
+      "tests/test_stable_mirror_lease.cpp": "b3aca95e5e6a2252c56e7f910a98cc73fe0e3a5ecf2cf08e513b68ad88d1bbdb",
+      "vendor/metal_api/layer/bblayer_gpu_memory.h": "14de97e9aae01d46b8f06622c41272ef75ad48f109a920ebc33a83ab46841a44",
+      "vendor/metal_api/layer/bblayer_gpu_memory.cpp": "b8344f836a6d1bf45525752546aaaebf2d926985842088335bdc650797eebef6"
+    },
+    "compile": [
+      "/usr/bin/clang++",
+      "-std=c++20",
+      "-arch",
+      "arm64",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-UNDEBUG",
+      "-pthread",
+      "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/metal_api/layer",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/tests/test_stable_mirror_lease.cpp",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/metal_api/layer/bblayer_gpu_memory.cpp",
+      "-o",
+      "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/stable-mirror-controls-1792917709586974000/test"
+    ],
+    "compile_exit": 0,
+    "run_exit": 0
+  },
+  "console": "PASS stable mirror controls=44 concurrent_accepted=503; table identity only, not payload or native lifetime\n"
+}

@@ -237,3 +237,10 @@ controls pass. Preparation uses bounded shader-header reads and POD fault leaves
 checked decoding rejects truncated owned inputs. The older SRT/fetch wide recovery
 region still needs replacement. No asynchronous first-miss compilation or performance
 improvement is claimed, and no game run or production update was performed.
+
+## Stable mirror registration identity
+
+See docs/stable-mirror-validation.zh-CN.md. Real Layer source passes 44 authored
+identity/concurrency controls. The new API is not called by game resource paths,
+and the complete GPU rebuild is still pending. The lease protects the registry,
+not allocator payload or native Metal lifetimes. No white-model fix is claimed.
