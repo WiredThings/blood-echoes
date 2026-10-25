@@ -1,0 +1,56 @@
+{
+  "status": "authored-controls-passed-no-game-performance-claim",
+  "candidate_sha256": "9f0573ad466ddb2468391c2769ab234c306b830a60c79cd230e25b524d9b8771",
+  "coherent_units": 230,
+  "recompiled_body_units": 2,
+  "archive_children": 15,
+  "producer_tests": 9,
+  "preservation_cases": 24,
+  "storage_test_backend_factory": "counting mock",
+  "strict_compute_and_render_archive_hits": true,
+  "runtime_library_identity_verified": true,
+  "public_headers_unchanged": true,
+  "game_started": false,
+  "white_model_fix_proven": false,
+  "performance_claim": false,
+  "default_enabled": false,
+  "ordinary_manual_QA_package_updated": false,
+  "formal_data_unchanged": {
+    "checked_files": 11671,
+    "unchanged": true,
+    "mismatches": [],
+    "read_only": true,
+    "checked_ns": 1792922348677859000
+  },
+  "supervision": {
+    "exit": 0,
+    "reason": null,
+    "before": {
+      "pressure": 2,
+      "locked": false,
+      "swap_mib": 4159.25
+    },
+    "after": {
+      "pressure": 2,
+      "locked": false,
+      "swap_mib": 4159.25
+    },
+    "seconds": 18.8066778749926,
+    "game_launched": false,
+    "memory_policy": {
+      "schema": 2,
+      "severe_seconds": 5.0,
+      "swap_total_mib": 2048.0,
+      "burst_window_seconds": 5.0,
+      "burst_growth_mib": 1024.0,
+      "warning_stops": false,
+      "lock_stops": true
+    }
+  },
+  "evidence": {
+    "checkpoint": "warm-persistence-checkpoint-1792922332021647000",
+    "archive_case": "warm-archive-authored-1792922345123177000",
+    "stage_case": "warm-stage-authored-1792922350202794000",
+    "producer_case": "warm-archive-producer-branches-mir62v1k"
+  }
+}

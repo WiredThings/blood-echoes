@@ -230,19 +230,6 @@ bool PipelineCacheCore::LoadPipelineStage(Serialization::Archive& ar, size_t sta
         return false;
     }
 
-    std::vector<u32> spv{};
-    Storage::DataBase::Instance().Load(Storage::BlobType::ShaderBinary,
-                                       fmt::format("{:#018x}_{}", program->info.pgm_hash, perm_idx),
-                                       spv);
-    // bbport: a SPIR-V binary starts with its magic number and a 5-word header; anything else is
-    // a damaged file (crash or power loss while it was written) the driver must not see.
-    if (spv.size() < 5 || spv[0] != 0x07230203u) {
-        if (!spv.empty()) {
-            throw Serialization::CorruptData{"damaged SPIR-V in the shader cache"};
-        }
-        return false;
-    }
-
     // Permutation hash depends on shader variation index. To prevent collisions, we need insert it
     // at the exact position rather than append
 
@@ -250,6 +237,21 @@ bool PipelineCacheCore::LoadPipelineStage(Serialization::Archive& ar, size_t sta
     // bbport: a module the driver rejects is a damaged entry (WarmUp rebuilds the cache), not a
     // fatal error as when compiling.
     const auto compile = [&] {
+        // Read only when this exact specialization needs a backend module. Other
+        // pipeline combinations may already own the validated module at perm_idx.
+        std::vector<u32> spv{};
+        Storage::DataBase::Instance().Load(Storage::BlobType::ShaderBinary,
+                                           fmt::format("{:#018x}_{}", program->info.pgm_hash, perm_idx),
+                                           spv);
+        // bbport: a SPIR-V binary starts with its magic number and a 5-word header; anything else is
+        // a damaged file (crash or power loss while it was written) the driver must not see.
+        if (spv.size() < 5 || spv[0] != 0x07230203u) {
+            if (!spv.empty()) {
+                throw Serialization::CorruptData{"damaged SPIR-V in the shader cache"};
+            }
+            return ShaderModuleHandle{};
+        }
+
         // Preserve the guest program identity on warm-up too: the Metal shader cache and
         // bounded diagnostic reference selection use the same name as runtime compilation.
         const auto name = GetShaderName(program->info.hw_stage, program->info.pgm_hash, perm_idx);
@@ -260,10 +262,13 @@ bool PipelineCacheCore::LoadPipelineStage(Serialization::Archive& ar, size_t sta
         return created;
     };
 
-    auto [it_pgm, new_program] = program_cache.try_emplace(program->info.pgm_hash);
-    if (new_program) {
+    auto it_pgm = program_cache.find(program->info.pgm_hash);
+    if (it_pgm == program_cache.end()) {
+        // Publish only after the first SPIR-V read, validation and backend creation
+        // succeed. A missing/corrupt blob or rejected module leaves no null program.
         module = compile();
-        it_pgm.value() = std::move(program);
+        if (!module) return false;
+        it_pgm = program_cache.try_emplace(program->info.pgm_hash, std::move(program)).first;
     } else {
         const auto& it = std::ranges::find(it_pgm.value()->modules, spec, &Program::Module::spec);
         if (it != it_pgm.value()->modules.end()) {
@@ -281,6 +286,7 @@ bool PipelineCacheCore::LoadPipelineStage(Serialization::Archive& ar, size_t sta
             module = it->module;
         } else {
             module = compile();
+            if (!module) return false;
         }
     }
     it_pgm.value()->InsertPermut(module, std::move(spec), perm_idx);

@@ -153,3 +153,7 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 ## 最新：模块finalizer实际回归及策略更新
 
 见 evidence/module-finalizer-verified-checkpoint-20261025/report.zh-CN.md。CPU7adf4d5e，真实C两组/11FEX/121基础及完整专项通过；原九缺口已有六项有界实现，三context仍未接。不称实景性能已验证，普通QA包仍67db/66d554bd。新增目标以完整组合持久化/加载预热为主，未知异步兜底，测逐draw校验累计成本；GOAL末尾保留细则。R2/live payload/context/firstmiss仅私有草稿，正式数据/Release不变。当前账户约87%剩余。
+
+## 2026-10-25：持久化与加载期读取验证
+
+见 docs/warm-persistence-validation.zh-CN.md（Shared 原始证据 evidence/warm-persistence-verified-checkpoint-20261025）。v3 归档实际身份隔离、原子成功发布、父目录故障保护及 LoadPipelineStage 精确命中免重读已在两单元候选实现，15 原生子进程、9 producer 分支、真实 Storage 路径、owned/phase 与 24 GPU 保留控制通过。无游戏启动、无新 FPS/白模成功主张，尚未默认启用、未更新普通手动 QA 包/正式应用/Release。下一步须在隔离场景核对完整组合覆盖与冷/暖启动编译、帧时间及内存，尤其 newLibraryWithSource 仍会发生，不能用 archive 命中代替所有层命中。完整设置散列保守且有启动成本；新原生候选必须用实际绑定此库的私有 GPU 执行文件测试，不能把旧 GPU app 的 v2 结果当成 v3。

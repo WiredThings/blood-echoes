@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792920608245702000,
+  "created_ns": 1792922461595543000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -325,7 +325,7 @@
     },
     {
       "path": "tools/build_first_upload_test.py",
-      "sha256": "073bf416c3e54ed5f91605881a27cec7e9cb5646bb2318e08f87d66cc9ca18dd"
+      "sha256": "0d8bec9ff8c13df2898bf329adee98afee504548858bff44f86977f0d7783452"
     },
     {
       "path": "tools/build_heap_bridge.py",
@@ -641,7 +641,7 @@
     },
     {
       "path": "tools/run_game.py",
-      "sha256": "d84ea1047e94c8f0e53b211c099af5d3297eb0d618fd7044bd437306d0bd6ff0"
+      "sha256": "587b1d9de9a25c7f08426267033381d75ffcd163b60940b2f5130f9d15650548"
     },
     {
       "path": "tools/run_gpu_retention_pair.py",
@@ -32425,7 +32425,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core_serialization.cpp",
-      "sha256": "0db4e81a9ec0c2841da3c688365ad63a392cbbc574d9d85362a4efea5a8bfe97"
+      "sha256": "87fdafc03cde57055826ddef198c6da947c9634fe64763e88198e4c303a39cb7"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core_types.h",
@@ -32649,7 +32649,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pso_cache.mm",
-      "sha256": "3564776968fdb4251de9a0abdd762c19b8e0a4ea0873529e5470c0b7176acdfb"
+      "sha256": "a640b0cd3ad1a238a086903fa372fafe841b3c4aa0812aeaa8b80f7d20e2b466"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_raster_util.h",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "3a89b07f9028c47a86385e42c5afbe23c6a155a90c7017e02c8f6a7d50548c57"
+      "sha256": "5c97ca0a4e49ea032739b6cf9492c37194744f78f7228048250ea44ba6c48fc1"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "db0065901bb0bb96d0399fcce5b0c0262666f9db432b314c5767beb0a43979dc"
+      "sha256": "57ef7b236558731bbec53cf3500336132440e6457da0e86154458b3fb1c56cfd"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39134,6 +39134,54 @@
     {
       "path": "docs/module-finalizer-validation.json",
       "sha256": "0cb5bfc7a4621eec4af58d56c8f7973d041b4ae94014a17736d630b7a68acbaf"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_warm_archive_identity.h",
+      "sha256": "151340c55f8b8536112c7e2b396fec053835ef4edf3fb3522b7d28276185a19e"
+    },
+    {
+      "path": "tools/warm_archive_manifest.py",
+      "sha256": "6b0d272f9d8c049156f66ae72c7968894d88cdfcd1d67f3f777b289aee543f38"
+    },
+    {
+      "path": "tools/test_warm_archive_manifest.py",
+      "sha256": "32e4fd96ba662386310c67bf4bef6aa0550baa75ca45f67123d67d54cf16bb2d"
+    },
+    {
+      "path": "tools/run_warm_archive_process_controls.py",
+      "sha256": "28a545c0c406697bc1929394fe3b70c6d046c400ef23b03da4a17c937fc1b95e"
+    },
+    {
+      "path": "tools/run_warm_stage_storage_controls.py",
+      "sha256": "3a9197351d4ba31abfceed6d8db87a36c4c1c443156515c61456cfef5f7ac16d"
+    },
+    {
+      "path": "tools/build_warm_archive_candidate.py",
+      "sha256": "a691510b2f9a9d5877a793c4b933c63f6fe1e4daa384d367565effd7da53c9e5"
+    },
+    {
+      "path": "tools/run_authored_controls_guard.py",
+      "sha256": "d026bcabd9ff9e4eb43d94779f040f466f35f9f66e5c853b555b276ded81b8a7"
+    },
+    {
+      "path": "tools/run_warm_persistence_regressions.py",
+      "sha256": "bc27418645bfc7ee377aca4495ecf07c6944f6f7dc645b62f59773e80c57e443"
+    },
+    {
+      "path": "tests/metal/test_warm_archive_process.mm",
+      "sha256": "07ac5a13c699308ba565ba8e977938224a127ecd66f0514c0f7e56f08476d8e2"
+    },
+    {
+      "path": "tests/metal/test_warm_stage_storage.cpp",
+      "sha256": "c0e53fa7b90874d8d5a02b3192e6c383bf20bfa9f0bd75bc0bcd243724e616e5"
+    },
+    {
+      "path": "docs/warm-persistence-validation.zh-CN.md",
+      "sha256": "ae85c0faeded5426800b5f026bda4a8f40eac77bc1dd3fe74f6ffdc632a48588"
+    },
+    {
+      "path": "docs/warm-persistence-validation.json",
+      "sha256": "b9ab27e08a1f7487d3138db041ef74859b9b41fc0700963736fa9a18c4833932"
     }
   ],
   "excluded": [
@@ -39150,35 +39198,33 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "ede9cf52f51889f25dee5077d8bada45cf3d30ea",
+    "base": "b65d9742aaec2ee1ac49cf0f7caa7a8624c01f5c",
     "paths": [
-      "vendor/bb_runtime/src/runtime_kernel.c",
-      "vendor/bb_runtime/src/arm_bridge.h",
-      "vendor/bb_runtime/src/runtime.c",
-      "src/game_runtime.cpp",
-      "tools/generate_native.py",
-      "tests/test_module_keys_candidate.c",
-      "tests/test_module_atexit_candidate.c",
-      "tests/module_finalize_fixture.py",
-      "tests/test_module_finalize_fex.py",
-      "generated/runtime_bridge.c",
-      "generated/runtime_kernel_bridge.c",
-      "generated/native-signatures.json",
-      "generated/native_adapters.inc",
-      "tests/test_module_finalize_native.py",
-      "tools/run_current_regressions.py",
-      "GOAL.zh-CN.md",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pso_cache.mm",
+      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_warm_archive_identity.h",
+      "vendor/metal_api/shadps4/video_core/pipeline_cache_core_serialization.cpp",
+      "tools/warm_archive_manifest.py",
+      "tools/test_warm_archive_manifest.py",
+      "tools/run_game.py",
+      "tools/run_warm_archive_process_controls.py",
+      "tools/run_warm_stage_storage_controls.py",
+      "tools/build_warm_archive_candidate.py",
+      "tools/build_first_upload_test.py",
+      "tools/run_authored_controls_guard.py",
+      "tools/run_warm_persistence_regressions.py",
+      "tests/metal/test_warm_archive_process.mm",
+      "tests/metal/test_warm_stage_storage.cpp",
       "CURRENT-PLAN.zh-CN.md",
       "NIGHT-HANDOFF.zh-CN.md",
-      "docs/module-finalizer-validation.zh-CN.md",
-      "docs/module-finalizer-validation.json"
+      "docs/warm-persistence-validation.zh-CN.md",
+      "docs/warm-persistence-validation.json"
     ],
     "excluded_parallel_drafts": [
-      "warm cache persistence",
-      "prepared exact export R2",
-      "live payload lease",
-      "context RET probe",
-      "firstmiss discovery/adoption"
-    ]
+      "R2 exact export",
+      "live payload leases",
+      "context restore",
+      "firstmiss async capture/adoption"
+    ],
+    "status": "authored-controls-only-not-enabled"
   }
 }

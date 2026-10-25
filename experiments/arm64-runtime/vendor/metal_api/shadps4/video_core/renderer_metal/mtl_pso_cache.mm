@@ -5,6 +5,9 @@
 #import <Metal/Metal.h>
 
 #include <algorithm>
+#include <atomic>
+#include <sys/sysctl.h>
+#include "video_core/renderer_metal/mtl_warm_archive_identity.h"
 #include <chrono>
 #include <cstring>
 #include <map>
@@ -232,17 +235,42 @@ PsoCache::PsoCache(Device& device_, std::filesystem::path cache_dir, bool relaxe
     if (cache_dir.empty()) {
         cache_dir = ShaderCompiler::DefaultCacheDir();
     }
-    archive_path = cache_dir / (relaxed_math ? "pipelines-relaxed-math-v2.binaryarchive"
-                                             : "pipelines-v2.binaryarchive");
-    const auto legacy_path=cache_dir/(relaxed_math ? "pipelines-relaxed-math.binaryarchive"
-                                                  : "pipelines.binaryarchive");
+    // Persist only explicitly named, fully verified compatibility cohorts. The manifest
+    // must bind the actual translator binary/dependencies, effective options, and game
+    // image + applied patches. Real device/OS and source-affecting toggles add local guards.
+    std::string compatibility;
+    if (impl->persist_enabled) {
+        const char* token = std::getenv("BB_MTL_ARCHIVE_COMPATIBILITY_ID");
+        char os_build[256]{}; size_t os_bytes = sizeof(os_build);
+        if (token && sysctlbyname("kern.osversion", os_build, &os_bytes, nullptr, 0) == 0) {
+            const auto gpu = std::to_string(impl->mtl_device.registryID) + ":" +
+                             std::string(impl->mtl_device.name.UTF8String);
+            std::string options = relaxed_math ? "relaxed" : "safe";
+            for (const char* key : {"BB_MTL_STRICT_FLOAT", "BB_MTL_RELAXED_MATH",
+                                    "BB_MTL_VERTEX_MATH", "BB_MTL_FRAGMENT_UNIFORMS",
+                                    "BB_MTL_COPY_PAIR", "BB_GS_DEBUG"}) {
+                const char* value = std::getenv(key);
+                options += std::string(";") + key + "=" + (value ? value : "<unset>");
+            }
+            compatibility = WarmArchiveNamespace(token, gpu, os_build, options);
+        }
+        if (compatibility.empty()) {
+            impl->persist_enabled = false;
+            LOG_WARNING(Render, "Metal archive persistence requires a verified 64-hex compatibility manifest; ignoring disk archives");
+        }
+    }
+    // No automatic legacy import: it lacks a translator/options/game identity. It is
+    // preserved unchanged. OFF keeps its prior fresh transient compilation behavior.
+    archive_path = cache_dir / (compatibility.empty()
+        ? (relaxed_math ? "pipelines-relaxed-math-v2.binaryarchive" : "pipelines-v2.binaryarchive")
+        : "pipelines-v3-" + compatibility + ".binaryarchive");
 
     @autoreleasepool {
         std::error_code ec;
         std::filesystem::create_directories(cache_dir, ec);
         // OFF ignores existing disk archives as well as disabling automatic writes.
         // Retain the fresh compilation object and active-PSO lifetime of the accepted baseline.
-        const auto input_path=std::filesystem::exists(archive_path,ec) ? archive_path : legacy_path;
+        const auto& input_path=archive_path;
         const bool exists = impl->persist_enabled && std::filesystem::exists(input_path, ec);
         MTLBinaryArchiveDescriptor* descriptor = [MTLBinaryArchiveDescriptor new];
         if (exists) {
@@ -302,6 +330,20 @@ bool PsoCache::Flush() {
     if (!impl->archive || !impl->archive_dirty) {
         return true;
     }
+    // AGX may abort while creating its intermediate metallib when the archive
+    // parent has become ENOTDIR. Reject that state before any driver rebuild or
+    // serialization. This is startup/flush-only, not a per-draw filesystem check.
+    // An external directory removal racing the subsequent driver call is not
+    // made safe by this preflight; existing archive bytes are never removed here.
+    std::error_code parent_error;
+    if (!std::filesystem::is_directory(archive_path.parent_path(), parent_error)) {
+        if (!impl->archive_error_logged) {
+            impl->archive_error_logged = true;
+            LOG_WARNING(Render, "Metal archive parent unavailable: {}; existing file retained",
+                        archive_path.parent_path().string());
+        }
+        return false;
+    }
     @autoreleasepool {
         if(impl->persist_enabled && !impl->archive_descriptors.empty()) {
             // AGX can successfully read an archive, but corrupt its stage associations when
@@ -331,8 +373,9 @@ bool PsoCache::Flush() {
             }
         }
         std::error_code ec;
-        const std::filesystem::path temp = archive_path.string() + ".tmp";
-        std::filesystem::remove(temp, ec);
+        static std::atomic<u64> sequence{0};
+        const std::filesystem::path temp = archive_path.string() + ".tmp-" +
+            std::to_string(getpid()) + "-" + std::to_string(sequence.fetch_add(1));
         NSError* error = nil;
         const BOOL ok = [impl->archive
             serializeToURL:[NSURL fileURLWithPath:[NSString stringWithUTF8String:temp.c_str()]]

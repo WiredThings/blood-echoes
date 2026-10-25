@@ -198,6 +198,25 @@ def main():
         elif not a.qa_online:env['BB_QUICKLOAD_PENDING']='1'
     env['BB_ARM_RESTART_REQUEST']=str(state/'.arm-restart-request')
     env['BB_ARM_RESTART_NONCE']=secrets.token_hex(16)
+    if a.pipeline_archive:
+        # Once before process creation, only for the explicit archive experiment.
+        # The selected library SHA binds the actual compiled translator/rewrites.
+        # Native PsoCache adds its actual GPU registry/name and OS build itself.
+        from warm_archive_manifest import prepare_startup_archive_policy
+        option_keys=('BB_MTL_', 'BB_LAYER_', 'BB_PC_', 'BB_GUEST_')
+        options={k:v for k,v in env.items()if k.startswith(option_keys) and not any(x in k for x in ('AUDIT','LOG','CAPTURE','FILE','NONCE','RESTART'))}
+        inputs={'boot':a.boot,'startup_patches':startup,'settings':a.settings_template} if a.graphics else {}
+        if a.content_profile: inputs['content_profile']=a.content_profile
+        for key,value in env.items():
+            if key.startswith('BB_MTL_') and key.endswith('_FILE') and Path(value).is_file():
+                inputs['shader_control_'+key]=Path(value)
+        if a.engine=='rosetta': inputs['rosetta_patches']=patch
+        updates,archive_policy=prepare_startup_archive_policy(enabled=a.graphics,engine=a.engine,
+            selected_executable=Path(env['BB_GPU_PROCESS']),backend_root=P/'backend',
+            game_artifacts=inputs,options=options,
+            profile={'engine':a.engine,'namespace':'arm64-srt1' if a.engine=='arm64' else 'rosetta','profile_abi':'SPV10-meta7-key5-msl3'})
+        env.update(updates)
+        (e/'warm-archive-compatibility.json').write_text(json.dumps(archive_policy,indent=2)+'\n')
     samples=[];generations=[];stop=None;start=time.monotonic();cleanup_warnings=[]
     def stop_owned(proc,sig):
         # Positive PIDs only. Darwin may refuse a whole process group after its

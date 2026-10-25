@@ -268,3 +268,15 @@ and the normal manual QA package remain unchanged.
 GOAL.zh-CN.md now prioritizes persistent complete combinations and load-time
 preparation, with first-seen async compilation as fallback. Warm-state validation
 cost and actual cross-process cache hits must be measured, not inferred.
+
+## Persistent startup archives and exact-module load reuse
+
+See docs/warm-persistence-validation.zh-CN.md and its machine-readable companion.
+The opt-in ARM archive cohort now binds actual translator/game/patch/options/device
+identity, preserves legacy files and the Rosetta branch, and publishes only successful
+atomic writes. Invalid parent directories are rejected before the driver's serializer.
+Already-loaded exact modules avoid duplicate SPIR-V reads during startup; corrupt first
+loads cannot publish null programs. Fifteen authored native processes, actual Storage
+controls, nine producer branches, and existing shader/texture regressions pass.
+This is not a game FPS, whole-game precompile coverage, white-model fix, or clean-build
+claim. The ordinary manual QA app and production app/data/caches/Release remain unchanged.
