@@ -46,6 +46,7 @@
 #include "core/platform.h"
 #include "remote/bb_control.h"
 #include "remote/bb_lifetime_reclaim.h"
+#include "remote/bb_peer_exit.h"
 #include "remote/bb_protocol.h"
 #include "remote/bb_remote.h"
 
@@ -415,7 +416,10 @@ void ProtectThread() {
 void WatchThread() {
     Common::SetCurrentThreadName("bb:remote-watch");
     int status = 0;
-    while (waitpid(g.child, &status, 0) < 0 && errno == EINTR) {
+    if (!WaitForConfirmedPeerExit(g.child, status)) {
+        std::perror("GPU process wait failed; backend death unconfirmed");
+        std::fflush(stderr);
+        std::_Exit(BB_ARM_EXIT_HLE_FAULT);
     }
     g.child_exited.store(true,std::memory_order_release);
     if(g.stopping.load(std::memory_order_acquire))return;
