@@ -26,6 +26,7 @@ if(signature=="iIPIP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsign
 if(signature=="iIPIiPP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,void*,unsigned int,int,void*,void*)>(wrapper));
 if(signature=="iIPP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,void*,void*)>(wrapper));
 if(signature=="iIPQ") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,void*,unsigned long long)>(wrapper));
+if(signature=="iIQ") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,unsigned long long)>(wrapper));
 if(signature=="iIRP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,const void*,void*)>(wrapper));
 if(signature=="iIi") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,int)>(wrapper));
 if(signature=="iIiP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,int,void*)>(wrapper));
@@ -53,12 +54,12 @@ if(signature=="iPiP") return MakeHleCallAdapter(reinterpret_cast<int (*)(void*,i
 if(signature=="iPiPi") return MakeHleCallAdapter(reinterpret_cast<int (*)(void*,int,void*,int)>(wrapper));
 if(signature=="iPq") return MakeHleCallAdapter(reinterpret_cast<int (*)(void*,long long)>(wrapper));
 if(signature=="iQ") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long)>(wrapper));
-if(signature=="iQPP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,void*,void*)>(wrapper));
 if(signature=="iQPPP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,void*,void*,void*)>(wrapper));
 if(signature=="iQPiq") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,void*,int,long long)>(wrapper));
 if(signature=="iQQ") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,unsigned long long)>(wrapper));
 if(signature=="iQQL") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,unsigned long long,unsigned long)>(wrapper));
 if(signature=="iQQP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,unsigned long long,void*)>(wrapper));
+if(signature=="iQQQ") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,unsigned long long,unsigned long long)>(wrapper));
 if(signature=="iQQi") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,unsigned long long,int)>(wrapper));
 if(signature=="iQiPQ") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long long,int,void*,unsigned long long)>(wrapper));
 if(signature=="iR") return MakeHleCallAdapter(reinterpret_cast<int (*)(const void*)>(wrapper));

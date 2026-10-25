@@ -149,3 +149,7 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 ## 最新：bounded SRT/fetch准备读集和mirror整库回归
 
 见 evidence/shader-readset-verified-checkpoint-20261025/report.zh-CN.md。230单元重建a36c7bd3，真实lookup/nested SRT/fetch/V#及旧capture/owned/phase/24保全通过；mirror 46项在独立源码和实际动态库均通过。成功64次小读微测约12us，非FPS。尚未接firstmiss discovery/worker/adoption，白模仍未解决；R2/finalizer/context独立草稿未混入。普通QA/正式数据/Release不变。
+
+## 最新：模块finalizer实际回归及策略更新
+
+见 evidence/module-finalizer-verified-checkpoint-20261025/report.zh-CN.md。CPU7adf4d5e，真实C两组/11FEX/121基础及完整专项通过；原九缺口已有六项有界实现，三context仍未接。不称实景性能已验证，普通QA包仍67db/66d554bd。新增目标以完整组合持久化/加载预热为主，未知异步兜底，测逐draw校验累计成本；GOAL末尾保留细则。R2/live payload/context/firstmiss仅私有草稿，正式数据/Release不变。当前账户约87%剩余。

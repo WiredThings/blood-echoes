@@ -3,6 +3,7 @@
  * use FreeBSD numbering; host errno values never reach the guest directly. */
 #define _GNU_SOURCE
 #include "runtime.h"
+#include "runtime_exit_codes.h"
 #include "platform.h"
 #include <stdatomic.h>
 #include <stdio.h>
@@ -240,15 +241,30 @@ static ABI int32_t thread_once(int32_t *once,void (ABI *routine)(void)) {
 }
 static ABI int32_t posix_once(int32_t *once,void (ABI *routine)(void)) { return thread_once(once,routine) ? 22 : 0; }
 #define KEYS 256
+/* Fixed module identity comes from the SHA-bound loader registry, not a native
+ * function pointer or a caller-supplied range. 9 is the BBPROBE5 registry cap. */
+#define KEY_MODULES 9
 typedef void (ABI *KeyDestructor)(void *);
-static struct { int used; KeyDestructor destructor; } keys[KEYS];
+static struct { int used; KeyDestructor destructor; uint32_t owner; uint64_t generation; } keys[KEYS];
+static struct { uint64_t in_flight; int closing; } key_modules[KEY_MODULES];
 static pthread_mutex_t key_lock=PTHREAD_MUTEX_INITIALIZER;
-static _Thread_local void *key_values[KEYS];
+static pthread_cond_t key_event=PTHREAD_COND_INITIALIZER;
+static _Thread_local struct { void *value; uint64_t generation; } key_values[KEYS];
+static _Thread_local unsigned key_callback_depth;
+static int key_owner(KeyDestructor destructor) {
+    if (!destructor) return 0;
+    return bb_arm_key_destructor_owner((uintptr_t)destructor);
+}
 static ABI int32_t key_create(uint32_t *key,KeyDestructor destructor) {
     if (!key) return ERR(22);
+    const int owner=key_owner(destructor);
+    if (destructor && (owner<=0 || owner>KEY_MODULES)) return ERR(22);
     pthread_mutex_lock(&key_lock);
+    if (owner && key_modules[owner-1].closing) { pthread_mutex_unlock(&key_lock); return ERR(16); }
     for (uint32_t i=1;i<KEYS;++i) if (!keys[i].used) {
-        keys[i].used=1; keys[i].destructor=destructor;
+        if (keys[i].generation==UINT64_MAX) continue; /* never reuse a wrapped token */
+        ++keys[i].generation;
+        keys[i].used=1; keys[i].destructor=destructor; keys[i].owner=(uint32_t)owner;
         pthread_mutex_unlock(&key_lock);
         *key=i; return 0;
     }
@@ -259,26 +275,71 @@ static ABI int32_t key_delete(uint32_t key) {
     if (!key || key>=KEYS) return ERR(22);
     pthread_mutex_lock(&key_lock);
     int32_t r=keys[key].used ? 0 : ERR(22);
-    keys[key].used=0; keys[key].destructor=NULL;
+    keys[key].used=0; keys[key].destructor=NULL; keys[key].owner=0;
     pthread_mutex_unlock(&key_lock);
     return r;
 }
 static ABI int32_t key_set(uint32_t key,void *value) {
-    if (!key || key>=KEYS || !keys[key].used) return ERR(22);
-    key_values[key]=value; return 0;
+    if (!key || key>=KEYS) return ERR(22);
+    pthread_mutex_lock(&key_lock);
+    if (!keys[key].used) { pthread_mutex_unlock(&key_lock); return ERR(22); }
+    key_values[key].value=value;key_values[key].generation=keys[key].generation;
+    pthread_mutex_unlock(&key_lock);return 0;
 }
-static ABI void *key_get(uint32_t key) { return key && key<KEYS ? key_values[key] : NULL; }
+static ABI void *key_get(uint32_t key) {
+    if (!key || key>=KEYS) return NULL;
+    pthread_mutex_lock(&key_lock);
+    void *value=keys[key].used && key_values[key].generation==keys[key].generation ? key_values[key].value : NULL;
+    pthread_mutex_unlock(&key_lock);return value;
+}
+/* Native internal status. The guest ABI is void and is adapted in the loader;
+ * errors must fail with HLE fault 74, never an ordinary success or restart. */
+int runtime_pthread_cxa_finalize_module(uint32_t owner) {
+    if (!owner || owner>KEY_MODULES) return EINVAL;
+    int old_cancel;pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,&old_cancel);
+    pthread_mutex_lock(&key_lock);
+    struct timespec deadline;clock_gettime(CLOCK_REALTIME,&deadline);deadline.tv_sec+=30;
+    int error=0;unsigned index=owner-1;
+    /* Waiting from any TSD destructor permits self/cross-module cycles. Refuse
+     * before changing registry state; callbacks may finalize an idle module. */
+    if (key_callback_depth && (key_modules[index].closing || key_modules[index].in_flight)) error=EDEADLK;
+    while (!error && key_modules[index].closing) error=pthread_cond_timedwait(&key_event,&key_lock,&deadline);
+    if (error) { pthread_mutex_unlock(&key_lock);pthread_setcancelstate(old_cancel,NULL);return error; }
+    key_modules[index].closing=1;
+    for (uint32_t i=1;i<KEYS;++i) if (keys[i].used && keys[i].owner==owner) keys[i].destructor=NULL;
+    while (!error && key_modules[index].in_flight) error=pthread_cond_timedwait(&key_event,&key_lock,&deadline);
+    key_modules[index].closing=0;pthread_cond_broadcast(&key_event);
+    pthread_mutex_unlock(&key_lock);pthread_setcancelstate(old_cancel,NULL);return error;
+}
 void runtime_thread_keys_cleanup(void) {
     for (int round=0;round<4;++round) {
         int any=0;
         for (uint32_t i=1;i<KEYS;++i) {
-            void *value=key_values[i];
-            if (!value || !keys[i].used || !keys[i].destructor) continue;
-            key_values[i]=NULL; any=1;
-            { uint64_t args[]={(uintptr_t)value};bb_arm_call((uintptr_t)keys[i].destructor,args,1); }
+            int old_cancel;pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,&old_cancel);
+            pthread_mutex_lock(&key_lock);
+            void *value=key_values[i].value;KeyDestructor destructor=NULL;uint32_t owner=0;
+            if (value && keys[i].used && key_values[i].generation==keys[i].generation && keys[i].destructor) {
+                owner=keys[i].owner;
+                if (owner && owner<=KEY_MODULES && !key_modules[owner-1].closing) {
+                    if (key_modules[owner-1].in_flight==UINT64_MAX) { pthread_mutex_unlock(&key_lock);fputs("ARM module callback counter overflow\n",stderr);_Exit(BB_ARM_EXIT_HLE_FAULT); }
+                    destructor=keys[i].destructor;++key_modules[owner-1].in_flight;key_values[i].value=NULL;
+                }
+            }
+            /* Non-destructor values remain visible to later destructors. */
+            pthread_mutex_unlock(&key_lock);
+            if (destructor) {
+                any=1;++key_callback_depth;
+                uint64_t args[]={(uintptr_t)value};bb_arm_call((uintptr_t)destructor,args,1);
+                --key_callback_depth;
+                pthread_mutex_lock(&key_lock);--key_modules[owner-1].in_flight;
+                if (!key_modules[owner-1].in_flight) pthread_cond_broadcast(&key_event);
+                pthread_mutex_unlock(&key_lock);
+            }
+            pthread_setcancelstate(old_cancel,NULL);
         }
         if (!any) break;
     }
+    memset(key_values,0,sizeof(key_values));
 }
 static ABI int32_t posix_key_create(uint32_t *k,KeyDestructor d) { int32_t r=key_create(k,d); return r ? r&0xffff : 0; }
 static ABI int32_t posix_key_delete(uint32_t k) { int32_t r=key_delete(k); return r ? r&0xffff : 0; }

@@ -48,7 +48,7 @@
   {
     "source": "runtime",
     "function": "guest_cxa_atexit",
-    "signature": "iQPP",
+    "signature": "iQQQ",
     "parameters": [
       "void (*)(void *)",
       "void *",
@@ -60,7 +60,7 @@
   {
     "source": "runtime",
     "function": "guest_finalize",
-    "signature": "vP",
+    "signature": "vQ",
     "parameters": [
       "void *"
     ],
@@ -896,7 +896,7 @@
   {
     "source": "runtime_kernel",
     "function": "key_set",
-    "signature": "iIP",
+    "signature": "iIQ",
     "parameters": [
       "uint32_t",
       "void *"
@@ -938,7 +938,7 @@
   {
     "source": "runtime_kernel",
     "function": "posix_key_set",
-    "signature": "iIP",
+    "signature": "iIQ",
     "parameters": [
       "uint32_t",
       "void *"

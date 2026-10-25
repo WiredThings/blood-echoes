@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792918945605506000,
+  "created_ns": 1792920608245702000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -149,7 +149,7 @@
     },
     {
       "path": "src/game_runtime.cpp",
-      "sha256": "95e3f9f1355d15eaa4125466446b7a32ac5988cc294961a77c36c8788b027ceb"
+      "sha256": "46dfc0ed8abeb375b2309f5b186d7e4a71b82719624e4f59356ba306e9a4d85b"
     },
     {
       "path": "src/guest_module_info.h",
@@ -433,7 +433,7 @@
     },
     {
       "path": "tools/generate_native.py",
-      "sha256": "9da9a54ef4838b24a213fe0f91059b339eb720b679de1632d88abdc1a6bd1e43"
+      "sha256": "360fe03bb3e8ed6f257d46a1b59d51d03f120ed8984ed522dcd5fe00cbd63523"
     },
     {
       "path": "tools/generate_tiler_bounds_shaders.py",
@@ -621,7 +621,7 @@
     },
     {
       "path": "tools/run_current_regressions.py",
-      "sha256": "5f4f60850e788c6b209bb557a3d2456f3cd640e6e87475677704dc70c6590262"
+      "sha256": "b02d7e9964a3b021aa5513be223c5685dda666dfdc71de1d1576b26a3db9b388"
     },
     {
       "path": "tools/run_death_observation.py",
@@ -1449,11 +1449,11 @@
     },
     {
       "path": "generated/native-signatures.json",
-      "sha256": "e85f5b556b1bcce80919c964ed296546de12681335f6649882f0424f0e18afaa"
+      "sha256": "3eb2aee6bb198b306486a52862526bc1851221796aca89a2cef580becc2aa1e9"
     },
     {
       "path": "generated/native_adapters.inc",
-      "sha256": "6af14dbcb3d9e63cb1e9a49b3e9059f096f302218024623682132caeef7fa390"
+      "sha256": "27c5f1f9931afe8bf4a9c838c10d350cf8aba7149bd97c25dfd2ee6a27a112de"
     },
     {
       "path": "generated/native_registry.c",
@@ -1469,7 +1469,7 @@
     },
     {
       "path": "generated/runtime_bridge.c",
-      "sha256": "9f7a50fd45a756b020ae525fcc0fee520c7f329e2ad4bcc4ef388dd593ad7345"
+      "sha256": "bd3310be944206daa3e413ee54ecfc661e9b3270351607a9d88136b1f41833ad"
     },
     {
       "path": "generated/runtime_content_bridge.c",
@@ -1481,7 +1481,7 @@
     },
     {
       "path": "generated/runtime_kernel_bridge.c",
-      "sha256": "6864ad3e5229a32b38cf84d77f9aac50171d3d684e598a716bf51b454c3d1957"
+      "sha256": "4a5e42df51ca825ba6f63d98efb48507821f16117b6bda5d645dddbb2b3998b6"
     },
     {
       "path": "generated/runtime_memory_bridge.c",
@@ -29417,7 +29417,7 @@
     },
     {
       "path": "vendor/bb_runtime/src/arm_bridge.h",
-      "sha256": "fee0640616c53293f2b61dd0973266121b735075e24d6b8a81a67676977b5db4"
+      "sha256": "85bc51a2fa5571752291039d4c13fab0ce4fb9d0c5c207e6723ce779f7dcd48e"
     },
     {
       "path": "vendor/bb_runtime/src/import_names.inc",
@@ -29445,7 +29445,7 @@
     },
     {
       "path": "vendor/bb_runtime/src/runtime.c",
-      "sha256": "73308ada0dd02f72a12b513ffeb5e4b4b79b56551d4962675d5e20dbebf29cd7"
+      "sha256": "01ee33af21eac3e13f23e01bfb863383b81617927b36970de9f5ee42c0c5ae36"
     },
     {
       "path": "vendor/bb_runtime/src/runtime.h",
@@ -29469,7 +29469,7 @@
     },
     {
       "path": "vendor/bb_runtime/src/runtime_kernel.c",
-      "sha256": "c8c991191017c65379deca048a66b543de2f6c50465b8326d881fd89242d1765"
+      "sha256": "e37143fcb4635db2473c928a1753f9a3dfdd15f26ac6a555b29408a38c2839d8"
     },
     {
       "path": "vendor/bb_runtime/src/runtime_memory.c",
@@ -38729,15 +38729,15 @@
     },
     {
       "path": "GOAL.zh-CN.md",
-      "sha256": "ec9e81617c36d8bd93193ac440bb600425efa7efc16ee04e2531a882d599824d"
+      "sha256": "d6d6a10f2bcb8a4fdd849de112a7413d4e0c25dd9816e687d523d8f08a9c13b1"
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "ef6c24e15f4dc31de9746480b3e766cd5584feb9455425e2825b541bde08203c"
+      "sha256": "3a89b07f9028c47a86385e42c5afbe23c6a155a90c7017e02c8f6a7d50548c57"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "1a9df5426d3f8e9c165745ec7e17753c9d349b8d6ffac88597576f512c5db9a4"
+      "sha256": "db0065901bb0bb96d0399fcce5b0c0262666f9db432b314c5767beb0a43979dc"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39106,6 +39106,34 @@
     {
       "path": "docs/shader-readset-validation.json",
       "sha256": "c5c225a01fa16a69ca7cd3803854dee358232c6fcba5ed7a72db61de88de1253"
+    },
+    {
+      "path": "tests/test_module_keys_candidate.c",
+      "sha256": "36129946e6a202afdae4d2de3d8ef8c3720e6ed4e60c23c3cdcde7057372bcf0"
+    },
+    {
+      "path": "tests/test_module_atexit_candidate.c",
+      "sha256": "333617372bc3a85fed6424ee8c3ae50fa4cfc7f8f9c93e66529423c1b1f257fe"
+    },
+    {
+      "path": "tests/module_finalize_fixture.py",
+      "sha256": "6c54303b74450afc684701f48e000801223e11c7cff7465fe643655ad47d6851"
+    },
+    {
+      "path": "tests/test_module_finalize_fex.py",
+      "sha256": "3e5fb599730d4ab1d8046adb30d51b1c53e7074d9a85f5bb3730ce91ad54e932"
+    },
+    {
+      "path": "tests/test_module_finalize_native.py",
+      "sha256": "67d5a020aae3b584223c0bf7444e5e3933f887a1a9744422e074531f87e55db2"
+    },
+    {
+      "path": "docs/module-finalizer-validation.zh-CN.md",
+      "sha256": "ba56472f4039d4c2551d2bb40d6960f9e400889b6b5b7b7ad6b7b650b7c43b34"
+    },
+    {
+      "path": "docs/module-finalizer-validation.json",
+      "sha256": "0cb5bfc7a4621eec4af58d56c8f7973d041b4ae94014a17736d630b7a68acbaf"
     }
   ],
   "excluded": [
@@ -39122,37 +39150,35 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "16fbb6dad5b2b079e4833450a6c6413cf72a941d",
+    "base": "ede9cf52f51889f25dee5077d8bada45cf3d30ea",
     "paths": [
-      "vendor/metal_api/shadps4/shader_recompiler/ir/passes/srt.h",
-      "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_arm64.inc",
-      "vendor/metal_api/shadps4/shader_recompiler/speculative_reads.h",
-      "vendor/metal_api/shadps4/shader_recompiler/info.h",
-      "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.h",
-      "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.cpp",
-      "vendor/metal_api/shadps4/shader_recompiler/frontend/format.cpp",
-      "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.cpp",
-      "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
-      "vendor/metal_api/shadps4/video_core/renderer_vulkan/vk_draw_prep.cpp",
-      "tests/metal/test_shader_speculative_reads.mm",
-      "tests/test_shader_speculative_reads.py",
-      "tools/build_first_upload_test.py",
-      "vendor/metal_api/layer/bblayer_gpu_memory.h",
-      "vendor/metal_api/layer/bblayer_gpu_memory.cpp",
-      "tests/test_stable_mirror_lease.cpp",
-      "tests/test_stable_mirror_lease.py",
-      "tests/metal/test_stable_mirror_library.mm",
-      "tests/test_stable_mirror_library.py",
+      "vendor/bb_runtime/src/runtime_kernel.c",
+      "vendor/bb_runtime/src/arm_bridge.h",
+      "vendor/bb_runtime/src/runtime.c",
+      "src/game_runtime.cpp",
+      "tools/generate_native.py",
+      "tests/test_module_keys_candidate.c",
+      "tests/test_module_atexit_candidate.c",
+      "tests/module_finalize_fixture.py",
+      "tests/test_module_finalize_fex.py",
+      "generated/runtime_bridge.c",
+      "generated/runtime_kernel_bridge.c",
+      "generated/native-signatures.json",
+      "generated/native_adapters.inc",
+      "tests/test_module_finalize_native.py",
+      "tools/run_current_regressions.py",
+      "GOAL.zh-CN.md",
       "CURRENT-PLAN.zh-CN.md",
       "NIGHT-HANDOFF.zh-CN.md",
-      "docs/shader-readset-validation.zh-CN.md",
-      "docs/shader-readset-validation.json"
+      "docs/module-finalizer-validation.zh-CN.md",
+      "docs/module-finalizer-validation.json"
     ],
     "excluded_parallel_drafts": [
-      "firstmiss capture/adoption",
+      "warm cache persistence",
       "prepared exact export R2",
-      "module finalizer",
-      "context probe"
+      "live payload lease",
+      "context RET probe",
+      "firstmiss discovery/adoption"
     ]
   }
 }

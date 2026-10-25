@@ -304,10 +304,30 @@ int32_t module_query(uintptr_t address,int32_t flags,void* output){
  const auto* info=active->module_info.Find(address);if(!info)return Error(3);
  std::memcpy(output,info,sizeof(*info));return 0;
 }
+void module_finalize(const BbGuestModules::Info* input){
+ bb_arm_require_range("__pthread_cxa_finalize",reinterpret_cast<uintptr_t>(input),sizeof(*input),0);
+ BbGuestModules::Info copy;std::memcpy(&copy,input,sizeof(copy));
+ const auto* original=active&&copy.segment_count&&copy.segment_count<=4?active->module_info.Find(copy.segments[0].address):nullptr;
+ if(!original||std::memcmp(original,&copy,sizeof(copy))||original->id<0||original->id>=9){
+  std::fputs("ARM module key finalization refused noncanonical module descriptor\n",stderr);_Exit(BB_ARM_EXIT_HLE_FAULT);
+ }
+ const int error=runtime_pthread_cxa_finalize_module(unsigned(original->id)+1);
+ if(error){std::fprintf(stderr,"ARM module key finalization failed error=%d\n",error);_Exit(BB_ARM_EXIT_HLE_FAULT);}
+}
 int module_match(const BbGuestModules::Info* input,uintptr_t address){
  bb_arm_require_range("__elf_phdr_match_addr",reinterpret_cast<uintptr_t>(input),sizeof(*input),0);
  BbGuestModules::Info copy;std::memcpy(&copy,input,sizeof(copy));return BbGuestModules::Match(copy,address);
 }
+}
+extern "C" int bb_arm_key_destructor_owner(uintptr_t address){
+ if(!active||!address)return 0;
+ const auto* info=active->module_info.Find(address);
+ return info&&info->id>=0&&info->id<9&&BbGuestModules::Match(*info,address)?info->id+1:0;
+}
+extern "C" int bb_arm_finalize_module_from_dso(uintptr_t dso){
+ if(!active||!dso)return 0;
+ const auto* info=active->module_info.Find(dso);
+ return info?runtime_pthread_cxa_finalize_module(unsigned(info->id)+1):0;
 }
 extern "C" void bb_arm_image_info(uintptr_t* base,uintptr_t* end,uintptr_t* libc,uint64_t* size){
  if(base)*base=active?active->image:0;if(end)*end=active?active->text_end:0;if(libc)*libc=active?active->libc:0;if(size)*size=active?active->image_size:0;
@@ -463,6 +483,9 @@ int game_main(int argc,char** argv){
    else if(net_adapter){auto net=std::shared_ptr<HleCallAdapter>(std::move(net_adapter));imported[i]=veneer(s,s.registry.Register(framed(net),std::string("net.")+runtime_import_name(b.names[i].c_str())));++native;route="native-net";}
    else if(av_adapter){
     imported[i]=veneer(s,s.registry.Register(framed(av_adapter),std::string("avplayer.")+runtime_import_name(b.names[i].c_str())));++native;route="native-avplayer";}
+   else if(!host&&!b.bindings.contains(i)&&kinds[i]==1&&s.module_info.Ready()&&b.names[i]=="kbw4UHHSYy0#p#J"){
+    imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(module_finalize)),"loader.__pthread_cxa_finalize"));++native;route="native-module-finalize";
+   }
    else if(!host&&!b.bindings.contains(i)&&kinds[i]==1&&s.module_info.Ready()&&(b.names[i]=="f7KBOafysXo#p#J"||b.names[i]=="Fjc4-n1+y2g#p#J")){
     auto adapter=b.names[i]=="f7KBOafysXo#p#J"?MakeHleCallAdapter(module_query):MakeHleCallAdapter(module_match);
     imported[i]=veneer(s,s.registry.Register(framed(adapter),std::string("loader.")+runtime_import_name(b.names[i].c_str())));++native;route="native-module-info";

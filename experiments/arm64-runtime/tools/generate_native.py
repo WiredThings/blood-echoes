@@ -25,7 +25,10 @@ opaque_slots={('runtime_services','http_wait'):{0},
 # query result pointers remain fully validated as data.
 opaque_slots.update({('runtime_memory',n):{0} for n in [
  'direct_unmap','release_flexible','posix_mmap','kernel_mprotect','query_protection','virtual_query']})
+# Values/DSO identifiers are opaque tokens, never pointed-to buffers.
+opaque_slots.update({('runtime','guest_finalize'):{0},('runtime','guest_cxa_atexit'):{1,2},('runtime_kernel','key_set'):{1},('runtime_kernel','posix_key_set'):{1}})
 callback_slots={('runtime_services',n):{0} for n in ['netctl_register','np_register','np_register_void']}
+callback_slots.update({('runtime',n):{0} for n in ['guest_atexit','guest_cxa_atexit']})
 # These scalar pointer words are proved by explicit count-aware wrapper checks.
 # Avoid repeating the generic one-byte check before proving the full span.
 span_slots={('runtime',n):({0}if n=='guest_memset'else{0,1})for n in ['guest_memcpy','guest_memmove','guest_memset','guest_memcmp']}

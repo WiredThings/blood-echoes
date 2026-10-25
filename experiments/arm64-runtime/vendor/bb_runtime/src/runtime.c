@@ -2,6 +2,7 @@
 #define _CRT_RAND_S
 #include "runtime.h"
 #include "gpu/bbgpu.h"
+#include "runtime_exit_codes.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -139,11 +140,17 @@ void runtime_finalize(void *dso) {
         pthread_mutex_lock(&handler_lock);
         size_t i = handler_count;
         while (i && (!handlers[i-1].active || (dso && handlers[i-1].dso != dso))) --i;
-        if (!i) { pthread_mutex_unlock(&handler_lock); return; }
+        if (!i) { pthread_mutex_unlock(&handler_lock); break; }
         ExitHandler handler = handlers[i-1]; handlers[i-1].active = 0;
         pthread_mutex_unlock(&handler_lock);
         if (handler.with_arg) { uint64_t args[]={(uintptr_t)handler.argument};bb_arm_call((uintptr_t)handler.callback.with_arg,args,1); }
         else bb_arm_call((uintptr_t)handler.callback.plain,NULL,0);
+    }
+    /* Preserve ALL existing global/DSO atexit callbacks above. NULL only skips
+     * this new module-key substep, matching the observed libc has-info gate. */
+    if (dso) {
+        int error=bb_arm_finalize_module_from_dso((uintptr_t)dso);
+        if (error) { fprintf(stderr,"ARM module key finalization failed error=%d\n",error);_Exit(BB_ARM_EXIT_HLE_FAULT); }
     }
 }
 static ABI void guest_finalize(void *dso) { runtime_finalize(dso); }

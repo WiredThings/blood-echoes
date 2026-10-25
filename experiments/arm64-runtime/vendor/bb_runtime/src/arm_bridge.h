@@ -15,6 +15,11 @@ void bb_arm_require_callback(const char*,uintptr_t);
 void bb_arm_require_range(const char*,uintptr_t,size_t,int);
 void bb_arm_require_string(const char*,const char*,size_t);
 void bb_arm_image_info(uintptr_t*,uintptr_t*,uintptr_t*,uint64_t*);
+/* Immutable, SHA-bound linked-module identity: 1..9, zero for non-guest code. */
+int bb_arm_key_destructor_owner(uintptr_t address);
+/* Internal errno status; the public __pthread_cxa_finalize ABI returns void. */
+int runtime_pthread_cxa_finalize_module(uint32_t owner);
+int bb_arm_finalize_module_from_dso(uintptr_t dso);
 void bb_arm_runtime_register(void);
 void bb_arm_add_native(const char* name,void* original,void* wrapper,const char* signature);
 void bb_arm_low_heap_range(uintptr_t* begin,uint64_t* size);

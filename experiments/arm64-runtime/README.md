@@ -254,3 +254,17 @@ owned shader, phase-output and 24 GPU preservation controls. Stable mirror tests
 now pass 46 controls against both real Layer source and the actual new library,
 superseding the prior pending-rebuild note. First-miss async compilation/adoption
 is still pending; no white-model fix, game FPS or memory improvement is claimed.
+
+## Module finalization and shader strategy
+
+See docs/module-finalizer-validation.zh-CN.md. Real C and eleven FEX controls,
+plus the fully rebuilt baseline suite pass. The module-specific TSD retirement
+preserves global/DSO atexit ordering, callback leases, key generations and the
+74 versus 75/76 exit contract. Six original missing imports now have bounded
+implementations; three context interfaces remain unsupported. This is not a
+generic dlclose guarantee or a game performance result. Formal app/data/Release
+and the normal manual QA package remain unchanged.
+
+GOAL.zh-CN.md now prioritizes persistent complete combinations and load-time
+preparation, with first-seen async compilation as fallback. Warm-state validation
+cost and actual cross-process cache hits must be measured, not inferred.

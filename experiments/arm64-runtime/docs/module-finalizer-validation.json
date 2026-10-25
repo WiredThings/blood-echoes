@@ -1,0 +1,185 @@
+{
+  "status": "native-and-real-FEX-passed-no-game",
+  "refs": {
+    "native": "module-finalizer-native-1792920145997216000",
+    "FEX": "module-finalizer-fex-1792919451466464000",
+    "aggregate": "current-runtime-regression-1792919473613013000"
+  },
+  "CPU_sha256": "7adf4d5e5c6b5fae8f71ad51342766e6ffe4d413f93385920ad32e95bf78b16d",
+  "native_cases": [
+    {
+      "test": "test_module_keys_candidate",
+      "source_sha256": "36129946e6a202afdae4d2de3d8ef8c3720e6ed4e60c23c3cdcde7057372bcf0",
+      "compile": [
+        "/usr/bin/clang",
+        "-std=c11",
+        "-O2",
+        "-arch",
+        "arm64",
+        "-UNDEBUG",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-Wl,-dead_strip",
+        "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/bb_runtime/src",
+        "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/bb_runtime",
+        "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/src",
+        "-I/opt/homebrew/include",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/tests/test_module_keys_candidate.c",
+        "-o",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/module-finalizer-native-1792920145997216000/test_module_keys_candidate"
+      ],
+      "compile_exit": 0,
+      "run_exit": 0
+    },
+    {
+      "test": "test_module_atexit_candidate",
+      "source_sha256": "333617372bc3a85fed6424ee8c3ae50fa4cfc7f8f9c93e66529423c1b1f257fe",
+      "compile": [
+        "/usr/bin/clang",
+        "-std=c11",
+        "-O2",
+        "-arch",
+        "arm64",
+        "-UNDEBUG",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-Wl,-dead_strip",
+        "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/bb_runtime/src",
+        "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/vendor/bb_runtime",
+        "-I/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/src",
+        "-I/opt/homebrew/include",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/tests/test_module_atexit_candidate.c",
+        "-o",
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/module-finalizer-native-1792920145997216000/test_module_atexit_candidate"
+      ],
+      "compile_exit": 0,
+      "run_exit": 0
+    }
+  ],
+  "FEX_cases": [
+    {
+      "mode": "valid",
+      "exit": 0,
+      "passed": true
+    },
+    {
+      "mode": "preserve-nondtor",
+      "exit": 0,
+      "passed": true
+    },
+    {
+      "mode": "global-null",
+      "exit": 0,
+      "passed": true
+    },
+    {
+      "mode": "unknown-dso",
+      "exit": 0,
+      "passed": true
+    },
+    {
+      "mode": "non-guest-callback",
+      "exit": 0,
+      "passed": true
+    },
+    {
+      "mode": "data-callback",
+      "exit": 0,
+      "passed": true
+    },
+    {
+      "mode": "veneer-callback",
+      "exit": 0,
+      "passed": true
+    },
+    {
+      "mode": "bad-info-span",
+      "exit": 74,
+      "passed": true
+    },
+    {
+      "mode": "bad-info-identity",
+      "exit": 74,
+      "passed": true
+    },
+    {
+      "mode": "bad-atexit-callback",
+      "exit": 74,
+      "passed": true
+    },
+    {
+      "mode": "reentrant-finalize",
+      "exit": 74,
+      "passed": true
+    }
+  ],
+  "jobs": [
+    {
+      "name": "rebuild-suite",
+      "status": 0
+    },
+    {
+      "name": "suite",
+      "status": 0
+    },
+    {
+      "name": "data",
+      "status": 0
+    },
+    {
+      "name": "spans",
+      "status": 0
+    },
+    {
+      "name": "exit",
+      "status": 0
+    },
+    {
+      "name": "producer-analysis",
+      "status": 0
+    },
+    {
+      "name": "signal-FEX",
+      "status": 0
+    },
+    {
+      "name": "writer-clock",
+      "status": 0
+    },
+    {
+      "name": "reader-clock",
+      "status": 0
+    },
+    {
+      "name": "ABI-marker",
+      "status": 0
+    },
+    {
+      "name": "AvPlayer-FEX",
+      "status": 0
+    },
+    {
+      "name": "progname-FEX",
+      "status": 0
+    },
+    {
+      "name": "module-info-FEX",
+      "status": 0
+    },
+    {
+      "name": "module-finalizer-FEX",
+      "status": 0
+    },
+    {
+      "name": "msync-FEX",
+      "status": 0
+    },
+    {
+      "name": "mlock-FEX",
+      "status": 0
+    }
+  ],
+  "remaining_original_imports": 3,
+  "game_started": false,
+  "performance_claim": false
+}
