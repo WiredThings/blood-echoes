@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792886321195873000,
+  "created_ns": 1792888824691735000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -313,7 +313,7 @@
     },
     {
       "path": "tools/build_present_image_candidate.py",
-      "sha256": "8a9a1b03917a70402e146d7767235ad2c4235d904337407a497661b6a1f3b4a6"
+      "sha256": "83035383dd61f38faabef8df687bb0ce5efc00f5e9661abcd52deaeaf4c3e0ba"
     },
     {
       "path": "tools/build_submit_diagnostic.py",
@@ -366,6 +366,10 @@
     {
       "path": "tools/generate_native.py",
       "sha256": "5217e9450a6bd50243b712603b94955d79ebbd98b4481c8a56584148902e5c92"
+    },
+    {
+      "path": "tools/gpu_candidate_identity.py",
+      "sha256": "13d0e5f0fcb285ead2c87fbd307308c536ef30538f95a05ebe09484d17a326da"
     },
     {
       "path": "tools/guard_launcher_gui.py",
@@ -565,7 +569,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "9028c10191b54bbab8f9bc8c8f4e9a4bfdf0277f50740ee6b92635aab0fd88e9"
+      "sha256": "c69810d714cd75e5afeae5d51c33109e847b393c5a76e12cfeb5682a3e1d0e36"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -574,6 +578,10 @@
     {
       "path": "tools/run_native_f3.py",
       "sha256": "89db4d64b322bea9c41461607d2d6b96dddf1f33f2afedbb1ccb84d14b1631ed"
+    },
+    {
+      "path": "tools/run_observed_combat_probe.py",
+      "sha256": "ecb31ee0549e6b2bf12a0c9912e1c708443a373c79604d4555dc76b5e0bd34d5"
     },
     {
       "path": "tools/run_pmr_abba.py",
@@ -625,7 +633,7 @@
     },
     {
       "path": "tools/validate_local_qa_package.py",
-      "sha256": "9313cb99900b8e04dca31c71e6d95d3397353518d205065acf7184fcdcc836a8"
+      "sha256": "f90ec2ac1b4344608450d4a5deb9df6b2a759d720787a5948cd1a4dd5cc88e50"
     },
     {
       "path": "tools/verify_cpu_usage_units.py",
@@ -832,6 +840,10 @@
       "sha256": "2ad34050e59981edb8cee1dd57ed44accddd442f709077565375123261da8c22"
     },
     {
+      "path": "tests/test_gpu_candidate_identity.py",
+      "sha256": "aedcae0d9a4c45e44098669d05d5d9d6dbe72e43974d233f2a45147e32dbeafc"
+    },
+    {
       "path": "tests/test_guest_frame.cpp",
       "sha256": "91c8c71671195314bb9be16ed20f780937abbb2ee0d5a15a4f0a155523b8ca0d"
     },
@@ -957,7 +969,7 @@
     },
     {
       "path": "tests/test_partial_audit_controls.py",
-      "sha256": "eca2b9606d8b18cee9ad7ddd1fd7d6331fcbb07f8b017d338c9e200a4167d5fc"
+      "sha256": "07a818dfe828b0fe71362247aeb402604494acd08a807257ae7e2a201c16ca65"
     },
     {
       "path": "tests/test_pmr_lifetime.cpp",
@@ -38385,11 +38397,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "39844dd8f1baa2958e761ac432a5f3ed2556fadb239c81b61dd80f8dc4997c84"
+      "sha256": "3298cef6a2d2ee02e00d59f5b3b64fd3b4c29817a89b73075456d8cf00e0fb4a"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "82d0e61a83009d13a44dc6c4247bffd20f1495a980a9472603014da1c9e8e550"
+      "sha256": "708869bd7918acc88a580046b59a6571c20935da0afcb470114d778de06baf4b"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38454,6 +38466,10 @@
     {
       "path": "docs/native-game-image-diagnostic.zh-CN.md",
       "sha256": "924137a2a456ed2a9e1cbf722556342e82446abf7f8bd2d467c463f26ea8d024"
+    },
+    {
+      "path": "docs/combined-combat-and-load-identity.zh-CN.md",
+      "sha256": "8d0780595cd4aee4edc32250452a245fe8bb5e4bc99807004accc9e41eb87314"
     }
   ],
   "excluded": [

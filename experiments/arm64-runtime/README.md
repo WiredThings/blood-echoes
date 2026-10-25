@@ -34,6 +34,11 @@ They are separate from FPS tests. A real Old Yharnam enemy contact was observed,
 but the intermittent combat white model remains unreproduced; one 140 ms frame
 overlapped image readback and is explicitly not performance evidence.
 See docs/native-game-image-diagnostic.zh-CN.md.
+Private GPU candidate admission now verifies the real Mach-O direct load edge,
+ARM64 architecture, declared hashes and strict signatures, with 12 authored
+Mach-O controls. The combined range/image route observed bloodied character
+textures but did not reproduce the intermittent white model. No performance
+benefit is claimed. See docs/combined-combat-and-load-identity.zh-CN.md.
 
 ## Development build limitations
 

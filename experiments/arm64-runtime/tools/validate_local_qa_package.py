@@ -19,6 +19,8 @@ subprocess.run(['/usr/bin/codesign','--verify','--strict',str(app)],check=True)
 for rel,sha in manifest['frozen_runtime'].items():
  f=stage/rel;assert hashlib.file_digest(f.open('rb'),'sha256').hexdigest()==sha
  subprocess.run(['/usr/bin/codesign','--verify','--strict',str(f)],check=True)
+from gpu_candidate_identity import verify as verify_gpu_candidate
+native_gpu_identity=verify_gpu_candidate(dict(target=str(stage/'bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'),library=str(stage/'bin/gpu-metal-arm64/libbbgpu.dylib'),library_sha256=manifest['frozen_runtime']['bin/gpu-metal-arm64/libbbgpu.dylib']),stage)
 preferences=plistlib.loads(Path(manifest['private_case']['preferences']).read_bytes());extra=dict(row.split('=',1)for row in preferences['extraEnv'].splitlines()if row);validate_manual_environment(extra)
 case=P/'evidence'/('frozen-qa-package-'+str(time.time_ns()));case.mkdir();scratch=P/'state'/('frozen-qa-'+str(time.time_ns()));scratch.mkdir();config=scratch/'bbport.ini';config.write_text('');gpu=scratch/'gpu';gpu.mkdir()
 env=dict(PATH='/usr/bin:/bin:/usr/sbin:/sbin',HOME=str(scratch),TMPDIR=str(scratch)+'/',BB_CONFIG=str(config),BB_GPU_USER_DIR=str(gpu),BB_AUDIO='none',BB_ONLINE='0',BB_QUICKSAVE='0')
@@ -29,5 +31,5 @@ for index,(mode,status)in enumerate([('guest-exit:0',0),('guest-exit:75',82),('g
  (case/(str(index)+'.log')).write_text(r.stdout+r.stderr);assert r.returncode==status and 'implemented in both'not in r.stderr,(mode,r.returncode,r.stderr[-1200:]);rows.append(dict(mode=mode,status=r.returncode))
 pyenv=dict(PATH='/usr/bin:/bin:/usr/sbin:/sbin',PYTHONHOME=str(stage/'python'),HOME=str(scratch))
 r=subprocess.run([str(stage/'python/bin/python3'),'-c','import platform,sys; print(platform.machine()); print(sys.version_info[:2])'],env=pyenv,capture_output=True,text=True,timeout=10);assert r.returncode==0 and 'arm64'in r.stdout,(r.returncode,r.stderr)
-result=dict(passed=True,archive_sha256=expected,strict_signature_after_unzip=True,private_manual_input_policy=True,authored_FEX=rows,bundled_python=r.stdout.strip(),game_started=False,formal_data_modified=False,unzip_location=str(target),qualification='No live GUI/F3/menu/network/death acceptance; authored fixtures only.')
+result=dict(passed=True,native_gpu_load_identity=native_gpu_identity,archive_sha256=expected,strict_signature_after_unzip=True,private_manual_input_policy=True,authored_FEX=rows,bundled_python=r.stdout.strip(),game_started=False,formal_data_modified=False,unzip_location=str(target),qualification='No live GUI/F3/menu/network/death acceptance; authored fixtures only.')
 (case/'result.json').write_text(json.dumps(result,indent=2)+'\n');print(case);print(json.dumps(result,indent=2))

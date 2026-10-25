@@ -8,6 +8,7 @@ from host_cpu_audit import HostCPUAudit
 from process_schedule_audit import ProcessScheduleAudit
 from cpu_stack_sample import CPUStackSample
 from diagnostic_frame_tail import read_tail
+from gpu_candidate_identity import verify as verify_gpu_candidate
 from qa_memory_policy import MemoryPolicy
 from launcher_environment import load as metal_environment
 from launcher_language_policy import load as language_environment
@@ -15,7 +16,7 @@ from run_game import usage
 from run_hle_lookup_abba import complete_rows
 P=Path(__file__).resolve().parents[1]
 def digest(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-def main():
+def main(gpu_load_identity=None):
  ap=argparse.ArgumentParser();ap.add_argument('--host-cpu-audit',action='store_true');ap.add_argument('--schedule-audit',action='store_true');ap.add_argument('--cpu-qos-order');ap.add_argument('--cpu-stack-sample',action='store_true');ap.add_argument('--producer-waits',action='store_true');ap.add_argument('--unaligned-audit',action='store_true');ap.add_argument('--component-stage',type=Path);ap.add_argument('--post-action-hold',type=int,default=0);ap.add_argument('--diagnostic-app-cache',type=Path);ap.add_argument('--gpu-variant',choices=['baseline','first-upload','submit-diagnostic','partial-audit','present-image'],default='baseline');ap.add_argument('--exploration-diagnostic',action='store_true');ap.add_argument('--texture-action',choices=['none','blood','attack'],default='none');ap.add_argument('--inspection-seconds',type=int,default=0);ap.add_argument('--library-reuse',choices=['0','1']);ap.add_argument('--compile-audit',action='store_true');ap.add_argument('--producer-trace',action='store_true');ap.add_argument('--require-full-trace',action='store_true');ap.add_argument('--action-trace',action='store_true');ap.add_argument('--texture-capture',action='store_true');ap.add_argument('--game-images',action='store_true');ap.add_argument('--external-image-control',action='store_true');ap.add_argument('--lifecycle',action='store_true');ap.add_argument('--save-seed',type=Path);ap.add_argument('--order',default='arm64,rosetta,rosetta,arm64');ap.add_argument('--memory-snapshot',action='store_true');ap.add_argument('--fex-mapping-audit',action='store_true');ap.add_argument('--seconds',type=int,default=120);a=ap.parse_args();order=a.order.split(',');assert 90<=a.seconds<=(600 if a.lifecycle else 300 if a.external_image_control else 180) and order and len(order)<=4 and set(order)<={'arm64','rosetta'}
  qos_order=a.cpu_qos_order.split(',')if a.cpu_qos_order else [None]*len(order)
  assert len(qos_order)==len(order)and all(q in(None,'inherit','user-initiated')for q in qos_order),'one supported QoS mode per run required'
@@ -65,6 +66,7 @@ def main():
   assert frozen['host_local_only']and frozen['formal_data_modified']is False and frozen['original_scripts']==source
   assert all(digest(stage/f)==h for f,h in frozen['frozen_runtime'].items()),'frozen QA binary identity mismatch'
   report['frozen_component']=dict(stage=str(stage),runtime=frozen['frozen_runtime'],upstream_inputs=frozen['upstream_inputs'])
+  gpu_load_identity=verify_gpu_candidate(dict(target=str(stage/'bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'),library=str(stage/'bin/gpu-metal-arm64/libbbgpu.dylib'),library_sha256=frozen['frozen_runtime']['bin/gpu-metal-arm64/libbbgpu.dylib']),stage)
  assert all(digest(stage/f)==h for f,h in source.items())
  # Copy only original script bytes; x86 reference is used solely in the Rosetta control.
  ref=e/'rosetta-stage';ref.mkdir()
@@ -77,7 +79,12 @@ def main():
  if a.gpu_variant=='first-upload':artifacts.append(P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.first-upload-candidate.dylib')
  if a.gpu_variant=='submit-diagnostic':artifacts.append(P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.submit-diagnostic.dylib')
  if a.gpu_variant=='partial-audit':artifacts.append(P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.partial-audit-candidate.dylib')
- if a.gpu_variant=='present-image':artifacts.append(P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.present-image-candidate.dylib')
+ if gpu_load_identity is None:
+  assert a.gpu_variant=='baseline'and not a.texture_capture,'diagnostic GPU load identity required'
+  baseline=json.loads((P/'evidence/heap-bridge-build.json').read_text())
+  gpu_load_identity=verify_gpu_candidate(dict(target=str((stage/'bin/gpu-metal-arm64/bb-gpu').resolve()),library=str(P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.dylib'),library_sha256=baseline['sha256']),P/'backend')
+ if a.component_stage is None:assert (stage/'bin/gpu-metal-arm64/bb-gpu').resolve()==Path(gpu_load_identity['target'])
+ artifacts.extend([Path(gpu_load_identity['library']),Path(gpu_load_identity['target'])]);report['gpu_load_identity']=gpu_load_identity
  if a.texture_capture:artifacts.append(P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.texture-candidate.dylib')
  if a.component_stage is not None:artifacts=[stage/f for f in frozen['frozen_runtime']]
  hashes={str(f):digest(f)for f in artifacts};report['artifacts']=hashes;report['script_hashes']=source
@@ -331,11 +338,12 @@ if __name__=='__main__':
   variant=sys.argv[sys.argv.index('--gpu-variant')+1]
   metadata={'first-upload':'first-upload-gpu-app.json','submit-diagnostic':'submit-gpu-app.json','partial-audit':'partial-audit-gpu-app.json','present-image':'present-image-gpu-app.json'}[variant]
   meta=json.loads((P/'evidence'/metadata).read_text())
+  gpu_identity=verify_gpu_candidate(meta,P/'backend')
   alias=P/'launcher-component-stage/bin/gpu-metal-arm64/bb-gpu';original=Path(meta['original_target'])
   assert alias.is_symlink()and alias.resolve()==original
   assert digest(Path(meta['library']))==meta['library_sha256']
   alias.unlink();alias.symlink_to(meta['target'])
-  try:main()
+  try:main(gpu_identity)
   finally:
    alias.unlink();alias.symlink_to(original)
  elif '--texture-capture'not in sys.argv:main()
@@ -348,8 +356,9 @@ if __name__=='__main__':
   if not identity.is_file():identity=Path(plan['evidence'])/'memo-null-fix-status.json'
   fixed=json.loads(identity.read_text())
   assert digest(P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.texture-candidate.dylib')==fixed['fixed_candidate_sha']
+  gpu_identity=verify_gpu_candidate(dict(target=str(candidate),library=str(P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.texture-candidate.dylib'),library_sha256=fixed['fixed_candidate_sha']),P/'backend')
   alias.unlink();alias.symlink_to(candidate)
-  try:main()
+  try:main(gpu_identity)
   finally:
    alias.unlink();alias.symlink_to(original)
 

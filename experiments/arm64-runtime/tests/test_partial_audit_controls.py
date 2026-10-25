@@ -1,6 +1,6 @@
 """Authored Metal controls: range visibility, NOT repaired pixel correctness.
 
-Requires the explicit private partial-audit library and inplace fixture build.
+Requires an explicit private partial-audit (optionally native-image) library and inplace fixture build.
 Expected pixel failures are retained as negative controls, never called fixes.
 """
 from pathlib import Path
@@ -10,7 +10,12 @@ sys.path.insert(0,str(P/'tools'))
 from qa_build_guard import require_no_games
 require_no_games()
 meta=json.loads((P/'evidence/first-upload-build-current.json').read_text())
-assert meta['suite']=='inplace-gpu' and Path(meta['library']).name=='libbbgpu.partial-audit-candidate.dylib'
+allowed={P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.partial-audit-candidate.dylib'}
+combined=P/'evidence/present-image-gpu-app.json'
+if combined.is_file():
+ image=json.loads(combined.read_text())
+ if image.get('range_audit'):allowed.add(Path(image['library']))
+assert meta['suite']=='inplace-gpu'and Path(meta['library'])in allowed
 assert hashlib.file_digest(Path(meta['library']).open('rb'),'sha256').hexdigest()==meta['library_sha256']
 e=P/'evidence'/('partial-audit-controls-'+str(time.time_ns()));e.mkdir()
 state=P/'state'/e.name;state.mkdir();rows=[]
