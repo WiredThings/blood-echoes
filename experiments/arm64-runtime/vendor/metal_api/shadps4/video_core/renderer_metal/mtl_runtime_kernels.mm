@@ -4,6 +4,7 @@
 // the MSAA copies. Counterparts: vk_tile_kernels.cpp, vk_fault_parser.cpp, vk_blit_helper.cpp.
 
 #include <string>
+#include "bb_tiler_bounds.h"
 
 #include "common/assert.h"
 #include "common/logging/log.h"
@@ -163,11 +164,14 @@ id<MTLComputePipelineState> HostKernels::Tiling(const VideoCore::TilingDispatch&
                                                 const H::Shader*& shader_out) {
     const H::Shader& shader = TilingShader(dispatch.key.num_bits, dispatch.is_macro);
     shader_out = &shader;
-    TilingKey key{dispatch.key.num_bits, dispatch.is_macro, {}};
-    std::get<2>(key) = dispatch.constants;
-    for (u32 i = dispatch.num_constants; i < 12; ++i) {
-        std::get<2>(key)[i] = 0; // unused entries must not split the cache
-    }
+    ASSERT(dispatch.num_constants <= dispatch.constants.size());
+    const bool bounded = VideoCore::TilerBounds::Enabled(dispatch);
+    const auto constants = VideoCore::TilerBounds::Constants(
+        std::span(dispatch.constants).first(dispatch.num_constants), shader.spec_constants, bounded);
+    TilingKey key{dispatch.key.num_bits, dispatch.is_macro, {}, bounded};
+    // Canonicalize the actual defaults, so omitted parameters cannot collide with
+    // a caller that explicitly supplies a different value for the same constant.
+    std::copy_n(constants.begin(), 12, std::get<2>(key).begin());
     if (const auto it = tiling.find(key); it != tiling.end()) {
         return it->second;
     }
@@ -177,13 +181,14 @@ id<MTLComputePipelineState> HostKernels::Tiling(const VideoCore::TilingDispatch&
                                                  dispatch.key.is_tiler ? "tiler" : "detiler"];
     LOG_INFO(Render, "Creating tiling pipeline {}", label.UTF8String);
     id<MTLComputePipelineState> pipeline =
-        ComputePipeline(shader, dispatch.constants.data(), dispatch.num_constants, label);
+        ComputePipeline(shader, constants.data(), constants.size(), label);
     tiling.emplace(key, pipeline);
     return pipeline;
 }
 
 id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDispatch& dispatch, bool proxy) {
-    const auto key=std::make_pair(proxy,TilingKey{dispatch.key.num_bits, true, dispatch.constants});
+    ASSERT(dispatch.num_constants <= dispatch.constants.size());
+    const auto key=std::make_pair(proxy,TilingKey{dispatch.key.num_bits, true, dispatch.constants, VideoCore::TilerBounds::Enabled(dispatch)});
     if(const auto i=texture_tiling.find(key);i!=texture_tiling.end())return i->second;
     if(texture_tiling.size()>=32)return nil;
     const auto& shader=TilingShader(dispatch.key.num_bits,true);
@@ -203,6 +208,8 @@ id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDi
             [values setConstantValue:&value type:MTLDataTypeUInt atIndex:spec.id];
         }
     }
+    const bool bounded=VideoCore::TilerBounds::Enabled(dispatch);
+    [values setConstantValue:&bounded type:MTLDataTypeBool atIndex:13];
     const u32 scale=proxy?2u:1u;[values setConstantValue:&scale type:MTLDataTypeUInt atIndex:12];
     auto function=library?[library newFunctionWithName:@"main0" constantValues:values error:&error]:nil;
     auto pipeline=function?[dev.device newComputePipelineStateWithFunction:function error:&error]:nil;

@@ -1,0 +1,10 @@
+{
+  "before": {
+    "class Metal::HostKernels": "Type: class Metal::HostKernels\n\nLayout: <ASTRecordLayout\n  Size:1664\n  DataSize:1664\n  Alignment:64\n  BaseOffsets: []>\n  VBaseOffsets: []>\n  FieldOffsets: [0, 64, 128, 448, 640, 832, 896, 960, 1024, 1088, 1152, 1216, 1408, 1600]>",
+    "struct Metal::Runtime::Impl": "Type: struct Metal::Runtime::Impl\n\nLayout: <ASTRecordLayout\n  Size:4288\n  DataSize:4288\n  Alignment:64\n  BaseOffsets: []>\n  VBaseOffsets: []>\n  FieldOffsets: [0, 64, 128, 1792, 1856, 2368, 2688, 3200, 3520, 4032, 4224]>"
+  },
+  "after": {
+    "class Metal::HostKernels": "Type: class Metal::HostKernels\n\nLayout: <ASTRecordLayout\n  Size:1664\n  DataSize:1664\n  Alignment:64\n  BaseOffsets: []>\n  VBaseOffsets: []>\n  FieldOffsets: [0, 64, 128, 448, 640, 832, 896, 960, 1024, 1088, 1152, 1216, 1408, 1600]>",
+    "struct Metal::Runtime::Impl": "Type: struct Metal::Runtime::Impl\n\nLayout: <ASTRecordLayout\n  Size:4288\n  DataSize:4288\n  Alignment:64\n  BaseOffsets: []>\n  VBaseOffsets: []>\n  FieldOffsets: [0, 64, 128, 1792, 1856, 2368, 2688, 3200, 3520, 4032, 4224]>"
+  }
+}

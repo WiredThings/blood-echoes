@@ -86,7 +86,19 @@ private:
     Device::Impl& dev;
     Scheduler& scheduler;
     std::unordered_map<const void*, id<MTLLibrary>> libraries;
-    using TilingKey = std::tuple<u32, bool, std::array<u32, 12>>;
+    using TilingKey = std::tuple<u32, bool, std::array<u32, 12>, bool>;
+    using LegacyTilingKey = std::tuple<u32, bool, std::array<u32, 12>>;
+    // Only HostKernels' out-of-line methods touch or destroy these nodes. Keep
+    // the container ABI stable for the other Runtime::Impl translation units.
+    static_assert(sizeof(std::map<TilingKey, id<MTLComputePipelineState>>) ==
+                  sizeof(std::map<LegacyTilingKey, id<MTLComputePipelineState>>));
+    static_assert(alignof(std::map<TilingKey, id<MTLComputePipelineState>>) ==
+                  alignof(std::map<LegacyTilingKey, id<MTLComputePipelineState>>));
+    static_assert(sizeof(std::map<std::pair<bool,TilingKey>, id<MTLComputePipelineState>>) ==
+                  sizeof(std::map<std::pair<bool,LegacyTilingKey>, id<MTLComputePipelineState>>));
+    static_assert(alignof(std::map<std::pair<bool,TilingKey>, id<MTLComputePipelineState>>) ==
+                  alignof(std::map<std::pair<bool,LegacyTilingKey>, id<MTLComputePipelineState>>));
+
     std::map<TilingKey, id<MTLComputePipelineState>> tiling;
     std::map<std::pair<bool,TilingKey>, id<MTLComputePipelineState>> texture_tiling;
     id<MTLComputePipelineState> fault_parser = nil;

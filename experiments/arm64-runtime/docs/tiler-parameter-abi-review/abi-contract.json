@@ -1,0 +1,102 @@
+{
+  "public": {
+    "TilingMip": {
+      "bytes": 28,
+      "alignment": 4
+    },
+    "TilingInfo": {
+      "bytes": 460,
+      "alignment": 4,
+      "header_offsets": [
+        0,
+        4,
+        8
+      ],
+      "mips_offset": 12,
+      "mip_stride": 28,
+      "mip_count": 16
+    },
+    "KernelBuffer": {
+      "bytes": 24,
+      "alignment": 8
+    },
+    "TilingKey": {
+      "bytes": 16
+    },
+    "TilingDispatch": {
+      "bytes": 160,
+      "alignment": 8,
+      "offsets": {
+        "key": 0,
+        "array_mode": 16,
+        "is_macro": 20,
+        "constants": 24,
+        "num_constants": 72,
+        "tiled": 80,
+        "linear": 104,
+        "params": 128,
+        "group_count_x": 152
+      }
+    }
+  },
+  "private_actual_candidate": {
+    "name": "TilerBounds::ParamsV1",
+    "bytes": 652,
+    "physical_prefix_bytes": 460,
+    "logical_offset": 460,
+    "logical_stride": 12,
+    "logical_count": 16,
+    "logical_fields": [
+      "width",
+      "height",
+      "slices"
+    ],
+    "specialization_id": 13,
+    "specialization_type": "bool",
+    "specialization_default": false,
+    "admission": "is_tiler && params.range == 652; complete canonical color exports only",
+    "legacy_bytes": 460,
+    "detile_specialization": false
+  },
+  "before_after_equal": true,
+  "host_classes": {
+    "HostKernels": {
+      "bytes": 208,
+      "alignment": 8,
+      "member_offsets_bytes": [
+        0,
+        8,
+        16,
+        56,
+        80,
+        104,
+        112,
+        120,
+        128,
+        136,
+        144,
+        152,
+        176,
+        200
+      ]
+    },
+    "Runtime::Impl": {
+      "bytes": 536,
+      "alignment": 8,
+      "member_offsets_bytes": [
+        0,
+        8,
+        16,
+        224,
+        232,
+        296,
+        336,
+        400,
+        440,
+        504,
+        528
+      ]
+    }
+  },
+  "caveat": "layout_contract.cpp also documents an unused alternative 656-byte embedded-version proposal; actual candidate and shader are 652 only."
+}

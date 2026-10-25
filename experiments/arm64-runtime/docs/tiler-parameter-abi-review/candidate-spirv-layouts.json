@@ -1,0 +1,2198 @@
+[
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_macro_128_comp.spv",
+    "sha256": "f583eeefdfb0a72188263bbcb54863e3f2750bdd4a9f9b77e23edee4c7343b9d",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "PIPE_CONFIG",
+        "spec_id": 5,
+        "default": 0
+      },
+      {
+        "name": "ARRAY_MODE",
+        "spec_id": 4,
+        "default": 0
+      },
+      {
+        "name": "MICRO_TILE_THICKNESS",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "BANK_WIDTH",
+        "spec_id": 6,
+        "default": 1
+      },
+      {
+        "name": "BANK_HEIGHT",
+        "spec_id": 7,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANKS",
+        "spec_id": 8,
+        "default": 1
+      },
+      {
+        "name": "MACRO_TILE_ASPECT",
+        "spec_id": 11,
+        "default": 1
+      },
+      {
+        "name": "TILE_SPLIT_BYTES",
+        "spec_id": 10,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANK_BITS",
+        "spec_id": 9,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_macro_16_comp.spv",
+    "sha256": "02c20c87a222178b1a46b01e814e869c8e24488f25dc8c0e1db37e5be788da3e",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "PIPE_CONFIG",
+        "spec_id": 5,
+        "default": 0
+      },
+      {
+        "name": "ARRAY_MODE",
+        "spec_id": 4,
+        "default": 0
+      },
+      {
+        "name": "MICRO_TILE_THICKNESS",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "BANK_WIDTH",
+        "spec_id": 6,
+        "default": 1
+      },
+      {
+        "name": "BANK_HEIGHT",
+        "spec_id": 7,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANKS",
+        "spec_id": 8,
+        "default": 1
+      },
+      {
+        "name": "MACRO_TILE_ASPECT",
+        "spec_id": 11,
+        "default": 1
+      },
+      {
+        "name": "TILE_SPLIT_BYTES",
+        "spec_id": 10,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANK_BITS",
+        "spec_id": 9,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_macro_32_comp.spv",
+    "sha256": "84c0217d88827bf5f7af1bf81fbdf1103e91bb3c81c51df5c0dfcd08a471b4ed",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "PIPE_CONFIG",
+        "spec_id": 5,
+        "default": 0
+      },
+      {
+        "name": "ARRAY_MODE",
+        "spec_id": 4,
+        "default": 0
+      },
+      {
+        "name": "MICRO_TILE_THICKNESS",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "BANK_WIDTH",
+        "spec_id": 6,
+        "default": 1
+      },
+      {
+        "name": "BANK_HEIGHT",
+        "spec_id": 7,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANKS",
+        "spec_id": 8,
+        "default": 1
+      },
+      {
+        "name": "MACRO_TILE_ASPECT",
+        "spec_id": 11,
+        "default": 1
+      },
+      {
+        "name": "TILE_SPLIT_BYTES",
+        "spec_id": 10,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANK_BITS",
+        "spec_id": 9,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_macro_64_comp.spv",
+    "sha256": "54ab119fc9dfd94dc2aef132e264c7a7e3aba87b1d2366db42c14f5e80b2f75d",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "PIPE_CONFIG",
+        "spec_id": 5,
+        "default": 0
+      },
+      {
+        "name": "ARRAY_MODE",
+        "spec_id": 4,
+        "default": 0
+      },
+      {
+        "name": "MICRO_TILE_THICKNESS",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "BANK_WIDTH",
+        "spec_id": 6,
+        "default": 1
+      },
+      {
+        "name": "BANK_HEIGHT",
+        "spec_id": 7,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANKS",
+        "spec_id": 8,
+        "default": 1
+      },
+      {
+        "name": "MACRO_TILE_ASPECT",
+        "spec_id": 11,
+        "default": 1
+      },
+      {
+        "name": "TILE_SPLIT_BYTES",
+        "spec_id": 10,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANK_BITS",
+        "spec_id": 9,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_macro_8_comp.spv",
+    "sha256": "b7f1fe5671b49f6bcf00103069476f4182c681da1bc523213e13d2bb8c9f769b",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "PIPE_CONFIG",
+        "spec_id": 5,
+        "default": 0
+      },
+      {
+        "name": "ARRAY_MODE",
+        "spec_id": 4,
+        "default": 0
+      },
+      {
+        "name": "MICRO_TILE_THICKNESS",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "BANK_WIDTH",
+        "spec_id": 6,
+        "default": 1
+      },
+      {
+        "name": "BANK_HEIGHT",
+        "spec_id": 7,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANKS",
+        "spec_id": 8,
+        "default": 1
+      },
+      {
+        "name": "MACRO_TILE_ASPECT",
+        "spec_id": 11,
+        "default": 1
+      },
+      {
+        "name": "TILE_SPLIT_BYTES",
+        "spec_id": 10,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANK_BITS",
+        "spec_id": 9,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_macro_96_comp.spv",
+    "sha256": "fb5c252772ec9d52e2638249a8009428733a88f8007041ba083f0aaae02ae25e",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "PIPE_CONFIG",
+        "spec_id": 5,
+        "default": 0
+      },
+      {
+        "name": "ARRAY_MODE",
+        "spec_id": 4,
+        "default": 0
+      },
+      {
+        "name": "MICRO_TILE_THICKNESS",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "BANK_WIDTH",
+        "spec_id": 6,
+        "default": 1
+      },
+      {
+        "name": "BANK_HEIGHT",
+        "spec_id": 7,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANKS",
+        "spec_id": 8,
+        "default": 1
+      },
+      {
+        "name": "MACRO_TILE_ASPECT",
+        "spec_id": 11,
+        "default": 1
+      },
+      {
+        "name": "TILE_SPLIT_BYTES",
+        "spec_id": 10,
+        "default": 1
+      },
+      {
+        "name": "NUM_BANK_BITS",
+        "spec_id": 9,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_micro_128_comp.spv",
+    "sha256": "7eaa81470ab96a34ce882453c8cdb01309e64263f593a441ae415c88567c55d1",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "thickness",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_micro_16_comp.spv",
+    "sha256": "aca3b4487978dbc192f98640df6ffc80254f865302cfb4a129a4bffb3b693daa",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "thickness",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_micro_32_comp.spv",
+    "sha256": "fb156ed1735a7c1a86d2eebea6d41fa8af9428cbba0c540a17201ac7f908ea62",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "thickness",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_micro_64_comp.spv",
+    "sha256": "52f038cff53ced89d2938ec65570bd6f92dba2dae7b213560c150a9e9bd32730",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "thickness",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_micro_8_comp.spv",
+    "sha256": "c65554c2e5256f3400b4d5c1ff244486024a63db8e3a157db1cb2817a9168913",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "thickness",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  },
+  {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/tiler-bounds-generated-1792909511202564000/tiling_micro_96_comp.spv",
+    "sha256": "d80e5c06d0df4359319373ed9b8b0b174d7a2ce2c1eb7875bdd8dbfd7f5b5c4c",
+    "structures": {
+      "MipInfo": [
+        {
+          "name": "size",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "pitch",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "offset",
+          "offset": [
+            12
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_pitch",
+          "offset": [
+            16
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "padded_height",
+          "offset": [
+            20
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            24
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "LogicalMipBounds": [
+        {
+          "name": "width",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "height",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "slices",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        }
+      ],
+      "TilingInfo": [
+        {
+          "name": "bank_swizzle",
+          "offset": [
+            0
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "micro_tiled_mips",
+          "offset": [
+            4
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "num_mips",
+          "offset": [
+            8
+          ],
+          "stride": null,
+          "length": null
+        },
+        {
+          "name": "mips",
+          "offset": [
+            12
+          ],
+          "stride": [
+            28
+          ],
+          "length": 16
+        },
+        {
+          "name": "logical",
+          "offset": [
+            460
+          ],
+          "stride": [
+            12
+          ],
+          "length": 16
+        }
+      ]
+    },
+    "specs": [
+      {
+        "name": "MICRO_TILE_MODE",
+        "spec_id": 1,
+        "default": 1
+      },
+      {
+        "name": "NUM_SAMPLES",
+        "spec_id": 0,
+        "default": 1
+      },
+      {
+        "name": "IS_TILER",
+        "spec_id": 3,
+        "default": 0
+      },
+      {
+        "name": "thickness",
+        "spec_id": 2,
+        "default": 1
+      },
+      {
+        "name": "HAS_LOGICAL_BOUNDS",
+        "spec_id": 13,
+        "default": false
+      }
+    ]
+  }
+]

@@ -3,6 +3,9 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstdlib>
+#include <cstring>
+#include "bb_tiler_bounds.h"
 
 #include "video_core/cache_backend.h"
 #include "video_core/texture_cache/image.h"
@@ -30,6 +33,7 @@ static std::pair<u32, u32> MacroTileExtent(const ImageInfo& info) {
 }
 
 TilingInfo TileManager::MakeTilingInfo(const ImageInfo& info, u32 num_mips) {
+    ASSERT(num_mips <= info.resources.levels && num_mips <= info.mips_layout.size());
     const bool is_macro = AmdGpu::IsMacroTiled(info.array_mode);
     const auto [macro_pitch, macro_height] =
         is_macro ? MacroTileExtent(info) : std::pair<u32, u32>{8, 8};
@@ -177,12 +181,19 @@ void TileManager::TileImage(Image& in_image, std::span<vk::BufferImageCopy> buff
     }
 
     const TilingInfo params = MakeTilingInfo(info, static_cast<u32>(buffer_copies.size()));
-
+    TilerBounds::ParamsV1 bounded{params};
+    static const bool requested = [] {
+        const auto* value = std::getenv("BB_ARM_TILER_BOUNDS");
+        return value && std::strcmp(value, "1") == 0;
+    }();
+    const bool use_bounds = requested && TilerBounds::Describe(info, buffer_copies, bounded);
+    const void* parameter_data = use_bounds ? static_cast<const void*>(&bounded) : &params;
+    const u64 parameter_bytes = use_bounds ? sizeof(bounded) : sizeof(params);
     const KernelBuffer params_buffer_info{
         .buffer = &stream_buffer,
-        .offset =
-            stream_buffer.Copy(&params, sizeof(params), backend.Limits().uniform_min_alignment),
-        .range = sizeof(params),
+        .offset = stream_buffer.Copy(parameter_data, parameter_bytes,
+                                    backend.Limits().uniform_min_alignment),
+        .range = parameter_bytes,
     };
 
     // Give a capable backend the same tiling description before allocating a linear snapshot.

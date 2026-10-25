@@ -14,6 +14,8 @@ layout(constant_id = 0) const uint NUM_SAMPLES = 1;
 layout(constant_id = 1) const uint MICRO_TILE_MODE = 1;
 layout(constant_id = 2) const uint MICRO_TILE_THICKNESS = 1;
 layout(constant_id = 3) const uint IS_TILER = 0;
+// Legacy 460-byte parameter blocks must never access this private extension.
+layout(constant_id = 13) const bool HAS_LOGICAL_BOUNDS = false;
 #if IS_MACRO_TILED
 layout(constant_id = 4) const uint ARRAY_MODE = 0;
 layout(constant_id = 5) const uint PIPE_CONFIG = 0;
@@ -107,11 +109,14 @@ layout (set = 0, binding = 1, scalar) buffer OutputBuf {
     BLOCK_TYPE linear_data[];
 };
 
+struct LogicalMipBounds { uint width; uint height; uint slices; };
+
 layout (set = 0, binding = 2, scalar) uniform TilingInfo {
     uint bank_swizzle;
     uint micro_tiled_mips;
     uint num_mips;
     MipInfo mips[16];
+    LogicalMipBounds logical[16];
 } info;
 
 uint32_t ComputePixelIndexWithinMicroTile(uint32_t x, uint32_t y, uint32_t z, uint32_t thickness) {
@@ -613,6 +618,13 @@ void main() {
             count = min(min(end - texel, pitch - x), TEXELS_PER_THREAD - (x & (TEXELS_PER_THREAD - 1)));
             linear_index = mip_first_texel + texel;
             texel += count;
+        }
+        if (IS_TILER != 0 && HAS_LOGICAL_BOUNDS) {
+            // Preserve the physical strides and address calculation. A texture-to-buffer
+            // copy initializes only actual image texels, not padded rows or small-mip tails.
+            if (x >= info.logical[mip].width || y >= info.logical[mip].height ||
+                slice >= info.logical[mip].slices) continue;
+            count = min(count, info.logical[mip].width - x);
         }
         CopyRow(mip, x, y, slice, padded_pitch, padded_height, linear_index, count);
     }

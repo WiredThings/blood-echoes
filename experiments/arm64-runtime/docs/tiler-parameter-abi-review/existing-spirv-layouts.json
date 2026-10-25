@@ -1,0 +1,1406 @@
+[
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_macro_128_comp.spv",
+    "sha256": "18de593dd939a517ed81e03b937e1533d3c938c92ca243589565ed7f5fc42332",
+    "structures": {
+      "MipInfo": {
+        "id": 543,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 545,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 544,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_macro_16_comp.spv",
+    "sha256": "22faec5fa73204ec5d1d987537d880183fc51aadeb1b8c5c70db12af4cc703fb",
+    "structures": {
+      "MipInfo": {
+        "id": 542,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 544,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 543,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_macro_32_comp.spv",
+    "sha256": "02f1e56dba584f345953a558162bf68528481587d6787b2f99a899f8632d3080",
+    "structures": {
+      "MipInfo": {
+        "id": 543,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 545,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 544,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_macro_64_comp.spv",
+    "sha256": "2fc592864b55ab91c8a802322a48985053bc204819d87561ec27a57aef8c2cf7",
+    "structures": {
+      "MipInfo": {
+        "id": 542,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 544,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 543,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_macro_8_comp.spv",
+    "sha256": "3bf97d26953e946d7f9dae72401ce747b0bb500fbbcbf756bceae594d8d39836",
+    "structures": {
+      "MipInfo": {
+        "id": 542,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 544,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 543,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_macro_96_comp.spv",
+    "sha256": "da6af8fd9129a893afadd0b83f828c3c5b7265137d9ac874f9e537b28578ba2c",
+    "structures": {
+      "MipInfo": {
+        "id": 531,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 533,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 532,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_micro_128_comp.spv",
+    "sha256": "29033cee0858a849cc15f0126fa7c557d87acf2c1eecc9972e62bcea233a8014",
+    "structures": {
+      "MipInfo": {
+        "id": 371,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 373,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 372,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_micro_16_comp.spv",
+    "sha256": "bcea774b081549e7eaa945aec8acade8836c4460cc74ad9200c6fa67b02440f9",
+    "structures": {
+      "MipInfo": {
+        "id": 370,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 372,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 371,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_micro_32_comp.spv",
+    "sha256": "282c3ef53305f2872a23313490867d717613b3866ccdb0194891ed587673754c",
+    "structures": {
+      "MipInfo": {
+        "id": 367,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 370,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 369,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_micro_64_comp.spv",
+    "sha256": "8af293d3e9ec68e86ba57f3916e746127594824618993e500f0c23b05b2110f2",
+    "structures": {
+      "MipInfo": {
+        "id": 369,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 372,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 371,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_micro_8_comp.spv",
+    "sha256": "0dd56ac83a314ae6500a407b877f7e9113f8229586a57b85c9b3159987a2ca7a",
+    "structures": {
+      "MipInfo": {
+        "id": 369,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 372,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 371,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "/private/tmp/blood-echoes-arm64-metal-20261023/build/host_shaders_spv/tiling_micro_96_comp.spv",
+    "sha256": "74dcb544e8beeac03bd0d3b59d50e0f283a3106154411ee7ebbc10f5057f7e5e",
+    "structures": {
+      "MipInfo": {
+        "id": 359,
+        "members": [
+          {
+            "name": "size",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "pitch",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "height",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "offset",
+            "offset": [
+              12
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_pitch",
+            "offset": [
+              16
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "padded_height",
+            "offset": [
+              20
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "slices",
+            "offset": [
+              24
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          }
+        ]
+      },
+      "TilingInfo": {
+        "id": 362,
+        "members": [
+          {
+            "name": "bank_swizzle",
+            "offset": [
+              0
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "micro_tiled_mips",
+            "offset": [
+              4
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "num_mips",
+            "offset": [
+              8
+            ],
+            "type_id": 6,
+            "array_stride": null,
+            "array_length": null
+          },
+          {
+            "name": "mips",
+            "offset": [
+              12
+            ],
+            "type_id": 361,
+            "array_stride": [
+              28
+            ],
+            "array_length": 16
+          }
+        ]
+      }
+    }
+  }
+]

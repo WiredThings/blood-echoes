@@ -1,0 +1,19 @@
+{
+  "captured_utc": "2026-10-25T06:37:44.205977+00:00",
+  "root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype",
+  "sha256": {
+    "src/bb_tiler_bounds.h": "7b73dd354546b8683869b08943521fca26e65ec706c9602e51eecbaa26cec751",
+    "vendor/metal_api/shadps4/video_core/texture_cache/tile_manager.h": "2ff9e93ecfcd028746577d779ace96c1a5dfb3643cad08f86bedbbd0a9cb4eeb",
+    "vendor/metal_api/shadps4/video_core/texture_cache/tile_manager.cpp": "5d92b1b0b2b344ce293f133f90ee98c7082ef37cd45ad9a4873fbff936f411c5",
+    "vendor/metal_api/shadps4/video_core/cache_backend.h": "5fa922742b6b7b682549cabef6907d97af81296f516ba08e65d2503e325f88cf",
+    "vendor/metal_api/shadps4/video_core/host_shaders/tiling.comp": "7569da1af407ac8284215be93049a9ff0a3cf3335902c127172950d09971e5e3",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_impl.h": "1dbbace5bdb61090d9f70a82179639252c18e0eaf608d902395875d41c38c6f0",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm": "fc09353c14cdc24181238d45640f6417b08220cea3c53c6a9b6504f3d96326a9",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_texture_tiling.h": "6e06d2f7ed7edb30ef2e5d32916d09a2e389ae31d9bdaadff33d6ac8c2202de2",
+    "vendor/metal_api/shadps4/video_core/buffer_cache/buffer_cache.cpp": "61630465b5e242561e26807a11fb5f332c8430f1bb63d092cd8e21694257a32a",
+    "vendor/metal_api/shim/remote/bb_protocol.h": "ebbb3980819d33862337e442c88e3ab42947bd922545682808d4223002426617",
+    "vendor/metal_api/shim/remote/remote_front.cpp": "5e4d3280252bf8c7a393ebc39c084a722f5353575d831a4f88bda69d54212dff",
+    "vendor/metal_api/shim/remote/remote_back.cpp": "d94e07440526a6cb0f28d67c65741f0c663dbb825f944e746363dd95283d2472"
+  },
+  "scope": "source-only review; no game or compilation launched in final review"
+}

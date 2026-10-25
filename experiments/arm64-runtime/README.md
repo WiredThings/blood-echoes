@@ -124,6 +124,30 @@ packaged-library FEX positive/negative and archive-content checks pass; GUI/live
 package F3/death/network acceptance is not claimed. The ZIP is local only, not in
 this Git snapshot or a Release. See the checkpoint report for its SHA and limits.
 
+## Opt-in logical tiler coverage candidate
+
+A private 652-byte parameter block preserves the public 460-byte prefix and adds
+logical extents only for canonical full color exports. Exact range and direction
+select constant 13, which also belongs to the full pipeline key. Physical addressing,
+proxy/MetalFX semantics and legacy callers retain their previous behavior. The
+new raw-padding fix passes 24 GPU controls, including the two original failures;
+old/new same-process pipeline separation and shape/range controls also pass.
+This candidate is OFF by default, has not changed FindImage selection and is not
+in the ordinary local QA package. A short silent isolated scene run completed,
+but swap increased about 1.73 GiB. It is not an FPS/memory equivalence or a
+white-model fix claim. See docs/tiler-logical-coverage.zh-CN.md and
+ docs/tiler-parameter-abi-review/report.zh-CN.md for measured ABI and limitations.
+
+Prepared isolated-host controls (never point them at formal caches or saves):
+
+```sh
+python3 tools/generate_tiler_bounds_shaders.py
+python3 tests/test_tiler_bounds_rewriter.py
+python3 tools/build_tiler_bounds_candidate.py
+python3 tests/test_tiler_bounds_cache.py
+python3 tests/test_texture_layout_preservation.py --full --candidate evidence/tiler-bounds-candidate-current.json --bounds
+```
+
 ## Development build limitations
 
 This is a source checkpoint of an active local prototype, **not yet a clean-checkout

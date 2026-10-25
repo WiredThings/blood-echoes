@@ -1,0 +1,10 @@
+{
+  "captured_utc": "2026-10-25T06:41:46.184253+00:00",
+  "review": "omitted specialization defaults follow-up; no compilation or test run by reviewer",
+  "previous_identity_unchanged": "source-identity.json",
+  "sha256": {
+    "src/bb_tiler_bounds.h": "96bb5306603e0f05b3061342d4191b53561421fccbac367b1aad5f79d61f4086",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm": "c37801108b3a337d6b7490dc522cdd1bd2f023434598f2b0334895ff534d9e5a",
+    "tests/texture_layout_contract_proposal/tiler_bounds_cache.mm": "cb65671eea5f28b07f6465cbadbcb830a2e1ed6fd05175df6a9e721d5adb80d4"
+  }
+}

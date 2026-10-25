@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792908532526449000,
+  "created_ns": 1792910734595944000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -110,6 +110,10 @@
     {
       "path": "src/bb_stutter_audit.h",
       "sha256": "bd46ad3978e5b753716b1ccfb16016c4dca93382a083f35c994f234bb1448c19"
+    },
+    {
+      "path": "src/bb_tiler_bounds.h",
+      "sha256": "96bb5306603e0f05b3061342d4191b53561421fccbac367b1aad5f79d61f4086"
     },
     {
       "path": "src/boot_image.h",
@@ -376,6 +380,10 @@
       "sha256": "7bd7225c95610b108228dd535575ea8ead20bf0f1fbb6619a1e3713dc5954aef"
     },
     {
+      "path": "tools/build_tiler_bounds_candidate.py",
+      "sha256": "40bb8303e4a8bea9ca1b460223fd23051da10daa0fb854ce0a9929fa34371534"
+    },
+    {
       "path": "tools/capture_launcher_memory.py",
       "sha256": "b7c06a0efd08fcdf37fbb1f14866b81bf9eefcc366cfa740d64bb6cb02a37563"
     },
@@ -426,6 +434,10 @@
     {
       "path": "tools/generate_native.py",
       "sha256": "9da9a54ef4838b24a213fe0f91059b339eb720b679de1632d88abdc1a6bd1e43"
+    },
+    {
+      "path": "tools/generate_tiler_bounds_shaders.py",
+      "sha256": "8dac5d50910285e1697d5111b40bf0dd98a912cc2dae6362ceccc0182cb5eaf0"
     },
     {
       "path": "tools/gpu_candidate_identity.py",
@@ -514,6 +526,10 @@
     {
       "path": "tools/prepare_startup.py",
       "sha256": "b6e966051525d927857f824b65f3532045ae07f79fec18418e8d0178a1a52f52"
+    },
+    {
+      "path": "tools/prepare_tiler_bounds_gpu.py",
+      "sha256": "3efeba13064eddd642321327cdbdf82de79f631bbf4d7560837f3ce34ea90310"
     },
     {
       "path": "tools/probe_disk_pso.mm",
@@ -657,7 +673,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "f15fdc34c39693d2294a6514aa5bbb62115559bdc3c64cd6bfa3ebd331d0a2ab"
+      "sha256": "8b6851740f5e322baf179af2744f58700b8e559be2dd5463c3b4fe77629f39b9"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -1329,7 +1345,7 @@
     },
     {
       "path": "tests/test_texture_layout_preservation.py",
-      "sha256": "17a34ca9b16d4e62cc0b02721628fda6a96f03b38ffcb8d6f23882dcdb3d4d36"
+      "sha256": "2caa47ab1a6792f75979c251f4659d05aa1443e74fc4e13548d5a82e2e9c0447"
     },
     {
       "path": "tests/test_texture_set_observation.cpp",
@@ -1346,6 +1362,14 @@
     {
       "path": "tests/test_thread_bootstrap.cpp",
       "sha256": "dd8700e6d17242103636007d0238ea034d14c93a6f7d4d18210257920541eb06"
+    },
+    {
+      "path": "tests/test_tiler_bounds_cache.py",
+      "sha256": "208f8708b170660c93158c6f7ce92d58917b7790eb3e8f04b3de866f51ad5ba1"
+    },
+    {
+      "path": "tests/test_tiler_bounds_rewriter.py",
+      "sha256": "306990f26760c2af8c4275b56c8c860fd6a64803f30403a0dc96441a056b831c"
     },
     {
       "path": "tests/test_trace_clock_rejection.py",
@@ -1377,7 +1401,7 @@
     },
     {
       "path": "tests/texture_layout_contract_proposal/gpu_raw_roundtrip.mm",
-      "sha256": "dc1ada03c1caf00877897ae92126f56e8a80426db77a2ae1cb81b36725f71070"
+      "sha256": "083c388caf83dbe312a706370b3b8abaf2fb6de0168170ebf6f89c084f6b39d5"
     },
     {
       "path": "tests/texture_layout_contract_proposal/layout-selection-diagnostic.patch",
@@ -1394,6 +1418,14 @@
     {
       "path": "tests/texture_layout_contract_proposal/layout_predicate_tests.cpp",
       "sha256": "3b809869bfd887949d1385d194d5f402d5fecda3b3d22b78741dbaf9c3a42772"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/tiler_bounds_cache.mm",
+      "sha256": "cb65671eea5f28b07f6465cbadbcb830a2e1ed6fd05175df6a9e721d5adb80d4"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/tiler_bounds_rewriter.cpp",
+      "sha256": "7667200f3301489e4cf8c52b66f7e15b9433597e30587468cbe51627a087eb55"
     },
     {
       "path": "tests/thread_signal_contract_review/README.md",
@@ -32357,7 +32389,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/host_shaders/tiling.comp",
-      "sha256": "7fdb8f28e330d2f0af00161d77ac0fa7d65b8b2e8ab3905669ae2006bc46da57"
+      "sha256": "7569da1af407ac8284215be93049a9ff0a3cf3335902c127172950d09971e5e3"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/host_shaders/upscale_merge.comp",
@@ -32649,11 +32681,11 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_impl.h",
-      "sha256": "a7da9ef9be27fc5502092153090f026435c66d6068974af50a0159961d1b02fc"
+      "sha256": "1dbbace5bdb61090d9f70a82179639252c18e0eaf608d902395875d41c38c6f0"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm",
-      "sha256": "d2bc9f8fb1e68d930ea9c2478aceaf62fbc2e5427fc83940b3745dbf16422ccd"
+      "sha256": "c37801108b3a337d6b7490dc522cdd1bd2f023434598f2b0334895ff534d9e5a"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_scene_targets.h",
@@ -32717,7 +32749,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_texture_tiling.h",
-      "sha256": "bfede149ee271e88d13ad582819150dee4b698115d57dd4020c4ade3b775521b"
+      "sha256": "6e06d2f7ed7edb30ef2e5d32916d09a2e389ae31d9bdaadff33d6ac8c2202de2"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_upscaler.h",
@@ -33177,7 +33209,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/texture_cache/tile_manager.cpp",
-      "sha256": "8752186189d7d4dbcd372a3b3b3ca294001a44d523f7107c45c09c79bca997dc"
+      "sha256": "5d92b1b0b2b344ce293f133f90ee98c7082ef37cd45ad9a4873fbff936f411c5"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/texture_cache/tile_manager.h",
@@ -38701,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "4ebcd45f0a0c576df8a859c4641994b7c5b28888f2a5bb963b8f4eed7a2617d7"
+      "sha256": "1a69e943d0c56787a980ac15732f7ad511787c1a97ee2f0318751f95026dd730"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "8790400bb9b247209b465d4e9db49b88a1e56adde33ac03a9bc103fc5bd782e1"
+      "sha256": "9cdd0661d988faf7a92b079d21ee6d36c599b94a3843213afdbf07f268286200"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38838,6 +38870,50 @@
     {
       "path": "docs/layout-observation-and-raw-preservation.zh-CN.md",
       "sha256": "3617892a94436dc6e68fb9ea519e2ea137c9fe342f342c519f4516a00f15bbbd"
+    },
+    {
+      "path": "docs/tiler-logical-coverage.zh-CN.md",
+      "sha256": "bf5768e0fd69a4e7fc18451a3bcd38e9251889be17098d34e2389ecf2991fb92"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/report.zh-CN.md",
+      "sha256": "36203176b6bbd30f5f0696273dbd49df91b966061bcbf7a4bcf23bcc2723e48a"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/abi-contract.json",
+      "sha256": "9c617c9fc120fd0e38c87091ee11e7ca12ea34778cf7dc74d98f54e3eff7a7be"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/source-identity.json",
+      "sha256": "6503ea49a2657b9a9f89333ea8b064164bbd2c850e3fa89ce8d02320ab0074e2"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/layout_contract.cpp",
+      "sha256": "24d07806f3a1d42be8f743dee70747a24d0fc97e2de19c60b25d8c24baf3ad6b"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/host_layout.mm",
+      "sha256": "769fabf67c30e33d1b0f9596f0c2ba4ec271dd6912adcf721fdfc87f7ecc3449"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/host-class-layouts.json",
+      "sha256": "64d4bf212f38ae6f48b939ebcc02b109f6ab53cb714128f1b3d3c96bd1496df2"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/existing-spirv-layouts.json",
+      "sha256": "f273400095e266e3189095c4b2bdc75b2f01877137c252ca09709511f617dc38"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/candidate-spirv-layouts.json",
+      "sha256": "07006db04038a7289922be089c364bae29bb7dc283211af7d9398e0fc3a72b8f"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/tiling-build-rules.json",
+      "sha256": "f93dfabdd08b9bb6ed3cc098dab4118584011d8660d8866f2bd99f18eead538d"
+    },
+    {
+      "path": "docs/tiler-parameter-abi-review/source-identity-defaults-followup.json",
+      "sha256": "f8d6cf2c915ccddd1f0b67e568b3e0db76dcba85f064efc469e3e99fef62665d"
     }
   ],
   "excluded": [
