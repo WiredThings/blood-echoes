@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792915621711689000,
+  "created_ns": 1792916879700780000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -149,7 +149,7 @@
     },
     {
       "path": "src/game_runtime.cpp",
-      "sha256": "aafc9bb47bc39eec9ed8c2c4ada00235dff705080025ad1add3e8b14edf9a582"
+      "sha256": "95e3f9f1355d15eaa4125466446b7a32ac5988cc294961a77c36c8788b027ceb"
     },
     {
       "path": "src/guest_module_info.h",
@@ -621,7 +621,7 @@
     },
     {
       "path": "tools/run_current_regressions.py",
-      "sha256": "b5ff10cf735327edff3c47b1e56d3f6cf8a196c3210b0cb61884f039e09c8ae6"
+      "sha256": "5f4f60850e788c6b209bb557a3d2456f3cd640e6e87475677704dc70c6590262"
     },
     {
       "path": "tools/run_death_observation.py",
@@ -1153,7 +1153,7 @@
     },
     {
       "path": "tests/test_missing_data_imports.py",
-      "sha256": "248dc4992e5798a53a66c49da9b1c60dbe0dc698f2ce5a4c27e4d95649606c4c"
+      "sha256": "24a3937629a816ec1ab63b19378e3b8fc8caba74d0517da93c810b3ff6eab0aa"
     },
     {
       "path": "tests/test_module_info_fex.py",
@@ -1449,11 +1449,11 @@
     },
     {
       "path": "generated/native-signatures.json",
-      "sha256": "9c01a3474cff3b7d5cc5abf693bb63065758f1bdcff860b26cf0e9baaa03e10d"
+      "sha256": "e85f5b556b1bcce80919c964ed296546de12681335f6649882f0424f0e18afaa"
     },
     {
       "path": "generated/native_adapters.inc",
-      "sha256": "ef532236d0f6de7f8418b5b6f63b1778b82f81b16f80930d024baa1de7122272"
+      "sha256": "6af14dbcb3d9e63cb1e9a49b3e9059f096f302218024623682132caeef7fa390"
     },
     {
       "path": "generated/native_registry.c",
@@ -1485,7 +1485,7 @@
     },
     {
       "path": "generated/runtime_memory_bridge.c",
-      "sha256": "4165abd371bada44fd863ffe34bc63deb03dd7fc426405e18a2d593841b91cb5"
+      "sha256": "37c035d690f4fb27f79390aba68fecd04561ae66d2a6305f2c22646c2d4f40b9"
     },
     {
       "path": "generated/runtime_mutex_bridge.c",
@@ -29417,11 +29417,11 @@
     },
     {
       "path": "vendor/bb_runtime/src/arm_bridge.h",
-      "sha256": "4a6093dbd2cfa01dc4e8cfbbb94577cd0cd1711eccf7fbd4acbb3c2f9ba2a753"
+      "sha256": "fee0640616c53293f2b61dd0973266121b735075e24d6b8a81a67676977b5db4"
     },
     {
       "path": "vendor/bb_runtime/src/import_names.inc",
-      "sha256": "b1bbfd8def8cac538f1f67a82bfb9e512a3f413a3b098af77608d564f19da3b8"
+      "sha256": "b013aef8a603fd9623e0005ca6c5fcaf7c89940084cca9b0d0da4c73c8ebb8e5"
     },
     {
       "path": "vendor/bb_runtime/src/low_heap.c",
@@ -29473,7 +29473,7 @@
     },
     {
       "path": "vendor/bb_runtime/src/runtime_memory.c",
-      "sha256": "25ae4d121ae6712eff2eddc358e673b714ca6632565a8f5e11e81e63905fa066"
+      "sha256": "8722eb472650c7029d4d1bde6535c59ee2ce8c3a8262e1fd1a9b1ba827f35c6a"
     },
     {
       "path": "vendor/bb_runtime/src/runtime_mutex.c",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "06d605a860700b58cbb16108b2b7b0a24a5951130b7aaf2e579d65d94417c75e"
+      "sha256": "991888fab642b35630d3ec2502bde6bfa118b8203c435bcb046766dfa0f79d9c"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "95191c65637ce8fde43b125a4aac0b367bdf78317c586c20e8b43427fc574536"
+      "sha256": "c1f07286aa9ea148374ad83f458e884cc154cf0ce4354dc6b3d3b413c34f6154"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39006,6 +39006,38 @@
     {
       "path": "docs/shader-first-miss-design.zh-CN.md",
       "sha256": "7714eb1e1cf6033b3a1ca0ee660a5aa3f90d805e38f4c379b830f740f6221c94"
+    },
+    {
+      "path": "vendor/bb_runtime/src/bounded_mlock.h",
+      "sha256": "69520e712c54ff23d632dd7a6e87d0e1d47742fb84b7d38b747ffdb64c884257"
+    },
+    {
+      "path": "tests/test_mlock_ledger.c",
+      "sha256": "9ec892963cf410ad44f720761bf1d310b0cdb76d938ab6b6d1a6cc41eff3b0c1"
+    },
+    {
+      "path": "tests/test_memory_mlock.c",
+      "sha256": "a4ba6b47c6f77f3f956579d6bc66e6c308e7c6a0ad5e679b159b602c8ddfb79a"
+    },
+    {
+      "path": "tests/test_mlock_native_wire.c",
+      "sha256": "ea69d25bcc393c2485830615dc76b4580d276d94703b2c1918cde35794dd3566"
+    },
+    {
+      "path": "tests/mlock_fixture.py",
+      "sha256": "8122bba22a36824cc1279bc860ffe73a03284567a6e103d5572e783bc45f4ec4"
+    },
+    {
+      "path": "tests/test_mlock_fex.py",
+      "sha256": "9c5e85671406542fd1676d3b22212ddcfc5484e5bc725ce49b736e7c22d62377"
+    },
+    {
+      "path": "docs/mlock-integrated-validation.zh-CN.md",
+      "sha256": "2254be2f6ff041073a7cdb7cda13a27cdf00db542e88849e288a881296aa62fc"
+    },
+    {
+      "path": "docs/mlock-integrated-validation.json",
+      "sha256": "859756a8da7302e920e2038cffda0e57acf4d95cbda59feca9ee7a134198f0b6"
     }
   ],
   "excluded": [
@@ -39022,42 +39054,32 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "94de6bb5e1fb83e4537eee80cd6274419ed90e1e",
+    "base": "a8bd4776b69814bc2501d4b5045664d1ce27ccf7",
     "paths": [
-      "vendor/metal_api/shadps4/shader_recompiler/compile_snapshot.h",
-      "vendor/metal_api/shadps4/shader_recompiler/compile_snapshot.cpp",
-      "vendor/metal_api/shadps4/shader_recompiler/info.h",
-      "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.h",
-      "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.cpp",
-      "vendor/metal_api/shadps4/shader_recompiler/recompiler.h",
-      "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_arm64.inc",
-      "vendor/metal_api/shadps4/video_core/pipeline_cache_core.h",
-      "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
-      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.h",
-      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.mm",
-      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.h",
-      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_shader.mm",
-      "tests/metal/test_shader_owned_snapshot.mm",
-      "tools/build_first_upload_test.py",
-      "vendor/metal_api/shim/bbport_overlay.cpp",
-      "tools/build_owned_shader_candidate.py",
-      "tools/prepare_owned_shader_gpu.py",
-      "tests/test_owned_shader.py",
-      "tools/frozen_gpu_headers.py",
-      "tools/build_raw_write_observer.py",
-      "tests/test_texture_authority_order.py",
-      "tools/run_launcher_engine_abba.py",
+      "vendor/bb_runtime/src/runtime_memory.c",
+      "vendor/bb_runtime/src/arm_bridge.h",
+      "src/game_runtime.cpp",
+      "vendor/bb_runtime/src/bounded_mlock.h",
+      "vendor/bb_runtime/src/import_names.inc",
+      "generated/native-signatures.json",
+      "generated/native_adapters.inc",
+      "generated/runtime_memory_bridge.c",
+      "tests/test_mlock_ledger.c",
+      "tests/test_memory_mlock.c",
+      "tests/test_mlock_native_wire.c",
+      "tests/mlock_fixture.py",
+      "tests/test_mlock_fex.py",
+      "tests/test_missing_data_imports.py",
+      "tools/run_current_regressions.py",
       "CURRENT-PLAN.zh-CN.md",
       "NIGHT-HANDOFF.zh-CN.md",
-      "docs/owned-shader-source-review.zh-CN.md",
-      "docs/owned-shader-source-manifest.json",
-      "docs/owned-shader-validation.zh-CN.md",
-      "docs/shader-first-miss-design.zh-CN.md"
+      "docs/mlock-integrated-validation.zh-CN.md",
+      "docs/mlock-integrated-validation.json"
     ],
     "excluded_parallel_drafts": [
-      "bounded Mlock integration",
-      "first-program capture/scheduler patches",
-      "raw-write live lease/export patches"
+      "shader guest capture",
+      "prepared exact image export",
+      "raw-write live lease factory"
     ]
   }
 }

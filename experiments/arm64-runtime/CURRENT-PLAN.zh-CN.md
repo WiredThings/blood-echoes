@@ -137,3 +137,7 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 ## 最新：独立shader编译基础已构建，暂停盲目攻击脚本
 
 见本机evidence/owned-shader-verified-checkpoint-20261025/report.zh-CN.md。230 GPU单元完整重建、owned真实GCN/Metal/毒化控制、原phase off/on及24字节保全通过。scheduler/首见捕获/采用仍未接入，不称卡顿已缓解。最后场景仅启动动作smoke；用户观察到一直砍墙，不是探索/战斗验收，后续不再启动该盲目脚本。新源码待精确export/push，dev当前94de6bb5；正式应用/数据及普通QA/Release不变。
+
+## 最新：有界 Mlock 接入通过无窗口回归
+
+见 evidence/mlock-integrated-checkpoint-20261025/report.zh-CN.md。CPU854294e0，56目标重建/121基础及14专项通过；真实Mach单页重复去重和MAP_FIXED清账通过。原九项已有五项有界实现，四项继续。未跑游戏、不称提帧或白模修复；普通QA包仍CPU67db。新owned-shader基础a8bd4776已推dev，捕获与raw预导出草稿尚未接入。正式数据/Release不变。用量本轮剩余约93%。

@@ -267,7 +267,19 @@ extern "C" int bb_arm_msync_native(uintptr_t address,uint64_t size,int host_flag
   const auto end=address+size;auto at=address;
   while(at<end){uintptr_t next=at;for(const auto&r:active->ranges)if(at>=r.Begin&&at-r.Begin<r.Size)next=std::max(next,std::min<uintptr_t>(end,r.Begin+r.Size));if(next==at)return EINVAL;at=next;}
  }
- return msync(reinterpret_cast<void*>(address),size,host_flags) ? errno : 0;
+ return runtime_memory_msync_native_leased(address,size,host_flags);
+}
+
+extern "C" int bb_arm_mlock_native(uintptr_t address,uint64_t size,int unlock){
+ if(!active||address>UINTPTR_MAX-size)return ENOMEM;
+ // Only explicitly published native-owned guest views. Holding State's read
+ // lease blocks stack unpublication; this path never takes the VMA lock.
+ std::shared_lock lock(active->mutex);
+ if(!size){bool found=false;for(const auto&r:active->ranges)if(address>=r.Begin&&address-r.Begin<r.Size){found=true;break;}if(!found)return ENOMEM;}
+ else{const auto end=address+size;auto at=address;
+  while(at<end){uintptr_t next=at;for(const auto&r:active->ranges)if(at>=r.Begin&&at-r.Begin<r.Size)next=std::max(next,std::min<uintptr_t>(end,r.Begin+r.Size));if(next==at)return ENOMEM;at=next;}
+ }
+ return runtime_memory_mlock_native_leased(address,size,unlock);
 }
 
 extern "C" void bb_arm_require_callback(const char* name,uintptr_t at){

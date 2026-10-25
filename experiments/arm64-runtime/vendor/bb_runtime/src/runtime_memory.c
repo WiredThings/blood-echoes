@@ -19,6 +19,41 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include "bounded_mlock.h"
+#include "../../../src/runtime_exit_codes.h"
+static BbMlockLedger mlock_ledger=BB_MLOCK_LEDGER_INIT;
+static _Atomic uint64_t mlock_requests,mlock_rejected;
+static int mlock_host(void*ctx,uintptr_t at,uint64_t bytes,int unlock){
+    (void)ctx;const int r=unlock?munlock((void*)at,(size_t)bytes):mlock((void*)at,(size_t)bytes);
+    return r?errno:0;
+}
+static int mlock_host_sync(void*ctx,uintptr_t at,uint64_t bytes,int flags){
+    (void)ctx;return msync((void*)at,(size_t)bytes,flags)?errno:0;
+}
+static int mlock_checked_error(int error){
+    if(error==BB_MLOCK_POISONED){fputs("ARM Mlock host rollback failed; pinned state remains accounted\n",stderr);fflush(stderr);_Exit(BB_ARM_EXIT_HLE_FAULT);}
+    return error;
+}
+/* A committed mapping must never be exposed with stale VMA/GPU metadata.
+ * The existing manager cannot roll back a multi-MAP_FIXED transaction. Fail
+ * before guest continuation rather than returning a recoverable error after
+ * irreversible partial host changes or early GPU unmap notification. */
+static void mlock_mapping_incomplete(const char*stage){
+#ifdef BB_MLOCK_MAPPING_FAILURE_OBSERVER
+    BB_MLOCK_MAPPING_FAILURE_OBSERVER(stage);
+#endif
+    static const char prefix[]="ARM VM COMMIT STOP ";
+    write(STDERR_FILENO,prefix,sizeof(prefix)-1);write(STDERR_FILENO,stage,strlen(stage));write(STDERR_FILENO,"\n",1);
+    _Exit(BB_ARM_EXIT_HLE_FAULT);
+}
+/* State read lease is supplied by the native guest-range owner; no VMA lock
+ * acquisition here. Normal guest VMAs call the same ledger under a VMA lease. */
+int runtime_memory_mlock_native_leased(uintptr_t at,uint64_t bytes,int unlock){
+    return mlock_checked_error(bb_mlock_apply(&mlock_ledger,at,bytes,unlock,mlock_host,NULL));
+}
+int runtime_memory_msync_native_leased(uintptr_t at,uint64_t bytes,int flags){
+    return mlock_checked_error(bb_mlock_sync(&mlock_ledger,at,bytes,flags,!!(flags&MS_INVALIDATE),mlock_host_sync,NULL));
+}
 /* sceKernelGetDirectMemorySize on retail PS4: 5056 MiB. BB_DMEM_MB raises it (the resolution
  * patches above 1080p need about 4 GiB more; run.sh sets it). */
 static uint64_t pool_size_bytes(void) {
@@ -242,8 +277,11 @@ static void ensure_chunks(uint64_t phys, uint64_t size) {
 }
 /* mmap of direct or flexible memory at phys, split where it crosses chunks. */
 static void *map_phys(uintptr_t address, uint64_t size, int prot, uint64_t phys) {
-    if (!chunk_fds || phys>=POOL_SIZE)
-        return mmap((void *)address,size,prot,MAP_SHARED|MAP_FIXED,pool_fd,(off_t)phys);
+    if (!chunk_fds || phys>=POOL_SIZE) {
+        void*p=mmap((void *)address,size,prot,MAP_SHARED|MAP_FIXED,pool_fd,(off_t)phys);
+        if(p!=MAP_FAILED)bb_mlock_forget_committed(&mlock_ledger,address,size);
+        return p;
+    }
     ensure_chunks(phys,size);
     for (uint64_t done=0;whole_chunks && done<size;) {
         const uint64_t at=phys+done;
@@ -258,8 +296,10 @@ static void *map_phys(uintptr_t address, uint64_t size, int prot, uint64_t phys)
             if (reported++ < 4)
                 fprintf(stderr,"Runtime: mapping direct memory %#" PRIx64 "+%#" PRIx64 " from %s failed: %s\n",
                         at,n,r && r->fd>=0 ? "a GPU-visible dma-buf (whole-allocation chunk)" : "the memfd",strerror(errno));
+            if(done)mlock_mapping_incomplete("map_phys partial MAP_FIXED");
             return MAP_FAILED;
         }
+        bb_mlock_forget_committed(&mlock_ledger,address+done,n);
         done+=n;
         if (done==size) return (void *)address;
     }
@@ -274,8 +314,10 @@ static void *map_phys(uintptr_t address, uint64_t size, int prot, uint64_t phys)
             if (reported++ < 4)
                 fprintf(stderr,"Runtime: mapping direct memory %#" PRIx64 "+%#" PRIx64 " from %s failed: %s\n",
                         at,n,chunk_fds[c]>=0 ? "a GPU-visible dma-buf chunk" : "the memfd",strerror(errno));
+            if(done)mlock_mapping_incomplete("map_phys partial MAP_FIXED");
             return MAP_FAILED;
         }
+        bb_mlock_forget_committed(&mlock_ledger,address+done,n);
         done+=n;
     }
     return (void *)address;
@@ -444,6 +486,7 @@ static uintptr_t find_free(uintptr_t hint, uint64_t size, uint64_t alignment) {
 }
 static void drop_range(uintptr_t start, uintptr_t end) {
     int error; size_t i=carve(start,end,&error), n=0;
+    if(error)mlock_mapping_incomplete("drop_range split after host commit");
     while (i+n<vma_count && vmas[i+n].end<=end && vmas[i+n].start>=start) {
         if (vmas[i+n].kind==KIND_FLEXIBLE) {
             flexible_bytes-=vmas[i+n].end-vmas[i+n].start;
@@ -480,12 +523,13 @@ static int32_t place(void **inout, uint64_t size, int prot, int flags, uint64_t 
         ? map_phys(address,size,host_prot(prot),phys)
         : mmap((void *)address,size,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE|MAP_FIXED,-1,0);
     if (mapped==MAP_FAILED) return NO_MEMORY;
+    if(kind==KIND_RESERVED||private_exec)bb_mlock_forget_committed(&mlock_ledger,address,size);
     /* Record successful host mappings even if later table publication fails.
      * Splits/protection changes preserve the original physical-to-guest relation. */
     if (kind==KIND_DIRECT) reclaim_mapping_record(address,size,phys,private_exec);
     drop_range(address,address+size);
     trap_forget(address,address+size); /* a new mapping starts without traps */
-    if (vma_insert(vma_index(address),(Vma){address,address+size,kind,prot,type,phys,private_exec})) return NO_MEMORY;
+    if (vma_insert(vma_index(address),(Vma){address,address+size,kind,prot,type,phys,private_exec}))mlock_mapping_incomplete("VMA insert after host commit");
     if (kind==KIND_FLEXIBLE) flexible_bytes+=size;
     if (kind!=KIND_RESERVED) queue_hook(HOOK_MAP,address,size);
     if (kind!=KIND_RESERVED) queue_mirror(MIRROR_MAP,address,size,phys,kind,prot,type,!private_exec);
@@ -575,7 +619,8 @@ static int32_t unmap_locked(uintptr_t start, uint64_t size) {
         uintptr_t a=vmas[i].start>start ? vmas[i].start : start, b=vmas[i].end<end ? vmas[i].end : end;
         /* Keep guest ownership of VA after release; future native allocations must
          * not land here before the next guest MAP_FIXED. No physical pages. */
-        if (mmap((void*)a,b-a,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)==MAP_FAILED) return INVALID;
+        if (mmap((void*)a,b-a,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)==MAP_FAILED)mlock_mapping_incomplete("unmap replacement after GPU notification");
+        bb_mlock_forget_committed(&mlock_ledger,a,b-a);
     }
     drop_range(start,end);
     trap_forget(start,end);
@@ -603,7 +648,8 @@ static ABI int32_t direct_release(uint64_t start, uint64_t size) {
         uint64_t length=v.end-v.start;
         if (v.kind==KIND_DIRECT && v.phys<start+size && start<v.phys+length) {
             uint64_t a=v.phys>start ? v.phys : start, b=v.phys+length<start+size ? v.phys+length : start+size;
-            unmap_locked(v.start+(a-v.phys),b-a);
+            const int32_t result=unmap_locked(v.start+(a-v.phys),b-a);
+            if(result){write_unlock();flush_hooks();return result;}
             i=vma_index(v.start);
             continue;
         }
@@ -669,6 +715,44 @@ static ABI void *posix_mmap(void *addr, uint64_t size, int prot, int flags, int 
     if (result) { *runtime_errno()=result==NO_MEMORY ? POSIX_ENOMEM : POSIX_EINVAL; return (void *)-1; }
     return out;
 }
+/* Numeric page operations: the range is never dereferenced as a C buffer.
+ * FreeBSD user-wire semantics reject committed-but-unreadable/execute-less
+ * mappings when locking, but allow unlocking a still mapped PROT_NONE range. */
+static int mlock_request(uintptr_t address,uint64_t size,int unlock){
+    atomic_fetch_add_explicit(&mlock_requests,1,memory_order_relaxed);
+    uintptr_t start=0;uint64_t bytes=0;int error=bb_mlock_normalize(address,size,&start,&bytes);
+    if(!error){
+        if(start<USER_MIN||start>=USER_MAX)error=bb_arm_mlock_native(start,bytes,unlock);
+        else if(bytes>USER_MAX-start)error=EINVAL;
+        else {
+            read_lock();
+            const uintptr_t end=start+bytes;uintptr_t at=start;
+            /* Even an aligned empty range must identify an owned current map. */
+            do {
+                const size_t i=vma_index(at);
+                if(i==vma_count||vmas[i].start>at||at>=vmas[i].end||vmas[i].kind==KIND_RESERVED||vmas[i].host_owned||(!unlock&&!(vmas[i].prot&5))){error=ENOMEM;break;}
+                if(!bytes)break;
+                at=vmas[i].end<end?vmas[i].end:end;
+            }while(at<end);
+            if(!error)error=runtime_memory_mlock_native_leased(start,bytes,unlock);
+            read_unlock();
+        }
+    }
+    if(error)atomic_fetch_add_explicit(&mlock_rejected,1,memory_order_relaxed);
+    return error;
+}
+static ABI int32_t kernel_mlock(uintptr_t address,uint64_t size){
+    const int error=mlock_request(address,size,0);return error?(int32_t)(UINT32_C(0x80020000)|runtime_guest_errno(error)):0;
+}
+static ABI int32_t kernel_munlock(uintptr_t address,uint64_t size){
+    const int error=mlock_request(address,size,1);return error?(int32_t)(UINT32_C(0x80020000)|runtime_guest_errno(error)):0;
+}
+static ABI int32_t posix_mlock(uintptr_t address,uint64_t size){
+    const int error=mlock_request(address,size,0);if(error){*runtime_errno()=runtime_guest_errno(error);return-1;}return 0;
+}
+static ABI int32_t posix_munlock(uintptr_t address,uint64_t size){
+    const int error=mlock_request(address,size,1);if(error){*runtime_errno()=runtime_guest_errno(error);return-1;}return 0;
+}
 /* FreeBSD 9 / ps4sdk MS_SYNC=0, ASYNC=1, INVALIDATE=2. Unknown bits are
  * ignored as in that kernel; never pass them through (Darwin bit4 kills pages).
  * The address is a numeric VM operation, not a C buffer to dereference. */
@@ -704,8 +788,7 @@ static ABI int32_t posix_msync(uintptr_t address,uint64_t size,int flags) {
     /* Hold the read lease across the syscall. A concurrent unmap/remap cannot
      * replace a validated mapping before the kernel follows its backing. No GPU
      * dirty notification: this syncs VM backing, not CPU/GPU rendering work. */
-    const int result=msync((void*)start,(size_t)bytes,host_flags);
-    const int error=result ? errno : 0;
+    const int error=runtime_memory_msync_native_leased(start,bytes,host_flags);
     read_unlock();
     return error ? msync_error(error) : 0;
 }
@@ -729,7 +812,7 @@ static int32_t protect_locked(uintptr_t start, uint64_t size, int prot, int type
     if (mprotect((void *)start,end-start,host_prot(prot))) return INVALID;
     trap_reapply(start,end,host_prot(prot)); /* traps restrict the new guest permissions */
     int error; size_t i=carve(start,end,&error);
-    if (error) return NO_MEMORY;
+    if (error)mlock_mapping_incomplete("VMA protection split after host commit");
     for (; i<vma_count && vmas[i].start<end; ++i) { vmas[i].prot=prot; if (type>=0) vmas[i].type=type; }
     queue_mirror(MIRROR_PROTECT,start,end-start,0,0,prot,type,0);
     queue_hook(HOOK_INVALIDATE,start,end-start);
@@ -821,6 +904,7 @@ static const RuntimeExport exports[]={
     {"sceKernelVirtualQuery",virtual_query}, {"sceKernelGetDirectMemoryType",direct_memory_type},
     {"sceKernelBatchMap",batch_map}, {"sceKernelBatchMap2",batch_map2},
     {"mmap",posix_mmap}, {"msync",posix_msync},
+    {"sceKernelMlock",kernel_mlock}, {"sceKernelMunlock",kernel_munlock}, {"mlock",posix_mlock}, {"munlock",posix_munlock},
 };
 uintptr_t runtime_memory_resolve(const char *name) {
     /* Direct-memory NIDs are exercised by test_runtime.c before names are loaded. */
@@ -829,6 +913,7 @@ uintptr_t runtime_memory_resolve(const char *name) {
     if (!strcmp(name, "L-Q3LEjIbgA#p#J")) return (uintptr_t)direct_map;
     if (!strcmp(name, "MBuItvba6z8#p#J")) return (uintptr_t)direct_release;
     if (!strcmp(name, "cQke9UuBQOk#p#J")) return (uintptr_t)direct_unmap;
+    if (!strcmp(name, "3k6kx-zOOSQ#p#J")) return (uintptr_t)kernel_mlock;
     return RUNTIME_LOOKUP(exports,name);
 }
 /* Host-owned memory the guest can see (image, stacks, trampolines) lives in
@@ -853,12 +938,12 @@ void *runtime_low_map(size_t size, int prot) {
     void* p=MAP_FAILED;
     for(size_t i=0;i<low_free_count;++i)if(low_free[i].bytes>=size){
         p=mmap((void*)low_free[i].at,size,prot,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0);
-        if(p!=MAP_FAILED){low_free[i].at+=size;low_free[i].bytes-=size;if(!low_free[i].bytes)low_free[i]=low_free[--low_free_count];}
+        if(p!=MAP_FAILED){bb_mlock_forget_committed(&mlock_ledger,(uintptr_t)p,size);low_free[i].at+=size;low_free[i].bytes-=size;if(!low_free[i].bytes)low_free[i]=low_free[--low_free_count];}
         write_unlock();return p==MAP_FAILED?NULL:p;
     }
     if(size<=low_arena_end-low_next&&PAGE<=low_arena_end-low_next-size){
         p=mmap((void*)low_next,size,prot,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0);
-        if(p!=MAP_FAILED)low_next+=size+PAGE;
+        if(p!=MAP_FAILED){bb_mlock_forget_committed(&mlock_ledger,(uintptr_t)p,size);low_next+=size+PAGE;}
     }
     write_unlock();
     return p==MAP_FAILED?NULL:p;
@@ -868,6 +953,7 @@ void runtime_low_release(void* address,size_t size){
     if(at<LOW_MIN||at>=low_arena_end||size>low_arena_end-at){fputs("ARM low release outside owned arena\n",stderr);_Exit(74);}
     write_lock();
     if(mmap(address,size,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)==MAP_FAILED)_Exit(74);
+    bb_mlock_forget_committed(&mlock_ledger,at,size);
     if(low_free_count<sizeof(low_free)/sizeof(low_free[0]))low_free[low_free_count++]=(LowFree){at,size};
     write_unlock();
 }
@@ -1449,6 +1535,10 @@ void runtime_memory_report(void) {
            allocations, maps, live_bytes, POOL_SIZE);
     printf("Runtime: flexible maps=%zu, in use=%" PRIu64 ", protects=%zu, queries=%zu, regions=%zu\n",
            flexible_maps, flexible_bytes, protects, queries, vma_count);
+    pthread_mutex_lock(&mlock_ledger.gate);
+    printf("Runtime: Mlock requests=%" PRIu64 ", rejected=%" PRIu64 ", ledger_calls=%" PRIu64 ", unlocks=%" PRIu64 ", wired=%" PRIu64 ", peak=%" PRIu64 ", duplicate_pages=%" PRIu64 ", ledger_failures=%" PRIu64 ", poisoned=%d\n",
+        atomic_load_explicit(&mlock_requests,memory_order_relaxed),atomic_load_explicit(&mlock_rejected,memory_order_relaxed),mlock_ledger.calls,mlock_ledger.unlocks,(uint64_t)mlock_ledger.count*BB_MLOCK_PAGE,mlock_ledger.high_water,mlock_ledger.duplicate_pages,mlock_ledger.failures,mlock_ledger.poisoned);
+    pthread_mutex_unlock(&mlock_ledger.gate);
 }
 #else
 void *runtime_low_map(size_t size, int prot) { (void)size; (void)prot; return NULL; }

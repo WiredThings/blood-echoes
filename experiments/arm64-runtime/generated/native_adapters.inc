@@ -29,6 +29,7 @@ if(signature=="iIPQ") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigne
 if(signature=="iIRP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,const void*,void*)>(wrapper));
 if(signature=="iIi") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,int)>(wrapper));
 if(signature=="iIiP") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned int,int,void*)>(wrapper));
+if(signature=="iLQ") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long,unsigned long long)>(wrapper));
 if(signature=="iLQi") return MakeHleCallAdapter(reinterpret_cast<int (*)(unsigned long,unsigned long long,int)>(wrapper));
 if(signature=="iP") return MakeHleCallAdapter(reinterpret_cast<int (*)(void*)>(wrapper));
 if(signature=="iPI") return MakeHleCallAdapter(reinterpret_cast<int (*)(void*,unsigned int)>(wrapper));

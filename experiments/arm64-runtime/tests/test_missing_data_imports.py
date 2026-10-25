@@ -12,7 +12,8 @@ def fixture(mode):
     nb=struct.unpack_from('<Q',raw,offset)[0];offset+=8+24*nb+24*ns
     names=[raw[offset+128*i:offset+128*(i+1)].split(b'\0')[0]for i in range(ni)]
     index=names.index(b'bb.prototype.missing')
-    name=b'f7uOxY9mM1U#p#J'if mode=='valid-data'else b'djxxOmW6-aw#p#J'
+    # __progname is now implemented; a stable synthetic unknown remains a negative contract.
+    name=b'f7uOxY9mM1U#p#J'if mode=='valid-data'else b'bb.prototype.unknown.data'
     raw[offset+128*index:offset+128*(index+1)]=name.ljust(128,b'\0')
     relocs=offset+128*ni;slot=None
     for i in range(nr):

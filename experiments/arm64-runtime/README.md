@@ -218,3 +218,13 @@ Old-ABI diagnostic libraries now obtain f349bd44 sources through tools/frozen_gp
 with revision-specific EOL attributes and Git-blob verification. They no longer compile
 against the newer Info structure. This still requires the prepared private dependency stage;
 it is not a clean-checkout standalone prototype build claim.
+
+## Bounded guest page wiring
+
+See docs/mlock-integrated-validation.zh-CN.md. Real Darwin locking is capped at
+16 MiB per request / 64 MiB total / 4096 pages; duplicate guest locks are a set.
+Mapping leases, successful replacement retirement, MS_INVALIDATE EBUSY and fatal
+partial-commit handling are covered by native and FEX controls. No game performance
+or full-game lock-demand claim is made. Five of the original nine missing imports
+now have bounded implementations and tests; four remain. The normal QA package
+and production app are unchanged. This supersedes the earlier unapplied-Mlock note.

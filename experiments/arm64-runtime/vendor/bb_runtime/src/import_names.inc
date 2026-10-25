@@ -752,3 +752,8 @@
 {"aCYPMSUIaP8#K#L","sceHttpGetAllResponseHeaders"},
 {"yigr4V0-HTM#K#L","sceHttpSetRecvTimeOut"},
 {"xegFfZKBVlw#K#L","sceHttpSetSendTimeOut"},
+
+/* Additional page-wiring exports verified against shadPS4 aerolib + StringToNid. */
+{"xQIIfJ860sk#p#J","sceKernelMunlock"},
+{"mTBZfEal2Bw#p#J","mlock"},
+{"OG4RsDwLguo#p#J","munlock"},

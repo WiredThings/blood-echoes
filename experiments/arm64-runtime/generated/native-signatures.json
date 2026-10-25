@@ -1077,6 +1077,50 @@
   },
   {
     "source": "runtime_memory",
+    "function": "kernel_mlock",
+    "signature": "iLQ",
+    "parameters": [
+      "uintptr_t",
+      "uint64_t"
+    ],
+    "returns": "int32_t",
+    "full_span_pointer_slots": []
+  },
+  {
+    "source": "runtime_memory",
+    "function": "kernel_munlock",
+    "signature": "iLQ",
+    "parameters": [
+      "uintptr_t",
+      "uint64_t"
+    ],
+    "returns": "int32_t",
+    "full_span_pointer_slots": []
+  },
+  {
+    "source": "runtime_memory",
+    "function": "posix_mlock",
+    "signature": "iLQ",
+    "parameters": [
+      "uintptr_t",
+      "uint64_t"
+    ],
+    "returns": "int32_t",
+    "full_span_pointer_slots": []
+  },
+  {
+    "source": "runtime_memory",
+    "function": "posix_munlock",
+    "signature": "iLQ",
+    "parameters": [
+      "uintptr_t",
+      "uint64_t"
+    ],
+    "returns": "int32_t",
+    "full_span_pointer_slots": []
+  },
+  {
+    "source": "runtime_memory",
     "function": "posix_msync",
     "signature": "iLQi",
     "parameters": [

@@ -1,0 +1,70 @@
+{
+  "status": "authored-native-and-FEX-regressions-passed-no-game",
+  "CPU_sha256": "854294e0ef42da5becdb99f24e68b90812cbc0b869753262670d576dea6e7bc5",
+  "regression_evidence": "current-runtime-regression-1792916582170640000",
+  "mlock_evidence": "mlock-contract-1792916322032111000",
+  "jobs": [
+    {
+      "name": "rebuild-suite",
+      "status": 0
+    },
+    {
+      "name": "suite",
+      "status": 0
+    },
+    {
+      "name": "data",
+      "status": 0
+    },
+    {
+      "name": "spans",
+      "status": 0
+    },
+    {
+      "name": "exit",
+      "status": 0
+    },
+    {
+      "name": "producer-analysis",
+      "status": 0
+    },
+    {
+      "name": "signal-FEX",
+      "status": 0
+    },
+    {
+      "name": "writer-clock",
+      "status": 0
+    },
+    {
+      "name": "reader-clock",
+      "status": 0
+    },
+    {
+      "name": "ABI-marker",
+      "status": 0
+    },
+    {
+      "name": "AvPlayer-FEX",
+      "status": 0
+    },
+    {
+      "name": "progname-FEX",
+      "status": 0
+    },
+    {
+      "name": "module-info-FEX",
+      "status": 0
+    },
+    {
+      "name": "msync-FEX",
+      "status": 0
+    },
+    {
+      "name": "mlock-FEX",
+      "status": 0
+    }
+  ],
+  "game_started": false,
+  "remaining_original_imports": 4
+}
