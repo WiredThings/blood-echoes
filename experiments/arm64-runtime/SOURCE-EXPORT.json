@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792922461595543000,
+  "created_ns": 1792924016903239000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -441,7 +441,7 @@
     },
     {
       "path": "tools/gpu_candidate_identity.py",
-      "sha256": "13d0e5f0fcb285ead2c87fbd307308c536ef30538f95a05ebe09484d17a326da"
+      "sha256": "60be63d9695f030841a5e3e6ca99a9af1a527daa8434393f55a6add71c7df6be"
     },
     {
       "path": "tools/guard_launcher_gui.py",
@@ -641,7 +641,7 @@
     },
     {
       "path": "tools/run_game.py",
-      "sha256": "587b1d9de9a25c7f08426267033381d75ffcd163b60940b2f5130f9d15650548"
+      "sha256": "4cc491f3007f87784f31185078d9513b58a615c5f310e249e440bbc2b26de89c"
     },
     {
       "path": "tools/run_gpu_retention_pair.py",
@@ -38729,15 +38729,15 @@
     },
     {
       "path": "GOAL.zh-CN.md",
-      "sha256": "d6d6a10f2bcb8a4fdd849de112a7413d4e0c25dd9816e687d523d8f08a9c13b1"
+      "sha256": "69736b339134d50c4b0dc0164e164736c5d555a06787d42f1fd63dcd616dd1f1"
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "5c97ca0a4e49ea032739b6cf9492c37194744f78f7228048250ea44ba6c48fc1"
+      "sha256": "ecf94ede66d33532fd3d7bf4573c6082346becf517b0a5847378bcecedad4b7f"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "57ef7b236558731bbec53cf3500336132440e6457da0e86154458b3fb1c56cfd"
+      "sha256": "4d7da3ed14836aab3f643e2b347955cdcea84fbcdb65e19c8e566b1eca705185"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39182,6 +39182,26 @@
     {
       "path": "docs/warm-persistence-validation.json",
       "sha256": "b9ab27e08a1f7487d3138db041ef74859b9b41fc0700963736fa9a18c4833932"
+    },
+    {
+      "path": "tools/prepare_gpu_candidate_app.py",
+      "sha256": "fd9d61bd7a00853e6a11c819bd224bed4e9a2a68b3dc23d959a1acf422c44db1"
+    },
+    {
+      "path": "tests/test_gpu_candidate_selection.py",
+      "sha256": "eeec9fe77b381f6539b614c716bcf8c020b9ecb62f73dec2dd72be1e9db8cbf7"
+    },
+    {
+      "path": "tools/analyze_warm_archive_cases.py",
+      "sha256": "4ef8be87672750fa87ac95453d8289e370b4701a5263bede931213efe2caadbe"
+    },
+    {
+      "path": "docs/warm-archive-game-validation.zh-CN.md",
+      "sha256": "f29427f25acd67403498e028df20ee5ebe2581d632472ca12d770fea58cdefa2"
+    },
+    {
+      "path": "docs/warm-archive-game-validation.json",
+      "sha256": "28fb0605d85e7b60c25325150335e3fb2faf54c87c9d462f13e8a17cd775ddda"
     }
   ],
   "excluded": [
@@ -39198,33 +39218,27 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "b65d9742aaec2ee1ac49cf0f7caa7a8624c01f5c",
+    "base": "ca52e78db84cd299f0c0373ea105db55fc892d12",
     "paths": [
-      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pso_cache.mm",
-      "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_warm_archive_identity.h",
-      "vendor/metal_api/shadps4/video_core/pipeline_cache_core_serialization.cpp",
-      "tools/warm_archive_manifest.py",
-      "tools/test_warm_archive_manifest.py",
+      "tools/gpu_candidate_identity.py",
       "tools/run_game.py",
-      "tools/run_warm_archive_process_controls.py",
-      "tools/run_warm_stage_storage_controls.py",
-      "tools/build_warm_archive_candidate.py",
-      "tools/build_first_upload_test.py",
-      "tools/run_authored_controls_guard.py",
-      "tools/run_warm_persistence_regressions.py",
-      "tests/metal/test_warm_archive_process.mm",
-      "tests/metal/test_warm_stage_storage.cpp",
+      "tools/prepare_gpu_candidate_app.py",
+      "tests/test_gpu_candidate_selection.py",
+      "tools/analyze_warm_archive_cases.py",
+      "GOAL.zh-CN.md",
       "CURRENT-PLAN.zh-CN.md",
       "NIGHT-HANDOFF.zh-CN.md",
-      "docs/warm-persistence-validation.zh-CN.md",
-      "docs/warm-persistence-validation.json"
+      "docs/warm-archive-game-validation.zh-CN.md",
+      "docs/warm-archive-game-validation.json"
     ],
+    "status": "matched-archive-cohort-only-opt-in",
     "excluded_parallel_drafts": [
-      "R2 exact export",
+      "GS equality review",
+      "R2 raw export",
       "live payload leases",
       "context restore",
-      "firstmiss async capture/adoption"
-    ],
-    "status": "authored-controls-only-not-enabled"
+      "firstmiss async scheduler",
+      "future local metallib builder"
+    ]
   }
 }

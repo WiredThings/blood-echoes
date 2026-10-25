@@ -157,3 +157,9 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 ## 2026-10-25：持久化与加载期读取验证
 
 见 docs/warm-persistence-validation.zh-CN.md（Shared 原始证据 evidence/warm-persistence-verified-checkpoint-20261025）。v3 归档实际身份隔离、原子成功发布、父目录故障保护及 LoadPipelineStage 精确命中免重读已在两单元候选实现，15 原生子进程、9 producer 分支、真实 Storage 路径、owned/phase 与 24 GPU 保留控制通过。无游戏启动、无新 FPS/白模成功主张，尚未默认启用、未更新普通手动 QA 包/正式应用/Release。下一步须在隔离场景核对完整组合覆盖与冷/暖启动编译、帧时间及内存，尤其 newLibraryWithSource 仍会发生，不能用 archive 命中代替所有层命中。完整设置散列保守且有启动成本；新原生候选必须用实际绑定此库的私有 GPU 执行文件测试，不能把旧 GPU app 的 v2 结果当成 v3。
+
+## 2026-10-25：实际归档BAAB及用户本地离线库要求
+
+见 docs/warm-archive-game-validation.zh-CN.md。显式候选选择入口已补，不再用旧GPU app冒充新库。用户关闭部分后台后4×75秒原生1080p同设置静音站桩完成：PSO开启500/520实际命中，平均创建23ms对关闭178ms；仍538次Metal建库约0.8s。FPS趋势48.82对46.58（仅单组），内存平均差+20MiB但两配对方向相反，未证明稳定增减；继续实验、不默认启用。两轮先前保护中止保留，不清缓存/不放宽保护。缓存508完整特化/409键按当前布局解码无错，但不是全游戏覆盖。正式11671文件不变、普通QA和Release不变。
+
+用户新增要求已写入GOAL末尾：交付代码中的本机离线建库流程，各用户自己构建，不分发开发机游戏metallib/归档。当前只有本机PSO归档，新的本机离线库构建器尚未实现；不可把两者混称。后续以实际重写后MSL和完整兼容身份做准备期构建/命中验证，不直接恢复已撤销Toolchain实验。几何runtime特化等价问题由已有subagent只读审查，未应用草稿或声称白模修复。

@@ -280,3 +280,18 @@ loads cannot publish null programs. Fifteen authored native processes, actual St
 controls, nine producer branches, and existing shader/texture regressions pass.
 This is not a game FPS, whole-game precompile coverage, white-model fix, or clean-build
 claim. The ordinary manual QA app and production app/data/caches/Release remain unchanged.
+
+## Actual archive comparison and local build delivery
+
+See docs/warm-archive-game-validation.zh-CN.md. Four isolated matched 75-second
+ON/OFF/OFF/ON cases completed after background apps were closed. Native archive
+hits reduce PSO construction, while 538 Metal source-library builds still occur.
+The single cohort's FPS/memory variation is qualified; archives remain opt-in.
+Two earlier protected stops are retained as incomplete, not performance passes.
+The explicit private candidate selector reuses existing architecture/signature/load-edge
+validation. No formal app, saves, settings, caches or Release were updated.
+
+The requested offline-library delivery is code that builds locally from each user's
+own game and complete effective shader combinations. Developer-generated game
+metallibs/PSO archives are not distributable project assets. A new local metallib
+builder is not yet implemented; the PSO archive alone must not be called one.

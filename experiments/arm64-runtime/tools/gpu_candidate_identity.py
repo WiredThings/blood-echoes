@@ -34,3 +34,16 @@ def verify(meta,backend_root):
   signature=subprocess.run(['/usr/bin/codesign','--verify','--strict',str(path)],capture_output=True,text=True)
   if signature.returncode:raise ValueError('GPU signature rejected: '+path.name+': '+(signature.stdout+signature.stderr).strip()[:1024])
  return dict(target=str(target),target_sha256=sha(target),library=str(library),library_sha256=sha(library),load_edge_verified=True,strict_signatures=True,architecture='arm64',declared_gpu_load_edges=gpu)
+
+
+def select_for_isolated_run(manifest_path, *, engine, graphics, private_root):
+ """Optional private selection, using the same verified Mach-O contract as fixtures."""
+ if manifest_path is None:return None
+ if engine!='arm64' or not graphics:raise ValueError('GPU candidate requires isolated ARM64 graphics')
+ import json
+ private_root=Path(private_root).resolve(strict=True)
+ manifest=Path(manifest_path).absolute()
+ if manifest!=manifest.resolve(strict=True)or not manifest.is_relative_to(private_root/'evidence'):
+  raise ValueError('GPU candidate manifest must be a canonical private evidence file')
+ record=json.loads(manifest.read_text())
+ return verify(record,private_root/'backend')
