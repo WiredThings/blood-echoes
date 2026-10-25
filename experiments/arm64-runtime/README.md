@@ -228,3 +228,12 @@ partial-commit handling are covered by native and FEX controls. No game performa
 or full-game lock-demand claim is made. Five of the original nine missing imports
 now have bounded implementations and tests; four remain. The normal QA package
 and production app are unchanged. This supersedes the earlier unapplied-Mlock note.
+
+## Safe speculative shader reads (preparation scheduler still pending)
+
+See docs/shader-guest-capture-validation.zh-CN.md. The full 230-unit GPU rebuild
+and authored signal-recovery, owned-GCN/Metal, phase-output and 24 byte-preservation
+controls pass. Preparation uses bounded shader-header reads and POD fault leaves;
+checked decoding rejects truncated owned inputs. The older SRT/fetch wide recovery
+region still needs replacement. No asynchronous first-miss compilation or performance
+improvement is claimed, and no game run or production update was performed.

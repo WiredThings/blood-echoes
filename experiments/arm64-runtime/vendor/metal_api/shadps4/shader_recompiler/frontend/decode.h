@@ -3,6 +3,10 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstring>
+#include <stdexcept>
+
 #include "shader_recompiler/frontend/instruction.h"
 
 namespace Shader::Gcn {
@@ -26,20 +30,27 @@ Opcode DecodeOpcode(u32 token);
 
 class GcnCodeSlice {
 public:
-    GcnCodeSlice(const u32* ptr, const u32* end) : m_ptr(ptr), m_end(end) {}
+    /// checked=true is for bounded owned/capture inputs; legacy ordered callers retain their
+    /// current fast path. Checks apply to all decoder reads, including literal extensions.
+    GcnCodeSlice(const u32* ptr, const u32* end, bool checked = false)
+        : m_ptr(ptr), m_end(end), m_checked(checked) {}
     GcnCodeSlice(const GcnCodeSlice& other) = default;
     ~GcnCodeSlice() = default;
 
     u32 at(u32 id) const {
+        RequireWords(size_t(id) + 1);
         return m_ptr[id];
     }
 
     u32 readu32() {
+        RequireWords(1);
         return *(m_ptr++);
     }
 
     u64 readu64() {
-        const u64 value = *(u64*)m_ptr;
+        RequireWords(2);
+        u64 value;
+        std::memcpy(&value, m_ptr, sizeof(value));
         m_ptr += 2;
         return value;
     }
@@ -54,8 +65,15 @@ public:
     }
 
 private:
+    void RequireWords(size_t count) const {
+        if (!m_checked) return;
+        if (m_ptr > m_end || count > size_t(m_end - m_ptr)) {
+            throw std::runtime_error{"truncated bounded GCN input"};
+        }
+    }
     const u32* m_ptr{};
     const u32* m_end{};
+    bool m_checked{};
 };
 
 class GcnDecodeContext {

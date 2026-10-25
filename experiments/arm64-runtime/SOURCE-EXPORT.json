@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792916879700780000,
+  "created_ns": 1792917355673430000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -325,7 +325,7 @@
     },
     {
       "path": "tools/build_first_upload_test.py",
-      "sha256": "d478a1ae5d2e4ddd056890cf332c53ac7bc2dfeb24a49833083e65ace3002708"
+      "sha256": "08eeded07e8e52dd567b3bbd81eb714bc9d1253bd929b2e15634add58560b4db"
     },
     {
       "path": "tools/build_heap_bridge.py",
@@ -31729,7 +31729,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.h",
-      "sha256": "175108a9b89b4ddc96dde7578145b1c082e77ffb03f78dd43afca3a472666a3a"
+      "sha256": "84aabe9d893b773a38ea733b4d750ef83638884ed4e117cc6d450e25a2c83506"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.cpp",
@@ -32417,7 +32417,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
-      "sha256": "f5d7992b00d3bb30409a6bd34b473761d5faaed06692482d6742ff62f11cf47a"
+      "sha256": "9d18aa8cf3974a8f099591ebfa0d0432312618db70556d42e1ce42aaf4f5ac20"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.h",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "991888fab642b35630d3ec2502bde6bfa118b8203c435bcb046766dfa0f79d9c"
+      "sha256": "c660768f20d8cf56593de385e5b184347395381184521f4f71092d3f8b702f01"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "c1f07286aa9ea148374ad83f458e884cc154cf0ce4354dc6b3d3b413c34f6154"
+      "sha256": "b4d45687a850804e598da4bbade7392dbf4551409688218cf1c96cc13cb4a3c8"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39038,6 +39038,30 @@
     {
       "path": "docs/mlock-integrated-validation.json",
       "sha256": "859756a8da7302e920e2038cffda0e57acf4d95cbda59feca9ee7a134198f0b6"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/common/guest_capture.h",
+      "sha256": "fe22910cd9c8ab086305e31e9cb22552d753ddf0abc74b4b83d3910c0ba5b28b"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/amdgpu/shader_capture.h",
+      "sha256": "91c78d4067312358765f3a612b938c96a953f5a975560c8c6de0db89ceb91de2"
+    },
+    {
+      "path": "tests/metal/test_shader_guest_capture.mm",
+      "sha256": "affa25f0d4c4d0f4d71338ff37dee70579cc08f407bbb11e3470701f706610df"
+    },
+    {
+      "path": "tests/test_shader_guest_capture.py",
+      "sha256": "6af2597f9b00d6160445cc20d374b3fb6098f3f33b46a9ab42b8081eda181294"
+    },
+    {
+      "path": "docs/shader-guest-capture-validation.zh-CN.md",
+      "sha256": "3a97275d267df1476601601405e73637386e780039eb5493b28e665c5140c7bd"
+    },
+    {
+      "path": "docs/shader-guest-capture-validation.json",
+      "sha256": "371832a9f29ed7022115f6a9e8bf91a013e2ae88ac8f384297ad5444deaf26ac"
     }
   ],
   "excluded": [
@@ -39054,32 +39078,24 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "a8bd4776b69814bc2501d4b5045664d1ce27ccf7",
+    "base": "c2c5bdc1428cc816193e934276837c79452ee9ce",
     "paths": [
-      "vendor/bb_runtime/src/runtime_memory.c",
-      "vendor/bb_runtime/src/arm_bridge.h",
-      "src/game_runtime.cpp",
-      "vendor/bb_runtime/src/bounded_mlock.h",
-      "vendor/bb_runtime/src/import_names.inc",
-      "generated/native-signatures.json",
-      "generated/native_adapters.inc",
-      "generated/runtime_memory_bridge.c",
-      "tests/test_mlock_ledger.c",
-      "tests/test_memory_mlock.c",
-      "tests/test_mlock_native_wire.c",
-      "tests/mlock_fixture.py",
-      "tests/test_mlock_fex.py",
-      "tests/test_missing_data_imports.py",
-      "tools/run_current_regressions.py",
+      "vendor/metal_api/shadps4/common/guest_capture.h",
+      "vendor/metal_api/shadps4/video_core/amdgpu/shader_capture.h",
+      "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.h",
+      "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
+      "tests/metal/test_shader_guest_capture.mm",
+      "tools/build_first_upload_test.py",
+      "tests/test_shader_guest_capture.py",
       "CURRENT-PLAN.zh-CN.md",
       "NIGHT-HANDOFF.zh-CN.md",
-      "docs/mlock-integrated-validation.zh-CN.md",
-      "docs/mlock-integrated-validation.json"
+      "docs/shader-guest-capture-validation.zh-CN.md",
+      "docs/shader-guest-capture-validation.json"
     ],
     "excluded_parallel_drafts": [
-      "shader guest capture",
-      "prepared exact image export",
-      "raw-write live lease factory"
+      "remaining speculative read set",
+      "prepared exact export",
+      "module finalizer"
     ]
   }
 }

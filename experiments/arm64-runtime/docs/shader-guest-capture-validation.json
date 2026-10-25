@@ -1,0 +1,53 @@
+{
+  "status": "authored-controls-passed-no-scheduler-no-game",
+  "refs": {
+    "build": "owned-shader-gpu-build-1792916932251418000",
+    "capture": "shader-guest-capture-controls-1792917262464639000",
+    "owned": "first-upload-regression-1792917281228003000",
+    "phases": "actual-shader-phase-controls-1792917286901471000",
+    "preservation": "texture-preservation-controls-1792917287432354000"
+  },
+  "library_sha256": "ec51ec6c939d3407bef32fd183f940d422e45bff9c303573f13efde9763d38f1",
+  "files": [
+    {
+      "path": "vendor/metal_api/shadps4/common/guest_capture.h",
+      "before_sha256": null,
+      "after_sha256": "fe22910cd9c8ab086305e31e9cb22552d753ddf0abc74b4b83d3910c0ba5b28b"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/amdgpu/shader_capture.h",
+      "before_sha256": null,
+      "after_sha256": "91c78d4067312358765f3a612b938c96a953f5a975560c8c6de0db89ceb91de2"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.h",
+      "before_sha256": "175108a9b89b4ddc96dde7578145b1c082e77ffb03f78dd43afca3a472666a3a",
+      "after_sha256": "84aabe9d893b773a38ea733b4d750ef83638884ed4e117cc6d450e25a2c83506"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
+      "before_sha256": "f5d7992b00d3bb30409a6bd34b473761d5faaed06692482d6742ff62f11cf47a",
+      "after_sha256": "9d18aa8cf3974a8f099591ebfa0d0432312618db70556d42e1ce42aaf4f5ac20"
+    },
+    {
+      "path": "tests/metal/test_shader_guest_capture.mm",
+      "before_sha256": null,
+      "after_sha256": "affa25f0d4c4d0f4d71338ff37dee70579cc08f407bbb11e3470701f706610df"
+    },
+    {
+      "path": "tools/build_first_upload_test.py",
+      "before_sha256": "d478a1ae5d2e4ddd056890cf332c53ac7bc2dfeb24a49833083e65ace3002708",
+      "after_sha256": "08eeded07e8e52dd567b3bbd81eb714bc9d1253bd929b2e15634add58560b4db"
+    },
+    {
+      "path": "tests/test_shader_guest_capture.py",
+      "before_sha256": null,
+      "after_sha256": "6af2597f9b00d6160445cc20d374b3fb6098f3f33b46a9ab42b8081eda181294",
+      "worker_draft_sha256": "cb3023ab91d1a621982bc4c221eaebf5addc6fb7c0e6650a73efe562652ab8aa"
+    }
+  ],
+  "normal_SPIRV_sha256": "623decccd1e59958cf087381db5a03d4a07ffbf50f161f3f368f1a2d78b99083",
+  "scheduler_enabled": false,
+  "game_started": false,
+  "formal_data_modified": false
+}

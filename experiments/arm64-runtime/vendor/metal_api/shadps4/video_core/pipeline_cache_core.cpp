@@ -25,6 +25,7 @@
 #include "shader_recompiler/recompiler.h"
 #include "shader_recompiler/runtime_info.h"
 #include "video_core/amdgpu/liverpool.h"
+#include "video_core/amdgpu/shader_capture.h"
 #include "video_core/pipeline_cache_core.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
 #include "video_core/motion_history.h"
@@ -163,11 +164,22 @@ const Shader::RuntimeInfo& PipelineCacheCore::BuildRuntimeInfo(PipelineSelection
         info.hw.gs.in_vertex_data_size = regs.vgt_esgs_ring_itemsize;
         info.hw.gs.out_vertex_data_size = regs.vgt_gs_vert_itemsize[0];
         info.hw.gs.mode = regs.vgt_gs_mode.mode;
-        const auto params_vc = AmdGpu::GetParams(regs.vs_program);
-        info.hw.gs.vs_copy = params_vc.code;
-        info.hw.gs.vs_copy_hash = params_vc.hash;
-        DumpShader(info.hw.gs.vs_copy, info.hw.gs.vs_copy_hash, Shader::HwStage::Vertex, 0,
-                   "copy.bin");
+        const auto params_vc = sel.worker
+            ? AmdGpu::GetParamsForPreparation(regs.vs_program)
+            : std::optional{AmdGpu::GetParams(regs.vs_program)};
+        if (!params_vc) {
+            sel.worker->failed = true;
+            info.hw.gs.vs_copy = {};
+            info.hw.gs.vs_copy_hash = 0;
+            break;
+        }
+        info.hw.gs.vs_copy = params_vc->code;
+        info.hw.gs.vs_copy_hash = params_vc->hash;
+        // Speculative workers never dereference this borrowed copy span or dump its bytes.
+        if (!sel.worker) {
+            DumpShader(info.hw.gs.vs_copy, info.hw.gs.vs_copy_hash, Shader::HwStage::Vertex, 0,
+                       "copy.bin");
+        }
         break;
     }
     case HwStage::Vertex: {
@@ -888,11 +900,16 @@ bool PipelineCacheCore::RefreshGraphicsStages(PipelineSelection& sel) {
             return false;
         }
 
-        const auto params = AmdGpu::GetParams(*pgm);
+        const auto params = sel.worker ? AmdGpu::GetParamsForPreparation(*pgm)
+                                       : std::optional{AmdGpu::GetParams(*pgm)};
+        if (!params) {
+            sel.worker->failed = true;
+            return false;
+        }
         std::optional<Shader::Gcn::FetchShaderData> fetch_shader_;
         std::tie(sel.infos[stage_out_idx], sel.modules[stage_out_idx], fetch_shader_,
                  key.stage_hashes[stage_out_idx]) =
-            GetProgram(sel, stage_in, stage_out, params, binding);
+            GetProgram(sel, stage_in, stage_out, *params, binding);
         if (fetch_shader_) {
             sel.fetch_shader = fetch_shader_;
         }
@@ -1134,6 +1151,7 @@ PipelineCacheCore::Result PipelineCacheCore::GetProgram(PipelineSelection& sel, 
                                                 Shader::Backend::Bindings& binding) {
     LogShaderUse(hw_stage, params.hash);
     auto runtime_info = BuildRuntimeInfo(sel, hw_stage, sw_stage);
+    if (sel.worker && sel.worker->failed) return {};
     if (sel.worker) {
         // bbport: draw-preparation worker: look up only, with the worker's own Info copy.
         auto& worker = *sel.worker;

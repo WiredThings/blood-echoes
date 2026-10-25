@@ -528,3 +528,7 @@ GOAL.zh-CN.md 已新增九接口收口及固定游戏着色器/特化目录，�
 ## 最新：有界 Mlock 接入通过无窗口回归
 
 见 evidence/mlock-integrated-checkpoint-20261025/report.zh-CN.md。CPU854294e0，56目标重建/121基础及14专项通过；真实Mach单页重复去重和MAP_FIXED清账通过。原九项已有五项有界实现，四项继续。未跑游戏、不称提帧或白模修复；普通QA包仍CPU67db。新owned-shader基础a8bd4776已推dev，捕获与raw预导出草稿尚未接入。正式数据/Release不变。用量本轮剩余约93%。
+
+## 最新：POD shader捕获基础通过真实控制
+
+见 evidence/guest-capture-verified-checkpoint-20261025/report.zh-CN.md。230GPU单元重建为ec51ec6c，1000故障恢复/owner析构、有界参数/真实prep入口/GCN截断通过；owned、原phase输出623deccc及24字节保全回归通过。未开游戏、未接scheduler，旧SRT/fetch大guard仍待修。源码仅dev同步；普通QA/正式数据/Release不变。Mlock已推c2c5bdc1；当前用量剩余约93%。
