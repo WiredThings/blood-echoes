@@ -1,7 +1,9 @@
 """Serial actual-source local builder proof. Run under run_authored_controls_guard.py."""
 from pathlib import Path
-import json,subprocess,sys,time
-P=Path(__file__).resolve().parents[1];e=P/'evidence'/('local-aot-authoritative-controls-'+str(time.time_ns()));e.mkdir();m=json.loads((P/'evidence/local-aot-candidate-current.json').read_text());library=m['candidate'];steps=[]
+import argparse,json,subprocess,sys,time
+P=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser();parser.add_argument('--candidate',type=Path,default=P/'evidence/local-aot-candidate-current.json');args=parser.parse_args();metadata=args.candidate.resolve(strict=True);assert metadata.is_relative_to(P/'evidence')
+e=P/'evidence'/('local-aot-authoritative-controls-'+str(time.time_ns()));e.mkdir();m=json.loads(metadata.read_text());library=m['candidate'];steps=[]
 def run(name,args):
  with(e/(name+'.log')).open('w')as log:r=subprocess.run([sys.executable,*args],cwd=P,stdout=log,stderr=subprocess.STDOUT)
  steps.append(dict(name=name,exit=r.returncode));(e/'steps.json').write_text(json.dumps(steps,indent=2)+'\n');assert r.returncode==0,(name,str(e));print('PASS',name,flush=True)

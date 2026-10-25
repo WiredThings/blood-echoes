@@ -169,8 +169,10 @@ struct HwGeometryRuntimeInfo {
     u64 vs_copy_hash;
 
     bool operator==(const HwGeometryRuntimeInfo& other) const {
-        return num_outputs == other.num_outputs && outputs == other.outputs && num_invocations &&
-               other.num_invocations && output_vertices == other.output_vertices &&
+        return num_outputs == other.num_outputs && outputs == other.outputs &&
+               num_invocations == other.num_invocations && output_vertices == other.output_vertices &&
+               in_vertex_data_size == other.in_vertex_data_size &&
+               out_vertex_data_size == other.out_vertex_data_size &&
                in_primitive == other.in_primitive &&
                std::ranges::equal(out_primitive, other.out_primitive) &&
                vs_copy_hash == other.vs_copy_hash;
@@ -250,7 +252,8 @@ struct HwComputeRuntimeInfo {
     std::array<bool, 3> tgid_enable;
 
     bool operator==(const HwComputeRuntimeInfo& other) const noexcept {
-        return workgroup_size == other.workgroup_size && tgid_enable == other.tgid_enable;
+        return shared_memory_size == other.shared_memory_size &&
+               workgroup_size == other.workgroup_size && tgid_enable == other.tgid_enable;
     }
 };
 

@@ -179,3 +179,9 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 见docs/local-metal-aot-archive.zh-CN.md。旧a24同候选ABBA的PSO归档命中500→0→500→0，确认source与本机离线库互相替换归档。3e6d7e83df299f146ea4c61857651122095c9da345a5166b7f20050075cbec9a按本机build_id隔离，只保留当前一套内存归档，19原生子进程严格命中/双文件保留/真实GPU输出通过；四库16准入及九组回归通过。修正preservation固定旧candidate的测试入口，本次24纹理实际载入3e6d7e83df299f146ea4c61857651122095c9da345a5166b7f20050075cbec9a。旧历史24项不能证明当时新AOT候选。AOT默认关，旧ABBA约0.68%差异不是收益证明。实际特化key28项作者负例确认GS invocations/ring尺寸及compute shared memory遗漏，仅shadow修复通过，vendor未改、白模根因未证。下一步独立实际IR输出/LoadStage/一致GPU重建；不清缓存。正式数据/应用/普通QA/Release不变。
 
 归档修复候选3e6d7e83的75.23秒source模式游戏smoke已完成，无保护中止；正式11671文件重验全不变。完整新候选AOT游戏性能仍待，尚未默认开启。
+
+## 2026-10-25：特化字段正确性修复已进隔离源码
+
+见docs/runtime-key-correctness.zh-CN.md。真实IR/GS copy/SPI emitter证明四字段改变编译；旧库实际Storage/ordered/worker检出六个错误，新库21检查零失败。ec7742a66c5d3ef4ce4858414aecc558ea9f7b2141c596f6e61e287b3fe6aa46完整230GPU单元重建，编译器布局不变，不清缓存。既有9回归、19原生归档及实际SHA绑定24纹理通过。ABBA+BA六轮站桩帧率基本持平，501份MSL与核心缓存计数一致，无新增变体、无保护中止/正向swap增长；B1内存偏高未持续，不能声称整游戏零成本或白模已修好。历史compute38条LDS全0、GS已知调用数全1，所以仍无live根因见证。正式11671文件全不变，普通QA/正式app/Release不更新。下一步：live payload原始身份/安全写回的实际生命周期，首次未知组合和异步采用；用户验收项继续暂缓。
+
+本机AOT回归新增显式--candidate以测试全量Ec7742a6库，四库/16准入和真实输出/GCN/skip4通过。当前header变化用完整230构建；旧三单元工具会正确拒绝，不绕过。

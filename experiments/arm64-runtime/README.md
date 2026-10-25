@@ -323,4 +323,22 @@ Texture regression selection now binds the actual chosen candidate SHA; earlier
 24-case runs accidentally used the prior warm-stage candidate and do not prove
 their then-current AOT library. No stable FPS gain or white-model fix is claimed.
 A separate 28-check authored probe proves GS ring/invocation and compute shared
-size omissions in RuntimeInfo equality; that candidate is not applied to vendor.
+size omissions in RuntimeInfo equality. It was not applied at that audit; the
+later full build and validation are described below.
+
+## Runtime specialization key correctness
+
+See docs/runtime-key-correctness.zh-CN.md. Actual compiler consumers and old-library
+cache counterexamples prove GS invocation/ring and compute shared-size omissions.
+The isolated fix is now fully rebuilt across all 230 GPU units; actual cache
+selection, unchanged compiler-derived layout, native archive and real texture
+preservation controls pass. Six fixed-scene comparisons show no meaningful FPS
+gain or additional variants. One higher footprint sample was not sustained; this
+does not prove long-run memory neutrality or that the white-model cause is solved.
+Production, ordinary QA packages, saves/settings/caches and Release stay unchanged.
+The historical three-header probe now requires an explicit --baseline-header.
+
+Current header changes require the complete build_owned_shader_candidate.py path;
+the earlier body-only incremental tool deliberately rejects that baseline mismatch.
+Local AOT regressions accept --candidate evidence/owned-shader-gpu-build-current.json
+to validate the actual full-build library. Prepared local dependencies are required.

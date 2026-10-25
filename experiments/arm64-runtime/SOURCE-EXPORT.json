@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792930310744369000,
+  "created_ns": 1792932716707612000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -325,7 +325,7 @@
     },
     {
       "path": "tools/build_first_upload_test.py",
-      "sha256": "3a6eeb2c56d56d5fba5feec0116fc0589049e9c501d4592697306396632c224f"
+      "sha256": "9c457184d28e821c7689fbbeab301793fa55103dfb691d2daeccd82dfb7d1238"
     },
     {
       "path": "tools/build_heap_bridge.py",
@@ -32101,7 +32101,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/runtime_info.h",
-      "sha256": "109461f33021254005a64574a58f4cf70d89195d8f3ca752b0422f5bd178d4f4"
+      "sha256": "7073b4b8835bba1d5810d43d7fe7b40b0da696781a272a194dae32b8b779bbb1"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/specialization.h",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "680618f48b193bbb2a0646500dfe30eef20a9bca5003cb61684893cddda14173"
+      "sha256": "50a1283fe0517b616aea74fb89d065697a4a415a06d88e17c0d5cf796b29d2de"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "06c1baccbf0a61a79cdd8c6221463d8848f590025fcdf5fcfbcb5a5c0565fe96"
+      "sha256": "0de730eed0bf65d6b49866282e070d455b78ef96bbab2e180f0a3f68e1101b54"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39229,7 +39229,7 @@
     },
     {
       "path": "tools/run_local_aot_authored.py",
-      "sha256": "def30860fc58215c4f7818e6ffbebf4f0a63360741fc60b627bd6721a1d769ec"
+      "sha256": "cd86fe0b4ee9b5837152ed61029c087a22d4a14a361dbeebad6df507b04ba931"
     },
     {
       "path": "tools/local_aot_policy.py",
@@ -39245,7 +39245,7 @@
     },
     {
       "path": "docs/local-metal-aot-validation.zh-CN.md",
-      "sha256": "79fabf5d1c3d2924eef7326f4cfdf5e7dca52f06031825294c64ffdf725cf13d"
+      "sha256": "30eb0cfb3510543ede0fc557094152b03cde8ffde2272085ac95adfc702df74f"
     },
     {
       "path": "docs/local-metal-aot-validation.json",
@@ -39273,15 +39273,47 @@
     },
     {
       "path": "tools/probe_runtime_specialization_keys.py",
-      "sha256": "1d0fe61bd5901e6792a11a4e72da5c900492d7c2801cca26be7438fe5af2ee25"
+      "sha256": "d9aa18bf1465f515ba2b77128cc09dfb8257a66f35abe3bc765b1bca63fb65e1"
     },
     {
       "path": "docs/local-metal-aot-archive.zh-CN.md",
-      "sha256": "2732775eccfd38a86a5fdc45da301a392ac5bba081b454e6a36e1378f699f90b"
+      "sha256": "fb2ee731f38b3ac6fcc94301a9fffd44d54728a8a1965e1a714d2677c98e9692"
     },
     {
       "path": "docs/local-metal-aot-archive.json",
-      "sha256": "8b9e5995b2a659dcd765b28a720352b93510b462228318b4ddad8d6c1b65ce62"
+      "sha256": "4f496d1f38f5ae2228abd427fa0a6eadc0983c19629320a8241ad060575a5268"
+    },
+    {
+      "path": "tests/metal/test_runtime_key_compilation.mm",
+      "sha256": "11f6b0fafbf6165da2a8833e1156c447e887ec4d78865dd1f69d528d54da2b6f"
+    },
+    {
+      "path": "tests/metal/test_runtime_key_cache.mm",
+      "sha256": "5b436e965228b6126cde2b6ead7d8df4da5dbd4de1590a78d05754f44d7b265e"
+    },
+    {
+      "path": "tools/run_runtime_key_compilation_controls.py",
+      "sha256": "c7aba2c9ef9a2713621e7f95feb0c76b94a197b70f5676b36a65659728b6f787"
+    },
+    {
+      "path": "tools/run_runtime_key_cache_controls.py",
+      "sha256": "4a2bdb6abfba7c9c78a2184e281ea2c094d7f8d72c48e6eed3a97177f5cc9674"
+    },
+    {
+      "path": "tools/run_runtime_key_regressions.py",
+      "sha256": "4240f6bc074bf1cbbcd89f8fc7530937154a875ad79054e4771768e45065be08"
+    },
+    {
+      "path": "tools/run_runtime_key_game_matrix.py",
+      "sha256": "d923763bfc38834b3b55d14826afb875b1375c49ed0355c744468a088ff301fc"
+    },
+    {
+      "path": "docs/runtime-key-correctness.zh-CN.md",
+      "sha256": "8edd9d248ed3aeb8ee404fffc06431b574dc8fa68b4fae26fb05ee574b547d45"
+    },
+    {
+      "path": "docs/runtime-key-correctness.json",
+      "sha256": "5042263a7ddd25bdcd67bac8d7c9f20b3ee34b0b2452a5fd8f9fad56920df9f7"
     }
   ],
   "excluded": [
@@ -39359,6 +39391,24 @@
       "docs/local-metal-aot-archive.zh-CN.md",
       "docs/local-metal-aot-archive.json"
     ],
-    "archive_provenance_status": "native-verified-and-game-source-smoke-passed-not-default"
+    "archive_provenance_status": "native-verified-and-game-source-smoke-passed-not-default",
+    "runtime_key_paths": [
+      "vendor/metal_api/shadps4/shader_recompiler/runtime_info.h",
+      "tests/metal/test_runtime_key_compilation.mm",
+      "tests/metal/test_runtime_key_cache.mm",
+      "tools/build_first_upload_test.py",
+      "tools/run_runtime_key_compilation_controls.py",
+      "tools/run_runtime_key_cache_controls.py",
+      "tools/run_runtime_key_regressions.py",
+      "tools/run_runtime_key_game_matrix.py",
+      "tools/probe_runtime_specialization_keys.py",
+      "CURRENT-PLAN.zh-CN.md",
+      "NIGHT-HANDOFF.zh-CN.md",
+      "docs/runtime-key-correctness.zh-CN.md",
+      "docs/runtime-key-correctness.json"
+    ],
+    "runtime_key_GPU_sha256": "ec7742a66c5d3ef4ce4858414aecc558ea9f7b2141c596f6e61e287b3fe6aa46",
+    "runtime_key_status": "isolated-correctness-fix-verified-no-performance-gain-proven",
+    "runtime_key_local_aot_verified": true
   }
 }

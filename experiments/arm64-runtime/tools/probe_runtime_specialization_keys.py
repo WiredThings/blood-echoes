@@ -1,8 +1,9 @@
 from pathlib import Path
-import json,hashlib,subprocess,time,sys
+import argparse,json,hashlib,subprocess,time,sys
 P=Path(__file__).resolve().parents[1];sys.path.insert(0,str(P/'tools'))
 from qa_build_guard import require_no_games
-require_no_games();e=P/'evidence'/('runtime-key-authored-'+str(time.time_ns()));e.mkdir();m=json.loads((P/'evidence/texture-expansion-build.json').read_text());header=P/'vendor/metal_api/shadps4/shader_recompiler/runtime_info.h';old=header.read_text();records=[]
+parser=argparse.ArgumentParser();parser.add_argument('--baseline-header',type=Path,required=True);args=parser.parse_args();baseline=args.baseline_header.resolve(strict=True)
+require_no_games();e=P/'evidence'/('runtime-key-authored-'+str(time.time_ns()));e.mkdir();m=json.loads((P/'evidence/texture-expansion-build.json').read_text());header=P/'vendor/metal_api/shadps4/shader_recompiler/runtime_info.h';current_header=header.read_bytes();old=baseline.read_text();records=[]
 source=e/'probe.mm';source.write_text(r'''
 #include <array>
 #include <cstdio>
@@ -42,5 +43,5 @@ for name,text,expected in [('baseline',old,1),('geometry-only',geometry,1),('geo
   result=subprocess.run(link,cwd='/private/tmp/blood-echoes-arm64-metal-20261023/build',stdout=log,stderr=subprocess.STDOUT);assert result.returncode==0,str(e/(name+'-build.log'))
  result=subprocess.run([str(binary)],capture_output=True,text=True);(e/(name+'-result.txt')).write_text(result.stdout+result.stderr);assert result.returncode==expected,(name,result.returncode,result.stdout,result.stderr)
  records.append(dict(name=name,exit=result.returncode,expected=expected,output=result.stdout.strip(),header_sha256=hashlib.sha256(text.encode()).hexdigest(),compile=cmd,link=link))
-assert hashlib.sha256(header.read_bytes()).hexdigest()==hashlib.sha256(old.encode()).hexdigest()
-(e/'result.json').write_text(json.dumps(dict(status='passed',actual_source_unchanged=True,game_or_gpu_work_launched=False,controls=records,qualification='authored actual inline equality/RuntimeInfo/StageSpecialization/ranges lookup; no shader output or live white-model claim'),indent=2)+'\n');print(e);print(json.dumps([{k:v for k,v in x.items()if k in['name','exit','expected','output']}for x in records],indent=2))
+assert header.read_bytes()==current_header
+(e/'result.json').write_text(json.dumps(dict(status='passed',actual_source_unchanged=True,baseline_header=str(baseline),game_or_gpu_work_launched=False,controls=records,qualification='authored actual inline equality/RuntimeInfo/StageSpecialization/ranges lookup; no shader output or live white-model claim'),indent=2)+'\n');print(e);print(json.dumps([{k:v for k,v in x.items()if k in['name','exit','expected','output']}for x in records],indent=2))

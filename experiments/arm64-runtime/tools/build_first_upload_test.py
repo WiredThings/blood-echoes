@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse,hashlib,json,subprocess,time
 from qa_build_guard import require_no_games
 P=Path(__file__).resolve().parents[1]
-ap=argparse.ArgumentParser();ap.add_argument('--suite',choices=['first-upload','expansion','partial-gpu','inplace-gpu','shader-phases','owned-shader','guest-capture','speculative-reads','stable-mirror','warm-archive','warm-stage','local-aot','local-aot-entry','avplayer-exports'],default='first-upload');ap.add_argument('--library',type=Path);a=ap.parse_args()
+ap=argparse.ArgumentParser();ap.add_argument('--suite',choices=['first-upload','expansion','partial-gpu','inplace-gpu','shader-phases','owned-shader','guest-capture','speculative-reads','stable-mirror','warm-archive','warm-stage','local-aot','local-aot-entry','runtime-keys','runtime-key-cache','avplayer-exports'],default='first-upload');ap.add_argument('--library',type=Path);a=ap.parse_args()
 library=(a.library or P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.dylib').resolve()
 assert library.is_relative_to(P/'backend')and library.is_file()
 require_no_games()
@@ -11,8 +11,8 @@ meta=json.loads((P/'evidence/texture-expansion-build.json').read_text())
 e=P/'evidence'/('first-upload-regression-'+str(time.time_ns()));e.mkdir()
 obj=e/'first-upload.o';cmd=list(meta['compile']);oldobj=cmd[cmd.index('-o')+1]
 cmd[cmd.index('-o')+1]=str(obj);cmd[cmd.index('-MF')+1]=str(obj.with_suffix('.d'))
-cmd[-1]=str(P/'tests/metal'/({'first-upload':'test_texture_first_upload.mm','expansion':'test_texture_expansion.mm','partial-gpu':'test_texture_partial_gpu.mm','inplace-gpu':'test_texture_inplace_gpu.mm','shader-phases':'test_shader_compile_phases.mm','owned-shader':'test_shader_owned_snapshot.mm','guest-capture':'test_shader_guest_capture.mm','speculative-reads':'test_shader_speculative_reads.mm','stable-mirror':'test_stable_mirror_library.mm','warm-archive':'test_warm_archive_process.mm','warm-stage':'test_warm_stage_storage.cpp','local-aot':'test_local_aot_library.mm','local-aot-entry':'test_local_aot_entry_fallback.mm','avplayer-exports':'test_avplayer_exports.mm'}[a.suite]));cmd.insert(cmd.index('-c'),'-UNDEBUG');cmd.insert(1,'-I'+str(P/'src'))
-if a.suite=='warm-stage':cmd.insert(1,'-I'+str(P/'vendor/metal_api'))
+cmd[-1]=str(P/'tests/metal'/({'first-upload':'test_texture_first_upload.mm','expansion':'test_texture_expansion.mm','partial-gpu':'test_texture_partial_gpu.mm','inplace-gpu':'test_texture_inplace_gpu.mm','shader-phases':'test_shader_compile_phases.mm','owned-shader':'test_shader_owned_snapshot.mm','guest-capture':'test_shader_guest_capture.mm','speculative-reads':'test_shader_speculative_reads.mm','stable-mirror':'test_stable_mirror_library.mm','warm-archive':'test_warm_archive_process.mm','warm-stage':'test_warm_stage_storage.cpp','local-aot':'test_local_aot_library.mm','local-aot-entry':'test_local_aot_entry_fallback.mm','runtime-keys':'test_runtime_key_compilation.mm','runtime-key-cache':'test_runtime_key_cache.mm','avplayer-exports':'test_avplayer_exports.mm'}[a.suite]));cmd.insert(cmd.index('-c'),'-UNDEBUG');cmd.insert(1,'-I'+str(P/'src'))
+if a.suite in('warm-stage','runtime-key-cache'):cmd.insert(1,'-I'+str(P/'vendor/metal_api'))
 b=Path('/private/tmp/blood-echoes-arm64-metal-20261023/build')
 with(e/'build.log').open('w')as log:
     r=subprocess.run(cmd,cwd=b,stdout=log,stderr=subprocess.STDOUT)

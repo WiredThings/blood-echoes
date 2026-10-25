@@ -1,5 +1,7 @@
 # 本机 Metal 离线库：隔离实现与实测（2026-10-25）
 
+历史批次记录：当前RuntimeInfo修复与全量构建状态见[runtime-key-correctness.zh-CN.md](runtime-key-correctness.zh-CN.md)。本页旧GPU实测与当时未并入的状态保留，不代表当前候选。
+
 ## 交付与实际实现
 
 交付建库代码，不分发开发机的游戏MSL、AIR、metallib、PSO归档。所有请求和产物保留在用户本机隔离GPU缓存下。当前仅显式开发CLI启用，普通QA包、正式应用和Release不更新；新checkout自包含clean-build尚未验证，工具依赖已有隔离构建元数据和本机已安装Metal Toolchain。

@@ -1,5 +1,7 @@
 # 本机离线库与 PSO 归档联用：实测、修复及特化键负例
 
+历史批次记录：当前RuntimeInfo修复与全量构建状态见[runtime-key-correctness.zh-CN.md](runtime-key-correctness.zh-CN.md)。本页旧GPU实测与当时未并入的状态保留，不代表当前候选。
+
 2026-10-25。只操作 Shared 隔离开发版；静音，无Cua/桌面录屏、无角色动作。正式应用、数据和Release不更新。交付本机建库源码与作者测试，不分发任何游戏MSL/AIR/metallib/PSO归档。
 
 ## 同候选五轮
