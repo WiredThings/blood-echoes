@@ -354,11 +354,8 @@ struct Upscaler::Impl {
                 merge_slots[binding.binding] = binding.msl_index;
             }
         }
-        id<MTLFunction> function = runtime.GetImpl().kernels.Function(shader, nullptr, 0);
         NSError* error = nil;
-        if (function) {
-            merge = [dev.device newComputePipelineStateWithFunction:function error:&error];
-        }
+        merge = runtime.GetImpl().kernels.UpscaleMerge(&error);
         if (!merge) {
             merge_failed = true;
             std::printf("Upscaler: the merge pass did not compile (%s); the live path is off\n",

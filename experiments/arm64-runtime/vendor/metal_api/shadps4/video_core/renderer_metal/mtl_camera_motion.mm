@@ -5,6 +5,7 @@
 
 #include "video_core/renderer_metal/mtl_camera_motion.h"
 
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -33,18 +34,16 @@ u32 TextureSlot(const H::Shader& shader, u32 binding) {
 
 struct CameraMotion::Impl {
     Scheduler::Impl& sched;
-    HostKernels kernels;
     id<MTLComputePipelineState> pipeline = nil;
     u32 depth_slot = 0;  ///< binding 0
     u32 motion_slot = 0; ///< binding 1
     u32 object_slot = 0; ///< binding 2 (object motion: off, the depth again)
 
-    Impl(Device& device, Scheduler& scheduler)
-        : sched{scheduler.GetImpl()}, kernels{device.GetImpl(), scheduler} {}
+    explicit Impl(Scheduler& scheduler) : sched{scheduler.GetImpl()} {}
 };
 
-CameraMotion::CameraMotion(Device& device, Scheduler& scheduler_)
-    : scheduler{scheduler_}, impl{std::make_unique<Impl>(device, scheduler_)} {
+CameraMotion::CameraMotion(Device& device, Scheduler& scheduler_, HostKernels& kernels)
+    : scheduler{scheduler_}, impl{std::make_unique<Impl>(scheduler_)} {
     const char* upscaler = std::getenv("BB_UPSCALER");
     enabled = !(upscaler && std::strcmp(upscaler, "none") == 0);
     if (const char* debug = std::getenv("BB_DEBUG_MOTION"); debug && debug[0] == '1') {
@@ -57,12 +56,12 @@ CameraMotion::CameraMotion(Device& device, Scheduler& scheduler_)
     impl->depth_slot = TextureSlot(shader, 0);
     impl->motion_slot = TextureSlot(shader, 1);
     impl->object_slot = TextureSlot(shader, 2);
-    id<MTLFunction> function = impl->kernels.Function(shader, nullptr, 0);
     NSError* error = nil;
-    impl->pipeline = [device.GetImpl().device newComputePipelineStateWithFunction:function
-                                                                            error:&error];
+    impl->pipeline = kernels.CameraMotionPipeline(&error);
     ASSERT_MSG(impl->pipeline, "Camera motion pipeline failed: {}",
                error ? error.localizedDescription.UTF8String : "unknown");
+    ASSERT_MSG(impl->pipeline.device.registryID == device.GetImpl().device.registryID,
+               "Camera motion pipeline belongs to another Metal device");
 }
 
 CameraMotion::~CameraMotion() = default;
@@ -85,7 +84,13 @@ void CameraMotion::RecordMotion(const void* depth_texture, const void* motion_te
     [compute setTexture:depth atIndex:impl->depth_slot];
     [compute setTexture:motion atIndex:impl->motion_slot];
     [compute setTexture:depth atIndex:impl->object_slot];
-    [compute setBytes:&push length:sizeof(push) atIndex:0];
+    // std430 carries 108 meaningful bytes; MSL aligns the float4-containing
+    // struct to 16 bytes and its reflected argument size is 112. Keep every
+    // original field offset and zero the tail without reading beyond push.
+    std::array<u8, 112> metal_push{};
+    static_assert(sizeof(push) == 108);
+    std::memcpy(metal_push.data(), &push, sizeof(push));
+    [compute setBytes:metal_push.data() length:metal_push.size() atIndex:0];
     [compute dispatchThreadgroups:MTLSizeMake((width + shader.local_size[0] - 1) / shader.local_size[0],
                                               (height + shader.local_size[1] - 1) / shader.local_size[1],
                                               1)

@@ -13,6 +13,7 @@
 #include "common/logging/log.h"
 #include "video_core/renderer_metal/mtl_device_impl.h"
 #include "video_core/renderer_metal/mtl_geometry.h"
+#include "video_core/renderer_metal/mtl_local_library.h"
 
 namespace Metal::Geometry {
 
@@ -479,8 +480,9 @@ const CompiledShader* PassThroughCache::Get(const GeometryInfo& info,
             options.fastMathEnabled = NO;
         }
         NSError* ns_error = nil;
+        Metal::LocalLibrary::Origin successful_origin;
         id<MTLLibrary> library =
-            Metal::LocalLibrary::Build(mtl_device, [NSString stringWithUTF8String:source.c_str()], options, &ns_error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"bb_gs_pass"}); });
+            Metal::LocalLibrary::Build(mtl_device, [NSString stringWithUTF8String:source.c_str()], options, &ns_error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"bb_gs_pass"}); }, true, &successful_origin);
         id<MTLFunction> function =
             library ? [library newFunctionWithName:@"bb_gs_pass"] : nil;
         if (!function) {
@@ -499,6 +501,8 @@ const CompiledShader* PassThroughCache::Get(const GeometryInfo& info,
             shader->num_buffers = 1;
             shader->library = (__bridge_retained void*)library;
             shader->function = (__bridge_retained void*)function;
+            shader->persistent_identity=CaptureSuccessfulFunctionIdentity((__bridge void*)mtl_device,
+                (__bridge void*)options,successful_origin,*shader);
             entry.shader = std::move(shader);
         }
     }

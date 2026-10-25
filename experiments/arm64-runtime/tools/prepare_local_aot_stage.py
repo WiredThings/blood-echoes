@@ -6,7 +6,10 @@ import argparse,ast,hashlib,json,os,shutil,stat,time
 PRIVATE_PROJECT=Path('/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype')
 TOOLS=('launcher_local_aot.py','local_aot_policy.py','local_metal_builder.py',
        'warm_archive_manifest.py','gpu_candidate_identity.py','native_observer.py',
-       'qa_memory_policy.py','qa_build_guard.py')
+       'qa_memory_policy.py','qa_build_guard.py','paged_metal_requests.py',
+       'launcher_game_pso.py','game_pso_component.py','game_pso_candidates.py',
+       'prepare_game_psos.py','game_pso_queue.py','game_pso_owned_audit.py',
+       'inventory_shader_cache.py','decode_shader_cache.py','game_shader_catalog.py')
 HOOK='''# Native-runtime component preparation happens after the original patch/mod
 # pipeline, before either game process exists. The wrapper execs this same probe.
 if [[ ${BB_ARM_LAUNCHER_COMPAT:-0} == 1 && ${BB_RENDERER:-} == metal ]]; then
@@ -108,6 +111,10 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
         ast.parse(path.read_text())
     tool_api(tools/'launcher_local_aot.py','main',('project','execution_root'))
     tool_api(tools/'launcher_local_aot.py','cli',('project','execution_root'))
+    tool_api(tools/'prepare_game_psos.py','prepare',('services',))
+    runner=(tools/'prepare_game_psos.py').read_text()
+    if "sys.path.insert(0,str(P/'tools'))"in runner:
+        raise ValueError('PSO runner imports code from external data P/tools')
     builder=(tools/'local_metal_builder.py').read_text()
     if "sys.path.insert(0,str(PROJECT/'tools'))"in builder:
         raise ValueError('builder still imports code from external data PROJECT/tools')
@@ -141,7 +148,9 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
         runtime_project=str(project),runtime_tools=hashes,
         startup_bootstrap_sha256=sha(startup),default_mode='auto',
         unchanged_original_scripts=15,original_stage_modified=False,
-        game_or_data_copied=False,source_repository=str(repository))
+        game_or_data_copied=False,source_repository=str(repository),
+        game_pso_component_manifest='GAME-PSO-COMPONENT.json',
+        default_game_pso_preparation='when-final-component-verified')
     (target/'ARM64-LOCAL-PREPARATION.json').write_text(json.dumps(manifest,indent=2)+'\n')
     for relative,digest in source.items():
         if sha(original/relative)!=digest:raise RuntimeError('previous stage changed during preparation')

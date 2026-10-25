@@ -252,16 +252,12 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
     // The pipelines are made here, while nothing else records: the host shader functions come
     // from the cache backend's kernels, which are not thread safe.
     HostKernels& kernels = runtime->GetImpl().kernels;
-    id<MTLFunction> vertex = kernels.Function(H::FS_TRI_VERT, nullptr, 0);
+    LocalLibrary::Origin vertex_origin;
+    id<MTLFunction> vertex = kernels.Function(H::FS_TRI_VERT, nullptr, 0,&vertex_origin);
     NSError* error = nil;
     {
-        MTLRenderPipelineDescriptor* descriptor = [MTLRenderPipelineDescriptor new];
-        descriptor.label = @"Post process";
-        descriptor.vertexFunction = vertex;
-        descriptor.fragmentFunction = kernels.Function(H::POST_PROCESS_FRAG, nullptr, 0);
-        descriptor.colorAttachments[0].pixelFormat = FramePixelFormat;
-        impl->post_process_pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor
-                                                                                 error:&error];
+        impl->post_process_pipeline = kernels.PostProcessPipeline(FramePixelFormat,&error,
+                                                                  vertex,&vertex_origin);
         ASSERT_MSG(impl->post_process_pipeline, "Post process pipeline failed: {}",
                    ErrorText(error));
     }

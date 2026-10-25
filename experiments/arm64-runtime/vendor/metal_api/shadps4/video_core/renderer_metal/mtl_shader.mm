@@ -33,6 +33,7 @@
 #include "common/path_util.h"
 #include "video_core/renderer_metal/mtl_device_impl.h"
 #include "video_core/renderer_metal/mtl_shader.h"
+#include "video_core/renderer_metal/mtl_function_origin.h"
 #include "video_core/renderer_metal/mtl_library_memo.h"
 #include "video_core/renderer_metal/mtl_local_aot.h"
 #include "video_core/renderer_metal/mtl_vertex_math.h"
@@ -1074,6 +1075,21 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
 }
 
 } // namespace
+
+PersistentFunctionIdentity CaptureSuccessfulFunctionIdentity(void* actual_mtl_device,
+    void* actual_compile_options,const LocalLibrary::Origin& origin,const CompiledShader& shader) {
+    if(!shader.function||shader.entry.empty()||!origin.valid())return {};
+    @autoreleasepool {
+        id<MTLFunction> function=(__bridge id<MTLFunction>)shader.function;
+        NSString* expected=[[NSString alloc] initWithBytes:shader.entry.data()
+            length:shader.entry.size() encoding:NSUTF8StringEncoding];
+        const bool accepted=expected&&[function.name isEqualToString:expected];
+        MTLCompileOptions* options=actual_compile_options
+            ? (__bridge MTLCompileOptions*)actual_compile_options : [MTLCompileOptions new];
+        return FunctionIdentity::FromSuccessfulOrigin(FunctionContext((__bridge id<MTLDevice>)actual_mtl_device),
+            FunctionOptions(options),origin,shader.entry,accepted,shader);
+    }
+}
 
 const char* ShaderStageName(ShaderStage stage) {
     switch (stage) {

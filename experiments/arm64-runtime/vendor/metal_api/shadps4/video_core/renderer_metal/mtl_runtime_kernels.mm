@@ -25,6 +25,9 @@
 #include "video_core/host_shaders_msl/color_to_ms_depth_frag_msl.h"
 #include "video_core/host_shaders_msl/fault_buffer_process_comp_msl.h"
 #include "video_core/host_shaders_msl/fs_tri_vert_msl.h"
+#include "video_core/host_shaders_msl/upscale_merge_comp_msl.h"
+#include "video_core/host_shaders_msl/post_process_frag_msl.h"
+#include "video_core/host_shaders_msl/camera_motion_comp_msl.h"
 #include "video_core/host_shaders_msl/ms_image_blit_frag_msl.h"
 #include "video_core/host_shaders_msl/ms_image_blit_msaa_frag_msl.h"
 #include "video_core/host_shaders_msl/tiling_macro_128_comp_msl.h"
@@ -343,6 +346,41 @@ id<MTLComputePipelineState> HostKernels::FillU32() {
         ASSERT_MSG(fill_u32, "fill_u32 pipeline failed: {}", ErrorText(error));
     }
     return fill_u32;
+}
+
+id<MTLComputePipelineState> HostKernels::UpscaleMerge(NSError** error) {
+    // The same shader, zero provided constants and CompileOptions as the previous
+    // Upscaler::MergePipeline call to Function. Preserve its nullable PSO policy.
+    std::array<LocalLibrary::Origin,1> origins;
+    id<MTLFunction> function=Function(H::UPSCALE_MERGE_COMP,nullptr,0,&origins[0]);
+    HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::UpscaleMerge;
+    auto* descriptor=(MTLComputePipelineDescriptor*)Descriptor(invocation);
+    descriptor.computeFunction=function;
+    return function?MakeCompute(descriptor,invocation,origins,error):nil;
+}
+
+id<MTLComputePipelineState> HostKernels::CameraMotionPipeline(NSError** error) {
+    // Same generated source, original Host3.1/Safe options and no provided constants.
+    // The caller retains its original camera pipeline slot; warming is temporary.
+    std::array<LocalLibrary::Origin,1> origins;
+    id<MTLFunction> function=Function(H::CAMERA_MOTION_COMP,nullptr,0,&origins[0]);
+    HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::CameraMotion;
+    auto* descriptor=(MTLComputePipelineDescriptor*)Descriptor(invocation);
+    descriptor.computeFunction=function;
+    return function?MakeCompute(descriptor,invocation,origins,error):nil;
+}
+
+id<MTLRenderPipelineState> HostKernels::PostProcessPipeline(MTLPixelFormat format,NSError** error,
+    id<MTLFunction> shared_vertex,const LocalLibrary::Origin* shared_origin) {
+    std::array<LocalLibrary::Origin,2> origins;
+    id<MTLFunction> vertex=shared_vertex;
+    if(vertex){if(shared_origin)origins[0]=*shared_origin;}
+    else vertex=Function(H::FS_TRI_VERT,nullptr,0,&origins[0]);
+    id<MTLFunction> fragment=Function(H::POST_PROCESS_FRAG,nullptr,0,&origins[1]);
+    HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::PostProcess;invocation.format=u32(format);
+    auto* descriptor=(MTLRenderPipelineDescriptor*)Descriptor(invocation);
+    descriptor.vertexFunction=vertex;descriptor.fragmentFunction=fragment;
+    return vertex&&fragment?MakeRender(descriptor,invocation,origins,error):nil;
 }
 
 id<MTLRenderPipelineState> HostKernels::MsCopyPipeline(u32 samples, MTLPixelFormat format,

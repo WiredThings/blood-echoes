@@ -9,10 +9,12 @@ import argparse, hashlib, json, os, plistlib, shutil, subprocess, sys, time, zip
 P=Path(__file__).resolve().parents[1]
 if P.name!='arm64-runtime-prototype':
     P=Path('/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype')
-sys.path.insert(0,str(P/'tools'))
+sys.path.insert(0,str(Path(__file__).resolve().parent))
 from qa_build_guard import require_no_games
 from manual_qa_policy import validate_manual_environment
 from prepare_local_aot_stage import build_stage
+from complete_packaged_python import complete as complete_python_sqlite
+from game_pso_component import freeze_inputs,sha as component_sha
 
 def sha(p):
     with Path(p).open('rb')as f:return hashlib.file_digest(f,'sha256').hexdigest()
@@ -50,8 +52,9 @@ def load_cpu_runtime_manifest(path,expected_gpu_sha256=None):
     return record
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,required=True);ap.add_argument('--source-repository',type=Path,required=True);ap.add_argument('--gpu-app-manifest',type=Path,required=True);ap.add_argument('--cpu-runtime-manifest',type=Path,required=True);ap.add_argument('--runtime-tools',type=Path);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,required=True);ap.add_argument('--source-repository',type=Path,required=True);ap.add_argument('--gpu-app-manifest',type=Path,required=True);ap.add_argument('--cpu-runtime-manifest',type=Path,required=True);ap.add_argument('--runtime-tools',type=Path);ap.add_argument('--game-pso-component',type=Path,required=True);ap.add_argument('--python-provider',type=Path);a=ap.parse_args()
     require_no_games()
+    assert not a.game_pso_component.is_symlink() and a.game_pso_component.resolve(strict=True).is_relative_to(P/'evidence'), 'admitted Shared game preparation manifest required'
     output=a.output.absolute();assert not output.exists(), 'Preserve old QA outputs; use a fresh directory'
     output.mkdir(parents=True)
     prepared=build_stage(project=P,repository=a.source_repository,runtime_tools=a.runtime_tools)
@@ -89,6 +92,7 @@ def main():
     validate_manual_environment(extra)
     for name in ['python','deps-metal-arm64','bin/gpu-net']:
         dst=stage/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copytree((original/name).resolve(),dst,symlinks=False)
+    python_closure=complete_python_sqlite(stage/'python',writable_stage=stage,provider=a.python_provider)
     cpu=stage/'bin/bb-probe-metal';cpu.parent.mkdir(exist_ok=True)
     cpu_runtime=load_cpu_runtime_manifest(a.cpu_runtime_manifest)
     cpu_game_source=Path(cpu_runtime['game']['path'])
@@ -111,11 +115,16 @@ def main():
     gpu_app=stage/'bin/Bloodborne Metal.app';source_app=Path(variant['target']).parents[2]
     shutil.copytree(source_app,gpu_app,symlinks=True)
     gpu=gpu_app/'Contents/MacOS/bb-gpu';freeze_consumer(gpu,gpu_source,gpu_lib)
+    component_source=json.loads(a.game_pso_component.read_text())
+    assert component_source['library_sha256']==variant['library_sha256'], 'worker and selected renderer are not one admitted build'
+    assert component_sha(Path(component_source['library']))==variant['library_sha256']
+    component=freeze_inputs(stage,a.game_pso_component,gpu_lib,rewrite=freeze_consumer,admission_root=P)
+    worker=stage/component['worker']
     # CPU and renderer must load one copied dependency closure, not both the
     # new SDL and its old absolute/rpath location (duplicate Objective-C classes).
     closure={f.name:f for f in (stage/'deps-metal-arm64/lib').glob('*.dylib')}
     net_lib=stage/'bin/gpu-net/libbbnet.dylib'
-    for binary in [cpu,cpu_lib,gpu,gpu_lib,net_lib,*closure.values()]:
+    for binary in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker,*closure.values()]:
         changed=False
         links=deps(binary)
         if binary.suffix=='.dylib':links=links[1:] # first otool row is LC_ID_DYLIB
@@ -127,18 +136,25 @@ def main():
                 subprocess.run(['/usr/bin/install_name_tool','-change',old,new,str(binary)],check=True)
                 changed=True
         if changed:subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(binary)],check=True)
+    # install_name_tool/codesign may alter both bytes. Seal final copied hashes,
+    # never carry the development worker/DSO SHA across relocation.
+    component['worker_sha256']=component_sha(worker)
+    component['library_sha256']=component_sha(gpu_lib)
+    (stage/'GAME-PSO-COMPONENT.json').write_text(json.dumps(component,indent=2)+'\n')
+    from game_pso_component import load as load_component
+    load_component(stage)
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(gpu_app)],check=True)
     # The unchanged entry chooses the app wrapper first and still checks this path.
     (stage/'bin/gpu-metal-arm64/bb-gpu').symlink_to('../Bloodborne Metal.app/Contents/MacOS/bb-gpu')
     native=dict(schema=1,default_enabled=True,minimum_os_major=27,
         renderer_architecture='arm64 CPU via FEX and independent arm64 Metal GPU; isolated prototype',
         production=False,baseline_revision=json.loads((P/'SOURCE.json').read_text())['blood_echoes_commit'],
-        frozen_runtime={str(f.relative_to(stage)):sha(f)for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib]})
+        frozen_runtime={str(f.relative_to(stage)):sha(f)for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker]})
     (stage/'NATIVE-METAL.json').write_text(json.dumps(native,indent=2)+'\n')
     manifest=dict(schema=2,created_ns=time.time_ns(),app=str(app),private_case=case,
         host_local_only=True,portable_installer=False,formal_data_modified=False,
         default_local_metal_preparation=True,protected_resource_writeback=True,new_component_stage=str(admitted_stage),
-        local_metal_preparation=prepared['manifest'],
+        python_sqlite_closure=python_closure,local_metal_preparation=prepared['manifest'],game_pso_component=component,default_game_pso_preparation=True,
         private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,
         frozen_runtime=native['frozen_runtime'],cpu_runtime_manifest=dict(path=str(a.cpu_runtime_manifest.resolve()),sha256=sha(a.cpu_runtime_manifest),protocol_version=cpu_runtime['protocol_version'],live_payload_version=cpu_runtime['live_payload_version'],author_instrumentation=cpu_runtime.get('author_instrumentation',False)),
         upstream_inputs=dict(cpu=sha(cpu_game_source),cpu_library=sha(cpu_source),gpu_library=sha(gpu_source),net_library=sha(original/'bin/gpu-net/libbbnet.dylib')),
@@ -147,19 +163,19 @@ def main():
         external_dependencies=['prepared Shared dependency tree','private Shared QA paths','locally dumped game and Chinese assets','new cloned private QA GPU cache'],
         known_limits=['combat white models not yet reproduced','remaining import/context contracts are tracked in GOAL.zh-CN.md','death, online and menu live retests deferred'])
     for rel,digest in source.items():assert sha(stage/rel)==digest
-    for binary in [cpu,cpu_lib,gpu,gpu_lib,net_lib]:
+    for binary in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker]:
         arch=subprocess.check_output(['/usr/bin/lipo','-archs',str(binary)],text=True).strip()
         assert arch=='arm64',(binary,arch)
     (resources/'ARM64-QA-MANIFEST.json').write_text(json.dumps(manifest,indent=2)+'\n')
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(app)],check=True)
     subprocess.run(['/usr/bin/codesign','--verify','--strict',str(app)],check=True)
-    for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib]:subprocess.run(['/usr/bin/codesign','--verify','--strict',str(f)],check=True)
+    for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker]:subprocess.run(['/usr/bin/codesign','--verify','--strict',str(f)],check=True)
     instructions='''Blood Echoes ARM64 本机隔离测试包
 
 这是本机 QA，依赖 Shared 开发树、游戏/汉化资产和新建的独立 QA 数据目录，不能在其它 Mac 独立运行；不是正式安装包。
 沿用现有启动器界面、键鼠/手柄、中文、F2/F3、网络和退出协议；不注入自动输入。默认离线、静音，不参与正式存档选择。
 
-本机 Metal 离线准备默认开启：已收集输入在游戏进程启动前按原选项串行建库；后续启动验证复用，不分发开发机游戏着色器产物。
+本机 Metal 离线准备默认开启：从当前选定隔离 GPU 缓存自动发现完整配方，在游戏进程启动前按原选项串行建库和准备管线；后续启动严格验证复用，不分发开发机游戏着色器产物。每次启动有时间预算，未完成项留待后续；不导入旧元数据或执行 SRT walker。
 缺少 Metal Toolchain 时明确回退原运行时编译；损坏/不兼容缓存不会被删除。严重内存/锁屏保护停止仍保留。
 源码覆盖和定向控制不等于白模已解决、所有场景零编译或已证明帧率提升；完整游戏/内存验收状态以runtime-manifest为准。
 

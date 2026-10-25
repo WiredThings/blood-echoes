@@ -6,11 +6,13 @@ builder -> prepare using the resulting local libraries. Never starts a game.
 """
 from pathlib import Path
 import argparse,hashlib,json,os,re,signal,stat,subprocess,sys,time
+from game_pso_queue import Deferred,Stopped
 
 MAX_BLOB=1024*1024;MAX_TOTAL=8*MAX_BLOB;MAX_LINE=256*1024
 HEX=re.compile(r'[0-9a-f]{64}')
+VALIDATION_ENV=('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES',
+                'MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')
 class Refused(ValueError):pass
-class Stopped(RuntimeError):pass
 def need(v,why):
  if not v:raise Refused(why)
 def digest(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(',',':')).encode()).hexdigest()
@@ -83,114 +85,228 @@ def freeze(unit,layout,root,cohort,allow_compile,*,cache_root,artifact_cache_dir
 
 def rows(path):
  with Path(path).open('rb')as f:
-  for _ in range(100000):
+  while True:
    b=f.readline(MAX_LINE+1)
    if not b:return
    need(len(b)<=MAX_LINE and b.endswith(b'\n'),'manifest line budget')
    yield json.loads(b)
-  need(not f.read(1),'manifest record budget')
 
 def preparation_ready(row):
  """A finished worker is insufficient: require actual native ready outcomes/events."""
- w=row['worker'];c=w.get('artifact_counts',{});events=row['artifact_events'];n=c.get('attempts',0)
+ w=row.get('worker');events=row.get('artifact_events',[])
+ if not isinstance(w,dict)or not isinstance(events,list):return False
+ c=w.get('artifact_counts',{})
+ if not isinstance(c,dict):return False
+ n=c.get('attempts',0)
+ if type(n)is not int:return False
  return (w.get('native_pipeline_ready')is True and w.get('artifact_publication_observed')is True
   and n>0 and len(events)==n and c.get('hits',0)+c.get('built',0)==n
   and c.get('deferred',0)+c.get('failed',0)+c.get('critical',0)+c.get('unavailable',0)==0
   and all(e.get('state')in(1,2)and HEX.fullmatch(e.get('archive_sha256',''))for e in events))
 
-def main(argv=None):
- ap=argparse.ArgumentParser();ap.add_argument('--project',required=True,type=Path)
- ap.add_argument('--worker',required=True,type=Path);ap.add_argument('--library-sha256',required=True)
- ap.add_argument('--manifest',required=True,type=Path);ap.add_argument('--layout',required=True,type=Path)
- ap.add_argument('--layout-sha256',required=True)
- ap.add_argument('--source-root',required=True,type=Path);ap.add_argument('--cohort',required=True)
- ap.add_argument('--gpu-root',required=True,type=Path);ap.add_argument('--run-root',required=True,type=Path)
- ap.add_argument('--artifact-cache-dir',required=True,type=Path)
- ap.add_argument('--phase',choices=['record','prepare','all'],default='all')
- ap.add_argument('--max-recipes',type=int,default=16);ap.add_argument('--seconds',type=int,default=600)
- ap.add_argument('--allow-compile',action=argparse.BooleanOptionalAction,default=True)
- a=ap.parse_args(argv);P=directory(a.project);sys.path.insert(0,str(P/'tools'))
- from game_pso_owned_audit import audit_owned_stage,audit_owned_key_profile,load_canonical_layout
- from qa_build_guard import require_no_games
- from native_observer import NativeObserver
- from qa_memory_policy import MemoryPolicy
- from warm_archive_manifest import resolve_gpu_identity
- from local_aot_policy import prepare
- need(HEX.fullmatch(a.cohort)and HEX.fullmatch(a.library_sha256)and HEX.fullmatch(a.layout_sha256),'current identities required')
- need(0<a.max_recipes<=4096 and 0<a.seconds<=7200,'explicit bounded work budget')
- run=directory(a.run_root);gpu=directory(a.gpu_root);artifact=directory(a.artifact_cache_dir)
- need(artifact.is_relative_to(gpu)and artifact!=gpu,'exact original QA PsoCache artifact/cache_dir required')
- need(run.parent==P/'state'and gpu.is_relative_to(P/'state')and run!=gpu and not any(run.iterdir()),'fresh Shared run and selected QA artifact roots')
- need(a.manifest.resolve(strict=True).is_relative_to(P)and a.layout.resolve(strict=True).is_relative_to(P),'actual runtime inputs must be Shared')
- require_no_games();identity=resolve_gpu_identity(a.worker,P);need(identity['library_sha256']==a.library_sha256,'actual selected worker library SHA')
- layout=load_canonical_layout(a.layout,a.source_root,a.layout_sha256)
- observer=NativeObserver();before=observer.system();need(not before['locked']and before['pressure']!=4,'protection preflight')
- policy=MemoryPolicy(before);start=time.monotonic();samples=[];outcomes=[];selected=[];seen=set();result={};selected_bytes=0;queue_budget_deferred=False
+def compile_environment(provided):
+ """Preserve actual game validation selection; absence is an actual selection."""
+ return {k:v for k,v in provided.items()if k in VALIDATION_ENV or k=='BB_GS_DEBUG' or
+         (k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))and
+          not k.startswith('BB_MTL_LOCAL_AOT_')and k!='BB_MTL_ARCHIVE_COMPATIBILITY_ID')}
+
+DYLD_PATH_MAX=16*1024
+DYLD_LIBRARY_MAX=256*MAX_BLOB
+_DYLD_IMAGE=re.compile(r'\Adyld(?:\[(?P<pid>[0-9]{1,20})\])?: (?:loaded: )?'
+ r'(?:<(?P<uuid>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})> )?'
+ r'(?P<path>/[^\x00\r\n]+)\Z')
+
+def dyld_gpu_image(line,expected_pid):
+ """Read a complete dyld image record, preserving internal path whitespace."""
+ need(isinstance(line,str)and len(line)<=MAX_LINE,'bounded dyld record')
+ match=_DYLD_IMAGE.fullmatch(line.rstrip('\r\n'))
+ if match is None:return None
+ text=match['path'];need(len(os.fsencode(text))<=DYLD_PATH_MAX,'dyld path budget')
+ path=Path(text)
+ if not path.name.startswith('libbbgpu'):return None
+ # Supported native hosts emit dyld[pid]. Never let another process or an
+ # unbound/forged legacy line authorize this worker's loaded GPU library.
+ need(match['pid']is not None and int(match['pid'])==expected_pid,'dyld GPU image PID mismatch')
+ need(path.is_absolute(),'absolute dyld GPU image path')
+ return str(path.resolve(strict=True))
+
+def verify_loaded_gpu(loaded,identity):
+ """Only one actual GPU DSO, bound to its expected path AND owned bytes SHA."""
+ expected=Path(identity['library']).resolve(strict=True)
+ need(set(loaded)=={str(expected)},'actual runtime GPU load edge changed')
+ need(HEX.fullmatch(identity['library_sha256']),'expected GPU library SHA')
+ fd=os.open(expected,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
  try:
-  for r in rows(a.manifest):
-   if r.get('record_type')!='offline-pso-input' or not r['execution_policy']['candidate_preparation']['policy_eligible']:continue
-   rid=r['recipe_blob_identity']
-   if rid in seen:continue
-   length=len(json.dumps(r,separators=(',',':')).encode())
-   if selected_bytes+length>16*1024*1024:queue_budget_deferred=True;break
-   seen.add(rid);selected.append(r);selected_bytes+=length
-   if len(selected)==a.max_recipes:break
-  need(bool(selected),'no eligible complete candidate recipes')
-  def check():
-   elapsed=time.monotonic()-start;s=observer.system();samples.append(dict(seconds=elapsed,**s))
-   stop=policy.observe(elapsed,s)
-   if stop or elapsed>a.seconds:raise Stopped(stop or 'bounded preparation budget reached')
-  phases=('record','prepare')if a.phase=='all'else(a.phase,)
-  for phase in phases:
-   check();updates,local=prepare(mode='record'if phase=='record'else'load',gpu_root=gpu,cohort=a.cohort,engine='arm64',graphics=True)
-   if local['status']=='stopped':raise Stopped(local.get('error','local builder safety stop'))
-   if phase=='prepare':need(local['status']=='prepared','verified local library builder completion required')
-   for ordinal,unit in enumerate(selected):
-    check();require_no_games();case=fresh(run,f'{phase}-{ordinal:04d}');packetdir=fresh(case,'packet');scratch=fresh(case,'source-cache');tmp=fresh(case,'tmp')
-    packet,held=freeze(unit,layout,packetdir,a.cohort,a.allow_compile,cache_root=P/'state',artifact_cache_dir=artifact,audit_stage=audit_owned_stage,audit_key_profile=audit_owned_key_profile)
-    env={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))}
-    env.update(updates);env.update(BB_GPU_USER_DIR=str(gpu),BB_MTL_ARCHIVE_COMPATIBILITY_ID=a.cohort,
-     BB_MTL_PERSIST_WARM_ARCHIVE='0',BB_MTL_RELEASE_WARM_ARCHIVE='1',HOME=str(case),TMPDIR=str(tmp),
-     DYLD_PRINT_LIBRARIES='1',MTL_DEBUG_LAYER='1')
-    # Keep actual original optimization selection; caller must provide current
-    # options. Only source/library preparation controls above are replaced.
-    for k,v in os.environ.items():
-     if k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))and not k.startswith('BB_MTL_LOCAL_AOT_')and k not in env:env[k]=v
-    log=case/'console.log';command=[str(a.worker.resolve()),phase,str(packetdir/'packet.json'),str(scratch)]
-    with log.open('w')as stream:
-     proc=subprocess.Popen(command,env=env,cwd=case,stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
-     try:
-      while proc.poll()is None:check();time.sleep(.1)
-     finally:
-      if proc.poll()is None:
-       os.killpg(proc.pid,signal.SIGTERM)
-       try:proc.wait(timeout=3)
-       except subprocess.TimeoutExpired:os.killpg(proc.pid,signal.SIGKILL);proc.wait()
-    # held bytes remain live through the entire compile; never reopen original cache.
-    need(sum(map(len,held.values()))<=MAX_TOTAL,'retained original read set budget');del held
-    text=log.read_text();events=[];worker=[];loaded=[]
-    for line in text.splitlines():
-     if line.startswith('GAME_PSO_RESULT '):worker.append(json.loads(line.split(' ',1)[1]))
-     if line.startswith('Metal game PSO artifact event: '):events.append(json.loads(line.split(': ',1)[1]))
-     if 'dyld'in line and'libbbgpu'in line and line.split()[-1].startswith('/'):loaded.append(str(Path(line.split()[-1]).resolve()))
-    need(sorted(set(loaded))==[identity['library']],'actual runtime GPU load edge changed')
-    row=dict(phase=phase,ordinal=ordinal,pid=proc.pid,exit=proc.returncode,recipe=unit['recipe_blob_identity'],
-     worker=worker[-1]if len(worker)==1 else None,artifact_events=events,log=str(log),
-     runtime_cache_import_allowed=False,actual_final_read_admission=False)
-    outcomes.append(row);(case/'result.json').write_text(json.dumps(row,indent=2)+'\n')
-    if proc.returncode in(70,79):raise Stopped('native worker protection/interruption; see actual log')
-    need(proc.returncode==0 and len(worker)==1,'worker rejected; see actual log')
-  incomplete=[row['ordinal']for row in outcomes if row['phase']=='prepare'and not preparation_ready(row)]
-  result['incomplete_preparations']=incomplete
-  result['status']='partial-worker-phases'if incomplete else'completed-worker-phases'
- except Stopped as e:result.update(status='stopped',error=str(e))
- except Exception as e:result.update(status='failed',error=str(e))
+  before=os.fstat(fd)
+  need(stat.S_ISREG(before.st_mode)and before.st_uid==os.getuid()and before.st_nlink==1 and
+       0<before.st_size<=DYLD_LIBRARY_MAX,'owned bounded loaded GPU library')
+  fingerprint=lambda value:(value.st_dev,value.st_ino,value.st_mode,value.st_uid,value.st_nlink,
+                            value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+  digest=hashlib.sha256();total=0
+  while True:
+   block=os.read(fd,MAX_BLOB)
+   if not block:break
+   total+=len(block);need(total<=DYLD_LIBRARY_MAX,'loaded GPU library byte budget');digest.update(block)
+  after=os.fstat(fd);need(fingerprint(before)==fingerprint(after)and total==before.st_size,'loaded GPU library changed during hash')
+  value=digest.hexdigest();need(value==identity['library_sha256'],'actual loaded GPU library SHA mismatch')
+  return dict(library=str(expected),library_sha256=value,library_bytes=total,single_gpu_load_edge=True,
+              owned_post_worker_sha_verified=True)
+ finally:os.close(fd)
+
+def prepare(config,*,services=None):
+ """Startup callable; current cache manifest and native identities are explicit.
+
+ services is a trusted internal test seam, never supplied by CLI/request JSON.
+ Completion always requires preparation_ready(actual native outcome).
+ """
+ from types import SimpleNamespace
+ import shutil
+ from game_pso_queue import run_manifest,Deferred,Stopped
+ a=SimpleNamespace(**config) if isinstance(config,dict) else config
+ for name,value in dict(phase='all',allow_compile=True,max_recipes=None,seconds=600,page_size=16,
+                        progress_root=None,environment=None,retain_worker_scratch=False).items():
+  if not hasattr(a,name):setattr(a,name,value)
+ P=directory(a.project)  # Data root; imports remain in the loaded tools closure.
+ if services is None:
+  from game_pso_owned_audit import audit_owned_stage,audit_owned_key_profile,load_canonical_layout
+  from qa_build_guard import require_no_games
+  from native_observer import NativeObserver
+  from qa_memory_policy import MemoryPolicy
+  from warm_archive_manifest import resolve_gpu_identity
+  # Data globals are explicit; code imports stay in this loaded closure.
+  import local_aot_policy,local_metal_builder
+  local_aot_policy.P=P
+  local_metal_builder.PROJECT=P
+  from local_aot_policy import prepare as local_prepare
+  from local_metal_builder import build as local_build,NativeToolchain,FixedRunner,Stopped as BuilderStopped
+  services=dict(audit_stage=audit_owned_stage,audit_key_profile=audit_owned_key_profile,load_layout=load_canonical_layout,
+    require_no_games=require_no_games,observer_factory=NativeObserver,memory_policy=MemoryPolicy,resolve_identity=resolve_gpu_identity,
+    local_prepare=local_prepare,local_build=local_build,toolchain=NativeToolchain,runner=FixedRunner,builder_stopped=BuilderStopped)
+ observer=None;require_no_games=services['require_no_games'];policy_type=services['memory_policy']
+ need(HEX.fullmatch(a.cohort)and HEX.fullmatch(a.library_sha256)and HEX.fullmatch(a.layout_sha256),'current identities required')
+ need((a.max_recipes is None or type(a.max_recipes)is int and a.max_recipes>0)and 0<a.seconds<=7200 and 0<a.page_size<=64,'explicit bounded work budget')
+ run=directory(a.run_root);gpu=directory(a.gpu_root);artifact=directory(a.artifact_cache_dir)
+ need(artifact.is_relative_to(gpu)and artifact!=gpu,'exact original selected PsoCache artifact/cache_dir required')
+ need(run.parent==P/'state'and gpu.is_relative_to(P/'state')and run!=gpu and not any(run.iterdir()),'fresh Shared run and selected artifact roots')
+ need(Path(a.manifest).resolve(strict=True).is_relative_to(P)and Path(a.layout).resolve(strict=True).is_relative_to(P),'actual runtime inputs must be Shared')
+ progress=Path(a.progress_root)if a.progress_root else gpu/'game-pso-progress'
+ need(progress.is_absolute()and progress.is_relative_to(gpu)and progress!=gpu,'progress must stay below selected GPU root')
+ if not progress.exists():progress.mkdir(mode=0o700)
+ directory(progress)
+ require_no_games();identity=services['resolve_identity'](a.worker,P);need(identity['library_sha256']==a.library_sha256,'actual selected worker library SHA')
+ layout=services['load_layout'](a.layout,a.source_root,a.layout_sha256)
+ worker_sha=sha(owned(Path(a.worker).resolve(strict=True),32*MAX_BLOB))
+ provided=dict(os.environ if a.environment is None else a.environment)
+ options=compile_environment(provided)
+ effective_options=dict(options,BB_MTL_PERSIST_WARM_ARCHIVE='0',BB_MTL_RELEASE_WARM_ARCHIVE='1')
+ context=dict(worker_sha256=worker_sha,library_sha256=a.library_sha256,layout_sha256=a.layout_sha256,
+              cohort=a.cohort,options_identity=digest(effective_options),artifact_cache_dir=str(artifact),
+              runner_sha256=sha(Path(__file__).read_bytes()))
+ if getattr(a,'options_identity',None):need(HEX.fullmatch(a.options_identity),'declared options identity');context['declared_options_identity']=a.options_identity
+ observer=services.get('observer') or services['observer_factory']()
+ before=observer.system()
+ if before['locked']or before['pressure']==4:
+  result=dict(status='stopped',error='locked or severe pressure at preflight',completed=0,protection_stops=1,game_started=False)
+  (run/'result.json').write_text(json.dumps(result,indent=2)+'\n');observer.close();return result
+ clock=services.get('clock',time.monotonic)
+ policy=policy_type(before);start=clock();samples=[];sample_count=0;outcomes=[];outcome_count=0;phase_env={};stop_error=None
+ samples_path=run/'samples.jsonl';outcomes_path=run/'outcomes.jsonl';events_path=run/'events.jsonl'
+ builder_tmp=fresh(run,'local-builder-tmp');result={}
+ def check():
+  nonlocal sample_count
+  elapsed=clock()-start
+  try:s=observer.system()
+  except Exception as error:raise Stopped('cannot observe protection state: '+str(error))from error
+  sample=dict(seconds=elapsed,**s);sample_count+=1
+  if len(samples)<64:samples.append(sample)
+  with samples_path.open('a')as stream:stream.write(json.dumps(sample,separators=(',',':'))+'\n')
+  reason=policy.observe(elapsed,s)
+  if reason:raise Stopped(reason)
+ def prep_phase(phase,guard):
+  nonlocal stop_error
+  class BuilderGuard:
+   def check(self,**kwargs):
+    nonlocal stop_error
+    try:
+     guard()
+     if kwargs.get('preflight'):require_no_games()
+    except (Deferred,Stopped,KeyboardInterrupt)as error:
+     stop_error=error;raise services['builder_stopped'](str(error))
+  def builder(root,cohort,**kwargs):
+   return services['local_build'](root,cohort,guard=BuilderGuard(),
+     toolchain=services['toolchain'](services['runner'](builder_tmp)),**kwargs)
+  updates,report=services['local_prepare'](mode='record'if phase=='record'else'auto',gpu_root=gpu,cohort=a.cohort,
+       engine='arm64',graphics=True,builder=builder)
+  if stop_error is not None:raise stop_error
+  if report['status']=='stopped':raise Stopped(report.get('error','local library protection stop'))
+  phase_env[phase]=updates;return report
+ def execute(unit,phase,allow_compile,ordinal):
+  nonlocal outcome_count
+  check();require_no_games();case=fresh(run,f'{phase}-{ordinal:06d}');packetdir=fresh(case,'packet');scratch=fresh(case,'source-cache');tmp=fresh(case,'tmp')
+  packet,held=freeze(unit,layout,packetdir,a.cohort,bool(allow_compile and a.allow_compile),cache_root=P/'state',artifact_cache_dir=artifact,
+        audit_stage=services['audit_stage'],audit_key_profile=services['audit_key_profile'])
+  env={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))and k not in VALIDATION_ENV};env.update(options);env.update(phase_env[phase])
+  env.update(BB_GPU_USER_DIR=str(gpu),BB_MTL_ARCHIVE_COMPATIBILITY_ID=a.cohort,BB_MTL_PERSIST_WARM_ARCHIVE='0',
+             BB_MTL_RELEASE_WARM_ARCHIVE='1',HOME=str(case),TMPDIR=str(tmp),DYLD_PRINT_LIBRARIES='1')
+  log=case/'console.log';command=[str(Path(a.worker).resolve()),phase,str(packetdir/'packet.json'),str(scratch)]
+  with log.open('w')as stream:
+   proc=subprocess.Popen(command,env=env,cwd=case,stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
+   try:
+    while proc.poll()is None:
+     # Use the same wall-clock deadline during the actual owned-byte worker.
+     check()
+     if clock()-start>=a.seconds:raise Deferred('preparation time budget')
+     if log.stat().st_size>8*MAX_BLOB:raise Stopped('bounded worker log budget')
+     time.sleep(.1)
+   finally:
+    if proc.poll()is None:
+     os.killpg(proc.pid,signal.SIGTERM)
+     try:proc.wait(timeout=3)
+     except subprocess.TimeoutExpired:os.killpg(proc.pid,signal.SIGKILL);proc.wait()
+  need(sum(map(len,held.values()))<=MAX_TOTAL,'retained original read-set budget');del held
+  events=[];workers=[];loaded=set()
+  with log.open()as stream:
+   while True:
+    line=stream.readline(MAX_LINE+1)
+    if not line:break
+    need(len(line)<=MAX_LINE,'bounded worker result line')
+    if line.startswith('GAME_PSO_RESULT '):workers.append(json.loads(line.split(' ',1)[1]));need(len(workers)<=1,'one actual worker result')
+    if line.startswith('Metal game PSO artifact event: '):events.append(json.loads(line.split(': ',1)[1]));need(len(events)<=64,'bounded actual artifact events')
+    image=dyld_gpu_image(line,proc.pid)
+    if image is not None:loaded.add(image);need(len(loaded)<=1,'multiple actual GPU libraries')
+  loaded_identity=verify_loaded_gpu(loaded,identity)
+  row=dict(phase=phase,ordinal=ordinal,pid=proc.pid,exit=proc.returncode,recipe=unit['recipe_blob_identity'],worker=workers[0]if len(workers)==1 else None,
+           artifact_events=events,log=str(log),loaded_gpu_identity=loaded_identity,runtime_cache_import_allowed=False,actual_final_read_admission=False)
+  (case/'result.json').write_text(json.dumps(row,indent=2)+'\n');outcome_count+=1
+  if len(outcomes)<64:outcomes.append(row)
+  with outcomes_path.open('a')as stream:stream.write(json.dumps(row,separators=(',',':'))+'\n')
+  if not a.retain_worker_scratch:
+   # These are this worker's brand-new temporary inputs/outputs, never old caches.
+   for child in (packetdir,scratch,tmp):shutil.rmtree(child)
+  return row
+ def event(value):
+  with events_path.open('a')as stream:stream.write(json.dumps(value,separators=(',',':'))+'\n')
+ try:
+  result=run_manifest(a.manifest,progress_root=progress,context=context,execute=execute,prepare_phase=prep_phase,check=check,
+       ready=preparation_ready,phase=a.phase,page_size=a.page_size,max_recipes=a.max_recipes,seconds=a.seconds,clock=clock,event_sink=event)
  finally:
-  result.update(before=before,after=observer.system(),samples=samples,memory_policy=MemoryPolicy.MANIFEST,
-   seconds=time.monotonic()-start,outcomes=outcomes,worker_identity=identity,selected_recipes=len(selected),
-   selected_manifest_bytes=selected_bytes,queue_budget_deferred=queue_budget_deferred,full_catalog_coverage_proven=False,
-   runtime_cache_import_allowed=False,actual_final_read_admission=False,game_started=False)
+  result.update(before=before,after=observer.system(),samples_preview=samples,sample_count=sample_count,samples_jsonl=str(samples_path),
+    memory_policy=policy_type.MANIFEST,wall_seconds=clock()-start,outcomes_preview=outcomes,outcome_count=outcome_count,
+    outcomes_jsonl=str(outcomes_path),events_jsonl=str(events_path),worker_identity=identity,current_context=context,
+    runtime_cache_import_allowed=False,actual_final_read_admission=False,game_started=False)
   (run/'result.json').write_text(json.dumps(result,indent=2)+'\n');observer.close()
- print(json.dumps({k:v for k,v in result.items()if k not in('samples','outcomes')},indent=2))
- return 0 if result['status']=='completed-worker-phases'else 70 if result['status']=='stopped'else 65
+ return result
+
+def main(argv=None):
+ ap=argparse.ArgumentParser()
+ for field in ('project','worker','manifest','layout','source-root','gpu-root','run-root','artifact-cache-dir'):
+  ap.add_argument('--'+field,required=True,type=Path)
+ for field in ('library-sha256','layout-sha256','cohort'):ap.add_argument('--'+field,required=True)
+ ap.add_argument('--progress-root',type=Path);ap.add_argument('--phase',choices=['record','prepare','all'],default='all')
+ ap.add_argument('--max-recipes',type=int,default=None);ap.add_argument('--page-size',type=int,default=16);ap.add_argument('--seconds',type=int,default=600)
+ ap.add_argument('--allow-compile',action=argparse.BooleanOptionalAction,default=True)
+ ap.add_argument('--retain-worker-scratch',action='store_true')
+ result=prepare(vars(ap.parse_args(argv)))
+ print(json.dumps({k:v for k,v in result.items()if k not in('samples_preview','outcomes_preview','events_preview')},indent=2))
+ return 0 if result['status']in('completed','no-candidates')else 70 if result['status']=='stopped'else 65
 if __name__=='__main__':raise SystemExit(main())

@@ -105,7 +105,7 @@ PersistentFunctionIdentity BindModule(const PersistentFunctionIdentity& library,
        shader.stage_inputs.size()>128||shader.tess_layout.members.size()>128||
        shader.tess_layout.patch_members.size()>128||shader.variant.es.members.size()>128||
        shader.variant.patch_input.members.size()>128||shader.geometry.varyings.size()>128)return {};
-    Writer w;w.text("compiled-metal-module-abi-v1");
+    Writer w;w.text("compiled-metal-module-abi-v2");
     w.raw(library.digest.data(),library.digest.size());w.word(static_cast<uint64_t>(library.route));
     w.word(static_cast<uint64_t>(shader.stage));
     const auto& v=shader.variant;w.word(static_cast<uint64_t>(v.kind));w.word(v.index_type);
@@ -127,7 +127,8 @@ PersistentFunctionIdentity BindModule(const PersistentFunctionIdentity& library,
     const auto& g=shader.geometry;w.word(static_cast<uint64_t>(g.input));w.word(g.input_vertices);
     w.word(static_cast<uint64_t>(g.output));w.word(g.max_vertices);w.word(g.varyings.size());
     for(const auto& varying:g.varyings){w.word(varying.location);w.word(varying.components);w.word(static_cast<uint64_t>(varying.type));}
-    w.word(shader.strict_vertex_helpers_inlined);w.word(shader.copy_pair_merged);
+    // Rewrite-attempt counters are provenance/diagnostics, not function ABI.
+    // The exact successful effective MSL is already bound by library.digest.
     return {w.finish(),library.route};
 }
 

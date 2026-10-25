@@ -14,12 +14,23 @@ Vendored code retains its original licenses. SOURCE.json records upstream proven
 
 The 2026-10-26 native PSO preparation checkpoint is described in
 [local-pso-preparation.zh-CN.md](docs/local-pso-preparation.zh-CN.md).
-The coherent 230-unit build passes source/local-library strict archive and GPU
-pixel controls. Three real complete game recipes prepare seven native PSOs;
-independent warm processes hit all seven without PSO compilation. This is not
-whole-game coverage or an original-game runtime acceptance test. Automatic startup
-orchestration, remaining helpers/variants and matched game hitch/memory checks
-remain open. Production and Release are unchanged.
+The coherent native closure passes source/local-library strict archive and GPU
+pixel controls, including the original CameraMotion::RecordMotion and Presenter
+post-processing factories. The Camera upload now pads its 108-byte public constants
+to the 112 bytes required by MSL without changing fields or shader math. Eleven
+helper families have preparation entries; other final pipeline families remain open.
+Three real complete game recipes previously prepared seven native PSOs, with all
+seven strictly reused in independent processes. These are scoped controls, not
+whole-game coverage or gameplay acceptance.
+
+Original final-exec orchestration now selects the actual title/cache and pages the
+whole candidate manifest with bounded memory and resumable progress. Real packaging
+exposed a missing bundled SQLite extension (repaired in new copies) and a load-log
+parser that truncated space-containing app paths (fixed with PID/path/SHA checks).
+The new package has completed its first real preparation page; subsequent pages
+and actual game consumption are still being validated.
+Whole-package game consumption and matched cold/warm hitch/memory checks remain
+open. Production and Release are unchanged.
 
 Local per-user compilation is the default-on delivery direction, superseding the
 earlier average-FPS-based default-off decisions below. Game compiler payloads stay

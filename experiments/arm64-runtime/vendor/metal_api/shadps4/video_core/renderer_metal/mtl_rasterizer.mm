@@ -210,7 +210,7 @@ Rasterizer::Rasterizer(Device& device_, Scheduler& scheduler_, Runtime& runtime_
     // path and the upscaler (UI composition of a scaled session, the MetalFX temporal scaler fed
     // by the camera motion vectors, the live path's upscale of the HDR scene); no object motion:
     // the core's null object.
-    camera_motion = std::make_unique<CameraMotion>(device, scheduler);
+    camera_motion = std::make_unique<CameraMotion>(device, scheduler, runtime.GetImpl().kernels);
     metal_scene_targets =
         std::make_unique<SceneTargets>(device, scheduler, runtime, texture_cache);
     scene_adapter = std::make_unique<SceneTargetsAdapter>(*metal_scene_targets);

@@ -39,6 +39,9 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
+// Startup preference only; actual factory consumption revalidates its own exact recipe.
+bool HasPreparedArtifact(const std::filesystem::path&, std::string_view);
+
 u64 UsSince(Clock::time_point start) {
     return std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
 }
@@ -286,6 +289,13 @@ PsoCache::PsoCache(Device& device_, std::filesystem::path cache_dir, bool relaxe
         // Retain the fresh compilation object and active-PSO lifetime of the accepted baseline.
         const auto& input_path=archive_path;
         const bool exists = impl->persist_enabled && std::filesystem::exists(input_path, ec);
+        // A fresh empty main archive used to block all independent strict hits
+        // throughout WarmUp. Keep a real old main archive's priority; otherwise
+        // do not allocate the empty blocker when a prepared artifact is verified.
+        if (!exists && HasPreparedArtifact(cache_dir, preparation_identity)) {
+            std::puts("Metal pipeline startup: prepared artifacts; no empty main archive");
+            return;
+        }
         MTLBinaryArchiveDescriptor* descriptor = [MTLBinaryArchiveDescriptor new];
         if (exists) {
             // Metal may move an unchanged input archive on serialize. Always read a private
@@ -317,6 +327,12 @@ PsoCache::PsoCache(Device& device_, std::filesystem::path cache_dir, bool relaxe
             LOG_WARNING(Render, "Metal binary archive not available ({}): pipelines are compiled "
                                 "on every start",
                         FirstLine(error));
+        }
+        // A preserved but unreadable/incompatible old file must not leave a
+        // freshly allocated empty blocker either. Never release a usable main.
+        if (!archive_loaded && HasPreparedArtifact(cache_dir, preparation_identity)) {
+            archive = nil;
+            std::puts("Metal pipeline startup: prepared artifacts after unusable main archive");
         }
         impl->archive = archive;
     }
@@ -1162,8 +1178,9 @@ const CompiledShader* DebugFragment(PsoCache::Impl& impl, Vulkan::GraphicsPipeli
     }
     @autoreleasepool {
         NSError* ns_error = nil;
+        Metal::LocalLibrary::Origin successful_origin;
         id<MTLLibrary> library =
-            Metal::LocalLibrary::Build(impl.mtl_device, [NSString stringWithUTF8String:source.c_str()], nil, &ns_error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"bb_gs_debug"}); });
+            Metal::LocalLibrary::Build(impl.mtl_device, [NSString stringWithUTF8String:source.c_str()], nil, &ns_error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"bb_gs_debug"}); }, true, &successful_origin);
         id<MTLFunction> function = library ? [library newFunctionWithName:@"bb_gs_debug"] : nil;
         if (!function) {
             error = fmt::format("debug fragment function: {}", FirstLine(ns_error));
@@ -1177,6 +1194,8 @@ const CompiledShader* DebugFragment(PsoCache::Impl& impl, Vulkan::GraphicsPipeli
         shader->num_buffers = 1;
         shader->library = (__bridge_retained void*)library;
         shader->function = (__bridge_retained void*)function;
+        shader->persistent_identity=CaptureSuccessfulFunctionIdentity((__bridge void*)impl.mtl_device,
+            nullptr,successful_origin,*shader);
         return impl.debug_fragments.emplace(source, std::move(shader)).first->second.get();
     }
 }

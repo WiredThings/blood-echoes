@@ -13,7 +13,7 @@
 #include "video_core/renderer_metal/mtl_library_origin.h"
 namespace Metal::HostPso {
 using U=std::uint32_t;
-enum class Kind:U {Tiling=1,TextureTiling,FaultParser,InlineUpdate,RenderInlineUpdate,Fill,MsCopy,MsDepth};
+enum class Kind:U {Tiling=1,TextureTiling,FaultParser,InlineUpdate,RenderInlineUpdate,Fill,MsCopy,MsDepth,UpscaleMerge,PostProcess,CameraMotion};
 enum class Type:U {Bool=1,U32,I32,F32};
 inline constexpr U Version=2,MaxConstants=14,MaxWarm=64,MaxBytes=2048,MaxMetadata=4096;
 enum class ArtifactState {Unavailable,Hit,Built,Deferred,Failed,Critical};
@@ -36,7 +36,7 @@ inline bool Hex(const std::string&s){return s.size()==64&&std::all_of(s.begin(),
 inline bool Entry(const std::string&s){return s.size()<=64&&std::all_of(s.begin(),s.end(),[](char c){return(c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='_';});}
 inline bool Valid(const Recipe&r){
  const auto&i=r.invocation;const U kind=U(i.kind);
- if(kind<1||kind>8||i.macro>1||i.proxy>1||i.bounded>1||i.src_msaa>1||i.count>MaxConstants||
+ if(kind<1||kind>11||i.macro>1||i.proxy>1||i.bounded>1||i.src_msaa>1||i.count>MaxConstants||
     !Hex(r.preparation)||!Hex(r.source_options)||!Hex(r.descriptor)||r.entry0.empty()||!Entry(r.entry0)||!Entry(r.entry1)||r.constants.size()>MaxConstants)return false;
  if(i.kind==Kind::Tiling||i.kind==Kind::TextureTiling){
   if(i.bits!=8&&i.bits!=16&&i.bits!=32&&i.bits!=64&&i.bits!=96&&i.bits!=128)return false;
@@ -47,8 +47,9 @@ inline bool Valid(const Recipe&r){
  if(i.kind==Kind::TextureTiling&&(!zero_from(i.count)||i.samples||i.format||i.src_msaa))return false;
  if(i.kind==Kind::FaultParser&&(i.count!=2||!zero_from(2)||i.bits||i.macro||i.proxy||i.bounded||i.samples||i.format||i.src_msaa))return false;
  if(U(i.kind)>=U(Kind::InlineUpdate)&&(i.count||!zero_from(0)||i.bits||i.macro||i.proxy||i.bounded))return false;
- if((i.kind==Kind::InlineUpdate||i.kind==Kind::RenderInlineUpdate||i.kind==Kind::Fill)&&(i.samples||i.format||i.src_msaa))return false;
+ if((i.kind==Kind::InlineUpdate||i.kind==Kind::RenderInlineUpdate||i.kind==Kind::Fill||i.kind==Kind::UpscaleMerge||i.kind==Kind::CameraMotion)&&(i.samples||i.format||i.src_msaa))return false;
  if(i.kind==Kind::MsDepth&&i.src_msaa)return false;
+ if(i.kind==Kind::PostProcess&&(r.entry1.empty()||!i.format||i.format>65535||i.samples||i.src_msaa))return false;
  if(i.kind==Kind::MsCopy||i.kind==Kind::MsDepth){if(!i.samples||i.samples>64||(i.samples&(i.samples-1))||!i.format||i.format>65535)return false;}
  U last=0;bool first=true;
  for(const auto&c:r.constants){if(c.id>=MaxConstants||U(c.type)<1||U(c.type)>4||(!first&&c.id<=last)||(c.type==Type::Bool&&c.bits>1))return false;last=c.id;first=false;}

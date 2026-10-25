@@ -36,6 +36,23 @@ std::optional<std::filesystem::path> ArtifactInput(const std::filesystem::path&r
  if(!LocalAot::String(receipt,@"archive_sha256",digest))return {};
  if(verified_sha)*verified_sha=digest;
  return root/name;
+ }
+void RememberPreparedArtifact(const std::filesystem::path&root,std::string_view key,std::string_view preparation)noexcept{
+ try {
+ // A small scheduling index, never an admission receipt. Readers revalidate the
+ // referenced receipt and bytes; actual factories still choose their own key.
+ NSDictionary*v=@{@"schema":@1,@"preparation":@(std::string(preparation).c_str()),@"key":@(std::string(key).c_str())};
+ ArtifactReplace(root/"startup-entry.json",[NSJSONSerialization dataWithJSONObject:v options:NSJSONWritingSortedKeys error:nil]);
+ }catch(...){ } // Optional index failure never changes a valid artifact outcome.
+}
+bool HasPreparedArtifact(const std::filesystem::path&cache,std::string_view preparation){
+ try {
+  auto root=ArtifactRoot(cache,preparation,false);if(!root)return false;
+  auto entry=LocalAot::Json(*root/"startup-entry.json");
+  if(!entry||!LocalAot::Integer(entry,@"schema",1)||!LocalAot::String(entry,@"preparation",preparation))return false;
+  id value=entry[@"key"];if(![value isKindOfClass:[NSString class]])return false;
+  const std::string key=[value UTF8String];return LocalAot::Hex(key)&&ArtifactInput(*root,key,preparation).has_value();
+ }catch(...){return false;} // Optional preference cannot invalidate original startup.
 }
 }
 
@@ -60,7 +77,7 @@ id PsoArtifactCreate(id<MTLDevice> device,Descriptor*descriptor,const std::files
  // CreateWithArchive never appends a loaded object in this persist/read-only
  // context. Release it and all retained descriptors before a fresh candidate.
  descriptor.binaryArchives=@[];input.archive=nil;input.archive_descriptors.clear();
- if(hit){out.state=S::Hit;out.archive_sha256=std::move(input_sha);return state;}
+ if(hit){if(prepare&&root)RememberPreparedArtifact(*root,key,preparation);out.state=S::Hit;out.archive_sha256=std::move(input_sha);return state;}
  if(!state){out.state=allow_compile?S::Failed:S::Deferred;return nil;}
  if(!prepare){out.state=S::Unavailable;return state;} // no serialization in gameplay
  if(ArtifactCritical()){out.state=S::Critical;return nil;}
@@ -94,6 +111,7 @@ id PsoArtifactCreate(id<MTLDevice> device,Descriptor*descriptor,const std::files
  if(!ArtifactReplace(*root/(std::string(key)+".json"),json)){out.state=S::Failed;error="artifact receipt publish failed; prior success retained";return state;}
  std::string committed_sha;const auto committed=ArtifactInput(*root,key,preparation,&committed_sha);
  if(!committed||*committed!=published||committed_sha!=digest){out.state=S::Failed;error="artifact committed receipt cannot be revalidated";return nil;}
+ RememberPreparedArtifact(*root,key,preparation);
  out.state=S::Built;out.archive_sha256=std::move(committed_sha);return verified;
 }
 

@@ -17,12 +17,15 @@ namespace Metal {
 
 class Device;
 class Scheduler;
+class HostKernels;
 
 /// Threads: the tracking calls and RecordMotion come from the thread that records (the draw
 /// recording thread or the GPU command thread), one at a time, like the scheduler's.
 class CameraMotion final : public VideoCore::CameraMotionApi {
 public:
-    CameraMotion(Device& device, Scheduler& scheduler);
+    // Shared kernels are consumed only during construction; no borrowed reference
+    // is stored. Must correspond to the same renderer Device/Scheduler.
+    CameraMotion(Device& device, Scheduler& scheduler, HostKernels& kernels);
     ~CameraMotion() override;
 
     CameraMotion(const CameraMotion&) = delete;

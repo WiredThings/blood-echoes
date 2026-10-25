@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "production_modified": false,
+  "game_performance_accepted": false,
+  "final_native_library_sha256": "c2ec6e0504e06b01e73fd53c00fd3d57d847d41ce6cd18511c77ef89593b9c2e",
+  "native_cases": [
+    {
+      "name": "pipeline",
+      "report_sha256": "85d0801f79d014bd6d7d41076814a23a4da2830df07b40e5f72135ebcabcb4f9",
+      "passed": true,
+      "processes": 11,
+      "seconds": 6.006024833070114,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 7259.5
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 7259.5
+      }
+    },
+    {
+      "name": "camera-production",
+      "report_sha256": "d8ec753c2cff9aab5694fd3c7efdd52b37cdcfa0b479845e2884ba8404ac9433",
+      "passed": true,
+      "processes": 7,
+      "seconds": 5.786608333000913,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 7259.5
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 7259.5
+      }
+    },
+    {
+      "name": "postprocess",
+      "report_sha256": "40df41f66a2c830739f2380669fdb9ecca8cc68fe0036000a1f068b4f2e9c0d6",
+      "passed": true,
+      "processes": 7,
+      "seconds": 5.941266583045945,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 7259.5
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 7259.5
+      }
+    }
+  ],
+  "packaging_failures": [
+    "missing bundled _sqlite3, repaired in new package",
+    "space-containing dyld path parser, fix in progress"
+  ],
+  "qualification": "Native fixtures and zero-swap small controls do not prove gameplay benefit, no white-model cause claim, old caches retained.",
+  "fixture_sha256": {
+    "function_origin.mm": "ad0cfc91352d3cd0e0be60363de7a7d81e96a5aa5f02c40fed0fd4e0f734d549",
+    "camera_record_motion.mm": "bb0828ba9cd17ed5545d07de62036c59e99516cf04bb2a4b2e97dbd2cd104d96",
+    "postprocess.mm": "1b61a9f91d5d025413cf54f7c3505dc4ed7b93858ae8476def90d6da1129078e",
+    "pipeline_artifact.mm": "1a43b0df43596144f9a72f55f37037c785186edc0cec96455ead43326ae9721c",
+    "authored.vert": "9aff853b7349c7ed54fb5bb380275acfad80c8fc0b3851e7cd0ba261eacb6b88",
+    "authored.frag": "da915897c6fd6d2fbb5a0b6cf3521f74df412e5fb1ea2544da90666ec7dbb1b9"
+  }
+}

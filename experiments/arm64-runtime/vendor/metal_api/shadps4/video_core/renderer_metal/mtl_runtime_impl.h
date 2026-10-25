@@ -60,6 +60,14 @@ public:
     /// `kernel fill_u32(device uint* dst [[buffer(0)]], constant uint& value [[buffer(1)]],
     /// constant uint& count [[buffer(2)]])`, one thread per word.
     id<MTLComputePipelineState> FillU32();
+    // Uses the original upscaler's merge slot; preparation returns only a temporary
+    // state, with no Upscaler/MetalFX/texture construction and no extra native map.
+    id<MTLComputePipelineState> UpscaleMerge(NSError** error=nullptr);
+    id<MTLComputePipelineState> CameraMotionPipeline(NSError** error=nullptr);
+    // Presenter keeps its original slot and may reuse the existing shared vertex
+    // object+actual origin. Warm replay omits it and builds the same two stages.
+    id<MTLRenderPipelineState> PostProcessPipeline(MTLPixelFormat format,NSError** error=nullptr,
+        id<MTLFunction> shared_vertex=nil,const LocalLibrary::Origin* shared_origin=nullptr);
     /// Optional <=256-byte ordered update, direct bound destination, no guest BDA lookup.
     id<MTLComputePipelineState> InlineUpdate();
     id<MTLRenderPipelineState> RenderInlineUpdate();

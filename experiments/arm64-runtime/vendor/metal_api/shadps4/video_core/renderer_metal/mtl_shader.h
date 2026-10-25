@@ -15,6 +15,8 @@
 #include "video_core/renderer_metal/mtl_function_identity.h"
 
 namespace Metal {
+namespace LocalLibrary { struct Origin; }
+
 
 class Device;
 
@@ -258,6 +260,13 @@ class LibraryMemo;
 struct LibraryReuseStats {
     u64 builds{}, reuses{}, waits{}, entries{};
 };
+
+/// Startup/cold factory only. Call after ALL CompiledShader ABI fields are set.
+/// actual_compile_options is MTLCompileOptions* or nullptr for actual native defaults.
+/// The adapter validates the real requested function name, reuses the same full
+/// effective-options/context capture as normal game shaders, then binds module ABI.
+PersistentFunctionIdentity CaptureSuccessfulFunctionIdentity(void* actual_mtl_device,
+    void* actual_compile_options,const LocalLibrary::Origin& origin,const CompiledShader& shader);
 
 class ShaderCompiler {
 public:

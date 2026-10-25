@@ -11,6 +11,8 @@ PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 LOCAL_PREFIX = 'BB_MTL_LOCAL_AOT_'
 OPTION_PREFIXES = ('BB_MTL_', 'BB_LAYER_', 'BB_PC_', 'BB_GUEST_')
+VALIDATION_OPTIONS = ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES',
+                      'MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')
 _pending_signal = 0
 
 
@@ -52,7 +54,7 @@ def launcher_inputs(arguments, environment, project):
 
 
 def prepare_launch(executable, arguments, environment, *, project=PROJECT,
-                   execution_root=None, archive_prepare=None, local_prepare=None, observe=None):
+                   execution_root=None, archive_prepare=None, local_prepare=None, observe=None, game_prepare=None):
     """One startup-only preparation; imports and toolchain work stay out of draws."""
     project = Path(project).resolve(strict=True)
     env = dict(environment)
@@ -83,7 +85,7 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
         if key.startswith(LOCAL_PREFIX):
             del env[key]
     options = {k:v for k,v in env.items()
-               if k.startswith(OPTION_PREFIXES) and
+               if (k=='BB_GS_DEBUG' or k in VALIDATION_OPTIONS or k.startswith(OPTION_PREFIXES)) and
                k != 'BB_MTL_ARCHIVE_COMPATIBILITY_ID' and
                not any(tag in k for tag in ('AUDIT', 'LOG', 'CAPTURE', 'FILE', 'NONCE', 'RESTART'))}
     if archive_prepare is None:
@@ -97,15 +99,15 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
         observer = NativeObserver()
         try:
             return _prepared(executable, arguments, env, project, inputs, options,
-                             explicit, archive_prepare, local_prepare, observer.system, backend_root)
+                             explicit, archive_prepare, local_prepare, observer.system, backend_root, code_root, game_prepare)
         finally:
             observer.close()
     return _prepared(executable, arguments, env, project, inputs, options,
-                     explicit, archive_prepare, local_prepare, observe, backend_root)
+                     explicit, archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare)
 
 
 def _prepared(executable, arguments, env, project, inputs, options, mode,
-              archive_prepare, local_prepare, observe, backend_root):
+              archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare):
     before = observe()
     if before['locked'] or before['pressure'] == 4:
         raise RuntimeError('locked or severe pressure before local Metal preparation')
@@ -119,6 +121,18 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
                                    cohort=cohort, engine='arm64', graphics=True)
     env.update(updates)
+    game_report = dict(status='deferred', reason='local toolchain is not ready')
+    if report['status'] in ('prepared', 'record', 'source-fallback') and mode != 'record':
+        if game_prepare is None:
+            from launcher_game_pso import prepare as game_prepare
+        game_report = game_prepare(project=project, execution_root=code_root,
+            arguments=arguments, environment=env, cohort=cohort, options=options, observe=observe)
+        # Candidate record requests may have extended this cohort. Reuse the
+        # same policy to get the latest validated final exec build identity.
+        if 'preparation' in game_report:
+            updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
+                                           cohort=cohort, engine='arm64', graphics=True)
+            env.update(updates)
     after = observe()
     # Preserve the entire preparation interval's cumulative budget. The builder
     # owns its continuous severe/burst checks; this boundary does not reset it.
@@ -131,7 +145,7 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     if report['status'] not in ('record', 'prepared', 'source-fallback'):
         raise RuntimeError('local Metal preparation refused: '+report['status'])
     manifest = dict(schema=1, status=report['status'], requested=mode or 'auto',
-                    local=report, cohort=cohort, before=before, after=after,
+                    local=report, game_pso=game_report, cohort=cohort, before=before, after=after,
                     original_arguments_preserved=True, formal_data_modified=False)
     return env, manifest
 
@@ -147,6 +161,7 @@ def main(argv=None, *, project=PROJECT, execution_root=None):
     # Never emit the inherited environment: it may contain the original QA token.
     visible={k:report[k]for k in ('status','requested')if k in report}
     if report.get('local',{}).get('reason'):visible['reason']=report['local']['reason']
+    if 'game_pso'in report:visible['game_pso']=report['game_pso'].get('status')
     print('Metal local preparation: '+json.dumps(visible,sort_keys=True),flush=True)
     os.execve(executable, [executable, *arguments], env)
 

@@ -6,6 +6,8 @@ using HK=HostPso::Kind;
 const H::Shader* HostRecipeShader(const HostPso::Invocation&i) {
  if(i.kind==HK::Tiling||i.kind==HK::TextureTiling)return &TilingShader(i.bits,i.macro);
  if(i.kind==HK::FaultParser)return &H::FAULT_BUFFER_PROCESS_COMP;
+ if(i.kind==HK::UpscaleMerge)return &H::UPSCALE_MERGE_COMP;
+ if(i.kind==HK::CameraMotion)return &H::CAMERA_MOTION_COMP;
  return nullptr;
 }
 std::string HostSource(NSString* text){NSData*d=[text dataUsingEncoding:NSUTF8StringEncoding];return d?std::string(static_cast<const char*>(d.bytes),d.length):std::string{};}
@@ -13,9 +15,10 @@ bool HostSeverePressure(){int pressure=0;size_t n=sizeof(pressure);return sysctl
 }
 
 id HostKernels::Descriptor(const HostPso::Invocation&i) const {
- if(i.kind==HK::RenderInlineUpdate||i.kind==HK::MsCopy||i.kind==HK::MsDepth) {
+ if(i.kind==HK::RenderInlineUpdate||i.kind==HK::MsCopy||i.kind==HK::MsDepth||i.kind==HK::PostProcess) {
   auto*d=[MTLRenderPipelineDescriptor new];
   if(i.kind==HK::RenderInlineUpdate)d.rasterizationEnabled=NO;
+  if(i.kind==HK::PostProcess){d.label=@"Post process";d.colorAttachments[0].pixelFormat=MTLPixelFormat(i.format);}
   if(i.kind==HK::MsCopy){d.label=[NSString stringWithFormat:@"Image to MS image %u",i.samples];d.rasterSampleCount=i.samples;d.colorAttachments[0].pixelFormat=MTLPixelFormat(i.format);}
   if(i.kind==HK::MsDepth){d.label=[NSString stringWithFormat:@"Color to MS depth %u",i.samples];d.rasterSampleCount=i.samples;d.depthAttachmentPixelFormat=MTLPixelFormat(i.format);}
   return d;
@@ -48,8 +51,8 @@ std::optional<HostPso::Recipe> HostKernels::Describe(const HostPso::Invocation&i
  }else if(i.kind==HK::InlineUpdate){source(HostSource(InlineUpdateSource),"inline_update");r.entry0="inline_update";}
  else if(i.kind==HK::RenderInlineUpdate){source(HostSource(RenderInlineUpdateSource),"update");r.entry0="update";}
  else if(i.kind==HK::Fill){source(HostSource(FillSource),"fill_u32");r.entry0="fill_u32";}
- else if(i.kind==HK::MsCopy||i.kind==HK::MsDepth){
-  const H::Shader&fragment=i.kind==HK::MsDepth?H::COLOR_TO_MS_DEPTH_FRAG:(i.src_msaa?H::MS_IMAGE_BLIT_MSAA_FRAG:H::MS_IMAGE_BLIT_FRAG);
+ else if(i.kind==HK::MsCopy||i.kind==HK::MsDepth||i.kind==HK::PostProcess){
+  const H::Shader&fragment=i.kind==HK::PostProcess?H::POST_PROCESS_FRAG:(i.kind==HK::MsDepth?H::COLOR_TO_MS_DEPTH_FRAG:(i.src_msaa?H::MS_IMAGE_BLIT_MSAA_FRAG:H::MS_IMAGE_BLIT_FRAG));
   source(H::FS_TRI_VERT.msl,H::FS_TRI_VERT.entry);source(fragment.msl,fragment.entry);r.entry0=std::string(H::FS_TRI_VERT.entry);r.entry1=std::string(fragment.entry);
  }else return {};
  std::sort(r.constants.begin(),r.constants.end(),[](const auto&a,const auto&b){return a.id<b.id;});
@@ -100,7 +103,7 @@ id<MTLComputePipelineState> HostKernels::MakeCompute(MTLComputePipelineDescripto
  if(state)RecordRecipe(i,d);return state;
 }
 id<MTLRenderPipelineState> HostKernels::MakeRender(MTLRenderPipelineDescriptor*d,const HostPso::Invocation&i,std::span<const LocalLibrary::Origin> origins,NSError**error) {
- if(!d.vertexFunction||((i.kind==HK::MsCopy||i.kind==HK::MsDepth)&&!d.fragmentFunction))return nil;
+ if(!d.vertexFunction||((i.kind==HK::MsCopy||i.kind==HK::MsDepth||i.kind==HK::PostProcess)&&!d.fragmentFunction))return nil;
  std::optional<HostPso::Recipe> recipe;
  try{recipe=Describe(i,d);}catch(...){if(warming){artifact_outcome.state=HostPso::ArtifactState::Failed;return nil;}}
  if(warming&&(!recipe||!expected_recipe||*recipe!=*expected_recipe||!HostFunctionEntries(*recipe,d))){artifact_outcome.state=HostPso::ArtifactState::Failed;return nil;}
@@ -138,7 +141,11 @@ bool HostKernels::Replay(const HostPso::Recipe&r) {
  }
  if(i.kind==HK::InlineUpdate)return bool(InlineUpdate());if(i.kind==HK::RenderInlineUpdate)return bool(RenderInlineUpdate());if(i.kind==HK::Fill)return bool(FillU32());
  if(i.kind==HK::MsCopy)return bool(MsCopyPipeline(i.samples,MTLPixelFormat(i.format),i.src_msaa));
- if(i.kind==HK::MsDepth)return bool(MsDepthPipeline(i.samples,MTLPixelFormat(i.format)));return false;
+ if(i.kind==HK::MsDepth)return bool(MsDepthPipeline(i.samples,MTLPixelFormat(i.format)));
+ if(i.kind==HK::UpscaleMerge){NSError*error=nil;return bool(UpscaleMerge(&error));}
+ if(i.kind==HK::CameraMotion){NSError*error=nil;return bool(CameraMotionPipeline(&error));}
+ if(i.kind==HK::PostProcess){NSError*error=nil;return bool(PostProcessPipeline(MTLPixelFormat(i.format),&error));}
+ return false;
 }
 void HostKernels::BindPsoCache(PsoCache*cache){
  // Every explicit binding establishes a fresh synchronous preparation generation.
