@@ -5,11 +5,18 @@ from game_pso_queue import run_manifest,Queue,Stopped,Deferred,digest
 from prepare_game_psos import preparation_ready
 
 def unit(i,eligible=True):
- return dict(schema=2,record_type='offline-pso-input',namespace=dict(cache_id=digest(['cache',i]),cache='/private/author/cache'),
-  key=dict(reference=dict(path=f'/private/author/cache/{i}.key',bytes=16,sha256=digest(['key',i]))),
+ cache='/private/author/cache'
+ def ref(name,tag):return dict(path=cache+'/'+name,name=name,bytes=16,sha256=digest([tag,i]))
+ profile=ref('profile.bin','profile');key=ref(f'{i}.key','key')
+ metadata=ref(f'{i}.meta','metadata');spirv=ref(f'{i}.spv','spirv')
+ return dict(schema=2,record_type='offline-pso-input',namespace=dict(cache_id=digest(['cache',i]),cache=cache),
+  profile=dict(reference=profile,semantic_sha256=digest(['profile-semantic',i])),
+  key=dict(reference=key),stages=[dict(logical_stage='vertex',hardware_stage='vertex',program_hash=f'{i:016x}',
+    cache_local_permutation=i,permutation_hash=f'{i+1:016x}',metadata=metadata,spirv=spirv,serialized_spec_sha256=digest(['spec',i]))],
   recipe_blob_identity=digest(['recipe',i]),source_provenance=dict(status='unknown'),
   classification=dict(family='graphics-existing-plain-or-rectlist-chain'),
-  execution_policy=dict(runtime_cache_import_allowed=False,candidate_preparation=dict(policy_eligible=eligible)))
+  execution_policy=dict(runtime_cache_import_allowed=False,candidate_preparation=dict(policy_eligible=eligible,
+    frozen_input_set_identity=digest([profile,key,metadata,spirv]))))
 class NativeAuthor:
  def __init__(self):self.artifacts=set();self.record_calls=collections.Counter();self.compile_calls=collections.Counter();self.probe_calls=collections.Counter();self.elapsed=0;self.reject=set();self.defer=set();self.stop=None;self.worker_only=False;self.phase_calls=[]
  def clock(self):return self.elapsed
@@ -109,7 +116,7 @@ class Controls(unittest.TestCase):
   self.write([unit(1)]);a=self.run_queue();self.context['options']='f'*64;self.native.elapsed=0;b=self.run_queue()
   self.assertNotEqual(a['job_id'],b['job_id'])
  def test_tampered_state_payload_is_not_trusted(self):
-  self.write([unit(1)]);r=self.run_queue();db=self.progress/r['job_id']/'queue.sqlite'
+  self.write([unit(1)]);r=self.run_queue();db=self.progress/'incremental-v2'/r['job_id']/'queue.sqlite'
   con=sqlite3.connect(db);con.execute("UPDATE units SET payload='{}'");con.commit();con.close();self.native.elapsed=0
   r2=self.run_queue();self.assertEqual(r2['status'],'failed');self.assertIn('payload changed',r2['error'])
  def test_deferred_library_phase_does_not_become_success(self):

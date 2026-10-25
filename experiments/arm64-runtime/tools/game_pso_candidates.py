@@ -4,6 +4,7 @@ import hashlib,json,os,re,stat,struct
 from game_pso_owned_audit import checked_bytes
 from inventory_shader_cache import inventory,combine
 from decode_shader_cache import decode_key,decode_meta,semantic_profile
+from game_pso_progress_identity import layout_abi_identity,cache_scope
 
 MAX_OUTPUT=256*1024*1024
 MAX_RECORDS=100000
@@ -26,7 +27,7 @@ def classify(key,stages):
   need({'tessellation_control','tessellation_eval'}<=names,'paired tessellation stages')
   return dict(family='tessellation-existing-three-variant-chain',tessellation=True)
  need(names<={'vertex','fragment'},'graphics stage set');return dict(family='graphics-existing-plain-or-rectlist-chain',tessellation=False,rectlist='original-native-key-chain')
-def cache_records(cache,layout,check=lambda:None):
+def cache_records(cache,layout,check=lambda:None,*,snapshot_sink=None):
  # Existing inventory joins only within this directory. No static-game catalog.
  paths=[p for p in cache.iterdir()if p.suffix in('.meta','.spv','.key','.bin')]
  need(len(paths)<=20000,'file count budget')
@@ -36,10 +37,13 @@ def cache_records(cache,layout,check=lambda:None):
  inv=inventory(cache,catalog=None)
  names=[inv['profile'],*inv['pipeline_keys']]
  for pair in inv['paired_specializations']:names.extend((pair['meta'],pair['spirv']))
- cid=digest(dict(path=str(cache),files=sorted({r['name']:r for r in names}.values(),key=lambda r:r['name'])))
- for error in inv['errors']:
-  yield dict(schema=2,record_type='rejected-input',namespace=dict(cache=str(cache),cache_id=cid),key_name=error['name'],reason=error['reason'])
+ inventory_sha=digest(dict(path=str(cache),files=sorted({r['name']:r for r in names}.values(),key=lambda r:r['name'])))
  profile,pref=reference(cache,inv['profile']);ps=semantic_profile(profile,layout)
+ abi=layout_abi_identity(layout);cid=cache_scope(cache,ps['semantic_sha256'],abi)
+ namespace=dict(cache=str(cache),cache_id=cid,scope_version=2,serialization_abi_sha256=abi)
+ if snapshot_sink is not None:snapshot_sink(dict(cache=str(cache),cache_id=cid,inventory_sha256=inventory_sha,profile_semantic_sha256=ps['semantic_sha256'],serialization_abi_sha256=abi,files=len({r['name']for r in names})))
+ for error in inv['errors']:
+  yield dict(schema=2,record_type='rejected-input',namespace=namespace,key_name=error['name'],reason=error['reason'])
  pairs={p['meta']['permutation_hash']:p for p in inv['paired_specializations']}
  for r in inv['pipeline_keys']:
   try:
@@ -59,12 +63,12 @@ def cache_records(cache,layout,check=lambda:None):
     stages.append(dict(logical_stage=logical,hardware_stage=m['stage'],program_hash=m['program_hash'],cache_local_permutation=m['permutation'],permutation_hash=ph,metadata=mref,spirv=sref,serialized_spec_sha256=m['serialized_spec_sha256'],metadata_role='audit-only; never native Info/SRT deserialize'))
    family=classify(key,stages);eligible=not reasons
    rid=digest(dict(profile=ps['semantic_sha256'],key=kref['sha256'],stages=stages))
-   yield dict(schema=2,record_type='offline-pso-input',namespace=dict(cache=str(cache),cache_id=cid),recipe_blob_identity=rid,
+   yield dict(schema=2,record_type='offline-pso-input',namespace=namespace,recipe_blob_identity=rid,
     profile=dict(reference=pref,semantic_sha256=ps['semantic_sha256'],compiler_compatibility_proof=False),key=dict(reference=kref,decoded=key),classification=family,stages=stages,
     source_provenance=dict(status='unknown',enabled=False,current_compiler_device_compatibility='not-validated'),
     execution_policy=dict(runtime_cache_import_allowed=False,candidate_preparation=dict(policy_eligible=eligible,executor_approval='not-proven',unknown_producer_tolerated_for_candidate_attempt=True,frozen_input_set_identity=digest(refs)),actual_final_read_admission=dict(allowed=False)),session_rejections=sorted(set(reasons)))
   except(ValueError,KeyError,TypeError,OSError,struct.error)as e:
-   yield dict(schema=2,record_type='rejected-input',namespace=dict(cache=str(cache),cache_id=cid),key_name=r['name'],reason=str(e))
+   yield dict(schema=2,record_type='rejected-input',namespace=namespace,key_name=r['name'],reason=str(e))
 
 def build(*,gpu_root,title_id,layout,output,check=lambda:None):
  gpu=directory(gpu_root);need(TITLE.fullmatch(title_id),'actual launcher TITLE_ID required')
@@ -78,7 +82,7 @@ def build(*,gpu_root,title_id,layout,output,check=lambda:None):
   for cache in paths:
    check();directory(cache);need(cache.parent==root,'direct selected cache only');summary['caches']+=1
    try:
-    for row in cache_records(cache,layout,check):
+    for row in cache_records(cache,layout,check,snapshot_sink=lambda receipt:summary.setdefault('cache_inventory_audits',[]).append(receipt)):
      check();encoded=json.dumps(row,sort_keys=True,separators=(',',':')).encode()+b'\n'
      need(len(encoded)<=256*1024 and summary['records']<MAX_RECORDS and summary['bytes']+len(encoded)<=MAX_OUTPUT,'automatic manifest bounded coverage')
      stream.write(encoded);summary['bytes']+=len(encoded);summary['records']+=1

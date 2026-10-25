@@ -8,7 +8,7 @@ TOOLS=('launcher_local_aot.py','local_aot_policy.py','local_metal_builder.py',
        'warm_archive_manifest.py','gpu_candidate_identity.py','native_observer.py',
        'qa_memory_policy.py','qa_build_guard.py','paged_metal_requests.py',
        'launcher_game_pso.py','game_pso_component.py','game_pso_candidates.py',
-       'prepare_game_psos.py','game_pso_queue.py','game_pso_owned_audit.py',
+       'prepare_game_psos.py','game_pso_queue.py','game_pso_progress_identity.py','game_pso_owned_audit.py',
        'inventory_shader_cache.py','decode_shader_cache.py','game_shader_catalog.py')
 HOOK='''# Native-runtime component preparation happens after the original patch/mod
 # pipeline, before either game process exists. The wrapper execs this same probe.

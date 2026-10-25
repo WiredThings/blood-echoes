@@ -248,3 +248,12 @@ UpscaleMerge、Presenter后处理和Camera共享原冷工厂，原owner槽/算�
 全游戏目录/完整PSO和其它辅助工厂仍未全完成，死亡/联网/菜单暂缓，正式数据及旧缓存保持不动。最新额度剩余32%，未用reset；整体目标仍active。
 
 带空格dyld解析已修为完整记录/PID/唯一库/实际SHA核验：13解析与真实日志、3supervisor控制通过，公开12项便携控制。新包原入口首批16真实配方完成，正在继续分页；尚未以中间状态作整游戏消费或性能验收。
+
+
+## 2026-10-26：整包消费与增量进度已验证
+
+四轮原final-exec入口游戏测试已通过；SQLite和带空格dyld路径修补已获整包验证。最新v2暖启429条中424项可准入全部完成（另5GS session/span拒绝），419条已有hint保留而仍严格重验，0record，原生492hit/4built/0failed。准备471.10秒；游戏527最终管线Hit状态日志、538本机MSL命中/0源码事件，49.08FPS，p99 21.88ms，最高压力2。不是全游戏覆盖、匹配FPS收益或零现场Metal编译证明；CSV遗漏WarmUp/辅助工厂。冷启短暂严重压力和swap增长留在汇总中。
+
+增量域v2、原子索引激活、编译子进程退出唤醒、仅QA cache/local-metal克隆已合入开发源，55项CPU控制通过；测试包为artifacts/arm64-qa-20261026-incremental，SHA bd7e75fa...611505，依赖本机Shared、不便携、不上传Release。准确汇总见evidence/startup-preparation-validation-20261026/game-integration-aggregate.json；其余旧段落是历史检查点。
+
+当前继续：消除准备阶段每页重复全扫描/工具探测（原native准入不能省），补其余固定helper最终PSO，推进静态完整目录与尚未完成的接口/翻译协同。全部源与对应文档仅同步dev，正式数据不动。死亡/联网/菜单仍由用户稍后验收，白模不扩大新假设。目标active。

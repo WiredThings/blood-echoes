@@ -1,6 +1,7 @@
 """Disk-backed scheduling, not an artifact cache or an authority to skip native checks."""
 from pathlib import Path
 import fcntl,hashlib,json,os,sqlite3,stat,time,uuid
+from game_pso_progress_identity import input_identity,execution_identity
 MAX_LINE=256*1024
 PAGE_MAX=64
 PREVIEW_MAX=64
@@ -33,11 +34,18 @@ def fingerprint(path,check):
  finally:os.close(fd)
 
 class Queue:
+ """Versioned scheduling hints. Only a fully indexed current snapshot is executable.
+
+ A changed manifest stages membership/payloads separately, so interruption leaves
+ the prior snapshot intact but never executable under the new incoming SHA.
+ """
  def __init__(self,manifest,progress_root,context,check):
   self.manifest=Path(manifest).resolve(strict=True);self.check=check;self.db=None;self.lock=None;self.interrupted=None
   self.manifest_sha=fingerprint(self.manifest,check)
-  self.job=digest(dict(manifest_sha256=self.manifest_sha,current_context=context))
-  root=canonical_dir(progress_root);folder=root/self.job
+  self.job=digest(dict(progress_schema=2,current_context=context))
+  root=canonical_dir(progress_root);domain=root/'incremental-v2'
+  if not domain.exists():canonical_dir(domain,True)
+  domain=canonical_dir(domain);folder=domain/self.job
   if not folder.exists():canonical_dir(folder,True)
   self.folder=canonical_dir(folder);self.db_path=folder/'queue.sqlite'
   try:
@@ -52,10 +60,12 @@ class Queue:
    self.db=sqlite3.connect(self.db_path);self.db.set_progress_handler(self._progress,50000)
    self._sql('PRAGMA temp_store=FILE');self._sql('PRAGMA mmap_size=0');self._sql('PRAGMA cache_size=-2048')
    self._sql('CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY,v TEXT)')
-   self._sql('''CREATE TABLE IF NOT EXISTS units(id TEXT PRIMARY KEY,ordinal INTEGER,payload TEXT,payload_sha TEXT,
-                ready_hint INTEGER DEFAULT 0,recorded_hint INTEGER DEFAULT 0,last_visit INTEGER DEFAULT 0,run_mark TEXT DEFAULT '')''')
-   self._sql('CREATE INDEX IF NOT EXISTS units_visit ON units(last_visit,ordinal)')
-   self.db.commit()
+   self._sql("""CREATE TABLE IF NOT EXISTS units(id TEXT PRIMARY KEY,input_json TEXT,input_sha TEXT,
+       active INTEGER DEFAULT 0,ordinal INTEGER,payload TEXT,payload_sha TEXT,
+       pending_scan TEXT DEFAULT '',pending_ordinal INTEGER,pending_payload TEXT,pending_payload_sha TEXT,
+       pending_execution_sha TEXT,pending_conflict INTEGER DEFAULT 0,
+       ready_hint INTEGER DEFAULT 0,recorded_hint INTEGER DEFAULT 0,last_visit INTEGER DEFAULT 0,run_mark TEXT DEFAULT '')""")
+   self._sql('CREATE INDEX IF NOT EXISTS units_visit ON units(active,last_visit,ordinal)');self.db.commit()
   except BaseException:self.close();raise
  def _progress(self):
   try:self.check()
@@ -67,11 +77,20 @@ class Queue:
    if self.interrupted is not None:raise self.interrupted
    raise
  def get(self,key,default=0):
+  if key=='indexed':return self.get('active_manifest',None)==self.manifest_sha
   row=self._sql('SELECT v FROM meta WHERE k=?',(key,)).fetchone();return json.loads(row[0]) if row else default
  def put(self,key,value):self._sql('INSERT OR REPLACE INTO meta VALUES(?,?)',(key,json.dumps(value)))
+ def _start_scan(self):
+  if self.get('pending_manifest',None)==self.manifest_sha:return
+  # Clearing only pending columns cannot disturb old active membership or hints.
+  self._sql("UPDATE units SET pending_scan='',pending_ordinal=NULL,pending_payload=NULL,pending_payload_sha=NULL,pending_execution_sha=NULL,pending_conflict=0")
+  self.put('pending_manifest',self.manifest_sha)
+  for key in ('records','eligible','rejected','excluded','duplicates','conflicts','offset'):self.put(key,0)
+  self.db.commit()
  def index(self):
   if self.get('indexed',False):return
-  count=self.get('records');eligible=self.get('eligible');rejected=self.get('rejected');excluded=self.get('excluded');duplicates=self.get('duplicates')
+  self._start_scan()
+  count=self.get('records');eligible=self.get('eligible');rejected=self.get('rejected');excluded=self.get('excluded');duplicates=self.get('duplicates');conflicts=self.get('conflicts')
   offset=self.get('offset');self.check();finished=False
   with self.manifest.open('rb') as stream:
    stream.seek(offset)
@@ -87,38 +106,51 @@ class Queue:
       elif u.get('record_type')!='offline-pso-input' or u.get('execution_policy',{}).get('candidate_preparation',{}).get('policy_eligible') is not True:excluded+=1
       else:
        need(u['schema']==2 and u['execution_policy']['runtime_cache_import_allowed'] is False,'v2 candidate-only input')
-       key=dict(cache_id=u['namespace']['cache_id'],key=u['key']['reference'],recipe_blob_identity=u['recipe_blob_identity'])
-       uid=digest(key);payload=canonical(u).decode();ph=hashlib.sha256(payload.encode()).hexdigest()
-       old=self._sql('SELECT payload_sha FROM units WHERE id=?',(uid,)).fetchone()
+       identity=input_identity(u);uid=digest(identity);identity_json=canonical(identity).decode()
+       payload=canonical(u).decode();ph=hashlib.sha256(payload.encode()).hexdigest();eh=execution_identity(u)
+       old=self._sql('SELECT input_json,pending_scan,pending_execution_sha,pending_conflict FROM units WHERE id=?',(uid,)).fetchone()
        if old:
-        need(old[0]==ph,'conflicting duplicate exact namespace');duplicates+=1
-       else:self._sql('INSERT INTO units(id,ordinal,payload,payload_sha) VALUES(?,?,?,?)',(uid,count,payload,ph))
+        need(old[0]==identity_json,'input identity collision')
+        if old[1]==self.manifest_sha:
+         if old[2]!=eh:
+          if not old[3]:conflicts+=1
+          self._sql('UPDATE units SET pending_conflict=1 WHERE id=?',(uid,));rejected+=1
+         else:duplicates+=1
+        else:
+         self._sql('UPDATE units SET pending_scan=?,pending_ordinal=?,pending_payload=?,pending_payload_sha=?,pending_execution_sha=?,pending_conflict=0 WHERE id=?',(self.manifest_sha,count,payload,ph,eh,uid))
+       else:
+        self._sql('INSERT INTO units(id,input_json,input_sha,pending_scan,pending_ordinal,pending_payload,pending_payload_sha,pending_execution_sha) VALUES(?,?,?,?,?,?,?,?)',(uid,identity_json,uid,self.manifest_sha,count,payload,ph,eh))
        eligible+=1
      except (ValueError,KeyError,TypeError):rejected+=1
      offset=stream.tell()
-     if count%PAGE_MAX==0:self._checkpoint(count,eligible,rejected,excluded,duplicates,offset)
-   finally:self._checkpoint(count,eligible,rejected,excluded,duplicates,offset)
+     if count%PAGE_MAX==0:self._checkpoint(count,eligible,rejected,excluded,duplicates,conflicts,offset)
+   finally:self._checkpoint(count,eligible,rejected,excluded,duplicates,conflicts,offset)
   if finished:
    need(fingerprint(self.manifest,self.check)==self.manifest_sha,'manifest changed while indexing')
-   self.put('indexed',True);self.db.commit()
- def _checkpoint(self,count,eligible,rejected,excluded,duplicates,offset):
-  for k,v in dict(records=count,eligible=eligible,rejected=rejected,excluded=excluded,duplicates=duplicates,offset=offset).items():self.put(k,v)
+   try:
+    self._sql('UPDATE units SET active=(pending_scan=? AND pending_conflict=0)',(self.manifest_sha,))
+    self._sql('UPDATE units SET ordinal=pending_ordinal,payload=pending_payload,payload_sha=pending_payload_sha WHERE active=1')
+    self.put('active_manifest',self.manifest_sha);self.db.commit()
+   except BaseException:self.db.rollback();raise
+ def _checkpoint(self,count,eligible,rejected,excluded,duplicates,conflicts,offset):
+  for k,v in dict(records=count,eligible=eligible,rejected=rejected,excluded=excluded,duplicates=duplicates,conflicts=conflicts,offset=offset).items():self.put(k,v)
   self.db.commit()
  def page(self,run,page_size):
-  self.check();rows=self._sql('''SELECT id,payload,payload_sha,ready_hint,recorded_hint FROM units WHERE run_mark!=?
-        ORDER BY last_visit,ordinal LIMIT ?''',(run,page_size)).fetchall()
+  self.check();need(self.get('indexed',False),'incoming manifest not fully indexed/activated')
+  rows=self._sql("""SELECT id,payload,payload_sha,ready_hint,recorded_hint FROM units WHERE active=1 AND run_mark!=?
+        ORDER BY last_visit,ordinal LIMIT ?""",(run,page_size)).fetchall()
   result=[]
   for uid,payload,expected,ready,recorded in rows:
    need(hashlib.sha256(payload.encode()).hexdigest()==expected,'progress payload changed')
-   u=json.loads(payload);key=dict(cache_id=u['namespace']['cache_id'],key=u['key']['reference'],recipe_blob_identity=u['recipe_blob_identity'])
-   need(digest(key)==uid,'progress unit identity')
+   u=json.loads(payload);need(digest(input_identity(u))==uid,'progress unit identity')
    result.append(dict(id=uid,unit=u,ready_hint=bool(ready),recorded_hint=bool(recorded)))
   return result
  def mark(self,item,run,*,ready=False,recorded=False):
+  need(self.get('indexed',False),'cannot mark an unactivated manifest')
   seq=self.get('visit_sequence')+1;self.put('visit_sequence',seq)
-  self._sql('UPDATE units SET ready_hint=?,recorded_hint=?,last_visit=?,run_mark=? WHERE id=?',(int(ready),int(recorded),seq,run,item['id']));self.db.commit()
- def total(self):return self._sql('SELECT COUNT(*) FROM units').fetchone()[0]
- def hint_count(self):return self._sql('SELECT COUNT(*) FROM units WHERE ready_hint=1').fetchone()[0]
+  self._sql('UPDATE units SET ready_hint=?,recorded_hint=?,last_visit=?,run_mark=? WHERE id=? AND active=1',(int(ready),int(recorded),seq,run,item['id']));self.db.commit()
+ def total(self):return self._sql('SELECT COUNT(*) FROM units WHERE active=1').fetchone()[0]
+ def hint_count(self):return self._sql('SELECT COUNT(*) FROM units WHERE active=1 AND ready_hint=1').fetchone()[0]
  def close(self):
   if self.db is not None:self.db.close();self.db=None
   if self.lock is not None:os.close(self.lock);self.lock=None
@@ -133,7 +165,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
  need(phase in ('all','record','prepare') and 0<page_size<=PAGE_MAX and seconds>0,'bounded page/phase/time budget')
  need(max_recipes is None or type(max_recipes) is int and max_recipes>0,'optional recipe work budget')
  start=clock();run=uuid.uuid4().hex;queue=None;active=None;ordinal=0
- report=dict(schema=1,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,
+ report=dict(schema=1,progress_schema=2,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,
              verified_artifact_hits=0,visited=0,events_preview=[],event_count=0,max_page_items=0,
              full_manifest_preparation_verified=False,state_is_artifact_authority=False)
  def guard():
@@ -167,14 +199,16 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
   queue=Queue(manifest,progress_root,context,guard);queue.index()
   report.update(job_id=queue.job,manifest_sha256=queue.manifest_sha,index_complete=True,
       manifest_records=queue.get('records'),policy_eligible_records=queue.get('eligible'),
-      index_rejected=queue.get('rejected'),policy_excluded=queue.get('excluded'),exact_duplicates=queue.get('duplicates'))
+      index_rejected=queue.get('rejected'),policy_excluded=queue.get('excluded'),exact_duplicates=queue.get('duplicates'),conflicting_uids=queue.get('conflicts'))
   while True:
    guard()
    if max_recipes is not None and report['visited']>=max_recipes:raise Deferred('recipe work budget')
    page=queue.page(run,min(page_size,max_recipes-report['visited']) if max_recipes is not None else page_size)
    if not page:break
    report['max_page_items']=max(report['max_page_items'],len(page));pending=[]
-   # Prior success schedules a real current lookup-only native verification.
+   # A scheduling hint only requests PSO lookup-only native verification.
+   # allow_compile=False does not forbid MSL function-source fallback.
+   # ready(row) and current final-exec env remain the admission authority.
    hints=[item for item in page if item['ready_hint'] and phase!='record']
    if hints:
     env=local('prepare')
@@ -222,7 +256,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
   report['seconds']=clock()-start
   if queue is not None:
    queue.db.set_progress_handler(None,0)
-   report.update(unique_units=queue.total(),observed_ready_hint_count=queue.hint_count(),index_complete=queue.get('indexed',False))
+   report.update(unique_units=queue.total(),observed_ready_hint_count=queue.hint_count(),index_complete=queue.get('indexed',False),active_manifest_sha256=queue.get('active_manifest',None),incoming_manifest_sha256=queue.manifest_sha)
    report['not_visited']=max(0,report['unique_units']-report['visited'])
    report['budget_deferred_remaining']=report['not_visited'] if report['index_complete'] else None
    report['rejected_total']=report['rejected']+queue.get('rejected')

@@ -27,10 +27,15 @@ Original final-exec orchestration now selects the actual title/cache and pages t
 whole candidate manifest with bounded memory and resumable progress. Real packaging
 exposed a missing bundled SQLite extension (repaired in new copies) and a load-log
 parser that truncated space-containing app paths (fixed with PID/path/SHA checks).
-The new package has completed its first real preparation page; subsequent pages
-and actual game consumption are still being validated.
-Whole-package game consumption and matched cold/warm hitch/memory checks remain
-open. Production and Release are unchanged.
+Four original-entry game integrations now pass. The latest warm restart strictly
+verifies all 424 policy-eligible current-cache recipes (429 records, five existing
+geometry session-span exclusions); 419 prior hints survive, but remain scheduling
+hints rather than artifact authority. Preparation still takes 471 seconds and
+repeats library scans; removing that work remains open. The scene runs at about
+49 FPS, with no matched gain claim. Full-game PSO coverage and cold/warm hitch/peak
+memory acceptance remain open; early loading pressure is documented rather than
+hidden. Source artifacts and aggregate evidence are published on the development
+branch only. Production and Release are unchanged.
 
 Local per-user compilation is the default-on delivery direction, superseding the
 earlier average-FPS-based default-off decisions below. Game compiler payloads stay

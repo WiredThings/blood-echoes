@@ -1,0 +1,291 @@
+{
+  "schema": 1,
+  "production_modified": false,
+  "release_updated": false,
+  "all_game_coverage": false,
+  "source_api_coverage_is_not_final_pso_coverage": true,
+  "runs": [
+    {
+      "label": "O4-first",
+      "passed": true,
+      "scene": {
+        "engine": "arm64",
+        "qa_cpu_qos": null,
+        "fps": 48.87027058539389,
+        "p95_ms": 21.19,
+        "p99_ms": 21.56,
+        "gpu_ms": 19.239127471029313,
+        "draws_median": 1366,
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ],
+        "cpu_percent": {
+          "bb-game-arm64": 273.345298712821,
+          "bb-gpu": 139.60649186538018
+        },
+        "combined_footprint_mib": 6097.629821777344,
+        "max_pressure": 4,
+        "swap_change_mib": 1848.0,
+        "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+        "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+        "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+        "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f"
+      },
+      "preparation": {
+        "status": "partial",
+        "completed": 304,
+        "recorded": 320,
+        "verified_artifact_hits": 0,
+        "deferred": 0,
+        "rejected": 0,
+        "protection_stops": 0,
+        "policy_eligible_records": 404,
+        "policy_excluded": 5,
+        "manifest_records": 409,
+        "wall_seconds": 600.012476917007,
+        "full_manifest_preparation_verified": false,
+        "budget_deferred_remaining": 100
+      },
+      "preparation_native_artifact_counts": {
+        "attempts": 352,
+        "built": 284,
+        "compile_attempts": 284,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 68,
+        "unavailable": 0
+      },
+      "worker_phase_counts": {
+        "record": 320,
+        "prepare": 304
+      },
+      "runtime_native_artifact_states": {
+        "1": 381,
+        "3": 139,
+        "0": 16
+      },
+      "runtime_local_msl_hits": 442,
+      "runtime_source_msl_events": 96,
+      "source_reports_sha256": {
+        "game": "b5202f0d79899bb09ab9066bb4e923eec0a6c6012c0f181c25fb29cc400373a5",
+        "preparation": "5090339778fb0901ed5fc9605dd123f9231ed1fd538a98a34022d558ca7c5559"
+      }
+    },
+    {
+      "label": "O4-warm",
+      "passed": true,
+      "scene": {
+        "engine": "arm64",
+        "qa_cpu_qos": null,
+        "fps": 48.35662460762315,
+        "p95_ms": 21.44,
+        "p99_ms": 21.81,
+        "gpu_ms": 19.50171605789111,
+        "draws_median": 1367,
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ],
+        "cpu_percent": {
+          "bb-game-arm64": 272.25289524370777,
+          "bb-gpu": 137.19234570983616
+        },
+        "combined_footprint_mib": 5927.114311218262,
+        "max_pressure": 4,
+        "swap_change_mib": 237.375,
+        "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+        "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+        "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+        "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f"
+      },
+      "preparation": {
+        "status": "partial",
+        "completed": 368,
+        "recorded": 384,
+        "verified_artifact_hits": 0,
+        "deferred": 0,
+        "rejected": 0,
+        "protection_stops": 0,
+        "policy_eligible_records": 424,
+        "policy_excluded": 5,
+        "manifest_records": 429,
+        "wall_seconds": 600.0178470000392,
+        "full_manifest_preparation_verified": false,
+        "budget_deferred_remaining": 56
+      },
+      "preparation_native_artifact_counts": {
+        "attempts": 424,
+        "built": 56,
+        "compile_attempts": 56,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 368,
+        "unavailable": 0
+      },
+      "worker_phase_counts": {
+        "record": 384,
+        "prepare": 368
+      },
+      "runtime_native_artifact_states": {
+        "1": 458,
+        "3": 78,
+        "2": 16
+      },
+      "runtime_local_msl_hits": 538,
+      "runtime_source_msl_events": 0,
+      "source_reports_sha256": {
+        "game": "899a8f23e1bb1503f94562f80dac68b41668e398f3ffa16d26706952f23d3e6e",
+        "preparation": "45293697c0004d9f0b596b2a68d51e9a11a00e6e06cfa7eb2b980e32a715da00"
+      }
+    },
+    {
+      "label": "v2-first",
+      "passed": true,
+      "scene": {
+        "engine": "arm64",
+        "qa_cpu_qos": null,
+        "fps": 49.286396954440576,
+        "p95_ms": 21.04,
+        "p99_ms": 21.6,
+        "gpu_ms": 18.91505747126437,
+        "draws_median": 1367,
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ],
+        "cpu_percent": {
+          "bb-game-arm64": 278.98920139219183,
+          "bb-gpu": 142.11081630466086
+        },
+        "combined_footprint_mib": 5811.184772491455,
+        "max_pressure": 2,
+        "swap_change_mib": 235.3125,
+        "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+        "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+        "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+        "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f"
+      },
+      "preparation": {
+        "status": "partial",
+        "completed": 419,
+        "recorded": 424,
+        "verified_artifact_hits": 0,
+        "deferred": 0,
+        "rejected": 0,
+        "protection_stops": 0,
+        "policy_eligible_records": 424,
+        "policy_excluded": 5,
+        "manifest_records": 429,
+        "wall_seconds": 600.1423063339898,
+        "full_manifest_preparation_verified": false,
+        "budget_deferred_remaining": 5
+      },
+      "preparation_native_artifact_counts": {
+        "attempts": 491,
+        "built": 49,
+        "compile_attempts": 49,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 442,
+        "unavailable": 0
+      },
+      "worker_phase_counts": {
+        "record": 424,
+        "prepare": 419
+      },
+      "runtime_native_artifact_states": {
+        "1": 523,
+        "3": 29
+      },
+      "runtime_local_msl_hits": 538,
+      "runtime_source_msl_events": 0,
+      "source_reports_sha256": {
+        "game": "f0dcde0d291d08ae0c0b2f68e82c82b58cc6b27c6a8c35751a454a9403cd9862",
+        "preparation": "b017826e00d0354f0f8493becc00c3bf5cb07b5d0d05342b80e866b605972ef1"
+      }
+    },
+    {
+      "label": "v2-warm",
+      "passed": true,
+      "scene": {
+        "engine": "arm64",
+        "qa_cpu_qos": null,
+        "fps": 49.08262475083821,
+        "p95_ms": 21.16,
+        "p99_ms": 21.88,
+        "gpu_ms": 19.152416836388323,
+        "draws_median": 1367,
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ],
+        "cpu_percent": {
+          "bb-game-arm64": 277.1752129199014,
+          "bb-gpu": 141.38622505253286
+        },
+        "combined_footprint_mib": 5825.747261047363,
+        "max_pressure": 2,
+        "swap_change_mib": -2515.8125,
+        "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+        "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+        "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+        "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f"
+      },
+      "preparation": {
+        "status": "completed",
+        "completed": 424,
+        "recorded": 0,
+        "verified_artifact_hits": 419,
+        "deferred": 0,
+        "rejected": 0,
+        "protection_stops": 0,
+        "policy_eligible_records": 424,
+        "policy_excluded": 5,
+        "manifest_records": 429,
+        "wall_seconds": 471.09550195897464,
+        "full_manifest_preparation_verified": true,
+        "budget_deferred_remaining": 0
+      },
+      "preparation_native_artifact_counts": {
+        "attempts": 496,
+        "built": 4,
+        "compile_attempts": 4,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 492,
+        "unavailable": 0
+      },
+      "worker_phase_counts": {
+        "prepare": 424
+      },
+      "runtime_native_artifact_states": {
+        "1": 527,
+        "3": 25
+      },
+      "runtime_local_msl_hits": 538,
+      "runtime_source_msl_events": 0,
+      "source_reports_sha256": {
+        "game": "bef11ba0f0a6c25122c1ca8f77ff283adfd4b815034374efaeda699e3ec7656d",
+        "preparation": "c8ea84853a834272e6723a43a43bb94695632a424d85c77a379dddaceec75b29"
+      }
+    }
+  ],
+  "qualification": "Static same-scene original-entry integration; not matched performance gain or zero-RAM-growth proof. Combined footprints double-count shared pages. Core CSV compile counters omit WarmUp/helper calls and cannot establish all-Metal zero compiles. O4 first/second runs had brief severe load pressure, preserved in source reports. No Cua, screen recording, character actions, death/online/menu acceptance. v2 warm fully verifies only 424 policy-eligible current-cache inputs; five geometry session-span chains remain excluded. User compiler inputs and artifacts are not published."
+}

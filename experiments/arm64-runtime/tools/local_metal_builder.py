@@ -217,7 +217,10 @@ class FixedRunner:
                     if os.path.lexists(path):
                         row=Path(path).lstat()
                         if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1 or not 0<=row.st_size<=limit:raise Stopped('compiler output size/type limit exceeded')
-                time.sleep(.1)
+                # Wait wakes immediately on exit; timeout preserves the existing
+                # at-most-0.1s supervision cadence for a still-running child.
+                try:proc.wait(timeout=.1)
+                except subprocess.TimeoutExpired:pass
             guard.check()
             if proc.returncode:
                 # Compiler diagnostics can quote private MSL. Retain only a bounded
@@ -233,6 +236,12 @@ class FixedRunner:
                     raise
                 raise Refused('fixed tool command failed: '+str(proc.returncode)+'; private diagnostic tail: '+name)
             if os.fstat(log.fileno()).st_size>LOG_MAX:raise Refused('tool output limit exceeded')
+            # A short-lived command can exit between periodic samples. Check its
+            # final outputs too, before any successful return is observable.
+            for path,limit in outputs:
+                if os.path.lexists(path):
+                    row=Path(path).lstat()
+                    if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1 or not 0<=row.st_size<=limit:raise Stopped('compiler output size/type limit exceeded')
             log.seek(0);return log.read(LOG_MAX+1)
         finally:
             if proc is not None and proc.poll()is None:

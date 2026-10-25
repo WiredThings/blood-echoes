@@ -13,6 +13,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from qa_build_guard import require_no_games
 from manual_qa_policy import validate_manual_environment
 from prepare_local_aot_stage import build_stage
+from qa_gpu_cache_seed import validate as validate_cache_seed,clone as clone_cache_seed
 from complete_packaged_python import complete as complete_python_sqlite
 from game_pso_component import freeze_inputs,sha as component_sha
 
@@ -52,9 +53,11 @@ def load_cpu_runtime_manifest(path,expected_gpu_sha256=None):
     return record
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,required=True);ap.add_argument('--source-repository',type=Path,required=True);ap.add_argument('--gpu-app-manifest',type=Path,required=True);ap.add_argument('--cpu-runtime-manifest',type=Path,required=True);ap.add_argument('--runtime-tools',type=Path);ap.add_argument('--game-pso-component',type=Path,required=True);ap.add_argument('--python-provider',type=Path);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,required=True);ap.add_argument('--source-repository',type=Path,required=True);ap.add_argument('--gpu-app-manifest',type=Path,required=True);ap.add_argument('--cpu-runtime-manifest',type=Path,required=True);ap.add_argument('--runtime-tools',type=Path);ap.add_argument('--game-pso-component',type=Path,required=True);ap.add_argument('--python-provider',type=Path);ap.add_argument('--gpu-cache-seed-manifest',type=Path);a=ap.parse_args()
     require_no_games()
     assert not a.game_pso_component.is_symlink() and a.game_pso_component.resolve(strict=True).is_relative_to(P/'evidence'), 'admitted Shared game preparation manifest required'
+    cpu_runtime=load_cpu_runtime_manifest(a.cpu_runtime_manifest)
+    cache_seed=validate_cache_seed(a.gpu_cache_seed_manifest,project=P,expected_upstream_gpu_sha256=cpu_runtime['gpu_library_sha256'])if a.gpu_cache_seed_manifest else None
     output=a.output.absolute();assert not output.exists(), 'Preserve old QA outputs; use a fresh directory'
     output.mkdir(parents=True)
     prepared=build_stage(project=P,repository=a.source_repository,runtime_tools=a.runtime_tools)
@@ -80,7 +83,9 @@ def main():
     old_gpu=Path(extra['BB_GPU_USER_DIR']).resolve(strict=True)
     assert old_gpu.is_relative_to(P/'state') and old_gpu!=P/'state'
     new_gpu=P/'state'/('gui-gpu-local-aot-'+str(time.time_ns()))
-    assert not new_gpu.exists();shutil.copytree(old_gpu,new_gpu,symlinks=False)
+    assert not new_gpu.exists()
+    if cache_seed is not None:cache_seed=clone_cache_seed(cache_seed,new_gpu,project=P,baseline_root=old_gpu)
+    else:shutil.copytree(old_gpu,new_gpu,symlinks=False)
     extra['BB_GPU_USER_DIR']=str(new_gpu)
     extra.pop('BB_MTL_LOCAL_AOT_MODE',None)
     # This new QA case exercises the validated resource path; formal preferences
@@ -94,7 +99,6 @@ def main():
         dst=stage/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copytree((original/name).resolve(),dst,symlinks=False)
     python_closure=complete_python_sqlite(stage/'python',writable_stage=stage,provider=a.python_provider)
     cpu=stage/'bin/bb-probe-metal';cpu.parent.mkdir(exist_ok=True)
-    cpu_runtime=load_cpu_runtime_manifest(a.cpu_runtime_manifest)
     cpu_game_source=Path(cpu_runtime['game']['path'])
     shutil.copy2(cpu_game_source,cpu)
     cpu_lib=stage/'bin/gpu-metal/libbbgpu.dylib';cpu_lib.parent.mkdir()
@@ -155,7 +159,7 @@ def main():
         host_local_only=True,portable_installer=False,formal_data_modified=False,
         default_local_metal_preparation=True,protected_resource_writeback=True,new_component_stage=str(admitted_stage),
         python_sqlite_closure=python_closure,local_metal_preparation=prepared['manifest'],game_pso_component=component,default_game_pso_preparation=True,
-        private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,
+        private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,gpu_cache_seed=cache_seed,
         frozen_runtime=native['frozen_runtime'],cpu_runtime_manifest=dict(path=str(a.cpu_runtime_manifest.resolve()),sha256=sha(a.cpu_runtime_manifest),protocol_version=cpu_runtime['protocol_version'],live_payload_version=cpu_runtime['live_payload_version'],author_instrumentation=cpu_runtime.get('author_instrumentation',False)),
         upstream_inputs=dict(cpu=sha(cpu_game_source),cpu_library=sha(cpu_source),gpu_library=sha(gpu_source),net_library=sha(original/'bin/gpu-net/libbbnet.dylib')),
         original_scripts=baseline,effective_scripts=source,controlled_changes=['run.sh final-exec hook','local Metal preparation runtime tools'],manual_physical_input=True,silent=True,

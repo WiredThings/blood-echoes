@@ -57,8 +57,8 @@
     }
   ],
   "packaging_failures": [
-    "missing bundled _sqlite3, repaired in new package",
-    "space-containing dyld path parser, fix in progress"
+    "missing bundled _sqlite3, repaired and packaged-game validated",
+    "space-containing dyld path parser, repaired and packaged-game validated"
   ],
   "qualification": "Native fixtures and zero-swap small controls do not prove gameplay benefit, no white-model cause claim, old caches retained.",
   "fixture_sha256": {
@@ -68,5 +68,13 @@
     "pipeline_artifact.mm": "1a43b0df43596144f9a72f55f37037c785186edc0cec96455ead43326ae9721c",
     "authored.vert": "9aff853b7349c7ed54fb5bb380275acfad80c8fc0b3851e7cd0ba261eacb6b88",
     "authored.frag": "da915897c6fd6d2fbb5a0b6cf3521f74df412e5fb1ea2544da90666ec7dbb1b9"
-  }
+  },
+  "packaged_game_integration_passed": true,
+  "current_cache_preparation_verified": {
+    "manifest_records": 429,
+    "policy_eligible": 424,
+    "completed": 424,
+    "excluded_geometry_session_chains": 5
+  },
+  "game_aggregate": "game-integration-aggregate.json"
 }
