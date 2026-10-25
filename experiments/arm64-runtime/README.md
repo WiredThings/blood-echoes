@@ -12,7 +12,11 @@ Vendored code retains its original licenses. SOURCE.json records upstream proven
 
 ## Current status
 
-See CURRENT-PLAN.zh-CN.md, NIGHT-HANDOFF.zh-CN.md and docs/. Exit-code error/restart separation,
+See GOAL.zh-CN.md, CURRENT-PLAN.zh-CN.md, NIGHT-HANDOFF.zh-CN.md and docs/.
+The goal now explicitly includes resolving the nine remaining imports and building
+a version-bound shader/material and full-specialization inventory. Bounded discovery
+probes find real lead time, mainly during startup; gameplay coverage remains partial.
+See docs/shader-preparation-opportunity.zh-CN.md; no async compilation is enabled. Exit-code error/restart separation,
 semantic Clang ABI markers, full libc spans and manual-input packaging have regressions.
 A real Metal first-upload hash bug has old/fixed pixel tests and an isolated QA candidate;
 its relation to the observed combat white models remains unproven. White models and exploration stutters

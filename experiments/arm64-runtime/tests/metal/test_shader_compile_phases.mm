@@ -40,6 +40,16 @@ int main(int argc,char**argv){
   Metal::Device device;Metal::ShaderCompiler compiler{device,path/"msl"};AmdGpu::Liverpool liverpool;
   VideoCore::AuthoredCore core{liverpool,device,compiler};
   std::array<u32,16> data{};const std::array<u32,3> code{0xBEEB03FF,0,0xBF810000};
+  // Run the real speculative lookup branch before any module exists. It must
+  // report unavailable without compiling, publishing a program, or skipping a draw.
+  {
+   Shader::ShaderParams params{std::span<const u32,16>{data},code,0x2468ace0ULL};
+   VideoCore::PrepWorker worker{};VideoCore::PipelineSelection selection{};
+   selection.regs=&liverpool.regs;selection.worker=&worker;
+   Shader::Backend::Bindings binding{};
+   auto result=core.GetProgram(selection,Shader::HwStage::Compute,Shader::SwStage::Compute,params,binding);
+   assert(worker.failed&&!std::get<1>(result)&&core.binaries.empty());
+  }
   for(size_t permutation=0;permutation<2;++permutation){
    Shader::ShaderParams params{std::span<const u32,16>{data},code,0x13579bdfULL};
    Shader::Info info{Shader::HwStage::Compute,Shader::SwStage::Compute,params};

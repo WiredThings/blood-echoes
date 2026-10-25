@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792895492378361000,
+  "created_ns": 1792896543701739000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -85,7 +85,7 @@
     },
     {
       "path": "src/bb_shader_phase_audit.h",
-      "sha256": "5160fb13624afa8ad1fbe67dc7607fe732f7e96f456b2be732b0c36df001713b"
+      "sha256": "e412f14d3e38d016c4db74f65e8de7ff5757b1b62466500024105b0be40e4a8d"
     },
     {
       "path": "src/bb_signal_audit.h",
@@ -105,7 +105,7 @@
     },
     {
       "path": "src/bb_stutter_audit.h",
-      "sha256": "d11872b5d096a73afc5f6748b7ba86eaf0164eb1c2413ed6055421b30a5d8fb7"
+      "sha256": "bd46ad3978e5b753716b1ccfb16016c4dca93382a083f35c994f234bb1448c19"
     },
     {
       "path": "src/boot_image.h",
@@ -265,7 +265,7 @@
     },
     {
       "path": "tools/analyze_stutter.py",
-      "sha256": "8d9e0116bf6ea975069e207d53f4a9a3b714c7fff77b8bdbbafa87854484a713"
+      "sha256": "79e9b6196f672d9a750a6080f62aae616da8eb48d63794356e6412316857a2f3"
     },
     {
       "path": "tools/analyze_texture_bindings.py",
@@ -450,6 +450,10 @@
     {
       "path": "tools/patch_adapter.py",
       "sha256": "4677f6b251412bfd12692c7e271e55cdf011b8954809a4c7f41887b6f7aa5fbc"
+    },
+    {
+      "path": "tools/prep_opportunity_analysis.py",
+      "sha256": "cfed31c99067b21efc7f9e9607567f21cce2336896410af5459a9480e83501d1"
     },
     {
       "path": "tools/prepare_launcher_gui_qa.py",
@@ -741,7 +745,7 @@
     },
     {
       "path": "tests/metal/test_shader_compile_phases.mm",
-      "sha256": "92420353cd70eb84074bb7544aa7fa247c8007b485621c5e4150c1ee356349cf"
+      "sha256": "790f68e6429c1897402644a006d6b904bc2b7de4c66dae3725fcfa724780d21b"
     },
     {
       "path": "tests/metal/test_texture_expansion.mm",
@@ -805,7 +809,7 @@
     },
     {
       "path": "tests/test_actual_shader_phases.py",
-      "sha256": "832942948d1ea7f24f8b30a8e4de985b24f3ea02104dc5c8fb7eb74f63eb2f49"
+      "sha256": "9f637366ea7fbc3837509a7199615325529d165256c9ed2d3070a1b346392055"
     },
     {
       "path": "tests/test_allocation_probe.cpp",
@@ -1046,6 +1050,18 @@
     {
       "path": "tests/test_pmr_lifetime.cpp",
       "sha256": "12bdfea7385673d520b37b7850691b21d9ca4f99aedfdbe8ec65b71b6d074e1e"
+    },
+    {
+      "path": "tests/test_prep_opportunity_analysis.py",
+      "sha256": "d3549cab123aee5c660f8e924328cb091a27143299e3d6708ecaefb8f749d364"
+    },
+    {
+      "path": "tests/test_prep_opportunity_probe.cpp",
+      "sha256": "1d465de7e3a4dba97b405ad0af5eb0d4c14ab4adffe0641a3bd011fcffee7457"
+    },
+    {
+      "path": "tests/test_prep_opportunity_probe.py",
+      "sha256": "b7a22f908daa6291faa915c8f431f9aaa2478c33265ad5273508024d23125039"
     },
     {
       "path": "tests/test_present_dump.py",
@@ -32169,7 +32185,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
-      "sha256": "4d43195fe42aa635428acc4889f30f2f9bd4145c2b622f72ed4ddc77978890aa"
+      "sha256": "7ac1387fa6d796a48e58eef42c2a021d3e2cc19a10d2c0513633d823b3d4993a"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.h",
@@ -38480,12 +38496,16 @@
       "sha256": "9f01e6b8cba139a19f5d329a87ee0a88f5be685b02739561cd34cde444eb5077"
     },
     {
+      "path": "GOAL.zh-CN.md",
+      "sha256": "007d75cde094e63d91a024edb55d9846ace55bc8e19b4e13e7e4a94fcafd00ee"
+    },
+    {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "887390d158ed2d69fa2c21bfba32106cfca72a4f6ed52d8cbf0db829d4864ac8"
+      "sha256": "b4832cef6088a7894e047d4782cdaf856073c9df23bf6769d79226e4445068ed"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "cd4ef45b05b7516b1a0b4cb784886fa0bb3e37a88277465e127676969eb45f3a"
+      "sha256": "8b470791c50366c5fe5845ba316296e5170ff3a6079eca9e81f0334949d9d4ec"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38562,6 +38582,10 @@
     {
       "path": "docs/avplayer-bridge.zh-CN.md",
       "sha256": "852003fa665dc075b2440a2eb7a983d81611f64b529db86fddf7aded0fd7de78"
+    },
+    {
+      "path": "docs/shader-preparation-opportunity.zh-CN.md",
+      "sha256": "dab5e5104af909ff02dc0249f85c18077248c2b2a15c628efa4efeafa1716ebc"
     }
   ],
   "excluded": [

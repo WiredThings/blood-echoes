@@ -2,8 +2,9 @@
 """Read bounded diagnostic metadata after the private processes have stopped."""
 import argparse,collections,json,re,struct,csv
 from shader_phase_analysis import analyze_shader_phases
+from prep_opportunity_analysis import analyze as analyze_preparation
 from pathlib import Path
-KINDS={1:'fex_block',2:'fex_invalidation_lock',3:'fex_ir',4:'fex_codegen',5:'fex_publish',6:'fex_code_buffer_lock',7:'fex_mapping_lock',8:'fex_code_pages_lock',10:'metal_library_total',11:'metal_library_build',12:'metal_pso',13:'metal_replay_wait',14:'metal_gpu_wait',15:'metal_submit_wait',16:'metal_spirv_to_msl_total',17:'metal_slow_packet_wall',18:'metal_packet_cpu_window',20:'ipc_total',21:'ipc_send',22:'ipc_reply',23:'ipc_handler',24:'ipc_writer_lock',25:'ipc_space_wait',26:'ipc_queue_write',30:'hle_wait',31:'guest_usleep',32:'hle_registry_lookup',33:'resource_hook',40:'frame_interval',41:'released_image_collection',42:'memory_report',46:'guest_gpu_submit',49:'guest_frame_cpu_window',50:'selected_condition_wait',54:'matching_condition_notification',58:'producer_thread_cpu_window',60:'remote_inline_retention',61:'submission_snapshot',62:'submission_preparation',63:'submission_queue',64:'submission_notify',65:'producer_condition_wait',70:'producer_condition_notification',73:'fex_unaligned_handler',74:'fex_unaligned_repair',75:'fex_unaligned_log_write',76:'fex_unaligned_publish',77:'fex_unaligned_rejected',78:'shader_module_total',79:'shader_gcn_to_ir',80:'shader_ir_to_spirv',81:'shader_module_identity',82:'shader_module_returned',83:'shader_module_backend'}
+KINDS={1:'fex_block',2:'fex_invalidation_lock',3:'fex_ir',4:'fex_codegen',5:'fex_publish',6:'fex_code_buffer_lock',7:'fex_mapping_lock',8:'fex_code_pages_lock',10:'metal_library_total',11:'metal_library_build',12:'metal_pso',13:'metal_replay_wait',14:'metal_gpu_wait',15:'metal_submit_wait',16:'metal_spirv_to_msl_total',17:'metal_slow_packet_wall',18:'metal_packet_cpu_window',20:'ipc_total',21:'ipc_send',22:'ipc_reply',23:'ipc_handler',24:'ipc_writer_lock',25:'ipc_space_wait',26:'ipc_queue_write',30:'hle_wait',31:'guest_usleep',32:'hle_registry_lookup',33:'resource_hook',40:'frame_interval',41:'released_image_collection',42:'memory_report',46:'guest_gpu_submit',49:'guest_frame_cpu_window',50:'selected_condition_wait',54:'matching_condition_notification',58:'producer_thread_cpu_window',60:'remote_inline_retention',61:'submission_snapshot',62:'submission_preparation',63:'submission_queue',64:'submission_notify',65:'producer_condition_wait',70:'producer_condition_notification',73:'fex_unaligned_handler',74:'fex_unaligned_repair',75:'fex_unaligned_log_write',76:'fex_unaligned_publish',77:'fex_unaligned_rejected',78:'shader_module_total',79:'shader_gcn_to_ir',80:'shader_ir_to_spirv',81:'shader_module_identity',82:'shader_module_returned',83:'shader_module_backend',84:'prepared_shader_candidate',85:'prepared_shader_identity',86:'prepared_shader_budget_overflow'}
 def read(path):
  data=path.read_bytes()
  if len(data)<64:raise ValueError('short audit header')
@@ -89,6 +90,7 @@ def main():
  csv_rows=list(csv.DictReader((e/'frames.csv').open())) if (e/'frames.csv').exists() else []
  observations=json.loads((e/'result.json').read_text()).get('samples',[])if(e/'result.json').exists()else[]
  report['shader_compile_phases']=analyze_shader_phases(rows)
+ report['shader_preparation_opportunities']=analyze_preparation(rows)
  report['producer_condition_waits']=producer_condition_waits(rows,names)
  report['producer_condition_metadata_complete']=all(x['metadata_complete']for x in report['producer_condition_waits'])
  report['producer_notifications']=producer_notifications(rows,names,report['producer_condition_waits'])
@@ -119,5 +121,5 @@ def main():
   report['long_frames'].append(item)
  if rows:report['all_retained']=summarize(rows,min(r['start'] for r in rows),max(r['end'] for r in rows),names)
  (e/'stutter-summary.json').write_text(json.dumps(report,indent=2)+'\n')
- print(json.dumps({k:v for k,v in report.items() if k not in ('shader_compile_phases','all_retained','windows','long_frames','events','packet_probe_status','packet_identities','task_targets','guest_frame_markers','guest_frame_status','guest_frame_accounting')},indent=2));print('windows',len(report['windows']),'long frames',len(report['long_frames']),'shader modules',len(report['shader_compile_phases']['modules']),'complete',sum(x['complete']for x in report['shader_compile_phases']['modules']))
+ print(json.dumps({k:v for k,v in report.items() if k not in ('shader_compile_phases','shader_preparation_opportunities','all_retained','windows','long_frames','events','packet_probe_status','packet_identities','task_targets','guest_frame_markers','guest_frame_status','guest_frame_accounting')},indent=2));print('windows',len(report['windows']),'long frames',len(report['long_frames']),'shader modules',len(report['shader_compile_phases']['modules']),'complete',sum(x['complete']for x in report['shader_compile_phases']['modules']))
 if __name__=='__main__':main()

@@ -1124,6 +1124,9 @@ PipelineCacheCore::Result PipelineCacheCore::GetProgram(PipelineSelection& sel, 
         std::shared_lock lk{programs_mutex};
         const auto found_program = program_cache.find(params.hash);
         if (found_program == program_cache.end() || !found_program->second->info_template) {
+            // No work is scheduled: measure the existing speculative discovery only.
+            BbShaderPhaseAudit::PreparationMiss(params.hash, static_cast<u32>(hw_stage),
+                                                   found_program == program_cache.end() ? 1 : 3);
             worker.failed = true;
             return {};
         }
@@ -1155,6 +1158,7 @@ PipelineCacheCore::Result PipelineCacheCore::GetProgram(PipelineSelection& sel, 
         }
         const auto it = std::ranges::find(program->modules, spec, &Program::Module::spec);
         if (it == program->modules.end()) {
+            BbShaderPhaseAudit::PreparationMiss(params.hash, static_cast<u32>(hw_stage), 2);
             worker.failed = true;
             return {};
         }
