@@ -244,3 +244,13 @@ See docs/stable-mirror-validation.zh-CN.md. Real Layer source passes 44 authored
 identity/concurrency controls. The new API is not called by game resource paths,
 and the complete GPU rebuild is still pending. The lease protects the registry,
 not allocator payload or native Metal lifetimes. No white-model fix is claimed.
+
+## Bounded preparation reads and coherent GPU rebuild
+
+See docs/shader-readset-validation.zh-CN.md. The existing lookup-only preparation
+path now uses bounded SRT/fetch/V# leaf reads and ordinary C++ unwinding instead
+of a wide longjmp region. The full 230-unit rebuild passes real preparation,
+owned shader, phase-output and 24 GPU preservation controls. Stable mirror tests
+now pass 46 controls against both real Layer source and the actual new library,
+superseding the prior pending-rebuild note. First-miss async compilation/adoption
+is still pending; no white-model fix, game FPS or memory improvement is claimed.

@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse,hashlib,json,subprocess,time
 from qa_build_guard import require_no_games
 P=Path(__file__).resolve().parents[1]
-ap=argparse.ArgumentParser();ap.add_argument('--suite',choices=['first-upload','expansion','partial-gpu','inplace-gpu','shader-phases','owned-shader','guest-capture','avplayer-exports'],default='first-upload');ap.add_argument('--library',type=Path);a=ap.parse_args()
+ap=argparse.ArgumentParser();ap.add_argument('--suite',choices=['first-upload','expansion','partial-gpu','inplace-gpu','shader-phases','owned-shader','guest-capture','speculative-reads','stable-mirror','avplayer-exports'],default='first-upload');ap.add_argument('--library',type=Path);a=ap.parse_args()
 library=(a.library or P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.dylib').resolve()
 assert library.is_relative_to(P/'backend')and library.is_file()
 require_no_games()
@@ -11,7 +11,7 @@ meta=json.loads((P/'evidence/texture-expansion-build.json').read_text())
 e=P/'evidence'/('first-upload-regression-'+str(time.time_ns()));e.mkdir()
 obj=e/'first-upload.o';cmd=list(meta['compile']);oldobj=cmd[cmd.index('-o')+1]
 cmd[cmd.index('-o')+1]=str(obj);cmd[cmd.index('-MF')+1]=str(obj.with_suffix('.d'))
-cmd[-1]=str(P/'tests/metal'/({'first-upload':'test_texture_first_upload.mm','expansion':'test_texture_expansion.mm','partial-gpu':'test_texture_partial_gpu.mm','inplace-gpu':'test_texture_inplace_gpu.mm','shader-phases':'test_shader_compile_phases.mm','owned-shader':'test_shader_owned_snapshot.mm','guest-capture':'test_shader_guest_capture.mm','avplayer-exports':'test_avplayer_exports.mm'}[a.suite]));cmd.insert(cmd.index('-c'),'-UNDEBUG');cmd.insert(1,'-I'+str(P/'src'))
+cmd[-1]=str(P/'tests/metal'/({'first-upload':'test_texture_first_upload.mm','expansion':'test_texture_expansion.mm','partial-gpu':'test_texture_partial_gpu.mm','inplace-gpu':'test_texture_inplace_gpu.mm','shader-phases':'test_shader_compile_phases.mm','owned-shader':'test_shader_owned_snapshot.mm','guest-capture':'test_shader_guest_capture.mm','speculative-reads':'test_shader_speculative_reads.mm','stable-mirror':'test_stable_mirror_library.mm','avplayer-exports':'test_avplayer_exports.mm'}[a.suite]));cmd.insert(cmd.index('-c'),'-UNDEBUG');cmd.insert(1,'-I'+str(P/'src'))
 b=Path('/private/tmp/blood-echoes-arm64-metal-20261023/build')
 with(e/'build.log').open('w')as log:
     r=subprocess.run(cmd,cwd=b,stdout=log,stderr=subprocess.STDOUT)

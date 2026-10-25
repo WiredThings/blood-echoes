@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792917808603791000,
+  "created_ns": 1792918945605506000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -325,7 +325,7 @@
     },
     {
       "path": "tools/build_first_upload_test.py",
-      "sha256": "08eeded07e8e52dd567b3bbd81eb714bc9d1253bd929b2e15634add58560b4db"
+      "sha256": "073bf416c3e54ed5f91605881a27cec7e9cb5646bb2318e08f87d66cc9ca18dd"
     },
     {
       "path": "tools/build_heap_bridge.py",
@@ -31109,7 +31109,7 @@
     },
     {
       "path": "vendor/metal_api/layer/bblayer_gpu_memory.cpp",
-      "sha256": "b8344f836a6d1bf45525752546aaaebf2d926985842088335bdc650797eebef6"
+      "sha256": "0510213ef5819d0aabd8e82ea5c19467b5607985e72fa805a2b2b13ec101fedf"
     },
     {
       "path": "vendor/metal_api/layer/bblayer_gpu_memory.h",
@@ -31725,15 +31725,15 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.cpp",
-      "sha256": "2100a0f2211c60cd2c7703ae92455789a85a74bfbb24e42f3acd68ba6fde0e42"
+      "sha256": "7f6a19aeacedda10c42a0cda3e105cc19beda089c544803660b1761687a2617f"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.h",
-      "sha256": "84aabe9d893b773a38ea733b4d750ef83638884ed4e117cc6d450e25a2c83506"
+      "sha256": "2ae23707f744d81bd47b72daaa81b90876ad4993ff01f6f262305a4e20a4e95e"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.cpp",
-      "sha256": "1150ee0c48c7ece84767b5a71c2d162325ea23010a0b751cff6e6ba78c43cc2e"
+      "sha256": "7cbf20241c7c85d1ab03c1c787929db24aebad3a4ef2b5af3f6caf38627b5bf0"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.h",
@@ -31741,7 +31741,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/format.cpp",
-      "sha256": "6643fec4a63da01e37ad08f9df1816b4646e99409ada05875b2316c5c7371613"
+      "sha256": "88bda35e10ae4ad8a14f37e581b0ffd6bf223fe314821ba62cfa043cebf13a22"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/frontend/instruction.cpp",
@@ -31809,7 +31809,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/info.h",
-      "sha256": "541215506104040c02435e7164f3294ecaf66a9f5167f68dbb2279ff68ad5b6c"
+      "sha256": "f3360e6f09f49b73c3c6a7eb8eeb8c1798d12348630c12523853ded43ba142fd"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/ir/abstract_syntax_list.cpp",
@@ -31905,7 +31905,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_arm64.inc",
-      "sha256": "8ed2b23a55c30870fb9a7841ce69dd927d102adc727337e55250b0f6b83c0ed3"
+      "sha256": "e79cbc2ef11bf571262a174925a4c454b8963890980f18201de17ad5c08bf9b0"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_pass.cpp",
@@ -31997,7 +31997,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/ir/passes/srt.h",
-      "sha256": "dbf0da537ca6235e1f54f3fbc5c50a66777794a366079f09cf37ec23d1a1828a"
+      "sha256": "ae19166ae07bdedd752b8d159ffb7b607fa6edf763b797df3883b9f5b4d4635f"
     },
     {
       "path": "vendor/metal_api/shadps4/shader_recompiler/ir/passes/srt_watch.cpp",
@@ -32417,7 +32417,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
-      "sha256": "9d18aa8cf3974a8f099591ebfa0d0432312618db70556d42e1ce42aaf4f5ac20"
+      "sha256": "9cef7e6519b8738430f2b2a4088333e758d00b14d26e76cd036f10ce58a22f01"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/pipeline_cache_core.h",
@@ -32889,7 +32889,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_vulkan/vk_draw_prep.cpp",
-      "sha256": "d93ed6f347a886c3691ed712253c48b6ecb42c061d95124eac92b3e33f834615"
+      "sha256": "d602e7cb0e309b770f204115fa6e38ae6c5c79f78605ec0d37ffcfb804a75ffc"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/renderer_vulkan/vk_draw_prep.h",
@@ -38733,11 +38733,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "c660768f20d8cf56593de385e5b184347395381184521f4f71092d3f8b702f01"
+      "sha256": "ef6c24e15f4dc31de9746480b3e766cd5584feb9455425e2825b541bde08203c"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "b4d45687a850804e598da4bbade7392dbf4551409688218cf1c96cc13cb4a3c8"
+      "sha256": "1a9df5426d3f8e9c165745ec7e17753c9d349b8d6ffac88597576f512c5db9a4"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -39065,7 +39065,7 @@
     },
     {
       "path": "tests/test_stable_mirror_lease.cpp",
-      "sha256": "b3aca95e5e6a2252c56e7f910a98cc73fe0e3a5ecf2cf08e513b68ad88d1bbdb"
+      "sha256": "3535325e666039cce6accedd6f776e79a2a1a2f55b50c6248517bb3873706380"
     },
     {
       "path": "tests/test_stable_mirror_lease.py",
@@ -39078,6 +39078,34 @@
     {
       "path": "docs/stable-mirror-validation.json",
       "sha256": "b66700c7da376c8630b9b00b664f324c638cb42521e3a7ec73dffcae81d97b9d"
+    },
+    {
+      "path": "vendor/metal_api/shadps4/shader_recompiler/speculative_reads.h",
+      "sha256": "fef7270c44535a7b6dcc05e604b8f46f31b6e99289fe41bf60fe2694e66b241c"
+    },
+    {
+      "path": "tests/metal/test_shader_speculative_reads.mm",
+      "sha256": "6ee7592f7db25055ab4df3f039a567673ad81a6adfac528780d1a0a727de8b9a"
+    },
+    {
+      "path": "tests/test_shader_speculative_reads.py",
+      "sha256": "c8a7325bf0daa914c59c81f4c72f23b478805c6de0c6111d8021c4f46e7e3cde"
+    },
+    {
+      "path": "tests/metal/test_stable_mirror_library.mm",
+      "sha256": "1a3afdc05fd40ebdbfa953da4a79a296bb1f10b918abd937a0cf48a005a135b2"
+    },
+    {
+      "path": "tests/test_stable_mirror_library.py",
+      "sha256": "43356c8163ce706faf450316a6b826ec2410c046bd968bcee67d8d0de6274866"
+    },
+    {
+      "path": "docs/shader-readset-validation.zh-CN.md",
+      "sha256": "3c67ba65f184417b4ab171c3b8bd895cbef162f39a97466e0127251430a865f7"
+    },
+    {
+      "path": "docs/shader-readset-validation.json",
+      "sha256": "c5c225a01fa16a69ca7cd3803854dee358232c6fcba5ed7a72db61de88de1253"
     }
   ],
   "excluded": [
@@ -39094,19 +39122,37 @@
   ],
   "standalone_clean_build_validated": false,
   "reviewed_overlay": {
-    "base": "734a34ce59174cd708f91f57456f475b5b928163",
+    "base": "16fbb6dad5b2b079e4833450a6c6413cf72a941d",
     "paths": [
+      "vendor/metal_api/shadps4/shader_recompiler/ir/passes/srt.h",
+      "vendor/metal_api/shadps4/shader_recompiler/ir/passes/flatten_extended_userdata_arm64.inc",
+      "vendor/metal_api/shadps4/shader_recompiler/speculative_reads.h",
+      "vendor/metal_api/shadps4/shader_recompiler/info.h",
+      "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.h",
+      "vendor/metal_api/shadps4/shader_recompiler/frontend/decode.cpp",
+      "vendor/metal_api/shadps4/shader_recompiler/frontend/format.cpp",
+      "vendor/metal_api/shadps4/shader_recompiler/frontend/fetch_shader.cpp",
+      "vendor/metal_api/shadps4/video_core/pipeline_cache_core.cpp",
+      "vendor/metal_api/shadps4/video_core/renderer_vulkan/vk_draw_prep.cpp",
+      "tests/metal/test_shader_speculative_reads.mm",
+      "tests/test_shader_speculative_reads.py",
+      "tools/build_first_upload_test.py",
       "vendor/metal_api/layer/bblayer_gpu_memory.h",
       "vendor/metal_api/layer/bblayer_gpu_memory.cpp",
       "tests/test_stable_mirror_lease.cpp",
       "tests/test_stable_mirror_lease.py",
-      "docs/stable-mirror-validation.zh-CN.md",
-      "docs/stable-mirror-validation.json"
+      "tests/metal/test_stable_mirror_library.mm",
+      "tests/test_stable_mirror_library.py",
+      "CURRENT-PLAN.zh-CN.md",
+      "NIGHT-HANDOFF.zh-CN.md",
+      "docs/shader-readset-validation.zh-CN.md",
+      "docs/shader-readset-validation.json"
     ],
     "excluded_parallel_drafts": [
+      "firstmiss capture/adoption",
       "prepared exact export R2",
-      "remaining speculative read set",
-      "module finalizer"
+      "module finalizer",
+      "context probe"
     ]
   }
 }

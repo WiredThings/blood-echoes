@@ -16,6 +16,7 @@
 #include "shader_recompiler/ir/reg.h"
 #include "shader_recompiler/ir/type.h"
 #include "shader_recompiler/params.h"
+#include "shader_recompiler/speculative_reads.h"
 #include "shader_recompiler/resource.h"
 #include "shader_recompiler/runtime_info.h"
 
@@ -124,6 +125,8 @@ struct Info : InfoPersistent {
 
     /// Non-null only for an explicitly owned, transient compilation context.
     const CompileSnapshot* compile_snapshot{};
+    // Only installed on the preparation worker's private Info, never a shared GPU Info.
+    mutable SpeculativeReadState* speculative_reads{};
     std::span<const u32> user_data;
     std::vector<u32> flattened_ud_buf;
     PersistentSrtInfo srt_info;
@@ -224,6 +227,22 @@ struct Info : InfoPersistent {
             return data;
         }
         const auto ud = UserData();
+        if (speculative_reads) {
+            const u64 offset = u64(dword_offset) * sizeof(u32);
+            if (ptr_index == IR::NumScalarRegs) {
+                if (offset > ud.size_bytes() || sizeof(T) > ud.size_bytes() - offset)
+                    SpeculativeReadState::Reject();
+                std::memcpy(&data, reinterpret_cast<const u8*>(ud.data()) + offset, sizeof(T));
+            } else {
+                if (ptr_index > ud.size() || 2 > ud.size() - ptr_index)
+                    SpeculativeReadState::Reject();
+                u64 pointer;
+                std::memcpy(&pointer, ud.data() + ptr_index, sizeof(pointer));
+                speculative_reads->Copy(&data, SpeculativeReadState::Address(
+                    pointer & 0xFFFFFFFFFFFFULL, offset), sizeof(T));
+            }
+            return data;
+        }
         const u32* base = ud.data();
         if (ptr_index != IR::NumScalarRegs) {
             std::memcpy(&base, &ud[ptr_index], sizeof(base));
@@ -255,6 +274,11 @@ struct Info : InfoPersistent {
             RefreshCompileSnapshotFlat(*compile_snapshot, srt_info, flattened_ud_buf);
             return;
         }
+        if (speculative_reads) {
+            speculative_reads->PrepareFlat(srt_info, UserData(), flattened_ud_buf);
+            ValidateSpeculativeFlat();
+            return;
+        }
         flattened_ud_buf.resize(srt_info.flattened_bufsize_dw);
         ASSERT(user_data.size() <= NUM_USER_DATA_REGS);
         std::memcpy(flattened_ud_buf.data(), user_data.data(), user_data.size_bytes());
@@ -269,6 +293,24 @@ struct Info : InfoPersistent {
         }
     }
 
+    void ValidateSpeculativeFlat() const {
+        const auto validate = [this](const auto& fetch, size_t words) {
+            // UNKNOWN_LOCATION intentionally means a null resource in the original path.
+            for (size_t i = 0; i < words; ++i)
+                if (fetch.offsets[i] == UNKNOWN_LOCATION) return;
+            for (size_t i = 0; i < words; ++i)
+                if (fetch.load_mask & (1u << i)) speculative_reads->RequireFlat(fetch.offsets[i]);
+        };
+        for (const auto& res : buffers) validate(res.sharp_fetch, 4);
+        for (const auto& res : images) validate(res.sharp_fetch, res.is_r128 ? 4 : 8);
+        for (const auto& res : samplers) {
+            validate(res.sharp_fetch, 4);
+            if (res.post_op == SharpFetchPostOp::DisableAnisoIfSingleLod)
+                speculative_reads->RequireFlat(res.post_op_tsharp_dw3_off);
+        }
+        for (const auto& res : fmasks) speculative_reads->RequireFlat(res.sharp_idx, 8);
+    }
+
     void ReadTessConstantBuffer(TessellationDataConstantBuffer& tess_constants) const {
         if (compile_snapshot) {
             ReadCompileSnapshotTess(*compile_snapshot, tess_constants);
@@ -278,6 +320,10 @@ struct Info : InfoPersistent {
         auto buf = ReadUdReg<AmdGpu::Buffer>(static_cast<u32>(tess_consts_ptr_base),
                                              static_cast<u32>(tess_consts_dword_offset));
         VAddr tess_constants_addr = buf.base_address;
+        if (speculative_reads) {
+            speculative_reads->Copy(&tess_constants, tess_constants_addr, sizeof(tess_constants));
+            return;
+        }
         memcpy(&tess_constants,
                reinterpret_cast<TessellationDataConstantBuffer*>(tess_constants_addr),
                sizeof(tess_constants));
@@ -285,6 +331,16 @@ struct Info : InfoPersistent {
 
     void Serialize(Serialization::Archive& ar) const;
     bool Deserialize(Serialization::Archive& ar);
+};
+// Recovery lives only inside Common::GuestCapture::TryCopy. This scope and every C++
+// owner above it unwind normally; the previous reader is restored even on a failed spec.
+struct ScopedSpeculativeReads {
+    const Info& info;
+    SpeculativeReadState* previous;
+    ScopedSpeculativeReads(const Info& i, SpeculativeReadState& reads)
+        : info{i}, previous{i.speculative_reads} { info.speculative_reads = &reads; }
+    ~ScopedSpeculativeReads() { info.speculative_reads = previous; }
+    ScopedSpeculativeReads(const ScopedSpeculativeReads&) = delete;
 };
 DECLARE_ENUM_FLAG_OPERATORS(Info::ReadConstType);
 

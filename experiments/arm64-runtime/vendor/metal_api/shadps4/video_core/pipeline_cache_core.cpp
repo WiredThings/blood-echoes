@@ -1165,24 +1165,31 @@ PipelineCacheCore::Result PipelineCacheCore::GetProgram(PipelineSelection& sel, 
             return {};
         }
         const Program* program = found_program->second.get();
+        // Bound the template's flat copy before try_emplace can allocate worker storage.
+        if (program->info_template->srt_info.flattened_bufsize_dw >
+                Shader::SpeculativeReadState::MaxFlatBytes / sizeof(u32) ||
+            program->info_template->flattened_ud_buf.size() >
+                Shader::SpeculativeReadState::MaxFlatBytes / sizeof(u32)) {
+            worker.failed = true;
+            return {};
+        }
         auto [it_info, new_info] = worker.infos.try_emplace(program, *program->info_template);
         auto& info = it_info->second;
         info.pgm_base = params.Base();
         info.user_data = params.user_data;
-        // The walk of resource tables and the fetch shader parse read guest memory through
-        // pointers in the registers; ahead of the GPU thread that memory may already be
-        // reused. A fault returns here (runtime_fault_recover) and the draw is left to the GPU
-        // thread. A jump out of the specialization leaks its partial allocations (rare).
-        sigjmp_buf recover;
-        if (sigsetjmp(recover, 0)) {
+        Shader::SpeculativeReadState reads;
+        Shader::ScopedSpeculativeReads scoped_reads{info, reads};
+        // No longjmp crosses resource owners: raw copies recover inside the POD leaf and
+        // throw normally. This branch remains lookup-only; it does not publish new modules.
+        Shader::SpeculativeFormatFailure failure{};
+        Shader::StageSpecialization spec;
+        try {
+            info.RefreshFlatBuf();
+            spec = Shader::StageSpecialization(info, runtime_info, profile, binding, &failure);
+        } catch (const std::runtime_error&) {
             worker.failed = true;
             return {};
         }
-        runtime_fault_recover = &recover;
-        info.RefreshFlatBuf();
-        Shader::SpeculativeFormatFailure failure{};
-        auto spec = Shader::StageSpecialization(info, runtime_info, profile, binding, &failure);
-        runtime_fault_recover = nullptr;
         if (!spec.Valid()) {
             // Do not publish this worker result or mutate the program/module caches. The
             // GPU command thread will walk and validate the guest tables again in order.

@@ -109,9 +109,12 @@ bool IsVop3BEncoding(Opcode opcode) {
 }
 
 GcnInst GcnDecodeContext::decodeInstruction(GcnCodeSlice& code) {
+    m_checked = code.Checked();
     const uint32_t token = code.at(0);
 
     InstEncoding encoding = GetInstructionEncoding(token);
+    if (m_checked && encoding == InstEncoding::ILLEGAL)
+        throw std::runtime_error{"illegal bounded GCN encoding"};
     ASSERT_MSG(encoding != InstEncoding::ILLEGAL, "illegal encoding: {:#x}", token);
     uint32_t encodingLen = getEncodingLength(encoding);
 
@@ -262,8 +265,11 @@ uint32_t GcnDecodeContext::mapEncodingOp(InstEncoding encoding, Opcode opcode) {
 
 void GcnDecodeContext::updateInstructionMeta(InstEncoding encoding) {
     uint32_t encodingOp = mapEncodingOp(encoding, m_instruction.opcode);
-    InstFormat instFormat = InstructionFormat(encoding, encodingOp);
+    InstFormat instFormat = InstructionFormat(encoding, encodingOp, m_checked);
 
+    if (m_checked && (instFormat.src_type == ScalarType::Undefined ||
+                      instFormat.dst_type == ScalarType::Undefined))
+        throw std::runtime_error{"undefined bounded GCN format"};
     ASSERT_MSG(instFormat.src_type != ScalarType::Undefined &&
                    instFormat.dst_type != ScalarType::Undefined,
                "Instruction format table incomplete for opcode {} ({}, encoding = 0x{:x})",
@@ -414,7 +420,7 @@ void GcnDecodeContext::decodeInstruction64(InstEncoding encoding, GcnCodeSlice& 
 void GcnDecodeContext::decodeLiteralConstant(InstEncoding encoding, GcnCodeSlice& code) {
     if (HasAdditionalLiteral(encoding, m_instruction.opcode)) {
         u32 encoding_op = mapEncodingOp(encoding, m_instruction.opcode);
-        InstFormat instFormat = InstructionFormat(encoding, encoding_op);
+        InstFormat instFormat = InstructionFormat(encoding, encoding_op, m_checked);
         m_instruction.src[m_instruction.src_count].field = OperandField::LiteralConst;
         m_instruction.src[m_instruction.src_count].type = instFormat.src_type;
         m_instruction.src[m_instruction.src_count].code = code.readu32();
@@ -1234,7 +1240,7 @@ void GcnDecodeContext::decodeInstructionDS(uint64_t hexInstruction) {
 
     m_instruction.control.ds = *reinterpret_cast<InstControlDS*>(&hexInstruction);
 
-    auto instFormat = InstructionFormat(InstEncoding::DS, (u32)op);
+    auto instFormat = InstructionFormat(InstEncoding::DS, (u32)op, m_checked);
 
     m_instruction.control.ds.dual =
         op == OpcodeDS::DS_WRITE2_B32 || op == OpcodeDS::DS_WRXCHG2_RTN_B32 ||

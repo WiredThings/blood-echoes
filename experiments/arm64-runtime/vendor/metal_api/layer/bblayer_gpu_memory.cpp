@@ -259,7 +259,8 @@ bool GpuMemory::WithStableMirror(const StableMirrorSnapshot& e,
     auto it=mirrors.find(e.source.base);
     if (it==mirrors.end()) return false;
     const auto& m=it->second;
-    if (m.kind!=MemorySource::Kind::Mirror || m.base!=e.source.base || m.size!=e.source.size ||
+    if (m.kind!=MemorySource::Kind::Mirror || !m.owner || !m.handle ||
+        m.base!=e.source.base || m.size!=e.source.size ||
         m.owner!=e.source.owner || m.handle!=e.source.handle ||
         m.device_address!=e.source.device_address || e.va<m.base || e.va-m.base>m.size ||
         e.size>m.size-(e.va-m.base) ||

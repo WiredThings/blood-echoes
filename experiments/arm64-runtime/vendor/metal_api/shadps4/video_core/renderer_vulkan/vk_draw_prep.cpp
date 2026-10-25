@@ -24,17 +24,14 @@ using VideoCore::PrepWorker;
 bool ReadSpeculativeVertexSharp(const Shader::Info& info,
                                 const Shader::Gcn::VertexAttribute& attribute,
                                 AmdGpu::Buffer& out) {
-    // No allocation/RAII is entered while this raw guest copy can fault.
-    sigjmp_buf recover;
-    auto* const previous_recover = runtime_fault_recover;
-    if (sigsetjmp(recover, 0)) {
-        runtime_fault_recover = previous_recover;
+    Shader::SpeculativeReadState reads;
+    Shader::ScopedSpeculativeReads scoped_reads{info, reads};
+    try {
+        out = attribute.GetSharp(info);
+        return true;
+    } catch (const std::runtime_error&) {
         return false;
     }
-    runtime_fault_recover = &recover;
-    out = attribute.GetSharp(info);
-    runtime_fault_recover = previous_recover;
-    return true;
 }
 
 namespace {

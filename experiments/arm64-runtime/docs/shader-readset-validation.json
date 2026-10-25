@@ -1,0 +1,74 @@
+{
+  "status": "full-GPU-and-authored-controls-passed-no-game-no-async",
+  "refs": {
+    "build": "owned-shader-gpu-build-1792918138731312000",
+    "reads": "shader-speculative-reads-controls-1792918560222570000",
+    "bench": "shader-speculative-reads-controls-1792918561314379000",
+    "capture": "shader-guest-capture-controls-1792918611523181000",
+    "owned": "first-upload-regression-1792918611989874000",
+    "phases": "actual-shader-phase-controls-1792918617184501000",
+    "preservation": "texture-preservation-controls-1792918617711333000",
+    "layer": "stable-mirror-controls-1792918773555278000",
+    "layer_library": "stable-mirror-library-controls-1792918813894296000"
+  },
+  "library_sha256": "a36c7bd3cdfad5924a50a6b165ec9940b16af032855b90c7c505f4f8a52b91ad",
+  "microbenchmark": {
+    "leaf_ns_median": 185.754,
+    "bounded_64_copy_stage_us_median": 11.907,
+    "raw": [
+      {
+        "sample": 0.0,
+        "bytes": 16.0,
+        "copies": 100000.0,
+        "direct_ns": 0.673,
+        "leaf_ns": 189.637,
+        "extra_ns": 188.965,
+        "projected_64_leaf_extra_us": 12.094,
+        "bounded_64_copy_stage_us": 11.977
+      },
+      {
+        "sample": 1.0,
+        "bytes": 16.0,
+        "copies": 100000.0,
+        "direct_ns": 0.672,
+        "leaf_ns": 184.747,
+        "extra_ns": 184.075,
+        "projected_64_leaf_extra_us": 11.781,
+        "bounded_64_copy_stage_us": 11.824
+      },
+      {
+        "sample": 2.0,
+        "bytes": 16.0,
+        "copies": 100000.0,
+        "direct_ns": 0.672,
+        "leaf_ns": 185.754,
+        "extra_ns": 185.082,
+        "projected_64_leaf_extra_us": 11.845,
+        "bounded_64_copy_stage_us": 12.183
+      },
+      {
+        "sample": 3.0,
+        "bytes": 16.0,
+        "copies": 100000.0,
+        "direct_ns": 0.672,
+        "leaf_ns": 184.953,
+        "extra_ns": 184.281,
+        "projected_64_leaf_extra_us": 11.794,
+        "bounded_64_copy_stage_us": 11.821
+      },
+      {
+        "sample": 4.0,
+        "bytes": 16.0,
+        "copies": 100000.0,
+        "direct_ns": 0.675,
+        "leaf_ns": 186.106,
+        "extra_ns": 185.431,
+        "projected_64_leaf_extra_us": 11.868,
+        "bounded_64_copy_stage_us": 11.907
+      }
+    ],
+    "FPS_claim": false
+  },
+  "formal_data_modified": false,
+  "game_started": false
+}

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Authored table identities only: no guest payload, GPU, production cache or window.
-#include "bblayer_gpu_memory.h"
+#include "../vendor/metal_api/layer/bblayer_gpu_memory.h"
 #include <cassert>
 #include <chrono>
 #include <future>
@@ -48,6 +48,8 @@ int main(){
  CHECK(!m.WithStableMirror(*unchanged,[](const auto&){return true;}));CHECK(!m.SnapshotStableMirror(base,size+16));
  m.RemoveMirror(other);m.MarkInvalid(other>>16,(other+size)>>16);
  m.AddMirror(base,size,0,22,&a);CHECK(!m.SnapshotStableMirror(base,16));m.AddMirror(base,size,11,22,nullptr);CHECK(!m.SnapshotStableMirror(base,16));reset();
+ // Eligibility is rechecked even if a caller constructs a value matching an invalid registration.
+ for(bool no_owner:{true,false}){auto bad=*m.SnapshotStableMirror(base,16);++bad.source_version;if(no_owner)bad.source.owner=nullptr;else bad.source.handle=0;m.AddMirror(base,size,no_owner?11:0,22,no_owner?nullptr:&a);CHECK(!m.WithStableMirror(bad,[](const auto&){return true;}));reset();}
  // A real public RemoveMirror cannot complete while WithStableMirror holds its read lease.
  auto held=m.SnapshotStableMirror(base,size);CHECK(held.has_value());std::promise<void>entered,leave,attempt;
  auto release=leave.get_future().share();auto reader=std::async(std::launch::async,[&]{return m.WithStableMirror(*held,[&](const auto&s){entered.set_value();release.wait();return s.source->owner==&a;});});

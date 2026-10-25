@@ -24,7 +24,11 @@ InstEncoding GetInstructionEncoding(u32 token);
 
 u32 GetEncodingLength(InstEncoding encoding);
 
-InstFormat InstructionFormat(InstEncoding encoding, u32 opcode);
+InstFormat InstructionFormat(InstEncoding encoding, u32 opcode, bool checked = false);
+
+struct GcnTruncatedInput : std::runtime_error {
+    GcnTruncatedInput() : std::runtime_error{"truncated bounded GCN input"} {}
+};
 
 Opcode DecodeOpcode(u32 token);
 
@@ -55,6 +59,8 @@ public:
         return value;
     }
 
+    bool Checked() const noexcept { return m_checked; }
+
     bool atEnd() const {
         return m_ptr == m_end;
     }
@@ -68,7 +74,7 @@ private:
     void RequireWords(size_t count) const {
         if (!m_checked) return;
         if (m_ptr > m_end || count > size_t(m_end - m_ptr)) {
-            throw std::runtime_error{"truncated bounded GCN input"};
+            throw GcnTruncatedInput{};
         }
     }
     const u32* m_ptr{};
@@ -118,6 +124,7 @@ private:
 
 private:
     GcnInst m_instruction;
+    bool m_checked{};
 };
 
 } // namespace Shader::Gcn

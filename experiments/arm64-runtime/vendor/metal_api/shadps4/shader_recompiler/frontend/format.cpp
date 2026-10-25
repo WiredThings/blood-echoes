@@ -4369,43 +4369,49 @@ constexpr std::array<InstFormat, 1> InstructionFormatEXP = {{
     {InstClass::Exp, InstCategory::Export, 4, 1, ScalarType::Float32, ScalarType::Any},
 }};
 
-InstFormat InstructionFormat(InstEncoding encoding, uint32_t opcode) {
+InstFormat InstructionFormat(InstEncoding encoding, uint32_t opcode, bool checked) {
+    const auto fetch = [opcode, checked](const auto& table) {
+        if (checked && opcode >= table.size())
+            throw std::runtime_error{"out-of-range bounded GCN opcode"};
+        return table[opcode];
+    };
     switch (encoding) {
     case InstEncoding::SOP1:
-        return InstructionFormatSOP1[opcode];
+        return fetch(InstructionFormatSOP1);
     case InstEncoding::SOPP:
-        return InstructionFormatSOPP[opcode];
+        return fetch(InstructionFormatSOPP);
     case InstEncoding::SOPC:
-        return InstructionFormatSOPC[opcode];
+        return fetch(InstructionFormatSOPC);
     case InstEncoding::VOP1:
-        return InstructionFormatVOP1[opcode];
+        return fetch(InstructionFormatVOP1);
     case InstEncoding::VOPC:
-        return InstructionFormatVOPC[opcode];
+        return fetch(InstructionFormatVOPC);
     case InstEncoding::VOP3:
-        return InstructionFormatVOP3[opcode];
+        return fetch(InstructionFormatVOP3);
     case InstEncoding::VOP3P:
-        return InstructionFormatVOP3P[opcode];
+        return fetch(InstructionFormatVOP3P);
     case InstEncoding::EXP:
-        return InstructionFormatEXP[opcode];
+        return fetch(InstructionFormatEXP);
     case InstEncoding::VINTRP:
-        return InstructionFormatVINTRP[opcode];
+        return fetch(InstructionFormatVINTRP);
     case InstEncoding::DS:
-        return InstructionFormatDS[opcode];
+        return fetch(InstructionFormatDS);
     case InstEncoding::MUBUF:
-        return InstructionFormatMUBUF[opcode];
+        return fetch(InstructionFormatMUBUF);
     case InstEncoding::MTBUF:
-        return InstructionFormatMTBUF[opcode];
+        return fetch(InstructionFormatMTBUF);
     case InstEncoding::MIMG:
-        return InstructionFormatMIMG[opcode];
+        return fetch(InstructionFormatMIMG);
     case InstEncoding::SMRD:
-        return InstructionFormatSMRD[opcode];
+        return fetch(InstructionFormatSMRD);
     case InstEncoding::SOPK:
-        return InstructionFormatSOPK[opcode];
+        return fetch(InstructionFormatSOPK);
     case InstEncoding::SOP2:
-        return InstructionFormatSOP2[opcode];
+        return fetch(InstructionFormatSOP2);
     case InstEncoding::VOP2:
-        return InstructionFormatVOP2[opcode];
+        return fetch(InstructionFormatVOP2);
     default:
+        if (checked) throw std::runtime_error{"unsupported bounded GCN encoding"};
         UNREACHABLE();
     }
     return {};
