@@ -1,3 +1,4 @@
+#include "avplayer_bridge.h"
 #include "runtime_exit_codes.h"
 #include "qa_cpu_qos.h"
 #include "bb_cpu_cache_build.h"
@@ -169,6 +170,12 @@ std::optional<FEXCore::ExecutableFileSectionInfo> code_file(void* c,uintptr_t ad
 void failure(void*,const HleCallFailure& f){std::fprintf(stderr,"ARM HLE STOP name=%.*s error=%d\n",int(f.name.size()),f.name.data(),f.error);std::fflush(nullptr);_Exit(BB_ARM_EXIT_HLE_FAULT);}
 void module_start(unsigned index){active->module=index;std::printf("ARM MODULE begin=%u\n",index);}
 int module_end(int result){std::printf("ARM MODULE end=%u result=%d\n",active->module.load(),result);return result;}
+extern "C" size_t bb_arm_host_thread_count(void);
+uint64_t fixture_avplayer_boundary(uint32_t end){
+ static size_t before{};const auto now=bb_arm_host_thread_count();
+ check(BbAvPlayerBridge::ActiveHandles()==0&&BbAvPlayerBridge::CallbackContexts()==0,"AvPlayer contexts retained");
+ if(!end)before=now;else{check(now==before,"AvPlayer host TCB retained");std::printf("ARM AV FIXTURE handles=0 contexts=0 host-TCB=%zu/%zu\n",now,before);}return 0;
+}
 uint64_t fixture_net_nested(uintptr_t entry){
  const uint64_t args[]={11,12,13,14,15,16,17};return bb_arm_call(entry,args,7);
 }
@@ -388,12 +395,13 @@ int game_main(int argc,char** argv){
    uint64_t sdk{};memcpy(&sdk,static_cast<uint8_t*>(image.ptr)+b.procparam+16,8);BbGpuConfig config{game_metadata.title.c_str(),game_metadata.serial.c_str(),getenv("BB_GPU_USER_DIR"),uint32_t(sdk),game_metadata.attributes,1920,1080};graphics_enabled=true;check(bbgpu_init(&config)==0,"native GPU init failed");std::printf("ARM GPU frontend ready symbols=%u\n",bbgpu_symbol_count());}
   unsigned native=0,linked=0,missing=0;std::ofstream imports(state/"imports.tsv");
   for(size_t i=0;i<b.names.size();++i){
-   auto host=runtime_resolve(b.names[i].c_str(),kinds[i]==2);std::unique_ptr<HleCallAdapter> net_adapter(host?static_cast<HleCallAdapter*>(bb_arm_net_adapter(host)):nullptr);std::string route;
+   auto host=runtime_resolve(b.names[i].c_str(),kinds[i]==2);std::unique_ptr<HleCallAdapter> net_adapter(host?static_cast<HleCallAdapter*>(bb_arm_net_adapter(host)):nullptr);auto av_adapter=host&&kinds[i]!=2?BbAvPlayerBridge::Adapter(runtime_import_name(b.names[i].c_str()),host):nullptr;std::string route;
    if(heap_fixture&&b.names[i]=="bb.prototype.extra_heap_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmExtraHeaps::FixtureCheck)),"fixture.extra_heap_check"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.extra_heap_during"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmExtraHeaps::FixtureDuring)),"fixture.extra_heap_during"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.travel_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmTravel::FixtureCheck)),"fixture.travel_check"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.resource_bad_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmResourceRuntime::FixtureBadCheck)),"fixture.resource_bad_check"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.resource_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmResourceRuntime::FixtureCheck)),"fixture.resource_check"));++native;route="authored-fixture";}
+   else if(heap_fixture&&b.names[i]=="bb.prototype.avplayer_boundary"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(fixture_avplayer_boundary)),"fixture.avplayer_boundary"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.net_workers"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(fixture_net_workers)),"fixture.net_workers"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.net_nested"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(fixture_net_nested)),"fixture.net_nested"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.heap_install"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(&BbHeapSites::InstallCounters)),"fixture.heap_install"));++native;route="authored-fixture";}
@@ -402,6 +410,8 @@ int game_main(int argc,char** argv){
    else if(heap_fixture&&b.names[i]=="bb.prototype.gpu_clock"){imported[i]=veneer(s,s.registry.Register(MakeHleCallAdapter(&Libraries::Kernel::sceKernelReadTsc),"fixture.gpu_clock"));++native;route="authored-fixture";}
    else if(heap_fixture&&b.names[i]=="bb.prototype.heap_live"){imported[i]=veneer(s,s.registry.Register(MakeHleCallAdapter(&BbHeapSites::LiveAllocations),"fixture.heap_live"));++native;route="authored-fixture";}
    else if(net_adapter){auto net=std::shared_ptr<HleCallAdapter>(std::move(net_adapter));imported[i]=veneer(s,s.registry.Register(framed(net),std::string("net.")+runtime_import_name(b.names[i].c_str())));++native;route="native-net";}
+   else if(av_adapter){
+    imported[i]=veneer(s,s.registry.Register(framed(av_adapter),std::string("avplayer.")+runtime_import_name(b.names[i].c_str())));++native;route="native-avplayer";}
    else if(host&&kinds[i]==2){imported[i]=host;route="native-data";auto page=host&~uintptr_t(Page-1);s.ranges.push_back({page,Page,false,true});}
    else if(host&&s.native.contains(host)){imported[i]=veneer(s,s.native.at(host));++native;route="native";}
    else if(host&&bb_arm_gpu_adapter(runtime_import_name(b.names[i].c_str()),host)){auto gpu_adapter=bb_arm_gpu_adapter(runtime_import_name(b.names[i].c_str()),host);

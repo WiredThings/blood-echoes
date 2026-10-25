@@ -123,6 +123,11 @@ void runtime_thread_detach_host(void) {
     *link=t->next;pthread_mutex_unlock(&lock);
     current=NULL;arm_tcb=NULL;free(t->tls_block);free(t);
 }
+size_t bb_arm_host_thread_count(void) {
+    size_t count=0;pthread_mutex_lock(&lock);
+    for(GuestThread*t=threads;t;t=t->next)count+=!!t->host_owned;
+    pthread_mutex_unlock(&lock);return count;
+}
 void runtime_thread_attach_main(void) {
     GuestThread *t=runtime_thread_current();
     snprintf(t->name,sizeof(t->name),"main");

@@ -9,6 +9,13 @@
 #include "common/types.h"
 
 extern "C" void runtime_thread_attach_host(const char* name);
+// Only the ARM64 CPU bridge provides this optional completion hook. Other hosts
+// retain their existing lifetime. It runs before native/FEX thread-local teardown.
+#ifdef __APPLE__
+extern "C" void bb_arm_native_host_thread_detach(void) __attribute__((weak_import));
+#else
+extern "C" void bb_arm_native_host_thread_detach(void) __attribute__((weak));
+#endif
 
 namespace Libraries::Kernel {
 // Several threads may end one Thread at once: when a stream ends, AvPlayer's demuxer joins the
@@ -28,6 +35,12 @@ public:
         std::scoped_lock lock(join_mutex);
         thread = std::jthread([this, func = std::move(func)](std::stop_token token) {
             runtime_thread_attach_host("bb:hle");
+            struct GuestScope {
+                ~GuestScope() {
+                    if (bb_arm_native_host_thread_detach) bb_arm_native_host_thread_detach();
+                    Current() = nullptr;
+                }
+            } guest_scope;
             Current() = this;
             func(token);
         });

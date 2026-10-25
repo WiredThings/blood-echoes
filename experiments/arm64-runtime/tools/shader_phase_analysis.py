@@ -1,5 +1,6 @@
 """Hierarchical BBAUDIT1 shader-module phases; never sum nested driver scopes."""
 import collections
+HW_STAGE_NAMES=('fragment','vertex','geometry','export','hull','local','compute')
 PHASES={79:'gcn_to_ir',80:'ir_to_spirv',83:'module_backend'}
 def analyze_shader_phases(rows):
  modules=[x for x in rows if x['kind']==78];anchors=collections.Counter((x['pid'],x['tid'],x['start'])for x in modules)
@@ -25,7 +26,7 @@ def analyze_shader_phases(rows):
   complete=identity_ok and return_ok and publication and all(len(bykind[k])==1 for k in PHASES)
   phase_rows={name:[dict(start_ns=x['start'],end_ns=x['end'],wall_ms=x['wall']/1e6,thread_cpu_ms=x['cpu']/1e6)for x in bykind[k]]for k,name in PHASES.items()}
   disjoint=all(a['end']<=b['start']for a,b in zip(sorted(phases,key=lambda x:x['start']),sorted(phases,key=lambda x:x['start'])[1:]))
-  entry=dict(pid=m['pid'],tid=m['tid'],seq=m['seq'],program_hash=f"{m['arg']:016x}",start_ns=m['start'],end_ns=m['end'],wall_ms=m['wall']/1e6,thread_cpu_ms=m['cpu']/1e6,identity_complete=identity_ok,returned_marker=return_ok,nonzero_module_handle=bool(returned[0]['arg'])if return_ok else None,stage=identity[0]['arg']>>32 if identity_ok else None,permutation=identity[0]['arg']&0xffffffff if identity_ok else None,anchor_unique=unique,publication_interval_complete=publication,phase_intervals_disjoint=disjoint,complete=bool(complete and disjoint),phases=phase_rows)
+  entry=dict(pid=m['pid'],tid=m['tid'],seq=m['seq'],program_hash=f"{m['arg']:016x}",start_ns=m['start'],end_ns=m['end'],wall_ms=m['wall']/1e6,thread_cpu_ms=m['cpu']/1e6,identity_complete=identity_ok,returned_marker=return_ok,nonzero_module_handle=bool(returned[0]['arg'])if return_ok else None,stage=identity[0]['arg']>>32 if identity_ok else None,stage_name=HW_STAGE_NAMES[identity[0]['arg']>>32]if identity_ok else None,permutation=identity[0]['arg']&0xffffffff if identity_ok else None,anchor_unique=unique,publication_interval_complete=publication,phase_intervals_disjoint=disjoint,complete=bool(complete and disjoint),phases=phase_rows)
   if entry['complete']:
    entry['other_module_wall_ms']=max(0,m['wall']-sum(x['wall']for x in phases))/1e6
   entry['backend_nested_scopes']={k:[dict(wall_ms=x['wall']/1e6,thread_cpu_ms=x['cpu']/1e6,arg=x['arg'])for x in rows if x['kind']==kind and (x['pid'],x['tid'])==(m['pid'],m['tid'])and m['start']<=x['start']and x['end']<=m['end']]for kind,k in[(16,'spirv_to_msl_total'),(10,'library_total'),(11,'driver_library_build')]}

@@ -18,7 +18,11 @@ A real Metal first-upload hash bug has old/fixed pixel tests and an isolated QA 
 its relation to the observed combat white models remains unproven. White models and exploration stutters
 remain under investigation; no performance improvement or complete compatibility is claimed.
 Death/respawn, online and menu live retests are deferred for the owner's acceptance.
-Existing AvPlayer implementations still need a proper guest callback/handle bridge.
+All 16 original AvPlayer implementations now have guest callback/handle bridges.
+Real FEX callbacks, thread cleanup and layout/bounds controls pass; static ABBA
+48.492 versus 48.623 FPS shows no measured improvement. Nine imports still need
+classification. See docs/avplayer-bridge.zh-CN.md for qualifications; normal manual
+QA packaging remains on the earlier CPU and does not include this checkpoint.
 The private CPU QoS option remains OFF: its measured static ABBA did not show a benefit.
 See docs/inplace-texture-and-cpu-scheduling.zh-CN.md for actual in-place pixel controls,
 limited game observations and process-wide scheduling counter qualifications.

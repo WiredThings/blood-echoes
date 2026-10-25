@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792891552690081000,
+  "created_ns": 1792895492378361000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -10,6 +10,14 @@
     {
       "path": "src/allocation_probe_runtime.h",
       "sha256": "644745bd95be882a0f85d55814ce8604df819d1fab1ab507a999db5ad8905084"
+    },
+    {
+      "path": "src/avplayer_bridge.cpp",
+      "sha256": "7c996b0d2330df8772eb3c1723674c428260cf37dfc1111cd0fc7f0ccb96d622"
+    },
+    {
+      "path": "src/avplayer_bridge.h",
+      "sha256": "1cd4c0b00e2c60f1b7ed093e453e63da0e2f1fdc23478d961b5f04c4b14cda4d"
     },
     {
       "path": "src/bb_cpu_cache_identity.h",
@@ -133,7 +141,7 @@
     },
     {
       "path": "src/game_runtime.cpp",
-      "sha256": "c256cc975919e70e4bae79cb56059314f245d435b04ffa9c007dde324f76a0d2"
+      "sha256": "7ffe02e507e16a5070c8081e22b177687cc1dec5202f01d13fea52b4f431442b"
     },
     {
       "path": "src/guest_resource_detours.h",
@@ -280,12 +288,20 @@
       "sha256": "0c87e211fe497654a6d3cb068aed5e0730d60d67ab3d3dc52cd04d76606ed5f7"
     },
     {
+      "path": "tools/build_avplayer_controls.py",
+      "sha256": "23372821db6bbc70425174ea056711fcba7d946a57d4660df944ff7f6aa856bc"
+    },
+    {
+      "path": "tools/build_avplayer_library.py",
+      "sha256": "a03bcc396c095fa38334f0d39fa438fe72c7863abfa6a0d3545113f85e1b33e8"
+    },
+    {
       "path": "tools/build_first_upload_candidate.py",
       "sha256": "7380c6531f0c0cbc2c56ed973cb8a9b91c93c83ba7c54902c106f7ef0e80ab5b"
     },
     {
       "path": "tools/build_first_upload_test.py",
-      "sha256": "24ddd5002b3b8f10df16326dd7f78cf1f15ce4a7164a723b87d2dc63f19e46d6"
+      "sha256": "30cdf52e8a0cbb97e06484570632ad56f7e07e3405b69cf6a8689f251a083810"
     },
     {
       "path": "tools/build_heap_bridge.py",
@@ -496,6 +512,14 @@
       "sha256": "fe1a5911d40a43a77d944c8bdf5b57cd34d8da1ff0c3c68f67e1b93b3018adb3"
     },
     {
+      "path": "tools/run_avplayer_component_abba.py",
+      "sha256": "c422e12dd59b7d944c17eee3bbb538c3e328bb0df89660a6a4f00fa4e4bdaef3"
+    },
+    {
+      "path": "tools/run_avplayer_controls.py",
+      "sha256": "15912c5266f9f57b2cbb7009387ca45f1a54346e1862e9f15cf1ceda8d8f7b44"
+    },
+    {
       "path": "tools/run_cpu_bridge_cache.py",
       "sha256": "c5e12c6a925f8fb5fb5a079e5bc79a6ae2ea97c0c32c6a4f9fc63f7936c6c953"
     },
@@ -525,7 +549,7 @@
     },
     {
       "path": "tools/run_current_regressions.py",
-      "sha256": "dfa9f7e0d1e7d646045f91e853c32549ec369ca8932bcb7ee5b419d2058685fa"
+      "sha256": "b5ff10cf735327edff3c47b1e56d3f6cf8a196c3210b0cb61884f039e09c8ae6"
     },
     {
       "path": "tools/run_death_observation.py",
@@ -637,7 +661,7 @@
     },
     {
       "path": "tools/shader_phase_analysis.py",
-      "sha256": "91abe95fa788fe158cb8cac000dbe5cad985517fe2b248d6059ab36dbe7fbff9"
+      "sha256": "d735959c4f8849f9583c6dbb7987010707e124443408ac6d0ca894b64ecc28cc"
     },
     {
       "path": "tools/validate_local_qa_package.py",
@@ -650,6 +674,10 @@
     {
       "path": "tools/vm_regions.c",
       "sha256": "01cf1eee93ec362b8c2edbf8889d0fe3391fc826b7eed7910eebc8093d7b30f7"
+    },
+    {
+      "path": "tests/avplayer_fixture.py",
+      "sha256": "34d4c2982f8f6f74288b071b216ea2133a977fd013df9053c63323b803c54647"
     },
     {
       "path": "tests/baseline_hle_call_adapter.h",
@@ -686,6 +714,10 @@
     {
       "path": "tests/metal/remote_front_before_host_pages.cpp",
       "sha256": "f493ea6ac3e3645b56d06c623832872ba89a49ebd6419d0d50ada769457608eb"
+    },
+    {
+      "path": "tests/metal/test_avplayer_exports.mm",
+      "sha256": "6da4f9606e06448a2c73c6fc140dc61598ef368a66e879d2ab53b117b6552d07"
     },
     {
       "path": "tests/metal/test_fragment_uniforms.mm",
@@ -786,6 +818,18 @@
     {
       "path": "tests/test_arm_travel_state.c",
       "sha256": "321daef37466c8024c7cef4ea61a36525ca9812e8389f264da8bd729d1eff1f9"
+    },
+    {
+      "path": "tests/test_avplayer_bridge.cpp",
+      "sha256": "4f2bf52cd6e7c767a5fe9486ec2418e4c2a948c578f4dd11ba342c53ef2a25bd"
+    },
+    {
+      "path": "tests/test_avplayer_fex.py",
+      "sha256": "66aa108210d626599f92088aeb11c25c033d71f23b750267235b4b429688bc11"
+    },
+    {
+      "path": "tests/test_avplayer_layout.cpp",
+      "sha256": "b2cd61bbc3b510c4dac7dc0e0ddbf45c2619f02bf797bb836fbe4b0aa284b2e3"
     },
     {
       "path": "tests/test_bbnet_byte_ranges.cpp",
@@ -1069,7 +1113,7 @@
     },
     {
       "path": "tests/test_shader_phase_analysis.py",
-      "sha256": "252adaa5d5087e3d5f287d3d96f703bc47aa72382baa33094529e87babe650ad"
+      "sha256": "4a2eba1b55aa0190c5a3e8abdacab94a092d0ddbfc9bf6359375369617d9c612"
     },
     {
       "path": "tests/test_shader_phase_audit.cpp",
@@ -29241,7 +29285,7 @@
     },
     {
       "path": "vendor/bb_runtime/src/runtime_thread.c",
-      "sha256": "0bb3879f2a8f3dcdb0087ca86a38b752b1632ae9b4016dc6d419267ab7858399"
+      "sha256": "6092cad70c380d601720dfbbdd4689b54a8b42ed0566b78dac646565eaa9e7c1"
     },
     {
       "path": "vendor/bb_runtime/src/runtime_time.c",
@@ -31221,7 +31265,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/core/libraries/avplayer/avplayer_state.cpp",
-      "sha256": "cf3de1c2b0e8e24ef6b594f9bd5c7d3a8271e069b689064b2fd9efce79aa8707"
+      "sha256": "3a1dc6d98491afd7b79a4a39629b3f6330a5198e53f8a5a846589451c3a8fa26"
     },
     {
       "path": "vendor/metal_api/shadps4/core/libraries/avplayer/avplayer_state.h",
@@ -33137,7 +33181,7 @@
     },
     {
       "path": "vendor/metal_api/shim/core/libraries/kernel/threads.h",
-      "sha256": "f4852a11e0fe402f708d2ae12f74497a521c10156b6700ad3dd7c1cdf19094f6"
+      "sha256": "bbbc8296674758c5ea28e809f8b252ecc2ba6c4a2c9ec58ffbdac0b56c3c307e"
     },
     {
       "path": "vendor/metal_api/shim/core/libraries/libs.h",
@@ -38429,7 +38473,7 @@
     },
     {
       "path": "targets.cmake",
-      "sha256": "266afb5ff2f35a110da062a8adefa9d70e5b17cb9d053bc854c9237c9e6982d2"
+      "sha256": "0672a5ed9b4184e584f5f7650589939a2cd7b75678e24812ce7c929fd2fedf0f"
     },
     {
       "path": "configure.py",
@@ -38437,11 +38481,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "56cf4d531b1aad9d2f0c2bb8bfad1b8af2d15f296137e10c766089c5644678e6"
+      "sha256": "887390d158ed2d69fa2c21bfba32106cfca72a4f6ed52d8cbf0db829d4864ac8"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "a169c5215bab8d07d1a90a37f87713f5c83a1039776e61e9d534942a7379a2ad"
+      "sha256": "cd4ef45b05b7516b1a0b4cb784886fa0bb3e37a88277465e127676969eb45f3a"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38513,7 +38557,11 @@
     },
     {
       "path": "docs/shader-phase-and-uniform-range.zh-CN.md",
-      "sha256": "18e7917488be82bc6a95661e9792fed0b2b977b9f99794d49e66fa5b9be33c07"
+      "sha256": "331472f1f10702c63e65f77e6256ae9aed5f22816ce51a949c28b5a9f1e24b3e"
+    },
+    {
+      "path": "docs/avplayer-bridge.zh-CN.md",
+      "sha256": "852003fa665dc075b2440a2eb7a983d81611f64b529db86fddf7aded0fd7de78"
     }
   ],
   "excluded": [

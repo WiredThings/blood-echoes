@@ -56,10 +56,15 @@ add_library(bb_gpu_adapters OBJECT ${BB_ARM64_PROTOTYPE_DIR}/generated/gpu_adapt
 target_compile_options(bb_gpu_adapters PRIVATE ${BB_GPU_HEADER_FLAGS} -Wno-ignored-attributes)
 target_include_directories(bb_gpu_adapters BEFORE PRIVATE ${BB_GPU_HEADER_INCLUDES})
 target_link_libraries(bb_gpu_adapters PRIVATE bb_fex_embedding)
+add_library(bb_avplayer_adapters OBJECT ${BB_ARM64_PROTOTYPE_DIR}/src/avplayer_bridge.cpp)
+target_compile_options(bb_avplayer_adapters PRIVATE ${BB_GPU_HEADER_FLAGS} -Wno-ignored-attributes)
+target_include_directories(bb_avplayer_adapters BEFORE PRIVATE ${BB_GPU_HEADER_INCLUDES} ${BB_ARM64_PROTOTYPE_DIR}/src)
+target_link_libraries(bb_avplayer_adapters PRIVATE bb_fex_embedding)
+
 
 target_compile_definitions(bb_native_runtime PRIVATE BB_WITH_NATIVE_GPU=1)
-target_sources(bb-game-arm64 PRIVATE $<TARGET_OBJECTS:bb_gpu_adapters>)
-set(BB_ARM_GPU_LIBRARY "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/bin/gpu-metal-arm64/libbbgpu.menu-candidate.dylib" CACHE FILEPATH "Private CPU-side GPU library")
+target_sources(bb-game-arm64 PRIVATE $<TARGET_OBJECTS:bb_gpu_adapters> $<TARGET_OBJECTS:bb_avplayer_adapters>)
+set(BB_ARM_GPU_LIBRARY "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/bin/gpu-metal-arm64/libbbgpu.avplayer-candidate.dylib" CACHE FILEPATH "Private CPU-side GPU library with AvPlayer thread completion revision 1")
 target_link_libraries(bb-game-arm64 PRIVATE ${BB_ARM_GPU_LIBRARY})
 target_link_options(bb-game-arm64 PRIVATE -Wl,-export_dynamic)
 set_target_properties(bb-game-arm64 PROPERTIES BUILD_RPATH "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/bin/gpu-metal-arm64")
@@ -125,7 +130,7 @@ target_compile_options(test_thread_bootstrap PRIVATE -UNDEBUG)
 add_executable(bb-game-arm64-old-stack-snapshot ${BB_ARM64_PROTOTYPE_DIR}/src/game_runtime.cpp)
 target_include_directories(bb-game-arm64-old-stack-snapshot PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/generated ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes)
 target_compile_definitions(bb-game-arm64-old-stack-snapshot PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_PROTOTYPE_DIR}" BB_OLD_THREAD_BOOTSTRAP)
-target_sources(bb-game-arm64-old-stack-snapshot PRIVATE $<TARGET_OBJECTS:bb_gpu_adapters>)
+target_sources(bb-game-arm64-old-stack-snapshot PRIVATE $<TARGET_OBJECTS:bb_gpu_adapters> $<TARGET_OBJECTS:bb_avplayer_adapters>)
 target_link_libraries(bb-game-arm64-old-stack-snapshot PRIVATE bb_fex_embedding bb_native_runtime ${BB_ARM_GPU_LIBRARY})
 target_link_options(bb-game-arm64-old-stack-snapshot PRIVATE -Wl,-export_dynamic)
 set_target_properties(bb-game-arm64-old-stack-snapshot PROPERTIES BUILD_RPATH "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/bin/gpu-metal-arm64")
@@ -319,11 +324,12 @@ add_custom_command(OUTPUT ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANI
   --bridge-part native=$<TARGET_FILE:bb_native_runtime>
   --bridge-part atrac=$<TARGET_FILE:bb_atrac>
   --bridge-part gpu-adapters=$<TARGET_OBJECTS:bb_gpu_adapters>
+  --bridge-part avplayer-adapters=$<TARGET_OBJECTS:bb_avplayer_adapters>
   --bridge-part game-frontend=${BB_ARM64_PROTOTYPE_DIR}/src/game_runtime.cpp
   ${BB_CPU_FRONTEND_IDENTITY_ARGS}
   --bridge-part gpu-library=${BB_ARM_GPU_LIBRARY}
   --header ${BB_CPU_CACHE_BUILD_HEADER} --manifest ${BB_CPU_CACHE_BUILD_MANIFEST}
- DEPENDS FEXCore bb_fex_embedding Common CommonTools bb_native_runtime bb_atrac bb_gpu_adapters
+ DEPENDS FEXCore bb_fex_embedding Common CommonTools bb_native_runtime bb_atrac bb_gpu_adapters bb_avplayer_adapters
   ${BB_CPU_FRONTEND_HEADERS}
   ${BB_ARM64_PROTOTYPE_DIR}/src/game_runtime.cpp
   ${BB_ARM64_PROTOTYPE_DIR}/src/cpu_cache_generator.cpp

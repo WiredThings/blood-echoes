@@ -579,3 +579,7 @@ bool AvPlayerState::IsStateTransitionValid(AvState state) {
 }
 
 } // namespace Libraries::AvPlayer
+
+// Isolated CPU bridge admission: this object was built with the optional native
+// thread completion scope. Do not pair the new FEX bridge with older host libraries.
+extern "C" unsigned bbgpu_arm_avplayer_bridge_revision(void) { return 1; }

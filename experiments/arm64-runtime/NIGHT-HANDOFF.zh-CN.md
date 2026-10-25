@@ -454,6 +454,10 @@ launcher-engine-abba-1792888283578587000：新装载准入接入后的原冻结�
 
 ## 当前优先交接：分段编译证据
 
-最新实测和回归见docs/shader-phase-and-uniform-range.zh-CN.md：已真实抓到片元37a8af3d的232ms驱动建库+84ms PSO，与338ms长帧和337ms提交阻塞吻合，FEX仅0.407ms；GCN重编译与驱动阻塞已经可分开。另有冷启动compute的34ms IR转换，不宜只修驱动。新小优化只消除片元源码后缀复制，生成文本/实际24像素用例不变，不能当FPS收益。
+最新实测和回归见docs/shader-phase-and-uniform-range.zh-CN.md：已真实抓到顶点37a8af3d的232ms驱动建库+84ms PSO，与338ms长帧和337ms提交阻塞吻合，FEX仅0.407ms；GCN重编译与驱动阻塞已经可分开。另有冷启动compute的34ms IR转换，不宜只修驱动。新小优化只消除片元源码后缀复制，生成文本/实际24像素用例不变，不能当FPS收益。
 
 诊断候选present-image-candidate-1792890975879404000（新增mtl_shader对象）已运行隔离路线通过；正常手动QA仍使用冻结的signal-checkpoint包，未加诊断库。第三轮同hash预加载0.206ms，但AI/内容偏差与缓存变暖不允许归因小优化。正式快照shader-phase-finish-20261025.json与native-runtime-goal-current.json完全相等。Cua仅按用户追加授权用于测试前收起Codex，服务关闭后才跑三轮；无需再启动Cua。限额41%，目标保持进行中。
+
+## 最新 AV 接入交接
+
+见 docs/avplayer-bridge.zh-CN.md：16 原实现薄桥、真实 FEX 回调与 TCB 收尾、旧宿主错配准入及静态 ABBA 已完成。新 CPU602795df，普通手动包仍09af59d2。未宣称白模修复/提帧；未重测死亡/在线/菜单，不更新正式/Release。剩余9导入、完整特化编译准备及白模归因继续。当前剩余额度38%，低于15%才按要求停工交接。
