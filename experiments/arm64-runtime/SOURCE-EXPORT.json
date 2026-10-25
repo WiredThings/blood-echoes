@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792897915844636000,
+  "created_ns": 1792899750364561000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -328,6 +328,10 @@
       "sha256": "13f04f3104d09d606f946bf91ecde37ffcb1082e7b518d5fd592caeb50f68e8b"
     },
     {
+      "path": "tools/build_metadata_layout.py",
+      "sha256": "728051e2b725b70b501cc7e79653bf725f1164143d02b0d15b9b97b85fb00927"
+    },
+    {
       "path": "tools/build_partial_audit.py",
       "sha256": "d8a6941ebb09ad7ff39cb643ee3b6c6e680fbe7aa669d9e00fd411f662a6c124"
     },
@@ -374,6 +378,10 @@
     {
       "path": "tools/decode_present_image.py",
       "sha256": "53fe65063f5447d56a526f867983c945a669f7b653f5ece04ad71f5b143e5b60"
+    },
+    {
+      "path": "tools/decode_shader_cache.py",
+      "sha256": "0165e22d4ae874bca915a43a767c1602cf7ea2ad37f4f49433ca2b5d951de3c0"
     },
     {
       "path": "tools/diagnostic_frame_tail.py",
@@ -736,6 +744,10 @@
       "sha256": "63e5bfd2099f65fe3ccb9c03a679f6442d4a37b30b3344824b0347444832c32b"
     },
     {
+      "path": "tests/metadata_layout.cpp",
+      "sha256": "0755998bbf736e08d10d5561d794ae51d80b3e8409608a6f3409b182e30ca4e1"
+    },
+    {
       "path": "tests/metal/remote_front_before_host_pages.cpp",
       "sha256": "f493ea6ac3e3645b56d06c623832872ba89a49ebd6419d0d50ada769457608eb"
     },
@@ -906,6 +918,10 @@
     {
       "path": "tests/test_darwin_fault.cpp",
       "sha256": "bae8d65f3bc2c64787a1786d378f2847e0621718a955174329a5828b64b33f34"
+    },
+    {
+      "path": "tests/test_decoded_shader_cache.py",
+      "sha256": "fd40ce63840a12328886986ebd1512601891413dbcd502993ec4a38e91f6f572"
     },
     {
       "path": "tests/test_diagnostic_frame_tail.py",
@@ -38529,11 +38545,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "ff140f599c5824bacc717414cfc382146982967a191f5ac94af4b9dc31d12dd7"
+      "sha256": "491720bf24352319147d808dbcf43cc68fb3bb48d07d3727ed41c53a517a6568"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "0efdde119150dfa46d3f88e739d51126d236024958a605c93dd99a8683a75f0e"
+      "sha256": "98c46760ecea3c1237411033abe935507bf7df26e9e1f252e492d231b2e89e2a"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38618,6 +38634,10 @@
     {
       "path": "docs/fixed-shader-catalog-and-imports.zh-CN.md",
       "sha256": "920fe24d1d3bd3058754aa2c6460b75a0557a55c948ef1739fa4f3d123c5c984"
+    },
+    {
+      "path": "docs/semantic-cache-inputs.zh-CN.md",
+      "sha256": "839122647a2150f1e24ed52def37a7df558f4240042c29baaccadf9ecae84378"
     }
   ],
   "excluded": [

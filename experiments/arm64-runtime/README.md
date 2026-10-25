@@ -23,7 +23,12 @@ keys. It does not establish whole-game variant coverage or PSO success. The old
 GPU host also lacks the nine imports; source resolver parity is byte-verified,
 not an execution test of the production CPU. These contracts remain pending.
 See docs/fixed-shader-catalog-and-imports.zh-CN.md. Game/catalog/cache payloads
-are local only; only authored tooling, controls and aggregate findings are exported. Exit-code error/restart separation,
+are local only; only authored tooling, controls and aggregate findings are exported.
+Bounded compiler-layout decoding now verifies the 508/409 and 327/259 cohorts
+without registering SRT code. Eighteen canonical Writer/Profile controls pass.
+Profile padding is excluded using native field equality; no cache is merged.
+Motion-vertex preload rejection is zero in these samples, so that hypothesis is
+not their cause. See docs/semantic-cache-inputs.zh-CN.md for limitations. Exit-code error/restart separation,
 semantic Clang ABI markers, full libc spans and manual-input packaging have regressions.
 A real Metal first-upload hash bug has old/fixed pixel tests and an isolated QA candidate;
 its relation to the observed combat white models remains unproven. White models and exploration stutters
