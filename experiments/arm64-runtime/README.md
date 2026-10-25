@@ -293,8 +293,9 @@ validation. No formal app, saves, settings, caches or Release were updated.
 
 The requested offline-library delivery is code that builds locally from each user's
 own game and complete effective shader combinations. Developer-generated game
-metallibs/PSO archives are not distributable project assets. A new local metallib
-builder is not yet implemented; the PSO archive alone must not be called one.
+metallibs/PSO archives are not distributable project assets. The local metallib
+builder is now implemented as the separate experiment below; PSO archive reuse
+and offline source-library building remain distinct stages.
 
 ## Local Metal library experiment (not default)
 
