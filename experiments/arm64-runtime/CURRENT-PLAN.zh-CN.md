@@ -8,7 +8,7 @@
 - 显式Clang ABI marker接回宏漏掉的包装器；344包装器不是全量兼容证明。完整libc跨度校验，未知data导入不可读guard页，同包离线/联网模块准入。
 - 首次GpuModified上传hash遗漏有真实Metal old/fixed像素对照；修复用于隔离QA。实战白模未复现，不能视作同一根因；ABBA未证明可靠提帧。
 - 原16个启动脚本字节不变；手动QA默认不屏蔽物理输入。正式版未替换。
-- 当前56个套件目标全部重建后121基础回归及专项通过；最新CPU67db33e2有额外msync/模块正负例，普通手动QA包仍冻结09af59d2。
+- 当前56个套件目标全部重建后121基础回归及专项通过；最新CPU67db33e2有额外msync/模块正负例，手动QA契约包已冻结67db33e2，旧09af包保留历史。
 
 ## 最新发现
 
@@ -31,7 +31,7 @@
 
 版本绑定、完整通用回退的Bloodborne FEX/Metal协同：有界热点/指令普查、资源代际+精确范围通知、快照去重、完整shader/PSO键下的有界准备。删未用x86实现不自动提帧；硬件TSO未准入，保留软件排序。
 
-开发分支dev/arm64-runtime-audit。源码检查点仅包含源码/自造测试/选定非敏感说明，不含游戏、存档、缓存、账号或画面。最新本机测试包在artifacts/arm64-qa-20261025-signal-checkpoint，主程序/GPU冻结，仍依赖本机Shared资源，不是可分发安装器。详见NIGHT-HANDOFF和docs/。
+开发分支dev/arm64-runtime-audit。源码检查点仅包含源码/自造测试/选定非敏感说明，不含游戏、存档、缓存、账号或画面。最新本机测试包在artifacts/arm64-qa-20261025-contract-checkpoint，CPU67db33e2/正确a500宿主/原first-upload GPU冻结，仍依赖本机Shared资源，不是可分发安装器。详见NIGHT-HANDOFF和docs/。
 
 限额最后可读剩余41%；阶段边界继续检查，低于15%就停止开发测试，完成交接与最新QA包，推代码，不更新Release。严重压力、快速swap增长、锁屏保护未改。用户随后授权仅测试前使用Cua，已在无游戏时收起Codex并验证服务停止；之后三轮不用Cua或桌面录屏。
 
@@ -113,3 +113,11 @@ GCN→IR/IR→SPIR-V/后端的默认关闭计时已接入，7项分析负例、7
 - 线程/上下文：finalize是模块注册清理，不是线程TLS清理；须补析构回调in-flight生命周期。三项上下文不能调Darwin sigreturn或空成功；12个ARM64/x86结构控制只验证子集，不证明完整PS4 ABI。见docs/thread-signal-contracts.zh-CN.md。
 
 主线程复跑22+10自造控制通过；这些新增候选不接resolver、不启用锁页/布局修复/后台编译，不产生新FPS结论。独立审查/自造测试可并行，公共执行状态与GPU行为修复集中整合，真实游戏/性能对照串行；所有正式数据继续不动，不发布Release。最新可读用量剩余32%。
+
+## 最新：布局诊断与GPU原始字节保全
+
+见docs/layout-observation-and-raw-preservation.zh-CN.md及两份GPU-only报告。默认关闭的64条饱和布局观测已编译，6原生helper/13实际Metal控制通过；不改选择/dirty/回收。原retile的padding有两个明确像素失败，GPU覆盖合并语义正控将错误降0，但CPU oracle mask不是生产方案；整合13控制仍保留2项known_defect，不能冒称全保全已修。下一步应让tiler按源逻辑texel写入并保留raw其余字节，先审TilingInfo ABI和所有消费者。
+
+两次加载被swap增长保护停止；按既有授权重启chronod后仍不能通过，用户关闭其它应用后第三轮实际场景17.07秒/两轮请求完成，布局错选0条；没有白模或FPS收益结论。短暂critical5采样、swap+963MiB不能省略。保护未变，alias和源QA存档已核验。正式既有11671文件及原16脚本不变。
+
+新本机QA契约包已冻结CPU67db33e2/正确a500宿主/原66d554bd renderer，修复打包器固定旧menu库的路径；两个包内FEX正负例和CRC/内容检查通过。artifacts/arm64-qa-20261025-contract-checkpoint，SHA c22970cc38eb2a90946327a4a5f80e7525f12ddd22d9b5504a116615badb5032。未启用布局转换/诊断到普通包，未开新GUI、未更新正式应用/Release。旧09af包仍保留历史。最后可读用量剩余30%。

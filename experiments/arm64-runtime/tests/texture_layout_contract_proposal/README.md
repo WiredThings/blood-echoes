@@ -12,3 +12,10 @@ at production or existing QA caches. No game input is required.
 The pure predicate controls are classification tests only. See source snapshot
 docs/white-model-resource-audit.zh-CN.md and docs/texture-layout-candidate.zh-CN.md
 for actual results, source identity, lawful aliases, and GPU-only preservation gates.
+
+GPU-only raw/coverage controls now use the copied GPL CPU address oracle in
+tests/metal/tiling_cpu_reference.h. Run tests/test_texture_layout_preservation.py
+on the prepared private host for 13 targeted controls, or --full for all 24
+roundtrip cases plus nine merge controls. The unmerged padding errors are
+intentional defect expectations. Coverage mask generation is test-only and
+MUST NOT be installed as a per-pixel CPU production path.

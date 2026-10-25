@@ -1,4 +1,5 @@
 #include "bb_stutter_audit.h"
+#include "bb_layout_audit.h"
 #include "bbport_reclaim_mapping.h"
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -681,6 +682,21 @@ ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
 
     const auto trace_selection = [&](ImageId id, const char* path) {
         const auto& selected = slot_images[id].info;
+        if (BbLayoutAudit::Enabled() && BbLayoutAudit::IsMismatch(info, selected)) {
+          if (const auto event = BbLayoutAudit::Counter().Claim()) {
+            const auto& image = slot_images[id];
+            const auto owner = guest_image_owners.find(id.index);
+            const u64 generation = owner == guest_image_owners.end() ? 0 : owner->second.generation;
+            const u32 roles = u32(image.usage.texture) | (u32(image.usage.storage) << 1) |
+                              (u32(image.usage.render_target) << 2) |
+                              (u32(image.usage.depth_target) << 3) |
+                              (u32(image.scene_proxy) << 4);
+            BbLayoutAudit::Print(event, info, selected, path, image.image_uid,
+                image.backing ? uintptr_t(image.backing->image.native) : 0,
+                registry_generation.load(std::memory_order_relaxed), generation,
+                u32(image.flags), u32(desc.type), roles, backend.CurrentTick(), image.gpu_write_tick);
+          }
+        }
         if (!IsViewTypeCompatible(desc.view_info.type, selected.type)) {
             LOG_ERROR(Render_Vulkan,
                       "Texture cache incompatible selection: path={} address={:#x} "

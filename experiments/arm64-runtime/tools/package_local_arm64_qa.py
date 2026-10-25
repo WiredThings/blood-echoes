@@ -49,7 +49,12 @@ def main():
     cpu=stage/'bin/bb-probe-metal';cpu.parent.mkdir(exist_ok=True)
     shutil.copy2(P/'build/fex/Bin/bb-game-arm64',cpu)
     cpu_lib=stage/'bin/gpu-metal/libbbgpu.dylib';cpu_lib.parent.mkdir()
-    cpu_source=P/'backend/bbport/bin/gpu-metal-arm64/libbbgpu.menu-candidate.dylib';shutil.copy2(cpu_source,cpu_lib)
+    # Freeze the library the current CPU actually imports; never silently select
+    # the older menu checkpoint after AV/callback runtime changes.
+    host=json.loads((P/'evidence/avplayer-host-candidate-current.json').read_text())
+    cpu_source=Path(host['candidate']);assert sha(cpu_source)==host['sha256']
+    assert str(cpu_source)in deps(cpu),'CPU load edge does not match the admitted host library'
+    shutil.copy2(cpu_source,cpu_lib)
     freeze_consumer(cpu,cpu_source,cpu_lib)
     variant=json.loads((P/'evidence/first-upload-gpu-app.json').read_text())
     gpu_source=Path(variant['library']);assert sha(gpu_source)==variant['library_sha256']
@@ -87,7 +92,7 @@ def main():
         original_scripts=source,manual_physical_input=True,silent=True,
         diagnostic_capture=False,performance_logging=False,
         external_dependencies=['prepared Shared dependency tree','private Shared QA paths','locally dumped game and Chinese assets','existing QA GPU cache'],
-        known_limits=['combat white models not yet reproduced','25 imports remain unresolved, including AvPlayer','death, online and menu live retests deferred'])
+        known_limits=['combat white models not yet reproduced','remaining import/context contracts are tracked in GOAL.zh-CN.md','death, online and menu live retests deferred'])
     for rel,digest in source.items():assert sha(stage/rel)==digest
     for binary in [cpu,cpu_lib,gpu,gpu_lib,net_lib]:
         arch=subprocess.check_output(['/usr/bin/lipo','-archs',str(binary)],text=True).strip()
@@ -107,10 +112,10 @@ F2 若被系统拦截，请用 Fn+F2。F3 仍按原协议以离线模式恢复�
 本轮不要求死亡、联网和菜单验收。正式应用、正式存档、设置和缓存未改。
 
 已确认并修复：错误退出码与 75/76 重启协议冲突；ABI 宏漏接；未实现数据导入保护页；完整 libc 访问范围校验；GpuModified 首次上传未记 hash 导致旧 CPU 数据覆盖 GPU 内容的定向错误。
-未宣称战斗白模已解决。仍有 25 项未解析导入，含 16 项 AvPlayer；长编译和探索长帧继续调查。
-纹理修复匹配 ABBA 约 +1.1%，处于波动范围；去重内存快照约 +12.5 MiB。最新整合版单轮约 49 FPS，不能当作严格改动收益。
+未宣称战斗白模已解决。AvPlayer 桥接、程序名、模块信息与 msync 契约已有定向控制；Mlock、模块终结和信号上下文仍待接入。
+本次 CPU 完成了原启动器隔离场景短测，不能作为白模、长时间内存或 FPS 收益验收。死亡、联网、菜单和完整 F3 实测仍留待后续。
 
-最新CPU含默认关闭的producer等待诊断及候选唤醒关联；本包没有开启逐帧诊断、自动输入或QoS实验。工作线程等待已经有线索，白模尚未复现，未承诺60FPS。
+本包不带逐帧诊断、布局审查日志、自动输入或QoS实验；renderer仍冻结在原first-upload候选，不安装尚未验证的布局转换。新源码中的GPU覆盖合并只是自造控制证明，未启用到游戏。
 
 源码：WiredThings/blood-echoes 的 dev/arm64-runtime-audit 分支。未更新 Release。
 包不包含游戏、存档、缓存、汉化资源、账号凭据或截图。不要删除本机 Shared 依赖目录。

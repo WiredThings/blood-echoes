@@ -43,8 +43,8 @@ Death/respawn, online and menu live retests are deferred for the owner's accepta
 All 16 original AvPlayer implementations now have guest callback/handle bridges.
 Real FEX callbacks, thread cleanup and layout/bounds controls pass; static ABBA
 48.492 versus 48.623 FPS shows no measured improvement. Five imports still need
-implementation; __progname, msync and the ModuleInfo query/matcher pair have actual FEX controls. See docs/avplayer-bridge.zh-CN.md for qualifications; normal manual
-QA packaging remains on the earlier CPU and does not include this checkpoint.
+implementation; __progname, msync and the ModuleInfo query/matcher pair have actual FEX controls. See docs/avplayer-bridge.zh-CN.md for qualifications; the latest host-local contract QA package now freezes CPU67db33e2 and its actual
+a500 host library. It is not a production installer or full compatibility acceptance.
 The private CPU QoS option remains OFF: its measured static ABBA did not show a benefit.
 See docs/inplace-texture-and-cpu-scheduling.zh-CN.md for actual in-place pixel controls,
 limited game observations and process-wide scheduling counter qualifications.
@@ -83,8 +83,10 @@ tests/mlock_contract_proposal/. No page-locking path was enabled.
 
 Seven existing-library Metal controls expose wrong same-address byte-layout reuse,
 while preserving lawful sRGB and normalized 1D/2D alias controls. The 26-case
-classification predicate and observation patch remain UNAPPLIED: preserving
-GPU-only raw bytes across retile/detile is an explicit gate. This is not proof of
+classification predicate remains out of resource selection; the original review
+patch is still an unapplied asset. A bounded implementation is now compiled into
+a separate, default-off observation candidate. Preserving GPU-only raw bytes
+across retile/detile remains an explicit behavior-change gate. This is not proof of
 the reported combat white-model cause. See docs/white-model-resource-audit.zh-CN.md,
 docs/texture-layout-candidate.zh-CN.md and tests/texture_layout_contract_proposal/.
 
@@ -97,6 +99,30 @@ The four remaining finalizer/context contracts have a separate review and 12
 dual-architecture structural assertions. None is implemented by that review.
 Module cleanup must not be confused with thread TLS cleanup; guest context
 restoration cannot call Darwin sigreturn. See docs/thread-signal-contracts.zh-CN.md.
+
+## Latest layout observation and local QA checkpoint
+
+The opt-in helper has six native controls and 13 real-Metal observation controls.
+It records at most 64 same-shape byte-layout mismatches per process, never changes
+selection or cache budgets, and preserves lawful aliases. The successful original-
+launcher short scene run recorded no mismatch; it is not white-model or FPS proof.
+Two earlier attempts stopped at swap-growth guards; a later user-closed-apps run
+completed, with transient critical-pressure samples still explicitly reported.
+
+GPU-only roundtrips expose padding errors in 64x60 and small mip chains. Nine
+GPU coverage-merge controls prove the required semantics, but their CPU-generated
+coverage oracle is NOT a production design. The integrated 13-case suite retains
+two known original defects with target_expected=0 and actual exit=7; its report
+all_preservation_paths_correct is false. See
+docs/layout-observation-and-raw-preservation.zh-CN.md,
+docs/texture-layout-roundtrip.zh-CN.md and docs/texture-layout-coverage-merge.zh-CN.md.
+
+The current host-local contract QA freezes CPU67db33e2 with the actual a500 host
+load edge and original first-upload renderer. It has no layout conversion, layout
+logging, automated input or QoS enabled. Package signature/architecture, actual
+packaged-library FEX positive/negative and archive-content checks pass; GUI/live
+package F3/death/network acceptance is not claimed. The ZIP is local only, not in
+this Git snapshot or a Release. See the checkpoint report for its SHA and limits.
 
 ## Development build limitations
 
@@ -119,6 +145,9 @@ python3 tests/test_native_abi_declarations.py
 python3 tests/test_msync_fex.py
 python3 tests/mlock_contract_proposal/test_bounded_mlock_model.py
 python3 tests/test_material_inventory.py
+python3 tests/test_layout_audit.py
+python3 tests/test_texture_layout_audit.py
+python3 tests/test_texture_layout_preservation.py
 python3 tests/test_manual_qa_policy.py
 ```
 

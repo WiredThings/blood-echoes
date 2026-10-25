@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792905667290865000,
+  "created_ns": 1792908532526449000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -70,6 +70,10 @@
     {
       "path": "src/bb_hardware_tso.h",
       "sha256": "3fb508c227bff50a2f4f59975a4dcea502a61834dc02390ef20f6c1c549a7d72"
+    },
+    {
+      "path": "src/bb_layout_audit.h",
+      "sha256": "d6cfdbcc470e65cc6b3e5c2cf55a48b991cd8140b7ecb540c96372b6482dec7d"
     },
     {
       "path": "src/bb_packet_metadata.h",
@@ -332,6 +336,10 @@
       "sha256": "d18dd203c47554f4d529886078469ba0247d0ae98b0fe8e625393e85161fa544"
     },
     {
+      "path": "tools/build_layout_audit_candidate.py",
+      "sha256": "f893ee1d195b1380ef2fee8c208b0f55bf0cb2da6af172a956a58b35a7cd38d8"
+    },
+    {
       "path": "tools/build_lifetime_metadata.py",
       "sha256": "9d59342793e690a9c41fcdad719b56d835c72d70ad1c1f7517b434643214cec4"
     },
@@ -485,7 +493,7 @@
     },
     {
       "path": "tools/package_local_arm64_qa.py",
-      "sha256": "7e0d0d8ee2872b90925085aa7c965c10ad59432fb99b3b4b303337fe97a98355"
+      "sha256": "ffab3c87b515671316607dfb99be74680bb75392a54d6d1dbd98342be97a6ee2"
     },
     {
       "path": "tools/patch_adapter.py",
@@ -649,7 +657,7 @@
     },
     {
       "path": "tools/run_launcher_engine_abba.py",
-      "sha256": "df34e342442848d902bcc3da968cabcca24d34c96d153e05a32b9e5a1b022719"
+      "sha256": "f15fdc34c39693d2294a6514aa5bbb62115559bdc3c64cd6bfa3ebd331d0a2ab"
     },
     {
       "path": "tools/run_memory_categories.py",
@@ -818,6 +826,10 @@
     {
       "path": "tests/metal/texture_cache_before_5444.cpp",
       "sha256": "eb50ef4e0b63c85c775a622e5347cfcb5a0c7e98f780f28434637c2db4925974"
+    },
+    {
+      "path": "tests/metal/tiling_cpu_reference.h",
+      "sha256": "db222cc35d4e3d99f023ad64b8d965e3e68759a5082f603e21164502c0cd8a18"
     },
     {
       "path": "tests/mlock_contract_proposal/README.md",
@@ -1076,6 +1088,14 @@
       "sha256": "64b45b7a0b889d779551d602fd13cec15d53cbb83b53f2e9df00fdb3bd47a66c"
     },
     {
+      "path": "tests/test_layout_audit.cpp",
+      "sha256": "12c6ea3df609301a248ef30110286d84cb9ea0f57387dcb37a7759fff7de09bb"
+    },
+    {
+      "path": "tests/test_layout_audit.py",
+      "sha256": "1a1459c0e3abfc893871820ad51c9dd46eede75fdbb3a66fb8426a79f63eee80"
+    },
+    {
       "path": "tests/test_libc_spans.py",
       "sha256": "064f1254b7cad5aa2ddf370b7d16eec6336ca9db6cdfafe3a2cef087d684f532"
     },
@@ -1086,6 +1106,10 @@
     {
       "path": "tests/test_live_metadata.cpp",
       "sha256": "d43a13120d19a8509f7b99969bc3994693e90a9e0910a5398d5eea4c0822a37b"
+    },
+    {
+      "path": "tests/test_local_qa_package.py",
+      "sha256": "07e9ec71d71c862d3f7c32c490981dfe9ec210f65cb4dbae2a86fafc949fe20a"
     },
     {
       "path": "tests/test_lookup.cpp",
@@ -1300,6 +1324,14 @@
       "sha256": "3a9c6f7c22f0e7a51e58579aba3d53ed04dbe6cc8ba711eb877bea721901512a"
     },
     {
+      "path": "tests/test_texture_layout_audit.py",
+      "sha256": "934990dd3dbdc0037d720dce961decd22bc8176e137d8f1143c831eaf0285a84"
+    },
+    {
+      "path": "tests/test_texture_layout_preservation.py",
+      "sha256": "17a34ca9b16d4e62cc0b02721628fda6a96f03b38ffcb8d6f23882dcdb3d4d36"
+    },
+    {
       "path": "tests/test_texture_set_observation.cpp",
       "sha256": "501c6a7c51438e0eff948ccf6e3c92017d2520237192286f05d6ec4a830c26ea"
     },
@@ -1337,7 +1369,15 @@
     },
     {
       "path": "tests/texture_layout_contract_proposal/README.md",
-      "sha256": "6aa97bac23bed56432b70213157113f459f5a482fe58ecb976a97145d7ac569b"
+      "sha256": "97684fed16df80281b477d224a3dd50adf359e1ecc4ee304886d1f1ae57cb664"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/gpu_coverage_merge.mm",
+      "sha256": "7c525087b828823d438d5ea1226be8d79d59bc853b6326834ed83d96ea26b30a"
+    },
+    {
+      "path": "tests/texture_layout_contract_proposal/gpu_raw_roundtrip.mm",
+      "sha256": "dc1ada03c1caf00877897ae92126f56e8a80426db77a2ae1cb81b36725f71070"
     },
     {
       "path": "tests/texture_layout_contract_proposal/layout-selection-diagnostic.patch",
@@ -1349,7 +1389,7 @@
     },
     {
       "path": "tests/texture_layout_contract_proposal/layout_identity.mm",
-      "sha256": "e08bd3794240940d132586d18c227895a1eb9ef6a0c9ba9cc3db4407674d05b6"
+      "sha256": "3fdffdf717576fe81c1197c743792b21ce4dc7c967b750fca1778afb37bd4358"
     },
     {
       "path": "tests/texture_layout_contract_proposal/layout_predicate_tests.cpp",
@@ -33125,7 +33165,7 @@
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.cpp",
-      "sha256": "03c736a9375764b7272d1fd1312e04b17125cca4f3a4d42a659c08f923275bc4"
+      "sha256": "641a763b9c6adf051c79fe74f7fb506e62e77993b4683d4b38a83c7e747bd57c"
     },
     {
       "path": "vendor/metal_api/shadps4/video_core/texture_cache/texture_cache.h",
@@ -38657,15 +38697,15 @@
     },
     {
       "path": "GOAL.zh-CN.md",
-      "sha256": "0131b36bebab8c52ea6048216aa333f9b97f696c6777dfebf85b5158000d3b0f"
+      "sha256": "ec9e81617c36d8bd93193ac440bb600425efa7efc16ee04e2531a882d599824d"
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "0591d567f60341a7482978055f6fa14b9c36feaae92b8a40419b19f94a0dbe38"
+      "sha256": "4ebcd45f0a0c576df8a859c4641994b7c5b28888f2a5bb963b8f4eed7a2617d7"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "5ee1707a5ac6736ff568b70ab7a2d30ccafe52765d9bdb0e73e0f12711523150"
+      "sha256": "8790400bb9b247209b465d4e9db49b88a1e56adde33ac03a9bc103fc5bd782e1"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38786,6 +38826,18 @@
     {
       "path": "docs/thread-signal-contracts.zh-CN.md",
       "sha256": "352a6baa378b47caeb979f7f77dcdcc427aa1266ac308bc49e96c1400a3b10f1"
+    },
+    {
+      "path": "docs/texture-layout-roundtrip.zh-CN.md",
+      "sha256": "6ac8bc21e52376f0c08b15adc00422cc38879f421b7d297e2ef51afc74930cb3"
+    },
+    {
+      "path": "docs/texture-layout-coverage-merge.zh-CN.md",
+      "sha256": "e77d7db0a82c833ff8b27d0e5a8e99569e8ce89139f71aff24d3b48711a1f462"
+    },
+    {
+      "path": "docs/layout-observation-and-raw-preservation.zh-CN.md",
+      "sha256": "3617892a94436dc6e68fb9ea519e2ea137c9fe342f342c519f4516a00f15bbbd"
     }
   ],
   "excluded": [

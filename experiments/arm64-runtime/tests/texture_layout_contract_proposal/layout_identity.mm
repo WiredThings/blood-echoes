@@ -28,6 +28,7 @@ int main(int argc,char**argv) {
   else {auto requested=Tiled(old.info.guest_address);assert(requested.info.guest_size==old.info.guest_size);auto ref=Tiled(test_base+0x200000);Pattern(ref.info.guest_address);auto ref_id=f.textures.FindImage(ref);(void)f.textures.FindTexture(ref_id,ref);auto expected=Read(f,f.textures.GetImage(ref_id));assert(expected!=old_pixels);
    if(kind=="memo-layout") {auto restore=old;assert(f.textures.FindImage(restore)==old_id);}
    if(kind=="exact-layout")runtime_disabled_optimizations|=BbToggle::FindImageCache;
+   if(kind=="repeat-layout")for(unsigned n=0;n<1000;++n)(void)f.textures.FindImage(requested);
    auto id=f.textures.FindImage(requested);(void)f.textures.FindTexture(id,requested);auto actual=Read(f,f.textures.GetImage(id));size_t mismatches=0;for(size_t i=0;i<actual.size();i++)mismatches+=actual[i]!=expected[i];
    printf("LAYOUT case=%s old_uid=%llu selected_uid=%llu requested_tile=%u selected_tile=%u same_id=%u byte_mismatch=%zu of %zu\n",argv[1],(unsigned long long)old_uid,(unsigned long long)f.textures.GetImage(id).image_uid,unsigned(requested.info.tile_mode),unsigned(f.textures.GetImage(id).info.tile_mode),id==old_id,mismatches,actual.size());
    assert(id==old_id&&mismatches>0);
