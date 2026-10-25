@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "created_ns": 1792896543701739000,
+  "created_ns": 1792897915844636000,
   "scope": "source-only isolated ARM64 development checkpoint",
   "files": [
     {
@@ -276,6 +276,10 @@
       "sha256": "d285c5106a7f1c00f7f6199bcead6e633a860fb744b88f53652ef62ec0863501"
     },
     {
+      "path": "tools/audit_inherited_imports.py",
+      "sha256": "66e50209a57f1d6d32448f136dd1a8a4103a00a73ae385a6ce7d615b13bc2bf4"
+    },
+    {
       "path": "tools/audit_launcher_integration.py",
       "sha256": "bd76204fe2e7999b6abe1072e1c6341a986af9edee5a8abc1ea96193a50999ad"
     },
@@ -352,6 +356,10 @@
       "sha256": "b7c06a0efd08fcdf37fbb1f14866b81bf9eefcc366cfa740d64bb6cb02a37563"
     },
     {
+      "path": "tools/compare_shader_catalog.py",
+      "sha256": "ba0cc15b94647cf08d1ef688fc0147dec5fc0a78a8d6cd22460060662aaefae5"
+    },
+    {
       "path": "tools/cpu_code_map.py",
       "sha256": "8af65a87a236af04f5675b15016957a83fd5a5db7be47d2037b4ae5ae00c55b9"
     },
@@ -380,6 +388,10 @@
       "sha256": "9d25f1bcd257de546a971b7a4e9e251c6b1fabfba1bf462d914dcfa0febe504a"
     },
     {
+      "path": "tools/game_shader_catalog.py",
+      "sha256": "574445533da311f5feab21511dd1bad6c34bc5b6224e09fb56fcd22af3fcdad5"
+    },
+    {
       "path": "tools/generate_gpu.py",
       "sha256": "1f9a721778abf0ded2d1808fb6dbb5bd3a60534ef6be25d022c0955eab26ce03"
     },
@@ -402,6 +414,10 @@
     {
       "path": "tools/host_cpu_audit.py",
       "sha256": "dc9d28ab8a05f09124477626565ca6576888da84b571dfaca402c65dda109407"
+    },
+    {
+      "path": "tools/inventory_shader_cache.py",
+      "sha256": "a1b97bdd7224060fed0670f63aa2a7bd9ab949550b2295206273d5743db779a2"
     },
     {
       "path": "tools/launcher_environment.py",
@@ -596,6 +612,10 @@
       "sha256": "c8562bde788ce062b72711561f250508a352645cd4ac4d3a530582d27d2e58f2"
     },
     {
+      "path": "tools/run_import_resolver_controls.py",
+      "sha256": "af7b0f5550437d273329a6ad13f3f05f82cf308e3aa7fb211560d3c914619a55"
+    },
+    {
       "path": "tools/run_launcher_component.py",
       "sha256": "aa16e19b6ceac2284c294921e880dd61dae0d2ec16f352cc2122fabbcc1f7ca2"
     },
@@ -721,7 +741,7 @@
     },
     {
       "path": "tests/metal/test_avplayer_exports.mm",
-      "sha256": "6da4f9606e06448a2c73c6fc140dc61598ef368a66e879d2ab53b117b6552d07"
+      "sha256": "ef757615acc31a543ac8fffbd045f575690ec6ce4cd900cc66428b8f63ef083e"
     },
     {
       "path": "tests/metal/test_fragment_uniforms.mm",
@@ -914,6 +934,10 @@
     {
       "path": "tests/test_game_menu_bridge.cpp",
       "sha256": "2ad34050e59981edb8cee1dd57ed44accddd442f709077565375123261da8c22"
+    },
+    {
+      "path": "tests/test_game_shader_catalog.py",
+      "sha256": "2f609b0785aeb93ec38d152788e2ec17da4b592d2a219ed749aadd0ce7043217"
     },
     {
       "path": "tests/test_gpu_candidate_identity.py",
@@ -1126,6 +1150,10 @@
     {
       "path": "tests/test_session_state.cpp",
       "sha256": "abf1d23a0a66f9c73814546a856e809f8619133ce789f2a86ca59cb7b695f964"
+    },
+    {
+      "path": "tests/test_shader_cache_inventory.py",
+      "sha256": "58b0edb74d5c024c941e8d99c721bba3ee26d62372a58b63f210ae0c06762d1b"
     },
     {
       "path": "tests/test_shader_phase_analysis.py",
@@ -38501,11 +38529,11 @@
     },
     {
       "path": "CURRENT-PLAN.zh-CN.md",
-      "sha256": "b4832cef6088a7894e047d4782cdaf856073c9df23bf6769d79226e4445068ed"
+      "sha256": "ff140f599c5824bacc717414cfc382146982967a191f5ac94af4b9dc31d12dd7"
     },
     {
       "path": "NIGHT-HANDOFF.zh-CN.md",
-      "sha256": "8b470791c50366c5fe5845ba316296e5170ff3a6079eca9e81f0334949d9d4ec"
+      "sha256": "0efdde119150dfa46d3f88e739d51126d236024958a605c93dd99a8683a75f0e"
     },
     {
       "path": "LAUNCHER-INTEGRATION-AUDIT.zh-CN.md",
@@ -38586,6 +38614,10 @@
     {
       "path": "docs/shader-preparation-opportunity.zh-CN.md",
       "sha256": "dab5e5104af909ff02dc0249f85c18077248c2b2a15c628efa4efeafa1716ebc"
+    },
+    {
+      "path": "docs/fixed-shader-catalog-and-imports.zh-CN.md",
+      "sha256": "920fe24d1d3bd3058754aa2c6460b75a0557a55c948ef1739fa4f3d123c5c984"
     }
   ],
   "excluded": [

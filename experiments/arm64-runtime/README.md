@@ -16,7 +16,14 @@ See GOAL.zh-CN.md, CURRENT-PLAN.zh-CN.md, NIGHT-HANDOFF.zh-CN.md and docs/.
 The goal now explicitly includes resolving the nine remaining imports and building
 a version-bound shader/material and full-specialization inventory. Bounded discovery
 probes find real lead time, mainly during startup; gameplay coverage remains partial.
-See docs/shader-preparation-opportunity.zh-CN.md; no async compilation is enabled. Exit-code error/restart separation,
+See docs/shader-preparation-opportunity.zh-CN.md; no async compilation is enabled.
+The fixed-title read-only inventory now finds stored code for all 221 observed
+program hashes, and indexes 508 existing serialized specializations/409 pipeline
+keys. It does not establish whole-game variant coverage or PSO success. The old
+GPU host also lacks the nine imports; source resolver parity is byte-verified,
+not an execution test of the production CPU. These contracts remain pending.
+See docs/fixed-shader-catalog-and-imports.zh-CN.md. Game/catalog/cache payloads
+are local only; only authored tooling, controls and aggregate findings are exported. Exit-code error/restart separation,
 semantic Clang ABI markers, full libc spans and manual-input packaging have regressions.
 A real Metal first-upload hash bug has old/fixed pixel tests and an isolated QA candidate;
 its relation to the observed combat white models remains unproven. White models and exploration stutters

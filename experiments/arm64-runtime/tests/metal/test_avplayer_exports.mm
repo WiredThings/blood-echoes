@@ -19,7 +19,15 @@ int main(){
  {"hdTyRzCXQeQ#m#n","sceAvPlayerStreamCount"},{"d8FcbzfAdQw#m#n","sceAvPlayerGetStreamInfo"},
  {"ODJK2sn9w4A#m#n","sceAvPlayerEnableStream"},{"Wnp1OVcrZgk#m#n","sceAvPlayerGetAudioData"}};
  for(const auto&e:exports){assert(bbgpu_resolve(e.nid));std::printf("FOUND %s\n",e.name);}
+ // These are separately audited unresolved imports, not success stubs.
+ const Export unresolved[]={
+ {"3k6kx-zOOSQ#p#J","sceKernelMlock"},{"f7KBOafysXo#p#J","sceKernelGetModuleInfoFromAddr"},
+ {"Fjc4-n1+y2g#p#J","__elf_phdr_match_addr"},{"kbw4UHHSYy0#p#J","__pthread_cxa_finalize"},
+ {"tZY4+SZNFhA#p#J","msync"},{"crb5j7mkk1c#p#J","_is_signal_return"},
+ {"mo0bFmWppIw#p#J","sigreturn"},{"OjWstbIRPUo#p#J","__Ux86_64_setcontext"},
+ {"djxxOmW6-aw#p#J","__progname"}};
+ for(const auto&e:unresolved){assert(!bbgpu_resolve(e.nid));std::printf("UNRESOLVED_HOST %s\n",e.name);}
  // Bad/unknown scoped NID must not resolve through an unrelated function.
  assert(!bbgpu_resolve("not-a-real-AV-nid#m#n"));
- puts("PASS 16 real host exports and unknown-NID rejection; no guest ABI/callback claim");
+ puts("PASS 16 real AV exports, 9 unresolved host imports and unknown-NID rejection; no guest ABI/callback claim");
 }
