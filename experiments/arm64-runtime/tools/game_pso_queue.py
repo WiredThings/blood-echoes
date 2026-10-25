@@ -1,6 +1,6 @@
 """Disk-backed scheduling, not an artifact cache or an authority to skip native checks."""
 from pathlib import Path
-import fcntl,hashlib,json,os,sqlite3,stat,time,uuid
+import fcntl,hashlib,json,os,re,sqlite3,stat,time,uuid
 from game_pso_progress_identity import input_identity,execution_identity
 MAX_LINE=256*1024
 PAGE_MAX=64
@@ -32,6 +32,32 @@ def fingerprint(path,check):
   b=os.fstat(fd);need((a.st_dev,a.st_ino,a.st_size,a.st_mtime_ns)==(b.st_dev,b.st_ino,b.st_size,b.st_mtime_ns),'manifest changed while fingerprinting')
   return h.hexdigest()
  finally:os.close(fd)
+
+def strict_lookup_ready(row,ready):
+ """Only actual current Local functions + strict archive hits, never a hint.
+
+ allow_compile=False restricts PSO creation, not MSL compilation. A successful
+ Source fallback is therefore not an admission to skip record/build.
+ """
+ try:
+  if not ready(row):return False
+ except (KeyError,TypeError,ValueError,AttributeError):return False
+ worker=row.get('worker',{});counts=worker.get('artifact_counts',{});functions=worker.get('functions',[]);events=row.get('artifact_events',[])
+ n=counts.get('attempts',0)
+ if (worker.get('allow_compile')is not False or worker.get('source_fallback')is not False or
+     type(n)is not int or n<=0 or any(type(counts.get(k))is not int for k in('hits','built','compile_attempts'))or counts.get('hits')!=n or counts.get('built')!=0 or
+     counts.get('compile_attempts')!=0 or not isinstance(functions,list)or not 0<len(functions)<=6 or
+     not isinstance(events,list)or len(events)!=n):return False
+ if not all(isinstance(f,dict)and f.get('actual_route')=='local-metallib'and
+            isinstance(f.get('identity'),str)and re.fullmatch('[0-9a-f]{64}',f['identity'])for f in functions):return False
+ def hex64(value):return isinstance(value,str)and re.fullmatch('[0-9a-f]{64}',value)
+ # PsoCache can create helper functions after worker.functions/source_fallback
+ # were collected. Its actual per-artifact routes must also remain Local.
+ return all(isinstance(e,dict)and e.get('state')==1 and hex64(e.get('archive_sha256'))and
+            hex64(e.get('key'))and hex64(e.get('descriptor'))and hex64(e.get('primary'))and
+            e.get('primary_route')==2 and
+            ((e.get('fragment_route')==0 and e.get('fragment')=='')or
+             (e.get('fragment_route')==2 and hex64(e.get('fragment'))))for e in events)
 
 class Queue:
  """Versioned scheduling hints. Only a fully indexed current snapshot is executable.
@@ -166,7 +192,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
  need(max_recipes is None or type(max_recipes) is int and max_recipes>0,'optional recipe work budget')
  start=clock();run=uuid.uuid4().hex;queue=None;active=None;ordinal=0
  report=dict(schema=1,progress_schema=2,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,
-             verified_artifact_hits=0,visited=0,events_preview=[],event_count=0,max_page_items=0,
+             verified_artifact_hits=0,strict_lookup_attempts=0,visited=0,events_preview=[],event_count=0,max_page_items=0,
              full_manifest_preparation_verified=False,state_is_artifact_authority=False)
  def guard():
   check()
@@ -206,22 +232,24 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
    page=queue.page(run,min(page_size,max_recipes-report['visited']) if max_recipes is not None else page_size)
    if not page:break
    report['max_page_items']=max(report['max_page_items'],len(page));pending=[]
-   # A scheduling hint only requests PSO lookup-only native verification.
-   # allow_compile=False does not forbid MSL function-source fallback.
-   # ready(row) and current final-exec env remain the admission authority.
-   hints=[item for item in page if item['ready_hint'] and phase!='record']
-   if hints:
+   # Native artifacts may remain valid after a runner/context update. Probe
+   # every current candidate when a real current load environment is available;
+   # old progress hints neither authorize nor gate the attempt.
+   if phase!='record':
     env=local('prepare')
-    for item in hints:
+    for item in page:
      try:
       if env.get('status')=='prepared':
+       report['strict_lookup_attempts']+=1
        row=call(item,'prepare',False)
-       if ready(row)and row['worker']['artifact_counts'].get('built',0)==0:
+       if strict_lookup_ready(row,ready):
         report['verified_artifact_hits']+=1;finish(item,'completed',recorded=True,row=row);continue
+      # A failed/Source lookup requires the original record -> build -> prepare,
+      # even if an old scheduling hint had recorded=True.
       item['recorded_hint']=False;pending.append(item)
      except (Rejected,ValueError,OSError) as error:
-      item['recorded_hint']=False;pending.append(item);event(item,'previous-hint-not-admitted',error=str(error)[:512])
-   pending.extend(item for item in page if item not in hints)
+      item['recorded_hint']=False;pending.append(item);event(item,'strict-lookup-not-admitted',error=str(error)[:512])
+   else:pending=page
    recorded=[]
    if phase in ('all','record') and pending:
     local('record')

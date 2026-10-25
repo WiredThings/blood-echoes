@@ -76,6 +76,7 @@
 |旧身份新增20项后|368/424，预算未完|600秒预算|458|538/0|48.36|
 |v2首次迁移|419/424，预算未完|600秒预算|523|538/0|49.29|
 |同包同缓存v2暖启|424/424，完成|471.10秒|527|538/0|49.08|
+|会话审核复用与strict-first新包|424/424，完成|103.72秒|527|538/0|49.70|
 
 v2 暖启实际执行424次 prepare、0次 record；419份沿用调度提示但仍通过本次验证，剩余5份补齐。准备器内原生计数为492次严格命中、4次新建、0失败；这与配方数不同，一份配方可生成多条管线。总目录429条，另5条几何着色器 session/span 链路因原安全限制排除；424/424仅代表当前缓存的可准入输入，不能称全游戏完整预编译。
 
@@ -87,6 +88,19 @@ v2 暖启实际执行424次 prepare、0次 record；419份沿用调度提示但�
 
 开发打包工具可用 `--gpu-cache-seed-manifest /Users/Shared/.../旧QA.app/Contents/Resources/ARM64-QA-MANIFEST.json`，仅从验证过的旧 QA 包克隆整个 `cache/` 与 `local-metal/`，禁止混合不同来源的 permutation 文件。原始上游 GPU SHA 与包内重定位 SHA 分开验证，签名、实际DSO边、CPU provenance 和工具/脚本闭包保持检查。原 QA 的进度、home、trophy、custom_configs 等不从这个种子导入；原基线配置/存档准备逻辑保持。实际本轮克隆4473文件/51,743,475B，源目录不变，正式数据从不参与。此选项只用于保留开发QA的编译进展，不是分发游戏编译产物。
 
-现有本机测试包位于工作区 `artifacts/arm64-qa-20261026-incremental/Blood-Echoes-ARM64-Local-QA.zip`，SHA256 `bd7e75fa4bd49f52fbb22ee3b0c4b810318f5e872bc8e5bc3db5fb56be611505`。它依赖准备好的本机Shared树，不是可移植安装包，未上传Release。
+最新已验证本机测试包位于工作区 `artifacts/arm64-qa-20261026-session-startup/Blood-Echoes-ARM64-Local-QA.zip`，SHA256 `bf4f9ae57d11d017a5f08459b85e7178f6f34f496d056e011ef7d51bdc580e05`。它依赖准备好的本机Shared树，不是可移植安装包，未上传Release。
 
-仍需完成：准备阶段每页重复扫描/工具查询的成本、其余辅助工厂最终PSO、全游戏完整状态目录、冷暖卡顿与峰值内存的匹配对照。不能把已完成整包消费说成这些项目全部完成。正式应用、正式存档/设置、已有缓存及Release保持不动；死亡/联网/菜单仍暂缓用户统一验收。
+仍需完成：其余辅助工厂最终PSO、全游戏完整状态目录、新用户无历史请求时固定helper首次收集，以及冷暖卡顿与峰值内存的匹配对照。不能把已完成整包消费说成这些项目全部完成。正式应用、正式存档/设置、已有缓存及Release保持不动；死亡/联网/菜单仍暂缓用户统一验收。
+
+
+## 消除每页重复审核，先严格复用已有产物
+
+重复审核修补已完成整包验证。PreparationSession只在本次prepare调用内保留一次真正`passed`且`built=0`的原完整审核，前后请求/收据/库的完整metadata集合必须稳定。每次复用仍持原builder锁，检查原保护、当前xcrun工具选择、二进制mutation pins和SDK/OS身份；record或任何变更立即失效，失败不缓存。SQLite metadata页512KiB，262144项/64MiB预算只禁止memo、退回原完整审核，不截断编译目录或缩缓存。临时ledger退出清理，不成为跨启动产物authority。SDK设置/工具身份不变的root手工SDK内部篡改不在这项会话metadata检测保证内，原native身份与实际产物准入仍独立保留。
+
+真实448请求/已有库在全新Shared副本上测试，原缓存metadata前后不变，原build_id不变：首次完整审核16.328秒，随后同会话0.401/0.398秒；0编译、压力1、swap不变。这是实际工具/SDK/收据审核时序，不是作者假编译器的微测，也不是游戏FPS结论。
+
+新工具上下文改变仍正常换新进度域，不导入旧hint。调度现在每页先用当前load环境、实际冻结输入和`allow_compile=False`做严格探测，不要求旧hint。必须所有实际函数和工厂内部event均为Local来源、完整身份、严格archive命中、0新建/编译，才能完成；Source回退或任何miss仍走原record/build/prepare，保护停止不吞掉。cold没有requests、环境仍record时不额外起probe。
+
+新包原入口已通过：424配方全部严格探测成功、0record，原生496hit/0built/0failed；27次本机库审核只有1次full、26次复用，审核合计26.66秒，整体准备103.72秒。启动至同一可操作场景155.91秒（前轮519.31秒）；boot/content/patch/settings/camera完全一致，但旧轮仍补过5配方、4PSO，不能把整轮差额全部单独归于memo。场景90秒约49.70FPS、p95/p99 20.94/21.43ms，合计footprint5808MiB不是去重RAM，最高压力2、swap净增205MiB；没有据此宣称帧率或RAM收益。运行时527条Hit、25条Deferred日志与旧暖轮相同，538本机库命中/0源码事件，仍不能推断所有驱动编译零。
+
+18项会话作者控制、16项strict-first、原26项builder及19项queue、11项增量控制通过。源/收据损坏、同字节替换并还原mtime、工具/SDK/OS变更、失败不缓存、预算禁memo、冷无requests、假hint、工厂内部Source回退和保护停止均有反例。完整游戏/审核摘要分别见 `session-reuse-game-aggregate.json` 与 `real-session-audit-aggregate.json`，同目录保留前轮汇总。新FormatConvert和阶段计数仍是独立私有工程，尚未纳入此包。

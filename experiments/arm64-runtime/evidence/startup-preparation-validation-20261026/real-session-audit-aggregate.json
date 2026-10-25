@@ -1,0 +1,66 @@
+{
+  "status": "passed",
+  "game_started": false,
+  "native_compilation_allowed": false,
+  "production_modified": false,
+  "original_cache_modified": false,
+  "source_sha256": "61f191d76da4411fb1a2278d40e273223329c1d6394cbe2b00d587a7b4ae1ed4",
+  "runs": [
+    {
+      "status": "passed",
+      "build_id": "b4288ef4f3fc355de5d499068999ce47df23ff2f6018efbb3f1bbd1b699ba449",
+      "built": 0,
+      "skipped": 448,
+      "requests": 448,
+      "session_reused": false,
+      "error": null,
+      "wall_seconds": 16.328385500004515
+    },
+    {
+      "status": "passed",
+      "build_id": "b4288ef4f3fc355de5d499068999ce47df23ff2f6018efbb3f1bbd1b699ba449",
+      "built": 0,
+      "skipped": 448,
+      "requests": 448,
+      "session_reused": true,
+      "error": null,
+      "wall_seconds": 0.40088354202453047
+    },
+    {
+      "status": "passed",
+      "build_id": "b4288ef4f3fc355de5d499068999ce47df23ff2f6018efbb3f1bbd1b699ba449",
+      "built": 0,
+      "skipped": 448,
+      "requests": 448,
+      "session_reused": true,
+      "error": null,
+      "wall_seconds": 0.3979979580035433
+    }
+  ],
+  "stats": {
+    "calls": 3,
+    "full_builds": 1,
+    "reuses": 2,
+    "invalidations": 0,
+    "metadata_entries": 2005,
+    "seconds": 17.127226123935543,
+    "full_build_seconds": 15.92974775005132,
+    "reuse_validation_seconds": 0.7988406238146126,
+    "events": []
+  },
+  "before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 6720.125
+  },
+  "after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 6720.125
+  },
+  "max_pressure": 1,
+  "sample_count": 1030,
+  "seconds": 17.732437124941498,
+  "original_cache_metadata_unchanged": true,
+  "qualification": "Real original Python RequestIndex, full source/receipt/library hashes, actual xcrun/SDK/OS/tools and safety checks on private clone; native Metal compilation prohibited. Helper startup verification timing only, not game loading/FPS or end-to-end memory acceptance."
+}

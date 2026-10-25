@@ -257,3 +257,10 @@ UpscaleMerge、Presenter后处理和Camera共享原冷工厂，原owner槽/算�
 增量域v2、原子索引激活、编译子进程退出唤醒、仅QA cache/local-metal克隆已合入开发源，55项CPU控制通过；测试包为artifacts/arm64-qa-20261026-incremental，SHA bd7e75fa...611505，依赖本机Shared、不便携、不上传Release。准确汇总见evidence/startup-preparation-validation-20261026/game-integration-aggregate.json；其余旧段落是历史检查点。
 
 当前继续：消除准备阶段每页重复全扫描/工具探测（原native准入不能省），补其余固定helper最终PSO，推进静态完整目录与尚未完成的接口/翻译协同。全部源与对应文档仅同步dev，正式数据不动。死亡/联网/菜单仍由用户稍后验收，白模不扩大新假设。目标active。
+
+
+### 2026-10-26：重复审核已消除，整包启动复测通过
+
+最新工具包原生组件仍c2ec/f894，没有混入尚未验证的Format/counter。真实448请求克隆审核16.328秒→0.401/0.398秒，源cache不动、pressure1/swap0。整包0hint新进度域先实际strict探测，424/424完成、0record，496nativehit/0built/0failed；27builder中1full/26reuse，整体准备103.72秒、同场景进场155.91秒，90秒49.70FPS、p99 21.43ms、maxpressure2。不同冷暖/旧轮曾补4PSO，所以不称匹配帧率/RAM收益。原生严格准入及全部保护不变。
+
+最新本机QA zip是artifacts/arm64-qa-20261026-session-startup，SHA bf4f9ae5...580e05（host-local）。源/对应文档同步dev，Release不变。接下来FormatConvert原工厂与Metal实际API阶段计数需同源重建/真实原生验收，仍不能将其作者控制视为已启用；其它固定helper/new-user种子及全游戏完整状态仍未完。目标active。

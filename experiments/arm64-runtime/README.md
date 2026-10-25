@@ -30,9 +30,12 @@ parser that truncated space-containing app paths (fixed with PID/path/SHA checks
 Four original-entry game integrations now pass. The latest warm restart strictly
 verifies all 424 policy-eligible current-cache recipes (429 records, five existing
 geometry session-span exclusions); 419 prior hints survive, but remain scheduling
-hints rather than artifact authority. Preparation still takes 471 seconds and
-repeats library scans; removing that work remains open. The scene runs at about
-49 FPS, with no matched gain claim. Full-game PSO coverage and cold/warm hitch/peak
+hints rather than artifact authority. A subsequent tools-only package removes repeated library audits within one
+preparation call and probes current native strict artifacts before recording,
+even in a new progress domain. It prepares all 424 inputs in 104 seconds and
+reaches the same scene in 156 seconds (previously 471/519 seconds). This is not
+a matched FPS gain claim; the scene remains around 49–50 FPS. The original
+freeze, native admission, memory and lock guards remain intact. Full-game PSO coverage and cold/warm hitch/peak
 memory acceptance remain open; early loading pressure is documented rather than
 hidden. Source artifacts and aggregate evidence are published on the development
 branch only. Production and Release are unchanged.

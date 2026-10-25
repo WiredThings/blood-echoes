@@ -32,9 +32,11 @@ class NativeAuthor:
   built=not hit and allow and rid not in self.defer and not self.worker_only
   if built:self.compile_calls[rid]+=1;self.artifacts.add(rid)
   good=(hit or built) and not self.worker_only
-  return dict(phase=phase,exit=0,worker=dict(native_pipeline_ready=good,artifact_publication_observed=good,
-   artifact_counts=dict(attempts=1,hits=int(hit),built=int(built),deferred=int(not good),failed=0,critical=0,unavailable=0)),
-   artifact_events=[dict(state=1 if hit else 2 if built else 3,archive_sha256='a'*64 if good else'')])
+  return dict(phase=phase,exit=0,worker=dict(native_pipeline_ready=good,artifact_publication_observed=good,allow_compile=allow,source_fallback=False,
+   functions=[dict(actual_route='local-metallib',identity=digest(['actual-author-function',rid]))],
+   artifact_counts=dict(attempts=1,hits=int(hit),built=int(built),deferred=int(not good),failed=0,critical=0,unavailable=0,compile_attempts=int(built))),
+   artifact_events=[dict(state=1 if hit else 2 if built else 3,archive_sha256='a'*64 if good else'',
+    key=digest(['author-key',rid]),descriptor=digest(['author-descriptor',rid]),primary=digest(['actual-author-function',rid]),primary_route=2,fragment='',fragment_route=0)])
 class Controls(unittest.TestCase):
  def setUp(self):
   self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name).resolve();self.progress=self.root/'progress';self.progress.mkdir();self.manifest=self.root/'manifest.jsonl';self.native=NativeAuthor();self.context=dict(worker='a'*64,dso='b'*64,cohort='c'*64,layout='d'*64,options='e'*64)
@@ -68,7 +70,7 @@ class Controls(unittest.TestCase):
   self.write([unit(1)]);r=self.run_queue();self.assertEqual(r['completed'],1)
   self.native.artifacts.clear();self.native.elapsed=0
   r2=self.run_queue();self.assertEqual(r2['completed'],1);self.assertEqual(self.native.compile_calls[unit(1)['recipe_blob_identity']],2)
-  self.assertEqual(self.native.probe_calls[unit(1)['recipe_blob_identity']],1)
+  self.assertEqual(self.native.probe_calls[unit(1)['recipe_blob_identity']],2)
  def test_worker_exit_zero_is_not_preparation_success(self):
   self.write([unit(1)]);self.native.worker_only=True;r=self.run_queue()
   self.assertEqual((r['status'],r['completed'],r['deferred']),('partial',0,1));self.assertFalse(r['full_manifest_preparation_verified'])

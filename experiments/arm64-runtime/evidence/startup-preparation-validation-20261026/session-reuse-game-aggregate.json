@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "passed": true,
+  "formal_data_modified": false,
+  "native_library_changed": false,
+  "preparation": {
+    "status": "completed",
+    "completed": 424,
+    "recorded": 0,
+    "verified_artifact_hits": 424,
+    "strict_lookup_attempts": 424,
+    "policy_eligible_records": 424,
+    "policy_excluded": 5,
+    "wall_seconds": 103.7183662080206,
+    "builder_session": {
+      "calls": 27,
+      "full_builds": 1,
+      "reuses": 26,
+      "invalidations": 0,
+      "metadata_entries": 2005,
+      "seconds": 26.66124550474342,
+      "full_build_seconds": 16.038328207912855,
+      "reuse_validation_seconds": 10.243944792891853,
+      "events": []
+    }
+  },
+  "native_preparation_counts": {
+    "attempts": 496,
+    "built": 0,
+    "compile_attempts": 0,
+    "critical": 0,
+    "deferred": 0,
+    "failed": 0,
+    "hits": 496,
+    "unavailable": 0
+  },
+  "runtime_native_states": {
+    "1": 527,
+    "3": 25
+  },
+  "runtime_local_msl_hits": 538,
+  "runtime_source_msl_events": 0,
+  "loaded_scene_seconds": 155.91,
+  "scene": {
+    "engine": "arm64",
+    "qa_cpu_qos": null,
+    "fps": 49.69824399537883,
+    "p95_ms": 20.94,
+    "p99_ms": 21.43,
+    "gpu_ms": 18.872360831656607,
+    "draws_median": 1367,
+    "camera": [
+      [
+        "-190.784",
+        "-27.226",
+        "71.116"
+      ]
+    ],
+    "cpu_percent": {
+      "bb-game-arm64": 281.3635952733713,
+      "bb-gpu": 142.36588916483913
+    },
+    "combined_footprint_mib": 5808.466205596924,
+    "max_pressure": 2,
+    "swap_change_mib": 204.6875,
+    "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+    "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+    "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+    "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f"
+  },
+  "qualification": "Current prepared-cache original-entry integration, not clean first-ever user build or matched FPS/RAM benefit. Same boot/content/patch/settings SHA/camera as old warm run. Old run had five remaining native builds; strongest causal evidence is real same-session full-vs-reuse 448-request audit. Original lookup/freeze/native admission retained. No Cua/recording/actions. All fixed-game PSOs are not yet covered.",
+  "source_report_sha256": {
+    "game": "b0a7194ca5329ce1f522fb8ccbfc9f8ddced501bbfacb528d4b9a6c1cc7158bd",
+    "preparation": "caa629df53016c8361b6ec82c3d4e6af41f57d450d35c5fedb7962230948b304"
+  }
+}

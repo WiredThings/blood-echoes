@@ -178,10 +178,10 @@ def prepare(config,*,services=None):
   local_aot_policy.P=P
   local_metal_builder.PROJECT=P
   from local_aot_policy import prepare as local_prepare
-  from local_metal_builder import build as local_build,NativeToolchain,FixedRunner,Stopped as BuilderStopped
+  from local_metal_builder import build as local_build,NativeToolchain,FixedRunner,Stopped as BuilderStopped,PreparationSession
   services=dict(audit_stage=audit_owned_stage,audit_key_profile=audit_owned_key_profile,load_layout=load_canonical_layout,
     require_no_games=require_no_games,observer_factory=NativeObserver,memory_policy=MemoryPolicy,resolve_identity=resolve_gpu_identity,
-    local_prepare=local_prepare,local_build=local_build,toolchain=NativeToolchain,runner=FixedRunner,builder_stopped=BuilderStopped)
+    local_prepare=local_prepare,local_build=local_build,toolchain=NativeToolchain,runner=FixedRunner,builder_stopped=BuilderStopped,builder_session_factory=PreparationSession)
  observer=None;require_no_games=services['require_no_games'];policy_type=services['memory_policy']
  need(HEX.fullmatch(a.cohort)and HEX.fullmatch(a.library_sha256)and HEX.fullmatch(a.layout_sha256),'current identities required')
  need((a.max_recipes is None or type(a.max_recipes)is int and a.max_recipes>0)and 0<a.seconds<=7200 and 0<a.page_size<=64,'explicit bounded work budget')
@@ -212,6 +212,7 @@ def prepare(config,*,services=None):
  policy=policy_type(before);start=clock();samples=[];sample_count=0;outcomes=[];outcome_count=0;phase_env={};stop_error=None
  samples_path=run/'samples.jsonl';outcomes_path=run/'outcomes.jsonl';events_path=run/'events.jsonl'
  builder_tmp=fresh(run,'local-builder-tmp');result={}
+ session_factory=services.get('builder_session_factory');builder_session=session_factory(builder_tmp)if session_factory else None
  def check():
   nonlocal sample_count
   elapsed=clock()-start
@@ -224,6 +225,7 @@ def prepare(config,*,services=None):
   if reason:raise Stopped(reason)
  def prep_phase(phase,guard):
   nonlocal stop_error
+  if phase=='record'and builder_session is not None:builder_session.invalidate('record-phase')
   class BuilderGuard:
    def check(self,**kwargs):
     nonlocal stop_error
@@ -233,6 +235,8 @@ def prepare(config,*,services=None):
     except (Deferred,Stopped,KeyboardInterrupt)as error:
      stop_error=error;raise services['builder_stopped'](str(error))
   def builder(root,cohort,**kwargs):
+   if builder_session is not None:
+    return builder_session.build(root,cohort,guard=BuilderGuard(),toolchain_factory=lambda:services['toolchain'](services['runner'](builder_tmp)),**kwargs)
    return services['local_build'](root,cohort,guard=BuilderGuard(),
      toolchain=services['toolchain'](services['runner'](builder_tmp)),**kwargs)
   updates,report=services['local_prepare'](mode='record'if phase=='record'else'auto',gpu_root=gpu,cohort=a.cohort,
@@ -290,6 +294,8 @@ def prepare(config,*,services=None):
   result=run_manifest(a.manifest,progress_root=progress,context=context,execute=execute,prepare_phase=prep_phase,check=check,
        ready=preparation_ready,phase=a.phase,page_size=a.page_size,max_recipes=a.max_recipes,seconds=a.seconds,clock=clock,event_sink=event)
  finally:
+  if builder_session is not None:
+   builder_session.close();result['builder_session']=dict(builder_session.stats)
   result.update(before=before,after=observer.system(),samples_preview=samples,sample_count=sample_count,samples_jsonl=str(samples_path),
     memory_policy=policy_type.MANIFEST,wall_seconds=clock()-start,outcomes_preview=outcomes,outcome_count=outcome_count,
     outcomes_jsonl=str(outcomes_path),events_jsonl=str(events_path),worker_identity=identity,current_context=context,

@@ -6,7 +6,7 @@ runner/fingerprint injection exists solely for authored tests; no compiler/flag 
 accepted from CLI or request JSON. Nothing uploads source, libraries, receipts or caches.
 """
 from pathlib import Path
-import argparse,fcntl,hashlib,json,os,re,signal,stat,subprocess,tempfile,time
+import argparse,fcntl,hashlib,json,os,re,signal,sqlite3,stat,subprocess,tempfile,time
 
 PROJECT=Path(__file__).resolve().parents[1]
 RECIPE='bb-metal-local-aot-v1'
@@ -252,13 +252,17 @@ class FixedRunner:
                 except subprocess.TimeoutExpired:os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=.75)
             log.close()
 
+def _session_stat(st):
+    # atime may change during legitimate reads; every mutation-sensitive field stays.
+    return [st.st_dev,st.st_ino,st.st_mode,st.st_uid,st.st_gid,st.st_nlink,st.st_size,st.st_mtime_ns,st.st_ctime_ns]
+
 def tool_fingerprint(path):
     path=Path(path).resolve(strict=True)
     before=path.stat()
     if not stat.S_ISREG(before.st_mode)or before.st_mode&0o022:raise Refused('tool binary must be regular and not group/world writable')
     with path.open('rb')as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
-    if _identity(before)!=_identity(path.stat()):raise Refused('tool binary changed while hashing')
-    return dict(path=str(path),sha256=sha,stat=list(_identity(before)))
+    if _session_stat(before)!=_session_stat(path.stat()):raise Refused('tool binary changed while hashing')
+    return dict(path=str(path),sha256=sha,stat=list(_identity(before)),session_stat=_session_stat(before))
 
 class NativeToolchain:
     def __init__(self,runner,*,fingerprint=tool_fingerprint):self.runner=runner;self.fingerprint=fingerprint
@@ -286,6 +290,29 @@ class NativeToolchain:
             if str(Path(found).resolve(strict=True))!=self.pins[name]['path']:raise Refused('selected toolchain changed during build')
         for row in self.pins.values():
             if list(_identity(Path(row['path']).stat()))!=row['stat']:raise Refused('tool binary changed during build')
+    def preparation_environment(self,guard):
+        # Session invalidation only, never a replacement for artifact/toolchain ID.
+        guard.check(preflight=True)
+        raw=self.runner.run(['/usr/bin/xcrun','--show-sdk-path'],10,guard).decode().strip()
+        if not raw.startswith('/')or '\n'in raw:raise Refused('invalid selected SDK path')
+        selected=Path(raw);sdk=selected.resolve(strict=True)
+        if not sdk.is_dir():raise Refused('selected SDK is not a directory')
+        pins={str(selected):_session_stat(selected.lstat()),str(sdk):_session_stat(sdk.stat())}
+        found=0
+        for name in ('SDKSettings.json','SDKSettings.plist'):
+            p=sdk/name
+            if p.is_file():
+                row=p.lstat()
+                if not stat.S_ISREG(row.st_mode)or not 0<row.st_size<=1024*1024:raise Refused('invalid SDK identity file')
+                pins[str(p)]=_session_stat(row);found+=1
+        if not found:raise Refused('missing SDK identity files')
+        for rawpath in ('/System/Library/CoreServices/SystemVersion.plist','/usr/bin/sw_vers'):
+            p=Path(rawpath);row=p.lstat()
+            if not stat.S_ISREG(row.st_mode):raise Refused('invalid OS identity file')
+            pins[str(p)]=_session_stat(row)
+        os_build=self.runner.run(['/usr/bin/sw_vers','-buildVersion'],10,guard).decode().strip()
+        if not os_build or len(os_build.encode())>256 or os_build!=self.build_manifest['os_build']:raise Refused('OS build changed within preparation')
+        return dict(sdk_selected=str(selected),sdk=str(sdk),os_build=os_build,pins=pins)
     def compile(self,source,air,library,request,guard):
         self.unchanged(guard)
         command=['/usr/bin/xcrun','metal','-std='+request['language'],
@@ -401,6 +428,154 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None):
         if lock_fd is not None:os.close(lock_fd)
         if observer is not None:observer.close()
     return summary
+
+
+SESSION_ENTRY_MAX=262144
+SESSION_LEDGER_MAX=64*1024*1024
+
+class _SessionSnapshot:
+    """Owned temporary disk ledger. No request bytes or unbounded Python pin map."""
+    def __init__(self,roots,scratch,guard):
+        self.roots=tuple(Path(p)for p in roots);self.count=0;self.db=None;self.path=None
+        fd,name=tempfile.mkstemp(prefix='preparation-pins-',suffix='.sqlite',dir=scratch);os.close(fd);self.path=Path(name)
+        try:
+            self.db=sqlite3.connect(name)
+            self.db.execute('PRAGMA max_page_count='+str(max(1,SESSION_LEDGER_MAX//4096)))
+            self.db.execute('PRAGMA temp_store=FILE');self.db.execute('PRAGMA mmap_size=0');self.db.execute('PRAGMA cache_size=-512')
+            self.db.execute('CREATE TABLE pins(root INTEGER,path TEXT,identity TEXT,PRIMARY KEY(root,path))')
+            for i,root in enumerate(self.roots):
+                for rel,row in self._walk(root,guard):
+                    if self.count>=SESSION_ENTRY_MAX:raise Refused('optional session metadata entry budget')
+                    self.db.execute('INSERT INTO pins VALUES(?,?,?)',(i,rel,canonical(_session_stat(row)).decode()));self.count+=1
+            self.db.commit();guard.check(preflight=True)
+        except BaseException as error:
+            self.close()
+            if isinstance(error,sqlite3.Error):raise Refused('optional session metadata ledger budget/error')from error
+            raise
+    def _walk(self,root,guard):
+        if root!=root.resolve(strict=True):raise Refused('linked preparation-session root')
+        ticks=0
+        def tick():
+            nonlocal ticks
+            if ticks%256==0:guard.check(preflight=True)
+            ticks+=1
+        def walk(folder,depth):
+            tick();row=folder.lstat()
+            if not stat.S_ISDIR(row.st_mode)or row.st_uid!=os.getuid():raise Refused('unowned session input directory')
+            yield str(folder.relative_to(root)),row
+            with os.scandir(folder)as entries:
+                for entry in entries:
+                    tick();p=Path(entry.path);row=entry.stat(follow_symlinks=False)
+                    if stat.S_ISDIR(row.st_mode):
+                        if depth>=1:raise Refused('unexpected deep session input tree')
+                        yield from walk(p,depth+1)
+                    else:
+                        if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid():raise Refused('unowned/nonregular session input')
+                        yield str(p.relative_to(root)),row
+        yield from walk(root,0)
+    def unchanged(self,guard):
+        count=0;guard.check(preflight=True)
+        for i,root in enumerate(self.roots):
+            for rel,row in self._walk(root,guard):
+                old=self.db.execute('SELECT identity FROM pins WHERE root=? AND path=?',(i,rel)).fetchone()
+                if old is None or old[0]!=canonical(_session_stat(row)).decode():return False
+                count+=1
+        guard.check(preflight=True);return count==self.count
+    def close(self):
+        if self.db is not None:self.db.close();self.db=None
+        if self.path is not None:
+            for suffix in ('','-journal','-wal','-shm'):
+                try:Path(str(self.path)+suffix).unlink()
+                except FileNotFoundError:pass
+            self.path=None
+
+class PreparationSession:
+    """One prepare() call only; metadata pins never authorize native artifact use.
+
+    Cache only a full original passed, zero-build verification enclosed by stable
+    request/artifact metadata snapshots. Cold builds need a later zero-build pass.
+    A record phase invalidates immediately. Every reuse still resolves the actual
+    selected toolchain, checks authenticated binary pins and all input stat pins.
+    """
+    def __init__(self,private_tmp,*,clock=time.monotonic):
+        self.tmp=Path(private_tmp);self.clock=clock;self.snapshot=None;self.toolchain=None;self.summary=None;self.scope=None;self.environment=None
+        self.stats=dict(calls=0,full_builds=0,reuses=0,invalidations=0,metadata_entries=0,seconds=0.0,full_build_seconds=0.0,reuse_validation_seconds=0.0,events=[])
+    def invalidate(self,reason='explicit'):
+        if self.snapshot is not None:self.snapshot.close()
+        if self.summary is not None:self.stats['invalidations']+=1
+        self.snapshot=self.toolchain=self.summary=self.scope=self.environment=None
+        if len(self.stats['events'])<64:self.stats['events'].append(dict(state='invalidated',reason=reason))
+    def _tools_unchanged(self,toolchain,guard):
+        # Original fixed xcrun selector checks + original guard; no alternate tool.
+        toolchain.unchanged(guard)
+        pins=getattr(toolchain,'pins',{})
+        if set(pins)!={'metal','metallib','xcrun'}:return False
+        for row in pins.values():
+            p=Path(row['path'])
+            if p!=p.resolve(strict=True)or row.get('session_stat')!=_session_stat(p.stat()):return False
+        return True
+    def build(self,root,cohort,*,guard,toolchain_factory,enabled=False):
+        if not enabled:return dict(status='off',build_id=None,built=0,skipped=0)
+        started=self.clock();self.stats['calls']+=1;root=Path(root);scope=(str(root),cohort)
+        try:
+            guard.check(preflight=True)
+            if self.summary is not None and self.scope==scope:
+                lock=None
+                try:
+                    # Preserve the exact cohort builder exclusion during reuse.
+                    checked_root(root)
+                    lock=os.open(root/cohort/'artifacts/.builder.lock',os.O_RDWR|os.O_NOFOLLOW)
+                    row=os.fstat(lock)
+                    if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1:raise Refused('invalid session builder lock')
+                    fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                    if self._tools_unchanged(self.toolchain,guard)and self.toolchain.preparation_environment(guard)==self.environment and self.snapshot.unchanged(guard):
+                        self.stats['reuses']+=1;self.stats['reuse_validation_seconds']+=self.clock()-started
+                        return dict(self.summary,built=0,skipped=self.summary['requests'],results=[],session_reused=True,
+                                    session_verification='same-call-current-tools-sdk-os-and-authenticated-stat-pins')
+                except (OSError,ValueError,Refused)as error:
+                    if isinstance(error,Stopped):raise
+                finally:
+                    if lock is not None:os.close(lock)
+                self.invalidate('inputs-or-tools-changed')
+            elif self.summary is not None:self.invalidate('scope-changed')
+            self.stats['full_builds']+=1;actual=toolchain_factory();before=None;environment_before=None
+            session=self
+            class EnclosedToolchain:
+                def identify(self,inner_guard):
+                    nonlocal before,environment_before
+                    result=actual.identify(inner_guard)
+                    # Builder has already validated the request inventory, and will
+                    # now audit every source/receipt/library. Capture both sides of
+                    # that full pass. New artifact folders/builds are not memoized.
+                    roots=(root/cohort/'requests',root/cohort/'artifacts'/result[0])
+                    try:
+                        if not callable(getattr(actual,'preparation_environment',None)):return result
+                        environment_before=actual.preparation_environment(inner_guard)
+                        before=_SessionSnapshot(roots,session.tmp,inner_guard)
+                    except (OSError,ValueError,Refused)as error:
+                        if isinstance(error,Stopped):raise
+                    return result
+                def compile(self,*args,**kwargs):return actual.compile(*args,**kwargs)
+            try:
+                summary=build(root,cohort,enabled=True,guard=guard,toolchain=EnclosedToolchain())
+                self.stats['full_build_seconds']+=self.clock()-started
+                if summary.get('status')=='passed'and summary.get('built')==0 and summary.get('requests',0)>0 and before is not None:
+                    try:
+                        if self._tools_unchanged(actual,guard)and actual.preparation_environment(guard)==environment_before and before.unchanged(guard):
+                            self.snapshot=before;before=None;self.toolchain=actual;self.scope=scope;self.summary=dict(summary);self.environment=environment_before
+                            self.stats['metadata_entries']=self.snapshot.count
+                    except (OSError,ValueError,Refused)as error:
+                        if isinstance(error,Stopped):raise
+                        # Optional memo failure cannot replace the original full
+                        # audit result. It never supplies a synthetic passed result.
+                return dict(summary,session_reused=False)
+            finally:
+                if before is not None:before.close()
+        finally:self.stats['seconds']+=self.clock()-started
+    def close(self):
+        if self.snapshot is not None:self.snapshot.close()
+        self.snapshot=self.toolchain=self.summary=self.scope=self.environment=None
+
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--enable',action='store_true');parser.add_argument('--root');parser.add_argument('--cohort')

@@ -76,5 +76,9 @@
     "completed": 424,
     "excluded_geometry_session_chains": 5
   },
-  "game_aggregate": "game-integration-aggregate.json"
+  "game_aggregate": "game-integration-aggregate.json",
+  "session_reuse_game_passed": true,
+  "session_reuse_game_aggregate": "session-reuse-game-aggregate.json",
+  "session_audit_aggregate": "real-session-audit-aggregate.json",
+  "latest_qa_zip_sha256": "bf4f9ae57d11d017a5f08459b85e7178f6f34f496d056e011ef7d51bdc580e05"
 }
