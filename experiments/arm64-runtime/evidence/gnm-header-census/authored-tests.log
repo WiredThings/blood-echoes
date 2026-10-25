@@ -1,0 +1,19 @@
+test_authored_stages_and_relocations (test_gnm_shader_metadata.Tests.test_authored_stages_and_relocations) ... ok
+test_bad_payload_extent_rejected (test_gnm_shader_metadata.Tests.test_bad_payload_extent_rejected) ... ok
+test_default_comparison_preserves_modified_and_ambiguous_cases (test_gnm_shader_metadata.Tests.test_default_comparison_preserves_modified_and_ambiguous_cases) ... ok
+test_duplicate_binary_identity_rejected (test_gnm_shader_metadata.Tests.test_duplicate_binary_identity_rejected) ... ok
+test_elf_reconstruction_budget_precedes_original_loader (test_gnm_shader_metadata.Tests.test_elf_reconstruction_budget_precedes_original_loader) ... ok
+test_embedded_alignment_is_relative_to_header (test_gnm_shader_metadata.Tests.test_embedded_alignment_is_relative_to_header) ... ok
+test_embedded_copy_uses_outer_relocation (test_gnm_shader_metadata.Tests.test_embedded_copy_uses_outer_relocation) ... ok
+test_embedded_scan_uses_actual_elf_scope (test_gnm_shader_metadata.Tests.test_embedded_scan_uses_actual_elf_scope) ... ok
+test_mismatched_gs_copy_keeps_explicit_unassociated_record (test_gnm_shader_metadata.Tests.test_mismatched_gs_copy_keeps_explicit_unassociated_record) ... ok
+test_oversized_usage_and_semantics_rejected (test_gnm_shader_metadata.Tests.test_oversized_usage_and_semantics_rejected) ... ok
+test_properties_follow_runtime_rule (test_gnm_shader_metadata.Tests.test_properties_follow_runtime_rule) ... ok
+test_reject_relocated_or_wrong_code_pointer (test_gnm_shader_metadata.Tests.test_reject_relocated_or_wrong_code_pointer) ... ok
+test_stage_mismatch_rejected (test_gnm_shader_metadata.Tests.test_stage_mismatch_rejected) ... ok
+test_truncated_inputs_never_accept_incomplete_payload (test_gnm_shader_metadata.Tests.test_truncated_inputs_never_accept_incomplete_payload) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.006s
+
+OK

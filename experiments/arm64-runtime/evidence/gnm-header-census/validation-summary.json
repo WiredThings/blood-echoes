@@ -1,0 +1,158 @@
+{
+  "scan": {
+    "schema": 1,
+    "counts": {
+      "entries": 15323,
+      "accepted_headers": 22519,
+      "rejected_candidates": 0,
+      "unassociated_programs": 0,
+      "embedded_modules": 8
+    },
+    "stages": {
+      "fragment": 8029,
+      "vertex": 9833,
+      "export": 1736,
+      "local": 757,
+      "geometry": 1701,
+      "hull": 345,
+      "compute": 118
+    },
+    "unparsed_tail_sizes": {
+      "fragment:2": 4202,
+      "vertex:2": 4702,
+      "vertex:0": 5131,
+      "export:0": 1736,
+      "local:0": 757,
+      "geometry:0": 1701,
+      "hull:0": 345,
+      "compute:0": 118,
+      "fragment:0": 3827
+    },
+    "entries_without_header": {},
+    "package_receipts": [
+      {
+        "path": "dvdroot_ps4/shader/gxdecal.shaderbnd.dcx",
+        "sha256": "b07d5bcb1853ad541874f90527c699a3427cfb8f359c0544dbad76628380ef06"
+      },
+      {
+        "path": "dvdroot_ps4/shader/gxffxshader.shaderbnd.dcx",
+        "sha256": "c1a0e7bbdc244624bf0c945bb483cf577247eb890c3af45ec730d54630e3340a"
+      },
+      {
+        "path": "dvdroot_ps4/shader/gxflvershader.shaderbnd.dcx",
+        "sha256": "40edc29b23cb821d8d3e45a8e90755286fc4789d09d2de601b0396c1b86fc4d8"
+      },
+      {
+        "path": "dvdroot_ps4/shader/gxgui.shaderbnd.dcx",
+        "sha256": "6eed07f097bc0b6a53fbea1bfb9fee65559026fbb97508adb7d3608b6eebf2b3"
+      },
+      {
+        "path": "dvdroot_ps4/shader/gxposteffect.shaderbnd.dcx",
+        "sha256": "64f688aa99d97bb8261cff6e42c33692c1fe612e5d09f072c4c1e82fe8e6b03a"
+      },
+      {
+        "path": "dvdroot_ps4/shader/gxrenderershader.shaderbnd.dcx",
+        "sha256": "2d5f6d714c23e1e1411faa42c37a8f7e796c9dfb3947118508c214047411c9d6"
+      },
+      {
+        "path": "dvdroot_ps4/shader/gxshader.shaderbnd.dcx",
+        "sha256": "5ac010ca3f2cfa49bc1a27f74d3c8901999e9a366c1438cff394ac4ddda1c4a5"
+      },
+      {
+        "path": "eboot.bin",
+        "sha256": "d65f0b4f01d59166aed16f8604196d8b7dd805abbf0758b356e8f1354c9429f9",
+        "missing_optional_program_headers": [
+          9
+        ]
+      },
+      {
+        "path": "sce_module/libSceFace.prx",
+        "sha256": "89e134d3162323b29ad89c4af77b9db6501acca4ea382a3d62284c5e99584bd5",
+        "missing_optional_program_headers": [
+          7
+        ]
+      },
+      {
+        "path": "sce_module/libSceFios2.prx",
+        "sha256": "3b8eb4d5a5c5a7b381d8d0610077e6cd404c29695a686274802f6b2737f6bf22",
+        "missing_optional_program_headers": [
+          7
+        ]
+      },
+      {
+        "path": "sce_module/libSceHand.prx",
+        "sha256": "0ef7de31c741b20a50b641bdc576ff9df467509eb511e60cb43d7ee5f240b070",
+        "missing_optional_program_headers": [
+          7
+        ]
+      },
+      {
+        "path": "sce_module/libSceHeadTracker.prx",
+        "sha256": "2ebfb4c208c3fbdd38c5f7a0f95f50b682ce2126a539c9be3fb9792ad761e1cb",
+        "missing_optional_program_headers": [
+          7
+        ]
+      },
+      {
+        "path": "sce_module/libSceS3DConversion.prx",
+        "sha256": "86a854022a1ad1a2940787acd7e47c7a84e67148b2b641dba5452771506d20b9",
+        "missing_optional_program_headers": [
+          7
+        ]
+      },
+      {
+        "path": "sce_module/libSceSmart.prx",
+        "sha256": "43f433e5459033e201bea857002343bb2436c03c33401c4f0c938b3e197df1ab",
+        "missing_optional_program_headers": [
+          7
+        ]
+      },
+      {
+        "path": "sce_module/libc.prx",
+        "sha256": "4378b47f46f1d856824a6f971db1a0c3f41833b77f49d2fba9538f667a139166",
+        "missing_optional_program_headers": [
+          8
+        ]
+      }
+    ],
+    "elapsed_seconds": 1.6809335420839489,
+    "peak_rss_native_units": 668876800,
+    "qualification": "File register defaults and semantic metadata only; no full runtime/PSO coverage claim. No game payload or compiled output emitted."
+  },
+  "runtime_comparison": {
+    "schema": 1,
+    "static_header_records": 22519,
+    "static_program_stage_pairs": 8915,
+    "counts": {
+      "metadata_records": 8036,
+      "with_static_header": 8036,
+      "one_default_variant_matches": 5809,
+      "defaults_require_modification": 2227
+    },
+    "distinct_matched_serialized_specs": 523,
+    "mismatching_fields": {
+      "vertex.num_input_vgprs": 2083,
+      "export.num_input_vgprs": 48,
+      "local.num_input_vgprs": 96
+    },
+    "distinct_specs_with_mismatching_field": {
+      "vertex.num_input_vgprs": 141,
+      "export.num_input_vgprs": 3,
+      "local.num_input_vgprs": 6
+    },
+    "default_variant_counts": {
+      "1": 8036
+    },
+    "header_metadata_sha256": "caa0259873d96a84d7953cdeae10ce48a3b7ab9e7f773e294e225f2c11ce6ecf",
+    "qualification": "Field comparison of already decoded metadata. Duplicate cache records counted explicitly. Static defaults may be modified by fetch/draw setup. Matching program hashes with multiple code digests remain ambiguous; no native loads, full-PSO completeness or cache merge approval."
+  },
+  "tests_exit": 0,
+  "source_sha256": {
+    "tools/gnm_shader_metadata.py": "4fc91132d4abd974391e83e1cbb67385b05fcd9c0124460c2b311e355047e634",
+    "tools/compare_gnm_runtime_metadata.py": "eb80e17edc9729f763633eec8916b43d4def405c117b65b455bf017f22d758ab",
+    "tests/test_gnm_shader_metadata.py": "4d7e962d651432d692f367ae58cc0fcf40c277bd50707dfc287f8bb8837354f1"
+  },
+  "game_started": false,
+  "native_cache_walker_executed": false,
+  "formal_data_modified": false
+}
