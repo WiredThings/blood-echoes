@@ -1,0 +1,307 @@
+{
+  "schema": 1,
+  "status": "read-only-stage-attribution-not-root-cause",
+  "initial_report_comparison": {
+    "0": {
+      "category_snapshots_equal": true,
+      "metal_allocated_equal": true,
+      "owned_equal": true,
+      "guest_alias_capacity_equal": true,
+      "unclassified_metal_equal": true
+    },
+    "1": {
+      "category_snapshots_equal": true,
+      "metal_allocated_equal": true,
+      "owned_equal": true,
+      "guest_alias_capacity_equal": true,
+      "unclassified_metal_equal": true
+    }
+  },
+  "cold_initial_categories_equal_previous": true,
+  "cases": {
+    "previous_warm": {
+      "ready_seconds": 324.5450588329695,
+      "stop": "time budget",
+      "first_gpu_seconds": 309.1749933329411,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 7248.6875
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 7257.6875
+      },
+      "pressure_transitions": [
+        {
+          "seconds": 0.001949166995473206,
+          "relative_to_first_gpu": -309.1730441659456,
+          "pressure": 1,
+          "swap_mib": 7248.6875,
+          "process_usage": []
+        },
+        {
+          "seconds": 324.5450588329695,
+          "relative_to_first_gpu": 15.370065500028431,
+          "pressure": 2,
+          "swap_mib": 7248.6875,
+          "process_usage": [
+            {
+              "role": "bb-probe-metal",
+              "footprint_bytes": 3166709744,
+              "resident_bytes": 3027042304,
+              "cpu_user_ns": 64493645458,
+              "cpu_system_ns": 19068104208,
+              "cpu_user_ticks": 1547847491,
+              "cpu_system_ticks": 457634501,
+              "pageins": 846
+            },
+            {
+              "role": "bb-gpu",
+              "footprint_bytes": 2441333544,
+              "resident_bytes": 548405248,
+              "cpu_user_ns": 3386153541,
+              "cpu_system_ns": 2171163416,
+              "cpu_user_ticks": 81267685,
+              "cpu_system_ticks": 52107922,
+              "pageins": 4357
+            }
+          ]
+        }
+      ],
+      "process_peaks": {
+        "bb-probe-metal": {
+          "seconds": 373.92807574989274,
+          "footprint_bytes": 3525339240,
+          "resident_at_footprint_peak_bytes": 3118514176
+        },
+        "bb-gpu": {
+          "seconds": 374.9567148749484,
+          "footprint_bytes": 2961509352,
+          "resident_at_footprint_peak_bytes": 729645056
+        }
+      }
+    },
+    "current_cold": {
+      "ready_seconds": null,
+      "stop": "unexpected >1GiB swap growth within5s",
+      "first_gpu_seconds": 419.60290775005706,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6745.625
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 8431.25
+      },
+      "pressure_transitions": [
+        {
+          "seconds": 0.0017821250949054956,
+          "relative_to_first_gpu": -419.60112562496215,
+          "pressure": 1,
+          "swap_mib": 6745.625,
+          "process_usage": []
+        },
+        {
+          "seconds": 423.161179458024,
+          "relative_to_first_gpu": 3.5582717079669237,
+          "pressure": 2,
+          "swap_mib": 6920.0,
+          "process_usage": [
+            {
+              "role": "bb-probe-metal",
+              "footprint_bytes": 690083888,
+              "resident_bytes": 515768320,
+              "cpu_user_ns": 68696913416,
+              "cpu_system_ns": 16761738833,
+              "cpu_user_ticks": 1648725922,
+              "cpu_system_ticks": 402281732,
+              "pageins": 656
+            },
+            {
+              "role": "bb-gpu",
+              "footprint_bytes": 977995504,
+              "resident_bytes": 163594240,
+              "cpu_user_ns": 1211193125,
+              "cpu_system_ns": 683303250,
+              "cpu_user_ticks": 29068635,
+              "cpu_system_ticks": 16399278,
+              "pageins": 5057
+            }
+          ]
+        },
+        {
+          "seconds": 423.4274265000131,
+          "relative_to_first_gpu": 3.8245187499560416,
+          "pressure": 4,
+          "swap_mib": 7497.75,
+          "process_usage": [
+            {
+              "role": "bb-probe-metal",
+              "footprint_bytes": 721803408,
+              "resident_bytes": 520454144,
+              "cpu_user_ns": 68831524500,
+              "cpu_system_ns": 16794814458,
+              "cpu_user_ticks": 1651956588,
+              "cpu_system_ticks": 403075547,
+              "pageins": 656
+            },
+            {
+              "role": "bb-gpu",
+              "footprint_bytes": 1045841696,
+              "resident_bytes": 103940096,
+              "cpu_user_ns": 1216593958,
+              "cpu_system_ns": 815313041,
+              "cpu_user_ticks": 29198255,
+              "cpu_system_ticks": 19567513,
+              "pageins": 5104
+            }
+          ]
+        }
+      ],
+      "process_peaks": {
+        "bb-probe-metal": {
+          "seconds": 423.6798337500077,
+          "footprint_bytes": 757356688,
+          "resident_at_footprint_peak_bytes": 558694400
+        },
+        "bb-gpu": {
+          "seconds": 423.6798337500077,
+          "footprint_bytes": 1141737272,
+          "resident_at_footprint_peak_bytes": 107397120
+        }
+      }
+    },
+    "current_warm": {
+      "ready_seconds": 248.82066133292392,
+      "stop": "time budget",
+      "first_gpu_seconds": 234.43600045796484,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 8407.25
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9263.875
+      },
+      "pressure_transitions": [
+        {
+          "seconds": 0.0024460419081151485,
+          "relative_to_first_gpu": -234.43355441605672,
+          "pressure": 1,
+          "swap_mib": 8407.25,
+          "process_usage": []
+        },
+        {
+          "seconds": 238.25988129200414,
+          "relative_to_first_gpu": 3.8238808340393007,
+          "pressure": 2,
+          "swap_mib": 8399.25,
+          "process_usage": [
+            {
+              "role": "bb-probe-metal",
+              "footprint_bytes": 698489048,
+              "resident_bytes": 605749248,
+              "cpu_user_ns": 47301334041,
+              "cpu_system_ns": 9428056250,
+              "cpu_user_ticks": 1135232017,
+              "cpu_system_ticks": 226273350,
+              "pageins": 686
+            },
+            {
+              "role": "bb-gpu",
+              "footprint_bytes": 1103873872,
+              "resident_bytes": 165543936,
+              "cpu_user_ns": 1210434416,
+              "cpu_system_ns": 696033583,
+              "cpu_user_ticks": 29050426,
+              "cpu_system_ticks": 16704806,
+              "pageins": 2577
+            }
+          ]
+        },
+        {
+          "seconds": 243.90806683292612,
+          "relative_to_first_gpu": 9.472066374961287,
+          "pressure": 4,
+          "swap_mib": 8474.0625,
+          "process_usage": [
+            {
+              "role": "bb-probe-metal",
+              "footprint_bytes": 1474732432,
+              "resident_bytes": 1350451200,
+              "cpu_user_ns": 55382152791,
+              "cpu_system_ns": 10132990166,
+              "cpu_user_ticks": 1329171667,
+              "cpu_system_ticks": 243191764,
+              "pageins": 691
+            },
+            {
+              "role": "bb-gpu",
+              "footprint_bytes": 1936607488,
+              "resident_bytes": 408616960,
+              "cpu_user_ns": 2009849166,
+              "cpu_system_ns": 1331475041,
+              "cpu_user_ticks": 48236380,
+              "cpu_system_ticks": 31955401,
+              "pageins": 2713
+            }
+          ]
+        },
+        {
+          "seconds": 244.68450179195497,
+          "relative_to_first_gpu": 10.248501333990134,
+          "pressure": 2,
+          "swap_mib": 8670.0625,
+          "process_usage": [
+            {
+              "role": "bb-probe-metal",
+              "footprint_bytes": 1655038664,
+              "resident_bytes": 1543929856,
+              "cpu_user_ns": 57026466791,
+              "cpu_system_ns": 10356704958,
+              "cpu_user_ticks": 1368635203,
+              "cpu_system_ticks": 248560919,
+              "pageins": 691
+            },
+            {
+              "role": "bb-gpu",
+              "footprint_bytes": 1946847488,
+              "resident_bytes": 435879936,
+              "cpu_user_ns": 2193761833,
+              "cpu_system_ns": 1453395833,
+              "cpu_user_ticks": 52650284,
+              "cpu_system_ticks": 34881500,
+              "pageins": 2715
+            }
+          ]
+        }
+      ],
+      "process_peaks": {
+        "bb-probe-metal": {
+          "seconds": 329.5588999169413,
+          "footprint_bytes": 3506989232,
+          "resident_at_footprint_peak_bytes": 3120775168
+        },
+        "bb-gpu": {
+          "seconds": 300.7924434170127,
+          "footprint_bytes": 2781629416,
+          "resident_at_footprint_peak_bytes": 677838848
+        }
+      }
+    }
+  },
+  "limitations": [
+    "category log batches do not include timestamps",
+    "system-wide VM and unrelated-process samples unavailable",
+    "process footprint sum is not deduplicated physical memory",
+    "no proof of a resource leak or no regression"
+  ],
+  "game_started": false,
+  "formal_data_modified": false
+}

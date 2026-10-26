@@ -1,0 +1,308 @@
+{
+  "schema": 1,
+  "status": "four-exact-source-identities-and-twelve-final-artifact-paths-verified",
+  "runtime_source_api": {
+    "calls": 4,
+    "failed": 0,
+    "api_ms": 3.035,
+    "aggregated_frame_ms": 269.29,
+    "per_call_key_timestamps_recorded": false
+  },
+  "builder": {
+    "requests": 449,
+    "built": 0,
+    "requests_after_game": 453
+  },
+  "new_library_requests": [
+    {
+      "key": "5783c2d3c9651a29c54a41c41191f38bc8d9210243d58542d43d546e24ae9ee3",
+      "source_sha256": "fa8432d3edc540e23c948ab370d8f5e0f3006e98d0db4e85a07b6c2b0ed9f117",
+      "source_header": "tiling_macro_64_comp_msl.h",
+      "variant": "original",
+      "source_bytes": 25238,
+      "entry": "main0"
+    },
+    {
+      "key": "3931c58866e2635c4310839070f8b9e2f90dd822cdef378f01988d9131632870",
+      "source_sha256": "9b9411d8714cc4af335642674a427576a72c2de1296d7f417598523ec1cdbd3f",
+      "source_header": "tiling_macro_32_comp_msl.h",
+      "variant": "TextureTilingSource-float",
+      "source_bytes": 25789,
+      "entry": "main0"
+    },
+    {
+      "key": "af6a6bd356a1296be6d882f77cbaf099930ee8d1bcef52eabfe73d6c640c471c",
+      "source_sha256": "a56d5104e19f4eb99a0fef3f7f111df990496a0dc163b43211e971d8ef51fc79",
+      "source_header": "tiling_macro_16_comp_msl.h",
+      "variant": "original",
+      "source_bytes": 25241,
+      "entry": "main0"
+    },
+    {
+      "key": "2e0449cfb32ac76f19fa8fb24f5c738e6eecaca697e9df1bc466fd42ece9ce56",
+      "source_sha256": "1cc7188bb55157dd0ffc8f6abc40dfac9cc520eba3145016b99c6fadb9614e83",
+      "source_header": "tiling_macro_64_comp_msl.h",
+      "variant": "TextureTilingSource-half",
+      "source_bytes": 26252,
+      "entry": "main0"
+    }
+  ],
+  "twelve_final_artifacts": [
+    {
+      "recipe_prefix": "3ac2b5792229",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "aee5541f85f0",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "8bb37092b01e",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "a35013ba67cd",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "9019d20b9016",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "a573afa78616",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "6914b9c7ff3f",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "d80a0c0b0493",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "785c3faebb33",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "4783e5fd01d7",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "75a2acd5aaeb",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    },
+    {
+      "recipe_prefix": "2a2bc2af0d09",
+      "first_status": "deferred",
+      "first_functions_local": true,
+      "first_source_fallback": false,
+      "final_status": "native-ready-see-actual-artifact-counts-and-events",
+      "final_counts": {
+        "attempts": 1,
+        "built": 1,
+        "compile_attempts": 1,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0,
+        "unavailable": 0
+      },
+      "runtime_same_key_hit": true,
+      "qualification": "original WarmUp before GPU ready; not actual draw proof"
+    }
+  ],
+  "static_library_domain": {
+    "original": 12,
+    "texture_rewrites": 2,
+    "total": 14,
+    "original_bits": [
+      8,
+      16,
+      32,
+      64,
+      96,
+      128
+    ],
+    "original_macro": [
+      false,
+      true
+    ],
+    "texture_bits": [
+      32,
+      64
+    ],
+    "source_total_bytes": 281323,
+    "maximum_single_source_bytes": 26252,
+    "implemented": false,
+    "full_final_pso_coverage": false
+  },
+  "source_api_is_not_entire_frame_time": true,
+  "game_started": false,
+  "formal_data_modified": false
+}

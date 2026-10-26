@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "scope": "last-30-seconds-stationary-only",
+  "one_percent_low_definition": "1000 / mean(frame_ms of ceil(N * 0.01) slowest frames)",
+  "matched_system_conditions": false,
+  "overlapping_wait_fields_must_not_be_summed": true,
+  "measurements": {
+    "previous_warm": {
+      "frames": 1457,
+      "slowest_one_percent_frames": 15,
+      "fps": 48.544012794029456,
+      "one_percent_low_fps": 40.98024752069502,
+      "p95_ms": 21.52,
+      "p99_ms": 22.67,
+      "max_frame_ms": 29.03,
+      "timing_means_ms": {
+        "gpu_ms": 19.413644474948523,
+        "rec_busy_ms": 6.684274536719286,
+        "gpu_wait_ms": 0.0002374742621825669,
+        "replay_wait_ms": 0.6374399450926561,
+        "present_wait_ms": 0.0,
+        "gnm_wait_ms": 0.0,
+        "submit_age_ms": 0.04753946465339739,
+        "ready_age_ms": 0.006256691832532601,
+        "guest_age_ms": 0.0
+      }
+    },
+    "current_warm": {
+      "frames": 1469,
+      "slowest_one_percent_frames": 15,
+      "fps": 48.93467969770427,
+      "one_percent_low_fps": 45.3898992344237,
+      "p95_ms": 21.13,
+      "p99_ms": 21.57,
+      "max_frame_ms": 23.24,
+      "timing_means_ms": {
+        "gpu_ms": 19.18583390061266,
+        "rec_busy_ms": 6.622065350578625,
+        "gpu_wait_ms": 0.00018584070796460176,
+        "replay_wait_ms": 0.6716324029952349,
+        "present_wait_ms": 0.0,
+        "gnm_wait_ms": 0.0,
+        "submit_age_ms": 0.04735534377127298,
+        "ready_age_ms": 0.0063315180394826415,
+        "guest_age_ms": 0.0
+      }
+    }
+  }
+}

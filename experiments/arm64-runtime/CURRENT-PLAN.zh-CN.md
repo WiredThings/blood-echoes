@@ -289,3 +289,13 @@ handle15658 terminal passed：P/evidence/launcher-engine-abba-179297535583002000
 真实冷准备404/404、record404、首审1/最终build1、385.63秒，准备swap0；随后的加载触发既有5秒swap增长保护，未取得冷场景结果。暖准备416/416、record0、175.27秒；原入口暖场景90秒通过，48.935FPS/p95 21.13/p99 21.57ms，合并footprint5851.3MiB（不去重），全程swap+856.625MiB、短暂压力4但不持续。GPU ready后Source4/3.035ms、最后30秒计数0；不是全驱动编译0，也不是已证FPS提升/内存达标。详docs/fixed-helper-startup.zh-CN.md和公开summary/warm-scene。
 
 剩余：匹配性能/峰值内存对照和瞬态严重压力归因、全游戏完整PSO状态目录和静态可确定调用的持续覆盖、3个signal/context入口、干净源码ARM构建、CPU/GPU及FEX专用化、硬件TSO准入。白模已确认风险的回写生命周期收口不再扩大；死亡/在线/菜单实测继续暂缓。正式app/data/cache/Release不动。整个目标仍active，不能以本轮准备通过标完成。
+
+## 2026-10-26 残余建库和加载压力只读归因
+
+四个新增schema2 helper库请求已与实际完整generated header及原TextureTilingSource变换逐source SHA匹配：macro16、macro64、texture macro32/64。首次GPUready后Source4/3.035ms为聚合计数，缺逐API key/time，不能将269.29ms整帧归因为3ms编译。十二条collected-local-inputs首次函数已Local且无source fallback，第二遍Built、随后原WarmUp同key Hit；缺的是最终PSO，非十二份MSL库。详docs/tiling-library-coverage.zh-CN.md。源码可确定14个tiling库有限域，下一实现应逐条沿原工厂默认首启收集，不靠历史、不硬编码本次hash；最终typed constants目录另行合法过滤和去重，不能把理论上界充作游戏全集。尚未改C++。
+
+加载压力首次出现均在原生GPU游戏宿主启动后，非已完成的目录准备阶段。旧/新开头两组八类资源全部字段、metal/owned/alias/unclassified统计完全相同。现有数据不显示新大块类别保留，但没有全系统VM/其它进程同刻明细，不能称已排除回归/泄漏或锁定后台原因。不得因此缩缓存或改回收；下一内存诊断复用NativeVMObserver。详docs/startup-memory-attribution.zh-CN.md。只读重算暖态1%low旧40.98、新45.39（各最慢15帧均值倒数），非匹配系统ABBA，不声明收益。
+
+新QA包中央目录854条，未包含AIR/metallib/binaryarchive/SPV/游戏payload或savedata；仍host-local。当前在同一QA包做下一暖重启，只让已有builder消费4新请求，验证Source4→0；保持原保护、静音、无Cua/录屏/角色动作。该结果后补，不以意图当通过。
+
+以上最小复测已完成：Shared launcher-engine-abba-1792984355921423000，原builder453条/449 verified skipped/4 built与既知四key逐一相符；目录424/424/record0。GPUready后Source4→0、Local7→11，strict13/13、ordinaryrender/compute各1。90秒站桩48.510FPS/p95 21.36/p99 21.72，1%low44.20；combinedfootprint5816.26MiB，maxpressure2、swap+373.06。无匹配系统A/B，不说FPS或内存收益；14库静态首启入口仍未实现。只改了新QA缓存中的正常建库产物，没有运行时代码或正式数据改动。
