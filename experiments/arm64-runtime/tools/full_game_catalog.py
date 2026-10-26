@@ -38,7 +38,7 @@ def project_root(explicit=None):
  if explicit is not None:candidates=[Path(explicit).resolve(strict=True)]
  else:candidates=[Path(__file__).resolve().parents[1],*Path(__file__).resolve().parents]
  for root in candidates:
-  if(root/'tools/game_shader_catalog.py').is_file()and(root/'vendor/blood_echoes/loader/prepare.py').is_file():return root
+  if any((root/name/'game_shader_catalog.py').is_file()for name in('tools','native-runtime-tools'))and(root/'vendor/blood_echoes/loader/prepare.py').is_file():return root
  raise ScanError('vendored tools/game_shader_catalog.py and vendor/blood_echoes/loader/prepare.py required; select --prototype')
 def readat(d,o,n):
  need(isinstance(o,int) and isinstance(n,int) and 0<=o<=len(d) and 0<=n<=len(d)-o,'span out of bounds')
@@ -161,7 +161,8 @@ class Scanner:
  def __init__(self,root,prior,out,p=None):
   p=project_root(p)
   need(out.is_dir()and not any(out.iterdir()),'fresh empty output directory required')
-  sys.path.insert(0,str(p/'tools'));import game_shader_catalog as g
+  tool_root=next(p/name for name in('native-runtime-tools','tools')if(p/name/'game_shader_catalog.py').is_file())
+  sys.path.insert(0,str(tool_root));import game_shader_catalog as g
   loader=p/'vendor/blood_echoes/loader/prepare.py';sys.path.insert(0,str(loader.parent));spec=importlib.util.spec_from_file_location('_catalog_self_loader_'+hashlib.sha256(str(loader).encode()).hexdigest()[:12],loader);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
   self.g=g;self.parse_self=module.parse_self;self.root=root;self.out=out;self.p=p
   self.prior=json.loads(prior.read_text());need(Path(self.prior['game_root'])==root,'catalog root mismatch')

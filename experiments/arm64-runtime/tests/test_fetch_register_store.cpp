@@ -20,6 +20,7 @@ Environment Env(){Environment e;for(auto*d:{&e.game,&e.compiler,&e.abi,&e.compil
 void File(const std::filesystem::path&p,std::string_view text,mode_t mode=0600){std::ofstream f(p,std::ios::binary);f<<text;f.close();chmod(p.c_str(),mode);}
 std::vector<std::byte>Bytes(const std::filesystem::path&p){std::ifstream f(p,std::ios::binary);std::string s((std::istreambuf_iterator<char>(f)),{});std::vector<std::byte>b(s.size());std::memcpy(b.data(),s.data(),s.size());return b;}
 bool CancelAfterWrite(void*p)noexcept{return ++*static_cast<int*>(p)>=2;}
+template<class Snapshot>void ProjectionBoundary(Snapshot s,const Environment&e){if constexpr(requires{s.fetch_projection;}){s.fetch_projection.emplace();Reject([&]{FromSnapshot(s,e);},"raw store refuses a semantic projection instead of losing its dynamic budget");}}
 }
 int main(int argc,char**argv){try{
  Check(argc==2,"private authored root argument");std::filesystem::path root=std::filesystem::canonical(argv[1]);chmod(root.c_str(),0700);auto s=Snapshot();auto environment=Env();auto r=FromSnapshot(s,environment);auto bytes=Encode(r);
@@ -27,6 +28,7 @@ int main(int argc,char**argv){try{
  Check(r.reads[0].words==std::array<uint32_t,4>{0x01234567,0x89ABCDEF,0x10203040,0x50607080},"all16 original Buffer bytes retained");
  Check(r.expected.profile[72]==1&&r.expected.profile[73]==1,"current relaxed float and two-level Profile fields");
  Check(r.expected.attributes[0].fields==std::array<uint8_t,9>{0,4,3,2,0,0,7,11,4},"all9 fetch fields retained");
+ ProjectionBoundary(s,environment);
  auto restored=s;restored.register_reads.clear();RestoreSnapshotReads(restored,r,r.expected);Check(restored.register_reads.size()==1&&std::memcmp(&restored.register_reads[0].buffer,&s.register_reads[0].buffer,16)==0,"reader restores exact owned descriptor");
  {auto bad=s;bad.register_reads.clear();Reject([&]{FromSnapshot(bad,environment);},"missing read refused");}
  {auto bad=s;bad.register_reads[0].dword_offset=4;Reject([&]{FromSnapshot(bad,environment);},"extraneous read refused");}

@@ -58,6 +58,10 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
     """One startup-only preparation; imports and toolchain work stay out of draws."""
     project = Path(project).resolve(strict=True)
     env = dict(environment)
+    # A prior F3 child/cohort must not authorize capture for this new selection.
+    # Only the current verified source/DSO preparation can supply these again.
+    for key in ('BB_FETCH_CAPTURE_ROOT','BB_FETCH_CAPTURE_GAME_ROOT'):
+        env.pop(key, None)
     explicit = env.get('BB_MTL_LOCAL_AOT_MODE')
     if explicit == 'off':
         return env, dict(status='off', requested='off', builder_invoked=False)
@@ -135,6 +139,10 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
             from launcher_game_pso import prepare as game_prepare
         game_report = game_prepare(project=project, execution_root=code_root,
             arguments=arguments, environment=env, cohort=cohort, options=options, observe=observe)
+        capture = game_report.get('capture_environment', {})
+        if set(capture)-{'BB_FETCH_CAPTURE_ROOT','BB_FETCH_CAPTURE_GAME_ROOT'}:
+            raise ValueError('unexpected runtime capture environment')
+        env.update(capture)
         # Candidate record requests may have extended this cohort. Reuse the
         # same policy to get the latest validated final exec build identity.
         if 'preparation' in game_report:

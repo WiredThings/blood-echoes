@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "status": "source-closure-and-authored-contract-passed",
+  "runtime_algorithm_shared": true,
+  "algorithm_comparison": {
+    "base_commit": "c0815c81585782825fa212c20562a1e1bd0aed3d",
+    "base_method_sha256": "630f5018775a18f929b40feaed514cbc26e6b77ff26ccb6fb68ee64eca20aecc",
+    "same_after_declared_handle_and_wrapper_substitutions": true
+  },
+  "source_sha256": {
+    "src/game_pso_preparer.mm": "340ef64b401092e8d7e7bf60d6f7b5c41e55c4a6da69ce00321d268c5ca3399b",
+    "tests/metal/test_geometry_pso_contract.mm": "3fab908127789a6e87691b3531643e0892286c53a636604662a88f8b7e08c10e",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_cached_variants.h": "d06d3272fd7ef3060c415f75ff88fe3979a79a7b5988f2b2a8bd3cc83e0fe7d4",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_pipeline_cache.mm": "06b317aa616e6919427166f2f9f3ff561fbc9efe42f8ed4a3c64bcbf40d972e8"
+  },
+  "syntax_checks": [
+    {
+      "label": "worker-syntax",
+      "exit": 0,
+      "seconds": 2.866873749997467
+    },
+    {
+      "label": "runtime-syntax",
+      "exit": 0,
+      "seconds": 1.8780367920408025
+    }
+  ],
+  "author_control": {
+    "status": "passed",
+    "checks": 47,
+    "GPU_started": false,
+    "GCN_translated": false,
+    "authored_contract_only": true
+  },
+  "native_test_dependencies": [
+    "\t/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation (compatibility version 300.0.0, current version 5027.0.69)",
+    "\t/usr/lib/libobjc.A.dylib (compatibility version 1.0.0, current version 228.0.0)",
+    "\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 2200.27.0)",
+    "\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1359.0.0)",
+    "\t/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 5027.0.69)"
+  ],
+  "execution_root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/geometry-pso-source-final-1793003873799047000",
+  "raw_result_sha256": "05140a96542a7f3e20df39f95cbf74ed47b9b16d8a9a983b3027d283a810d0b8",
+  "GPU_started": false,
+  "game_started": false,
+  "real_GCN_retranslation_performed": false,
+  "GS_pipeline_count_native_validated": 0,
+  "known_77_pipelines_not_claimed_prepared": true,
+  "packet_schema": 2,
+  "geometry_pso_schema": 1,
+  "old_packet_schema1_retains_GS_rejection": true,
+  "source_only_packet_proof_requires_controller_actual_CPU_and_compiler_DSO_admission": true,
+  "formal_data_modified": false,
+  "quality_changed": false,
+  "ordinary_ES_status_gate_unchanged": true,
+  "geometry_ES_plain_failure_matches_runtime_variants_only": true,
+  "GS_debug_actual_fragment_origin_reported": true
+}

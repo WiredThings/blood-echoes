@@ -18,7 +18,8 @@ size_t WordsBytes(size_t words) {
 size_t CompileSnapshot::SizeBytes() const {
     return sizeof(*this) + (code.size() + user_data.size() + flat.size() + walker.size() +
            gs_copy.size()) * sizeof(u32) + register_reads.size() * sizeof(RegisterRead) +
-           (fetch ? fetch->attributes.size() * sizeof(Gcn::VertexAttribute) : 0);
+           (fetch ? fetch->attributes.size() * sizeof(Gcn::VertexAttribute) : 0) +
+           (fetch_projection ? fetch_projection->attributes.capacity()*sizeof(FetchAttributeProjection) : 0);
 }
 
 std::optional<CompileSnapshot> CompileSnapshot::Capture(
@@ -113,6 +114,27 @@ Info CompileSnapshot::MakeInfo() const {
         (hw_stage == HwStage::Fragment && runtime.hw.fs.motion_vectors) || SizeBytes() > MaxBytes) {
         throw std::runtime_error{"invalid owned shader inputs"};
     }
+    if(fetch_projection) {
+        const auto& p=*fetch_projection;
+        if(!fetch||!register_reads.empty()||sw_stage!=SwStage::Vertex||
+           (hw_stage!=HwStage::Vertex&&hw_stage!=HwStage::Local)||
+           p.attributes.empty()||p.attributes.size()>MaxFetchAttributes||
+           p.attributes.size()!=fetch->attributes.size()||p.code_size!=fetch->size||
+           p.vertex_offset_sgpr!=fetch->vertex_offset_sgpr||
+           p.instance_offset_sgpr!=fetch->instance_offset_sgpr)
+            throw std::runtime_error{"invalid explicit fetch projection domain"};
+        for(size_t i=0;i<p.attributes.size();++i) {
+            const auto& a=p.attributes[i];
+            if(!SameFetchFields(a.attribute,fetch->attributes[i])||!a.nonnull||
+               a.attribute.semantic!=i||u32(a.number_class)>u32(AmdGpu::NumberClass::Uint)||
+               u32(a.read_number_conversion)>u32(AmdGpu::NumberConversion::SrgbToNorm))
+                throw std::runtime_error{"invalid explicit fetch projection attribute"};
+            for(const auto value:a.effective_dst_select.array) {
+                const auto v=u8(value);
+                if(!(v<=1||(v>=4&&v<=7)))throw std::runtime_error{"invalid explicit fetch projection component"};
+            }
+        }
+    }
     Info result;
     result.hw_stage = hw_stage; result.sw_stage = sw_stage; result.pgm_hash = hash;
     result.pgm_base = program_base; result.user_data = user_data;
@@ -120,6 +142,19 @@ Info CompileSnapshot::MakeInfo() const {
     // Fetch parsing in the translator sets the SGPR itself; the emitter also uses ParseFetchShader.
     result.has_fetch_shader = bool(fetch);
     return result;
+}
+
+const FetchAttributeProjection* QueryFetchCompileProjection(
+    const Info& info,const Gcn::VertexAttribute& attribute) {
+    if(!info.compile_snapshot||!info.compile_snapshot->fetch_projection)return nullptr;
+    const auto& p=*info.compile_snapshot->fetch_projection;
+    if(attribute.semantic>=p.attributes.size()||
+       !SameFetchFields(p.attributes[attribute.semantic].attribute,attribute))
+        throw std::runtime_error{"explicit fetch projection query has no exact entry"};
+    return &p.attributes[attribute.semantic];
+}
+bool HasFetchCompileProjection(const Info& info) {
+    return info.compile_snapshot&&info.compile_snapshot->fetch_projection.has_value();
 }
 
 void CompileSnapshot::ValidateSrt(std::span<const u32> generated,

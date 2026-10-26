@@ -13,11 +13,13 @@
 | 原 final-exec/cohort | `launcher_local_aot`、`warm_archive_manifest` | 保留原参数、语言、联网、F3 和退出码语义 |
 | 旧观察输入转换 | 原 canonical metadata/key/profile reader、owned module consumer、fetch projection、owned GS | 通用 module controller 自动分类；不能证明的组合记缺口，不能猜描述符 |
 | Metal 本机库/PSO | 原 local builder、`prepare_game_psos`、`game_pso_queue`、runtime `ShaderCompiler`/`PsoCache` | GS 使用同一队列、共享 Geometry 算法、相同实际缓存目录与 cohort |
-| 动态补齐 | 原 Parse/GetSharp/StageSpec/CompileModule 已发生的读取 | 完整 companion 与 stage/key 封口正在接入；暖缓存命中也必须覆盖，不能靠清缓存触发 |
+| 动态补齐 | 原 Parse/GetSharp/StageSpec/CompileModule 已发生的读取 | 新编译与暖命中已接单 blob／真实stage-permutation封口，CPU及实际TU控制通过；typed消费原生10项通过；尚未验证真实游戏命中 |
 
 ## 静态入口的增量与保护
 
-`launcher_game_pso.prepare` 在已验证实际 renderer/worker 同 DSO、TITLE_ID 和隔离 GPU 根后，先执行默认静态入口，再枚举原观察缓存。空缓存也会扫描，而不是直接返回空目录。
+`launcher_game_pso.prepare` 在已验证实际 renderer/worker 同 DSO及隔离 GPU 根后，复用原 Mod 合并算法核对实际 final app0，再用 APFS clonefile 产生只读普通文件视图。TITLE_ID 用原 SFO reader读取同字节视图；游戏 final exec仍用原 app0。接着执行默认静态入口，再枚举原观察缓存。空缓存也会扫描，而不是直接返回空目录。
+
+新增源视图严格核对原 Mod 选择/优先级、社区汉化last-mod、实际虚拟文件名与canonical来源；不会盲随未知链接，不用hardlink，不在CoW失败时默默全量copy。冷发布前重核完整源内容读集，暖采用也拒绝快照新增/缺失文件。原CLI相对路径和默认`../CUSA03173`按原脚本语义规范化，严格reader不放宽。源视图16项作者控制包含真实APFS clonefile、原mods合并、并发源修改/新增文件反例；不等于真实游戏运行验证。
 
 每代索引以实际游戏文件内容摘要和扫描算法身份寻址；文件新增、删除、内容修改以及扫描器变更都会失效。原 native enum 与原 SELF loader 也纳入算法身份。编译器、设备、补丁、选项变化由原 cohort 独立管理，不把静态索引身份充作运行时管线键。
 
@@ -29,10 +31,10 @@
 
 ## 尚未闭合
 
-1. 完整动态 companion 的新编译及暖命中封口、真实 stage/permutation/PSO 关联、自动 receipt 配置与消费。
-2. 通用 module controller 和 GS assembler 的最终接线、真实 capability/同 DSO 准入；不能使用 targeted override 的结果冒充 coherent 组件。
-3. 当前全部源码 coherent 构建，以及原打包工具纳入扫描器、原 loader、module consumer 和 capability。缺组件必须明确 unavailable，不能伪造“已准备”。
-4. 隔离新安装/冷暖启动、版本失效、实际 Local/PSO 命中、现场编译/长帧、启动时间和峰值/常驻内存的统一验收。
+1. typed companion原生10项正反例已通过（含实际自造GCN重译与完整特化/SPIR-V逐字节对照），helper异常处理已修复。新编译/暖命中封口已接源码并通过CPU与实际TU控制，但不能据此宣称游戏闭环通过。
+2. 通用controller、GS同队列接口和自动capture环境已接；实际同DSO组件及整包入口仍需验收。候选scan非安全deferred时保留已验证capture环境，不伪造PSO完成。
+3. 当前235GPU TU及两helper coherent构建已完成，320.3秒，压力2→2、swap 7902→7886MiB；同snapshot ABI已生成。consumer异常路径移用JSON对象问题已修复；仅重建main，完整共享头和原DSO不变，原生10项通过。新repair组件用于后续QA，旧consumer及旧结果保留但不采用。未重建整套FEX CPU，也不是clean-checkout证明。
+4. 新隔离code stage已通过原打包入口生成，36准备模块与2原parser冻结，原16脚本仅run.sh新增已准入final-exec hook。仍需完整新包、空缓存首启/冷暖/失效、真实Local/PSO命中、编译/长帧、启动及峰值/常驻内存统一验收。
 
 静态扫描并不假称已有完整 PSO：确实依赖绘制时描述符、附件、特化等状态的字段列入缺口，由正常运行自动采集，后续启动准备。静态 identity、captured input 完整性摘要与原 runtime 语义 key 分开。
 
@@ -41,3 +43,9 @@
 按用户最新调查修订：三个接口是上游与正式 Rosetta 已有的兼容性缺口，不是 ARM 迁移漏接的已有功能，也不再是本主线交付前置条件。`_is_signal_return` 与普通 `__Ux86_64_setcontext` 保留隔离门控实现及真实 FEX 27 场景/282 断言，默认关闭；这些测试不代表血源真实命中。完整 `sigreturn` 暂停扩展，未知路径继续明确诊断。后续只在正常回归真实命中后据现场处理，不继续理论覆盖长测。
 
 此前六项为 `sceKernelMlock`、`sceKernelGetModuleInfoFromAddr`、`__elf_phdr_match_addr`、`__pthread_cxa_finalize`、`msync`、`__progname`，各自按正确性和集成状态收尾，不回退，也不被三项缺口捆绑阻塞。取消捆绑门槛不等于自动闭环、coherent构建、实际运行命中、集中回归和交付已完成。
+
+## 实际全量静态入口（2026-10-26）
+
+本机真实用户游戏的28852文件经原Mod算法核对后，用APFS CoW生成只读视图并完成自动目录生成，总390.9秒（目录247.2秒，其余主要为源视图与内容核验）。扫描得8915个代码/硬件阶段身份；静态完整PSO仍为0，不能据此声称静态输入已具备动态附件/描述符。一个可选about SELF段保持明确unsupported记录，未猜解、未隐藏。系统压力2→2、swap净增75.44MiB；未运行游戏、GPU或编译器，未证明持续内存等价或实际缓存命中。成功代元数据由READY封口，后续暖采用继续严格核验。摘要见`evidence/automatic-source-entry-20261026/summary.json`。
+
+新的隔离GPU应用已绑定同源DSO并通过实际ARM64/签名/加载边核验；准备器新main绑定还会核对全部编译头。SDKSettings.json是当前Xcode SDK中的root-owned系统输入，独立匹配当前xcrun SDK后做稳定摘要，其余组件/头仍要求user-owned，不放宽游戏或缓存目录校验。完整新CPU/GPU包和真实运行验收未完成。

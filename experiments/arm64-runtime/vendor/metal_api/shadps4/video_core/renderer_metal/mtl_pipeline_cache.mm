@@ -337,61 +337,9 @@ bool PipelineCache::GeometryShaders(
     std::span<const ShaderModuleHandle, VideoCore::MaxShaderStages> modules,
     const CompiledShader* fs, GeometryPipelineInput& input, std::string& error,
     bool& unsupported) {
-    using Shader::SwStage;
-    unsupported = false;
-    ShaderModule* es = modules[u32(SwStage::Vertex)] ? ToModule(modules[u32(SwStage::Vertex)]) : nullptr;
-    ShaderModule* gs = modules[u32(SwStage::Geometry)] ? ToModule(modules[u32(SwStage::Geometry)])
-                                                       : nullptr;
-    if (!es || es->stage != ShaderStage::Vertex || !gs || gs->stage != ShaderStage::Geometry) {
-        error = "a stage's module is missing or of another stage";
-        return false;
-    }
-    // The shape first: the shaders the first version cannot handle are counted, not failures.
-    const GeometryRewrite analysis = AnalyzeGeometryShader(gs->spirv);
-    if (!analysis.ok) {
-        error = analysis.error;
-        unsupported = true;
-        return false;
-    }
-    const AmdGpu::PrimitiveType prim = key.prim_type;
-    const bool matches = (analysis.info.input == GsInputPrimitive::Points &&
-                          prim == AmdGpu::PrimitiveType::PointList) ||
-                         (analysis.info.input == GsInputPrimitive::Lines &&
-                          prim == AmdGpu::PrimitiveType::LineList) ||
-                         (analysis.info.input == GsInputPrimitive::Triangles &&
-                          prim == AmdGpu::PrimitiveType::TriangleList);
-    if (!matches) {
-        error = "the draw's primitive type is not a list of the geometry shader's input primitive";
-        unsupported = true;
-        return false;
-    }
-    for (u32 index_type = 0; index_type < 3; ++index_type) {
-        input.es[index_type] = VariantShader(
-            *es, {.kind = CompileVariant::Kind::TessVertex, .index_type = index_type}, error);
-        if (!input.es[index_type]) {
-            error = "export kernel: " + error;
-            return false;
-        }
-    }
-    CompileVariant variant{.kind = CompileVariant::Kind::GeometryKernel};
-    variant.es.stride = input.es[0]->tess_layout.output;
-    variant.es.members = input.es[0]->tess_layout.members;
-    input.gs = VariantShader(*gs, variant, error);
-    if (!input.gs) {
-        error = "geometry kernel: " + error;
-        return false;
-    }
-    const bool clip_minus_w_to_w = key.clip_space == AmdGpu::ClipSpace::MinusWToW;
-    std::span<const StageInput> fs_inputs;
-    if (fs) {
-        fs_inputs = fs->stage_inputs;
-    }
-    input.pass_through = pass_through.Get(input.gs->geometry, fs_inputs, clip_minus_w_to_w, error);
-    if (!input.pass_through) {
-        error = "pass-through function: " + error;
-        return false;
-    }
-    return true;
+    std::array<ShaderModule*,VideoCore::MaxShaderStages> native{};
+    for(size_t i=0;i<native.size();++i)native[i]=modules[i]?ToModule(modules[i]):nullptr;
+    return CachedVariants::Geometry(compiler,pass_through,key,native,fs,input,error,unsupported);
 }
 
 std::unique_ptr<VideoCore::PipelineSerialization> PipelineCache::NewGraphicsSerialization() {

@@ -171,6 +171,9 @@ std::optional<FetchShaderData> ParseFetchShader(const Shader::Info& info) {
     if (const auto it = cache.find(code);
         !BbToggle::Disabled(BbToggle::FetchShaderCache) && it != cache.end() &&
         std::memcmp(code, it->second.code.data(), it->second.code.size() * sizeof(u32)) == 0) {
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        ObserveCapturedFetch(info,it->second.data);
+#endif
         return it->second.data;
     }
 
@@ -235,6 +238,9 @@ std::optional<FetchShaderData> ParseFetchShader(const Shader::Info& info) {
         cache.clear();
     }
     cache[code] = CachedParse{std::vector<u32>(code, code_slice.position()), data};
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+    ObserveCapturedFetch(info,data);
+#endif
     return data;
 }
 

@@ -436,6 +436,8 @@ private:
 
     SpirvAttribute GetAttributeInfo(AmdGpu::NumberFormat fmt, Id id, u32 num_components,
                                     bool output, bool loaded = false, bool array = false);
+    SpirvAttribute GetProjectedAttributeInfo(AmdGpu::NumberClass cls,Id id,u32 num_components,
+                                             bool output,bool loaded=false,bool array=false);
 
     BufferSpv DefineBuffer(bool is_written, bool is_coherent, u32 elem_shift,
                            BufferType buffer_type, Id data_type);

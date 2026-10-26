@@ -1,0 +1,88 @@
+{
+  "GPU_started": false,
+  "actual_native_compilation_verified": false,
+  "actual_native_compilation_verified_for_selected_six": true,
+  "after": {
+    "locked": false,
+    "pressure": 2,
+    "swap_mib": 6940.0625
+  },
+  "all_1152_native_prepared": false,
+  "author_Python_tests": 15,
+  "automatic_controller_author_tests": 10,
+  "automatic_converter_default": "all provable entries; consecutive bounded pages in one startup until total budget",
+  "automatic_native_admission_negative": 6,
+  "automatic_native_admission_positive": 1,
+  "automatic_native_admission_status": "passed",
+  "before": {
+    "locked": false,
+    "pressure": 2,
+    "swap_mib": 6940.0625
+  },
+  "clean_checkout_build_proven": false,
+  "coherent_GPU_units_rebuilt": 235,
+  "coherent_build_seconds": 320.25763979100157,
+  "coherent_build_swap_growth_mib": -16,
+  "coherent_builder_author_tests": 6,
+  "coherent_builder_executed": true,
+  "coherent_builder_plan_GPU_TUs": 235,
+  "coherent_component_status": "built and CPU contracts passed; game/runtime pending",
+  "coherent_native_renderer_built": true,
+  "coherent_runtime_component_validated": false,
+  "counts": {
+    "frozen_local": 2,
+    "frozen_vertex": 4,
+    "records": 3201
+  },
+  "field_projection_eligible": {
+    "local": 96,
+    "vertex": 1056
+  },
+  "formal_data_modified": false,
+  "game_started": false,
+  "generic_companion_default_count_control": 21,
+  "generic_companion_incremental_verified_reuse_control": 21,
+  "native_API_tests": 15,
+  "native_ambiguity_rejected": true,
+  "native_negative_count": 25,
+  "native_negatives_status": "passed",
+  "native_only_main_repair": true,
+  "native_validation": {
+    "GPU_started": false,
+    "after": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 8709.5
+    },
+    "before": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 8709.5
+    },
+    "build_sha256": "1f4a73276ecb9fbb9287e9e17e7e8bd268ab209bde570f66dd11da7591dcd436",
+    "counts": {
+      "passed": 6
+    },
+    "fresh_coherent_renderer": false,
+    "raw_Vsharp_synthesized": false,
+    "status": "passed"
+  },
+  "normal_and_GS_incremental_byte_equal": true,
+  "producer_identity_not_runtime_permutation_key": true,
+  "raw_Vsharp_synthesized": false,
+  "rejection_reasons": {
+    "number-conversion-ambiguous-or-unproven": 2049
+  },
+  "runtime_cache_import_allowed": false,
+  "schema": 1,
+  "sidecar_sha256": "1b7a588544fa41b639c5184468f0d897bb30e8e65b945df6356ff26b2baf5f1b",
+  "source_cache_modified": false,
+  "status": "frozen-unique-fetch-projection-inputs",
+  "typed_companion_author_tests": 9,
+  "typed_companion_known_base_contract_separate": true,
+  "typed_companion_native_actual_game_coverage_proven": false,
+  "typed_companion_native_controls": 10,
+  "typed_companion_native_validated": true,
+  "typed_companion_old_masked_error_cleanly_rejected": true,
+  "unknown_conversion_records_still_rejected": 2049
+}

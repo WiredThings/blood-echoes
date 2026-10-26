@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "status": "static-source-entry-completed",
+  "evidence_report_sha256": "478b01127889d4bab0a2b255b73c0487f3469cb3da8a6f88d090750c47a57f2f",
+  "source_view": {
+    "status": "snapshotted",
+    "source_identity": "75107f85d431eb85e059105d235dfa6327405d8441df9084f64fe6559b5d1fc6",
+    "files": 28852,
+    "logical_bytes": 31438478315,
+    "CoW": true,
+    "original_app0_preserved": true
+  },
+  "seconds": 390.88640529103577,
+  "catalog_seconds": 247.17425487493165,
+  "source_files": 28852,
+  "static_programs": 8915,
+  "scan_errors": 1,
+  "error_classes": [
+    "encrypted SELF in optional sce_sys/about/right.sprx; recorded unsupported input"
+  ],
+  "full_static_pso_recipes": 0,
+  "complete_pso_claim": false,
+  "before": {
+    "pressure": 2,
+    "locked": false,
+    "swap_mib": 7878.1875
+  },
+  "after": {
+    "pressure": 2,
+    "locked": false,
+    "swap_mib": 7953.625
+  },
+  "swap_delta_mib": 75.4375,
+  "scope": "actual local user game, original mod merge, APFS CoW view, default static catalogue; not compilation or runtime use",
+  "game_started": false,
+  "GPU_started": false,
+  "compiler_invoked": false,
+  "formal_data_modified": false,
+  "persistent_ram_equivalence_proven": false
+}

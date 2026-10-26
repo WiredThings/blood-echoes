@@ -1,0 +1,21 @@
+{
+  "status": "frozen-not-default-not-sigreturn",
+  "overlay_is_not_build_source": true,
+  "source_sha256": {
+    "src/bb_architectural_continuation.h": "753097cc368527489aa7ac562b4b2ed4a7feb6f7e5b2871ec7d0d1ee9de0bb7f",
+    "src/owned_signal_libc_contract.h": "db7fb0faf84c7ba3ce6f3aa4026a6b37ecc865bcaa6aa20cea31291ffabae4eb",
+    "vendor/aether/src/core/fex/fex_guest_engine.h": "ce593c7c98d2eabae96b55c7f93d074662fda4e97dc23d35aef8a1d5f6b6fa00",
+    "vendor/aether/src/core/fex/fex_guest_engine.cpp": "8b96dbd85f6ee3b641c16d6d92ebf2190969db7dcbcdaab9e68bba1332abcaab",
+    "vendor/bb_runtime/src/runtime.h": "11b456ca11e6300638d0d4ee96b409c1b89781499e69f3ef496f5378a2ba8c6d",
+    "vendor/bb_runtime/src/runtime_kernel.c": "f77ac8b056069cc0dca0c824b421ea4884367d389e3c24a045feec7df66e7199",
+    "tests/test_architectural_continuation.cpp": "2e2bdc5fdc699717bb8c11abafeba5abe818f539a35f6121bc1bf0f7ff898369",
+    "tests/test_owned_signal_libc_consumer.cpp": "eea39beb13ad66647a21174464b1c31454c8d42cca3de6c8d27c7731192f128a",
+    "tests/test_guest_signal_registry.c": "f7df031c5d3262b14daa6070033b91386c48f6d9ee9fe78496e2795108d50cf8",
+    "tests/test_ordinary_unwind_fex.py": "f18e291f49f214a8994165da3986c7e1821410862fa10af655529bab1d6e377f"
+  },
+  "verified_architectural_evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/architectural-continuation-current-1793008426366889000/result.json",
+  "verified_registry_evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/owned-signal-registry-1793009059650475000/result.json",
+  "consumer_closure": "failed-after-17-register-address-calls-do-not-count-as-passed",
+  "sigreturn_implemented": false,
+  "formal_data_modified": false
+}

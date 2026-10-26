@@ -4,7 +4,7 @@
 A targeted translation test, not a fresh coherent renderer build. Old native
 objects/library are read-only; all compiled outputs go to a new evidence root.
 """
-import argparse, hashlib, json, pathlib, subprocess, time, re
+import argparse, hashlib, json, pathlib, subprocess, time, re, shlex
 
 def sha(p): return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
 def main():
@@ -20,7 +20,12 @@ def main():
     evidence=(args.project/'evidence').resolve();out=evidence/f'game-module-native-{time.time_ns()}'
     out.mkdir(); unit=next(u for u in data['units'] if 'game_artifact_native' in u['source'])
     units=[]
-    sources=[root/'src/game_module_preparer.mm',root/'vendor/metal_api/shadps4/shader_recompiler/recompiler.cpp']
+    compiler=root/'vendor/metal_api/shadps4/shader_recompiler'
+    # These call sites must all be current objects. An old DSO translator/emitter
+    # cannot prove use of the new explicit compilation projection API.
+    sources=[root/'src/game_module_preparer.mm',compiler/'recompiler.cpp',
+             compiler/'compile_snapshot.cpp',compiler/'frontend/translate/translate.cpp',
+             compiler/'backend/spirv/emit_spirv.cpp',compiler/'backend/spirv/spirv_emit_context.cpp']
     for i,src in enumerate(sources):
         cmd=[v.replace(old,str(root)) for v in unit['command']]
         cmd[-1]=str(src);cmd[cmd.index('-o')+1]=str(out/f'unit{i}.o')
@@ -32,7 +37,7 @@ def main():
         if r.returncode:print(log.read_text()[-12000:]);raise SystemExit(r.returncode)
     link=data['binaries']['worker']['link'][:]
     first=next(i for i,v in enumerate(link) if v.endswith('/worker.o'))
-    link[first:first+1]=[str(out/'unit0.o'),str(out/'unit1.o')]
+    link[first:first+1]=[str(out/f'unit{i}.o')for i in range(len(sources))]
     binary=out/'game-module-preparer';link[link.index('-o')+1]=str(binary)
     with (out/'link.log').open('w') as f:r=subprocess.run(link,stdout=f,stderr=subprocess.STDOUT,timeout=180)
     if r.returncode:print((out/'link.log').read_text()[-12000:]);raise SystemExit(r.returncode)
@@ -46,6 +51,12 @@ def main():
     subprocess.run(['/usr/bin/codesign','--verify','--strict',str(binary)],check=True,capture_output=True)
     if subprocess.check_output(['/usr/bin/lipo','-archs',str(binary)],text=True).strip()!='arm64':raise ValueError('native consumer architecture')
 
-    result={'kind':'targeted-cpu-module-consumer','gpu_started':False,'fresh_coherent_renderer':False,'diagnostic_only':args.diagnostic,'baseline_manifest':str(baseline),'baseline_sha256':sha(baseline),'pinned_library':str(lib),'pinned_library_sha256':sha(lib),'units':units,'link':link,'binary':str(binary),'binary_sha256':sha(binary),'profile_boolean_fields':bools,'dependencies':deps(binary)}
+    headers={}
+    for i in range(len(sources)):
+        text=(out/f'unit{i}.d').read_text().replace('\\\n',' ')
+        for name in shlex.split(text.split(':',1)[1]):
+            path=pathlib.Path(name)
+            if path.is_file():headers[str(path.resolve())]=sha(path)
+    result={'kind':'targeted-cpu-module-consumer','gpu_started':False,'fresh_coherent_renderer':False,'diagnostic_only':args.diagnostic,'baseline_manifest':str(baseline),'baseline_sha256':sha(baseline),'pinned_library':str(lib),'pinned_library_sha256':sha(lib),'units':units,'link':link,'binary':str(binary),'binary_sha256':sha(binary),'profile_boolean_fields':bools,'dependencies':deps(binary),'compiled_header_sha256':headers,'explicit_projection_callsite_TUs_compiled':True}
     (out/'build.json').write_text(json.dumps(result,indent=2)+'\n');print(out/'build.json')
 if __name__=='__main__':main()

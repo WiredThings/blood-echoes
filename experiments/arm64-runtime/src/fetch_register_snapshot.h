@@ -24,10 +24,17 @@ inline Digest WordDigest(std::span<const uint32_t>words){
  static_assert(std::endian::native==std::endian::little);
  return BbCpuCache::Hash(std::as_bytes(words));
 }
+template<class Snapshot>inline bool HasSemanticProjection(const Snapshot&s){
+ // Supports the original raw-only native type and its forthcoming explicit projection
+ // extension. A type without this member cannot contain such a projection at all.
+ if constexpr(requires{s.fetch_projection;})return s.fetch_projection.has_value();
+ return false;
+}
 // This is a projection of an already-owned capture. It never calls Capture, ReadUdReg,
 // MakeInfo, native deserializers or old walker code, and never reads live guest memory.
 inline Expected DescribeSnapshot(const Shader::CompileSnapshot&s,const Environment&environment){
  static_assert(sizeof(AmdGpu::Buffer)==16&&sizeof(Shader::CompileSnapshot::RegisterRead)==24);
+ RequireSnapshot(!HasSemanticProjection(s),"raw fetch store cannot mix semantic projection inputs");
  RequireSnapshot(s.fetch.has_value()&&!s.tess&&s.gs_copy.empty(),"owned fetch capture required; no GS/tess session context");
  RequireSnapshot(s.hw_stage==s.runtime.hw_stage&&s.sw_stage==s.runtime.sw_stage,"snapshot stage identity");
  RequireSnapshot(s.code.size()<=Shader::CompileSnapshot::MaxCodeBytes/4&&!s.code.empty()&&

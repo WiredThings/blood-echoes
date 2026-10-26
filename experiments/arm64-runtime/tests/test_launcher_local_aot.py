@@ -67,6 +67,34 @@ class Startup(unittest.TestCase):
             archive_prepare=fail, local_prepare=fail, observe=fail)
         self.assertEqual(report['status'], 'off'); self.assertEqual(result, env)
 
+    def test_prior_child_capture_selection_is_not_inherited(self):
+        env=dict(self.env,BB_FETCH_CAPTURE_ROOT='/old/root',BB_FETCH_CAPTURE_GAME_ROOT='/old/game')
+        result,_=self.run_prepare(env=env)
+        self.assertNotIn('BB_FETCH_CAPTURE_ROOT',result)
+        self.assertNotIn('BB_FETCH_CAPTURE_GAME_ROOT',result)
+        self.assertEqual(env['BB_FETCH_CAPTURE_ROOT'],'/old/root')
+
+    def test_current_verified_capture_map_reaches_same_final_exec_environment(self):
+        current={'BB_FETCH_CAPTURE_ROOT':str(self.gpu/'automatic-game-inputs/runtime'),
+                 'BB_FETCH_CAPTURE_GAME_ROOT':'/current/selected game'}
+        def prepared(**kw):return {'BB_MTL_LOCAL_AOT_MODE':'load'},{'status':'prepared'}
+        def game(**kw):return dict(status='empty',capture_environment=current)
+        result,_=prepare_launch(str(self.inputs/'runtime'),self.args,self.env,project=self.root,
+            archive_prepare=self.identity,local_prepare=prepared,
+            observe=lambda:dict(locked=False,pressure=1,swap_mib=100),game_prepare=game,
+            fixed_helper_prepare=lambda **kw:({},dict(status='completed')))
+        self.assertEqual({k:result[k]for k in current},current)
+        self.assertEqual(result['BB_THD_TOKEN'],self.env['BB_THD_TOKEN'])
+
+    def test_capture_phase_cannot_override_original_network_or_restart_environment(self):
+        def prepared(**kw):return {},{'status':'prepared'}
+        with self.assertRaisesRegex(ValueError,'unexpected runtime capture'):
+            prepare_launch(str(self.inputs/'runtime'),self.args,self.env,project=self.root,
+                archive_prepare=self.identity,local_prepare=prepared,
+                observe=lambda:dict(locked=False,pressure=1,swap_mib=100),
+                game_prepare=lambda **kw:dict(status='empty',capture_environment={'BB_THD_TOKEN':'replace'}),
+                fixed_helper_prepare=lambda **kw:({},dict(status='completed')))
+
     def test_final_patch_changes_compatibility_cohort(self):
         _, a = self.run_prepare()
         (self.inputs/'patches').write_text('different actual patch payload')

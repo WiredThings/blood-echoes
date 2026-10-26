@@ -9,7 +9,15 @@ TOOLS=('launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py'
        'qa_memory_policy.py','qa_build_guard.py','paged_metal_requests.py',
        'launcher_game_pso.py','game_pso_component.py','game_pso_candidates.py',
        'prepare_game_psos.py','game_pso_queue.py','game_pso_progress_identity.py','game_pso_owned_audit.py',
-       'inventory_shader_cache.py','decode_shader_cache.py','game_shader_catalog.py')
+       'inventory_shader_cache.py','decode_shader_cache.py','game_shader_catalog.py',
+       'launcher_game_catalog.py','launcher_game_modules.py','full_game_catalog.py',
+       'gnm_shader_metadata.py','static_program_links.py','complete_pipeline_inputs.py',
+       'game_module_inputs.py','fetch_projection_inputs.py','owned_geometry_inputs.py',
+       'game_pso_geometry_adapter.py','complete_geometry_psos.py','run_game_module_contracts.py',
+       'prepare_fetch_capture_receipt.py','run_owned_geometry_contracts.py','launcher_source_view.py',
+       'game_companion_modules.py')
+SUPPORT={'vendor/blood_echoes/loader/prepare.py':'scripts/prepare.py',
+         'vendor/blood_echoes/loader/game_check.py':'scripts/game_check.py'}
 HOOK='''# Native-runtime component preparation happens after the original patch/mod
 # pipeline, before either game process exists. The wrapper execs this same probe.
 if [[ ${BB_ARM_LAUNCHER_COMPAT:-0} == 1 && ${BB_RENDERER:-} == metal ]]; then
@@ -30,6 +38,18 @@ def tool_api(path, function, names):
     tree=ast.parse(path.read_text());node=next((n for n in tree.body if isinstance(n,ast.FunctionDef)and n.name==function),None)
     if node is None or not set(names)<={n.arg for n in node.args.kwonlyargs}:
         raise ValueError('packaged preparation API not ready: '+function)
+def validate_import_closure(tools):
+    """Refuse a newly added local dependency before creating a partial stage."""
+    expected=set(TOOLS)
+    for name in TOOLS:
+        tree=ast.parse((tools/name).read_text());imports=[]
+        for node in ast.walk(tree):
+            if isinstance(node,ast.Import):imports.extend(alias.name.split('.')[0]for alias in node.names)
+            elif isinstance(node,ast.ImportFrom)and node.module:imports.append(node.module.split('.')[0])
+        for module in imports:
+            dependency=module+'.py'
+            if(tools/dependency).is_file()and dependency not in expected:
+                raise ValueError('runtime preparation local dependency is not frozen: '+name+' -> '+dependency)
 def bootstrap(project):
     return '''#!/usr/bin/env python3
 import sys
@@ -54,6 +74,15 @@ def main():
             raise ValueError('runtime tool is not an owned regular file')
         with path.open('rb')as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
         if actual!=digest:raise ValueError('runtime tool identity changed: '+name)
+    support=manifest['runtime_support']
+    if set(support)!={'''+','.join(repr(name)for name in SUPPORT)+'''}:
+        raise ValueError('incomplete original parser closure')
+    for name,digest in support.items():
+        path=stage/name;info=path.lstat()
+        if path!=path.resolve(strict=True)or not stat.S_ISREG(info.st_mode)or info.st_uid!=os.getuid():
+            raise ValueError('original parser is not canonical owned code')
+        with path.open('rb')as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
+        if actual!=digest:raise ValueError('original parser identity changed: '+name)
     sys.path.insert(0,str(tools))
     import local_metal_builder,local_aot_policy,launcher_local_aot
     for module in (local_metal_builder,local_aot_policy,launcher_local_aot):
@@ -94,7 +123,7 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
     project=owned_dir(project);repository=owned_dir(repository)
     original=owned_dir(project/'launcher-component-stage')
     state=owned_dir(project/'state')
-    tools=owned_dir(runtime_tools or project/'tools')
+    tools=owned_dir(runtime_tools or Path(__file__).resolve().parent)
     source=json.loads((original/'SOURCE-PARITY.json').read_text())['original_sources']
     if len(source)!=16:raise ValueError('expected the admitted original 16-script stage')
     for relative,digest in source.items():
@@ -109,6 +138,7 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
         path=tools/name
         if not path.is_file()or path.is_symlink():raise ValueError('missing/linked tool dependency: '+name)
         ast.parse(path.read_text())
+    validate_import_closure(tools)
     tool_api(tools/'launcher_local_aot.py','main',('project','execution_root'))
     tool_api(tools/'launcher_local_aot.py','cli',('project','execution_root'))
     tool_api(tools/'prepare_game_psos.py','prepare',('services',))
@@ -137,6 +167,11 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
     hashes={}
     for name in TOOLS:
         shutil.copy2(tools/name,native_tools/name);hashes[name]=sha(native_tools/name)
+    support={}
+    for destination,original_name in SUPPORT.items():
+        dst=target/destination;dst.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(original/original_name,dst)
+        support[destination]=sha(dst)
     startup=target/'tools/macos/local_metal_startup.py'
     startup.write_text(bootstrap(project));startup.chmod(0o755)
     effective=dict(source);effective['run.sh']=sha(target/'run.sh')
@@ -145,7 +180,7 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
         previous_stage=str(original),previous_stage_modified=False)
     (target/'SOURCE-PARITY.json').write_text(json.dumps(parity,indent=2)+'\n')
     manifest=dict(schema=1,host_local_only=True,portable_installer=False,
-        runtime_project=str(project),runtime_tools=hashes,
+        runtime_project=str(project),runtime_tools=hashes,runtime_support=support,
         startup_bootstrap_sha256=sha(startup),default_mode='auto',
         unchanged_original_scripts=15,original_stage_modified=False,
         game_or_data_copied=False,source_repository=str(repository),

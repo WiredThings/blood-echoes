@@ -50,7 +50,7 @@ class GeometryInputs(unittest.TestCase):
   raw=bytearray(metadata());struct.pack_into('<Q',raw,24+12+64+72,0x9999);self.meta_ref=reference(self.root/'meta.bin',raw)
   with self.assertRaisesRegex(ValueError,'owned-copy provenance'):self.freeze()
  def test_geometry_enum_and_array_count_rejected_before_native(self):
-  for offset,value in [(0,33),(16,0),(20,0),(32,8),(52,99)]:
+  for offset,value in [(0,4),(16,0),(20,0),(32,8),(52,99)]:
    raw=bytearray(metadata());struct.pack_into('<I',raw,24+12+64+offset,value);meta,sec=metadata_sections(raw,layout())
    with self.subTest(offset=offset),self.assertRaises(ValueError):sanitized_spec(raw,meta,sec,layout())
  def test_canonical_permutation_hash_required(self):

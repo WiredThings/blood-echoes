@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 #include "shader_recompiler/frontend/fetch_shader.h"
+#include "shader_recompiler/fetch_compile_projection.h"
 #include "shader_recompiler/profile.h"
 #include "shader_recompiler/recompiler.h"
 
@@ -36,6 +37,9 @@ struct CompileSnapshot {
     std::optional<Gcn::FetchShaderData> fetch;
     std::vector<RegisterRead> register_reads;
     std::optional<TessellationDataConstantBuffer> tess;
+    // Preparation-only semantic input. Existing member offsets are unchanged.
+    // It is mutually exclusive with captured raw descriptor reads.
+    std::optional<FetchCompileProjection> fetch_projection;
 
     /// Bounds are checked before allocation; nullopt means use the existing synchronous path.
     /// `fetch` is the already parsed specialization data, not another guest pointer.

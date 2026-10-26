@@ -36,6 +36,11 @@
 #include "bbport_settings.h"
 #include "game_profile.h"
 #include "bbport_toggles.h"
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+#include "fetch_compile_observer.h"
+#include "fetch_compile_producer.h"
+#include "video_core/cache_storage.h"
+#endif
 
 // bbport: shader/pipeline compile time on the GPU thread, reported by BB_FRAME_STATS (read by
 // the video out driver as Vulkan::g_bb_compile_ns).
@@ -1079,7 +1084,18 @@ std::optional<PreparedShader> PipelineCacheCore::PrepareOwnedShader(
 
 ShaderModuleHandle PipelineCacheCore::CompileModule(Shader::Info& info, Shader::RuntimeInfo& runtime_info,
                                               const std::span<const u32>& code, size_t perm_idx,
-                                              Shader::Backend::Bindings& binding) {
+                                              Shader::Backend::Bindings& binding
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+                                              ,BbFetchCapture::CompileOutput* capture
+#endif
+                                              ) {
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+    std::optional<BbFetchCapture::CompileScope> fetch_record;
+    if (!EmulatorSettings.IsPatchShaders() && !EmulatorSettings.IsDumpShaders() &&
+        !EmulatorSettings.IsShaderCollect()) {
+        fetch_record.emplace(info,runtime_info,profile,binding,code);
+    }
+#endif
     BbShaderPhaseAudit::Module phases{info.pgm_hash,static_cast<u32>(info.hw_stage),perm_idx};
     LOG_INFO(Render_Vulkan, "Compiling {} shader {:#x} {}", info.hw_stage, info.pgm_hash,
              perm_idx != 0 ? "(permutation)" : "");
@@ -1109,6 +1125,12 @@ ShaderModuleHandle PipelineCacheCore::CompileModule(Shader::Info& info, Shader::
     }
 
     backend_phase.End();
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+    if (capture && module && !is_patched && !info.translation_failed && BbFetchCapture::Producer::Enabled()) {
+        capture->binary={BbFetchStore::WordDigest(spv),spv.size(),false};
+        if(fetch_record)capture->pending=fetch_record->Finish(spv);
+    }
+#endif
     RegisterShaderBinary(std::move(spv), info.pgm_hash, perm_idx);
 
     if (EmulatorSettings.IsShaderCollect()) {
@@ -1215,13 +1237,26 @@ PipelineCacheCore::Result PipelineCacheCore::GetProgram(PipelineSelection& sel, 
     if (it_pgm == program_cache.end()) {
         auto new_program = std::make_unique<Program>(hw_stage, sw_stage, params);
         auto start = binding;
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        BbFetchCapture::CompileOutput captured;
+#endif
         const auto module =
-            CompileModule(new_program->info, runtime_info, params.code, 0, binding);
+            CompileModule(new_program->info, runtime_info, params.code, 0, binding
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+                ,&captured
+#endif
+                );
         auto spec = Shader::StageSpecialization(new_program->info, runtime_info, profile, start);
         const auto perm_hash = HashCombine(params.hash, 0);
 
         RegisterShaderMeta(new_program->info, spec.fetch_shader_data, spec, perm_hash, 0);
+        #if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        captured.binary.capture_attempted=!captured.pending||BbFetchCapture::Producer::Publish(std::move(*captured.pending),spec,0,perm_hash);
+#endif
         new_program->AddPermut(module, std::move(spec));
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        new_program->modules[0].capture_proof=captured.binary;
+#endif
         new_program->info_template = std::make_unique<Shader::Info>(new_program->info);
         Program* program = new_program.get();
         {
@@ -1242,6 +1277,16 @@ PipelineCacheCore::Result PipelineCacheCore::GetProgram(PipelineSelection& sel, 
     info.pgm_base = params.Base(); // Needs to be actualized for inline cbuffer address fixup
     info.user_data = params.user_data;
     info.RefreshFlatBuf();
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+    // Passive observation surrounds only the parser/GetSharp calls already made below.
+    std::optional<BbFetchCapture::CompileScope> warm_capture;
+    bool capture_state_changed=false;
+    const bool last_valid=program->last_used<program->modules.size();
+    if(BbFetchCapture::ObserveWarm(program->capture_remaining,program->capture_retry,last_valid,
+          last_valid&&program->modules[program->last_used].capture_proof.capture_attempted)&&BbFetchCapture::Producer::Enabled()&&
+       !EmulatorSettings.IsPatchShaders()&&!EmulatorSettings.IsDumpShaders()&&!EmulatorSettings.IsShaderCollect())
+        warm_capture.emplace(info,runtime_info,profile,binding,params.code,true);
+#endif
     auto spec = Shader::StageSpecialization(info, runtime_info, profile, binding);
 
     size_t perm_idx = program->modules.size();
@@ -1259,17 +1304,46 @@ PipelineCacheCore::Result PipelineCacheCore::GetProgram(PipelineSelection& sel, 
     }
     if (it == program->modules.end()) {
         auto new_info = Shader::Info(hw_stage, sw_stage, params);
-        module = CompileModule(new_info, runtime_info, params.code, perm_idx, binding);
+        #if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        warm_capture.reset(); // no nested passive observer around the ordinary compiler
+        BbFetchCapture::CompileOutput captured;
+#endif
+        module = CompileModule(new_info, runtime_info, params.code, perm_idx, binding
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+            ,&captured
+#endif
+            );
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        captured.binary.capture_attempted=!captured.pending||BbFetchCapture::Producer::Publish(std::move(*captured.pending),spec,perm_idx,perm_hash);
+#endif
 
         RegisterShaderMeta(info, spec.fetch_shader_data, spec, perm_hash, perm_idx);
         std::unique_lock lk{programs_mutex};
         program->AddPermut(module, std::move(spec));
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        program->modules[perm_idx].capture_proof=captured.binary;program->capture_remaining|=!captured.binary.capture_attempted;capture_state_changed=true;program->capture_retry=!captured.binary.capture_attempted;
+#endif
     } else {
         info.AddBindings(binding);
         module = it->module;
         perm_idx = std::distance(program->modules.begin(), it);
         perm_hash = HashCombine(params.hash, perm_idx);
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        auto&proof=it->capture_proof;
+        const bool prior_attempted=proof.capture_attempted;
+        if(warm_capture&&!proof.capture_attempted&&!proof.words){BbFetchCapture::Producer::Reject(BbFetchCapture::Refusal::NoReference);proof.capture_attempted=true;}
+        if(warm_capture&&!proof.capture_attempted&&proof.words){
+            bool permanent=false;auto loader=Storage::DataBase::Instance().BoundedShaderReader(fmt::format("{:#018x}_{}",params.hash,perm_idx),proof.words*4,&permanent);
+            if(loader)proof.capture_attempted=warm_capture->FinishWarm(spec,perm_idx,perm_hash,{proof.sha,proof.words,std::move(loader)});
+            else if(permanent){BbFetchCapture::Producer::Reject(BbFetchCapture::Refusal::ReferenceBudget);proof.capture_attempted=true;}
+        }
+        capture_state_changed=prior_attempted!=proof.capture_attempted;
+        program->capture_retry=BbFetchCapture::RetryWarm(program->capture_retry,prior_attempted,proof.capture_attempted,warm_capture.has_value());
+#endif
     }
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+    if(capture_state_changed&&program->capture_remaining)program->capture_remaining=std::ranges::any_of(program->modules,[](const auto&m){return !m.capture_proof.capture_attempted;});
+#endif
     return std::make_tuple(&program->info, module,
                            program->modules[perm_idx].spec.fetch_shader_data, perm_hash);
 }
@@ -1282,6 +1356,9 @@ std::optional<ShaderModuleHandle> PipelineCacheCore::ReplaceShader(ShaderModuleH
             if (m.module == module) {
                 DestroyShaderModule(m.module);
                 m.module = CreateShaderModule(spv_code, {}, false);
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+                m.capture_proof={};
+#endif
                 new_module = m.module;
             }
         }

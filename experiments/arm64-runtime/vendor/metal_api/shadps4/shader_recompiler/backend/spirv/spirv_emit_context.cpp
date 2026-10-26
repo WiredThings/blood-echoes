@@ -6,6 +6,7 @@
 #include "common/div_ceil.h"
 #include "shader_recompiler/backend/spirv/spirv_emit_context.h"
 #include "shader_recompiler/frontend/fetch_shader.h"
+#include "shader_recompiler/fetch_compile_projection.h"
 #include "shader_recompiler/ir/attribute.h"
 #include "shader_recompiler/ir/microinstruction.h"
 #include "shader_recompiler/runtime_info.h"
@@ -214,6 +215,19 @@ EmitContext::SpirvAttribute EmitContext::GetAttributeInfo(AmdGpu::NumberFormat f
     UNREACHABLE_MSG("Invalid attribute type {}", fmt);
 }
 
+EmitContext::SpirvAttribute EmitContext::GetProjectedAttributeInfo(
+    AmdGpu::NumberClass cls,Id id,u32 num_components,bool output,bool loaded,bool array) {
+    switch(cls) {
+    case AmdGpu::NumberClass::Float:
+        return {id,output?output_f32:input_f32,F32[1],num_components,false,loaded,array};
+    case AmdGpu::NumberClass::Uint:
+        return {id,output?output_u32:input_u32,U32[1],num_components,true,loaded,array};
+    case AmdGpu::NumberClass::Sint:
+        return {id,output?output_s32:input_s32,S32[1],num_components,true,loaded,array};
+    }
+    throw std::runtime_error{"invalid projected attribute number class"};
+}
+
 Id EmitContext::GetBufferSize(const u32 sharp_idx) {
     // Can this be done with memory access? Like we do now with ReadConst
     const auto& srt_flatbuf = buffers[flatbuf_index];
@@ -339,6 +353,22 @@ void EmitContext::DefineInputs() {
         }
         for (const auto& attrib : fetch_shader->attributes) {
             ASSERT(attrib.semantic < IR::NumParams);
+            if(const auto* projection=QueryFetchCompileProjection(info,attrib)) {
+                const VectorIds* types=nullptr;
+                switch(projection->number_class) {
+                case AmdGpu::NumberClass::Float:types=&F32;break;
+                case AmdGpu::NumberClass::Uint:types=&U32;break;
+                case AmdGpu::NumberClass::Sint:types=&S32;break;
+                }
+                if(!types)throw std::runtime_error{"invalid projected input class"};
+                const Id id=DefineInput((*types)[4],attrib.semantic);
+                if(attrib.GetStepRate()!=Gcn::VertexAttribute::InstanceIdType::None)
+                    Name(id,fmt::format("vs_instance_attr{}",attrib.semantic));
+                else Name(id,fmt::format("vs_in_attr{}",attrib.semantic));
+                input_params[attrib.semantic]=GetProjectedAttributeInfo(
+                    projection->number_class,id,4,false);
+                continue;
+            }
             const auto sharp = attrib.GetSharp(info);
             const Id type{GetAttributeType(*this, sharp.GetNumberFmt())[4]};
             Id id{DefineInput(type, attrib.semantic)};

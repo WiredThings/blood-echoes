@@ -2,6 +2,7 @@
 #pragma once
 // Shared original runtime algorithms. No Info/SRT or guest resource execution.
 #include "video_core/renderer_metal/mtl_pipeline_cache.h"
+#include "video_core/renderer_metal/mtl_spirv_geometry.h"
 #include "video_core/renderer_metal/mtl_spirv_rectlist.h"
 #include <cstdlib>
 namespace Metal::CachedVariants {
@@ -152,6 +153,67 @@ inline bool Tessellation(ShaderCompiler& compiler,
         error);
     if (!input.eval) {
         error = "evaluation function: " + error;
+        return false;
+    }
+    return true;
+}
+
+inline bool Geometry(ShaderCompiler& compiler,Metal::Geometry::PassThroughCache& pass_through,
+    const VideoCore::GraphicsPipelineKey& key,
+    std::span<ShaderModule* const, VideoCore::MaxShaderStages> modules,
+    const CompiledShader* fs, GeometryPipelineInput& input, std::string& error,
+    bool& unsupported) {
+    using Shader::SwStage;
+    unsupported = false;
+    ShaderModule* es = modules[u32(SwStage::Vertex)];
+    ShaderModule* gs = modules[u32(SwStage::Geometry)];
+    if (!es || es->stage != ShaderStage::Vertex || !gs || gs->stage != ShaderStage::Geometry) {
+        error = "a stage's module is missing or of another stage";
+        return false;
+    }
+    // The shape first: the shaders the first version cannot handle are counted, not failures.
+    const GeometryRewrite analysis = AnalyzeGeometryShader(gs->spirv);
+    if (!analysis.ok) {
+        error = analysis.error;
+        unsupported = true;
+        return false;
+    }
+    const AmdGpu::PrimitiveType prim = key.prim_type;
+    const bool matches = (analysis.info.input == GsInputPrimitive::Points &&
+                          prim == AmdGpu::PrimitiveType::PointList) ||
+                         (analysis.info.input == GsInputPrimitive::Lines &&
+                          prim == AmdGpu::PrimitiveType::LineList) ||
+                         (analysis.info.input == GsInputPrimitive::Triangles &&
+                          prim == AmdGpu::PrimitiveType::TriangleList);
+    if (!matches) {
+        error = "the draw's primitive type is not a list of the geometry shader's input primitive";
+        unsupported = true;
+        return false;
+    }
+    for (u32 index_type = 0; index_type < 3; ++index_type) {
+        input.es[index_type] = Variant(compiler,
+            *es, {.kind = CompileVariant::Kind::TessVertex, .index_type = index_type}, error);
+        if (!input.es[index_type]) {
+            error = "export kernel: " + error;
+            return false;
+        }
+    }
+    CompileVariant variant{.kind = CompileVariant::Kind::GeometryKernel};
+    variant.es.stride = input.es[0]->tess_layout.output;
+    variant.es.members = input.es[0]->tess_layout.members;
+    input.gs = Variant(compiler, *gs, variant, error);
+    if (!input.gs) {
+        error = "geometry kernel: " + error;
+        return false;
+    }
+    const bool clip_minus_w_to_w = key.clip_space == AmdGpu::ClipSpace::MinusWToW;
+    std::span<const StageInput> fs_inputs;
+    if (fs) {
+        fs_inputs = fs->stage_inputs;
+    }
+    input.pass_through = pass_through.Get(input.gs->geometry, fs_inputs, clip_minus_w_to_w, error);
+    if (!input.pass_through) {
+        error = "pass-through function: " + error;
         return false;
     }
     return true;

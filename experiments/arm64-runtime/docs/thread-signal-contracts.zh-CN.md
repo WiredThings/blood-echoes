@@ -1,5 +1,7 @@
 # 线程与信号上下文剩余导入审查（2026-10-25）
 
+> 历史研究记录，下面的“仍未接入／建议顺序”不代表当前交付门槛。2026-10-26 已完成 finalizer，以及默认关闭的普通恢复／PC 分类两项候选；完整 sigreturn 扩展按用户最新要求冻结，保留明确 missing 诊断。最新范围见 `context-interfaces-integration.zh-CN.md`。原六项集成和 shader 自动准备不再等待完整信号子系统。
+
 本轮只读审查 `__pthread_cxa_finalize`、`_is_signal_return`、`sigreturn`、`__Ux86_64_setcontext`，另做不执行游戏的自造结构控制。四项仍未接入，不能计作兼容性完成。没有改公共源码、重建共享目标、启动游戏、调用宿主上下文恢复函数或触碰正式数据。`sceKernelMlock` 由另一专项负责。
 
 ## 实际调用结构

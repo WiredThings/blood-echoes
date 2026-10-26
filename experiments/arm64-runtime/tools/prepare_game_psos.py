@@ -276,8 +276,12 @@ def prepare(config,*,services=None):
  def execute(unit,phase,allow_compile,ordinal):
   nonlocal outcome_count
   check();require_no_games();case=fresh(run,f'{phase}-{ordinal:06d}');packetdir=fresh(case,'packet');scratch=fresh(case,'source-cache');tmp=fresh(case,'tmp')
-  packet,held=freeze(unit,layout,packetdir,a.cohort,bool(allow_compile and a.allow_compile),cache_root=P/'state',artifact_cache_dir=artifact,
-        audit_stage=services['audit_stage'],audit_key_profile=services['audit_key_profile'])
+  if 'owned_geometry_pso'in unit:
+   from game_pso_geometry_adapter import freeze as geometry_freeze
+   packet,held=geometry_freeze(unit,layout,packetdir,a.cohort,bool(allow_compile and a.allow_compile),artifact_cache_dir=artifact,check=check)
+  else:
+   packet,held=freeze(unit,layout,packetdir,a.cohort,bool(allow_compile and a.allow_compile),cache_root=P/'state',artifact_cache_dir=artifact,
+         audit_stage=services['audit_stage'],audit_key_profile=services['audit_key_profile'])
   env={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))and k not in VALIDATION_ENV};env.update(options);env.update(phase_env[phase])
   env.update(BB_GPU_USER_DIR=str(gpu),BB_MTL_ARCHIVE_COMPATIBILITY_ID=a.cohort,BB_MTL_PERSIST_WARM_ARCHIVE='0',
              BB_MTL_RELEASE_WARM_ARCHIVE='1',HOME=str(case),TMPDIR=str(tmp),DYLD_PRINT_LIBRARIES='1')

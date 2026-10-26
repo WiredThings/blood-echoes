@@ -5,6 +5,7 @@
 #include "common/path_util.h"
 #include "core/emulator_settings.h"
 #include "shader_recompiler/frontend/fetch_shader.h"
+#include "shader_recompiler/fetch_compile_projection.h"
 #include "shader_recompiler/frontend/translate/translate.h"
 #include "shader_recompiler/info.h"
 #include "shader_recompiler/ir/attribute.h"
@@ -1179,13 +1180,18 @@ void Translator::EmitFetch(const GcnInst& inst) {
         IR::VectorReg dst_reg{attrib.dest_vgpr};
 
         // Read the V# of the attribute to figure out component number and type.
-        const auto buffer = attrib.GetSharp(info);
-        const auto values =
-            ir.CompositeConstruct(ir.GetAttribute(attr, 0), ir.GetAttribute(attr, 1),
-                                  ir.GetAttribute(attr, 2), ir.GetAttribute(attr, 3));
-        const auto converted =
-            IR::ApplyReadNumberConversionVec4(ir, values, buffer.GetNumberConversion());
-        const auto swizzled = ApplySwizzle(ir, converted, buffer.DstSelect());
+        const auto convert=[&](AmdGpu::NumberConversion conversion,AmdGpu::CompMapping mapping) {
+            const auto values=ir.CompositeConstruct(ir.GetAttribute(attr,0),ir.GetAttribute(attr,1),
+                                                   ir.GetAttribute(attr,2),ir.GetAttribute(attr,3));
+            const auto converted=IR::ApplyReadNumberConversionVec4(ir,values,conversion);
+            return ApplySwizzle(ir,converted,mapping);
+        };
+        const auto swizzled=[&] {
+            if(const auto* p=QueryFetchCompileProjection(info,attrib))
+                return convert(p->read_number_conversion,p->effective_dst_select);
+            const auto buffer=attrib.GetSharp(info);
+            return convert(buffer.GetNumberConversion(),buffer.DstSelect());
+        }();
         for (u32 i = 0; i < 4; i++) {
             ir.SetVectorReg(dst_reg++, IR::F32{ir.CompositeExtract(swizzled, i)});
         }

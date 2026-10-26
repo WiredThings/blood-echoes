@@ -14,6 +14,13 @@ struct Archive;
 
 namespace Shader::Gcn {
 
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+struct VertexAttribute;
+struct FetchShaderData;
+void ObserveCapturedSharp(const Shader::Info&,const VertexAttribute&,const AmdGpu::Buffer&)noexcept;
+void ObserveCapturedFetch(const Shader::Info&,const FetchShaderData&)noexcept;
+#endif
+
 struct VertexAttribute {
     enum InstanceIdType : u8 {
         None = 0,
@@ -38,6 +45,10 @@ struct VertexAttribute {
 
     AmdGpu::Buffer GetSharp(const Shader::Info& info) const {
         auto buffer = info.ReadUdReg<AmdGpu::Buffer>(sgpr_base, dword_offset);
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        // Observe the read that already happened, before address/typed-load overrides.
+        ObserveCapturedSharp(info,*this,buffer);
+#endif
         buffer.base_address += inst_offset;
         if (data_format) {
             buffer.data_format = data_format;

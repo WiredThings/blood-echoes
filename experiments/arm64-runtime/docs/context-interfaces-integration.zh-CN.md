@@ -4,6 +4,8 @@
 
 本轮完成了两个可供整合的有界候选：普通私有 libunwind 的 `__Ux86_64_setcontext` 恢复、`_is_signal_return` 的实际 0/1/2 分类。**`sigreturn` 尚未完成，不能把三个接口或全部九项写成已完成。** 普通恢复支持已证实的展开语义，不冒充完整信号恢复。
 
+**当前交付口径（2026-10-26 用户纠正后）：** 这三项是正式 Rosetta／源头也存在的未覆盖路径，目前没有血源实际运行命中证据；27 场景／282 断言是定向验证，不是游戏动态覆盖。两项候选保留 `BB_ARM_CONTEXT_IMPORTS=1` 显式门控，默认关闭；完整 `sigreturn` 保持明确 missing 诊断，不删导入、不空成功。当前已停止 owned producer／handler 投递／417 thunk 等扩展。三项不再捆绑为 shader 自动准备、原六项集成或当前交付必须完成的门槛，也不因此宣称它们永不可达。
+
 ## 普通恢复的实际推进
 
 源码在 `src/guest_ordinary_unwind.h`、`ordinary_unwind.asm`、`ordinary_unwind_bytes.h`，以及 `vendor/aether/src/core/fex/fex_guest_engine.{h,cpp}` 的最小边界查询。作者汇编与字节数组重新组装比对一致，第三方顺序参考的许可保存在 `ordinary_unwind_LICENSE.txt`。
@@ -72,3 +74,19 @@
 本轮没有改这些公共 FEX/HLE 状态字段，也没有为信号另建无限生命周期表。`sigreturn-constraint-audit.json` 把调用点、已有提交字段和上述根深度方案分别记录；这是精确的剩余边界，不是全游戏实现承诺。
 
 整合后当前 game_runtime.cpp 通过 `-fsyntax-only`（使用当前 D 源码/shim 头和已有准备依赖）；已有 27 场景、282 断言实际 FEX 控制再通过，用时 3.36 秒；Shared `evidence/ordinary-unwind-current-1792997378879745000/result.json` 保存本轮最终证据。完整游戏功能、性能/内存匹配与最终包仍留给统一收尾，不能用语法通过或夹具通过替代。
+
+### 已冻结实验：真实架构状态捕获与结构化采用
+
+本节记录已完成的有界实验，**已从默认 runtime 源码撤出**。完整作者源码保留在 `evidence/context-continuation-frozen-20261026/overlay`，带源 SHA manifest，不是构建输入。原 handler/mask accessor、continuation 字段/API、每 HLE epoch 与提交分支均未留在当前默认 runtime；原六项、Mlock/finalizer 和两项默认关闭 context 候选不受影响。下面的“捕获／排队”指冻结实验，不能按当前默认功能理解。
+
+进一步核对当前实际编译闭包发现，`DeliverGuestOrbisSignal` 没有调用者；Aether 的 `exception.cpp` 没有包含在当前 vendor/构建中。Blood Echoes 实际 `runtime_kernel.c::signal` 仍仅登记 handler，`sigprocmask` 仅维护 guest TLS mask。因此继承的 Unity `FlushPendingOrbisSignal` 不是这份血源执行组件已接通的真实 signal producer；不能拿其硬编码 guest 地址窗口、清零 GPR、虚构 RIP 的 frame 当合法 PS4 输入。
+
+冻结的“真实安全边界完整捕获／非返回采用”实验有源码与实际 FEX 正负例：overlay 的 `bb_architectural_continuation.h`、`PrototypeCaptureArchitecturalState` 和 `PrototypeQueueArchitecturalContinuation`。结构不超过 1 KiB，**是内部 native architectural snapshot，不是 PS4 Ucontext，也不是给 sigreturn 填造的假帧**。只在真正 spill 的 root HLE 边界、同一 thread owner/单调 boundary epoch 内准入；不复制 JIT bookkeeping、host 指针或 FEX 线程引用计数。
+
+捕获沿实际 FEX API 重建 flags、XMM/YMM，并保存 x87/MM、MXCSR、FS/GS 和 selectors。TLS/selector 变更、未知 AVX 能力、不可支持扩展、非法 MXCSR/x87 字段、特权 flags、异栈和可写／未知 RIP 在任何提交前拒绝。嵌套 callback 拒绝。排队只在需要时分配这份小型 snapshot，普通游戏 HLE 不分配它。
+
+第一次正控明确证伪了一个源码推断：虽然 FEX 对 `BLOCK_END` syscall 会重读 `State.rip`，项目普通 syscall veneer 不属于该路径，仅写 RIP 不会跳转，随后 RET 会从新 RSP 取错地址。没有据注释把它当通过。现候选仅接受原项目 **16 字节 `mov r10,rcx; movabs rax,operation; syscall; ret`**：不可写执行范围、完整指令字节和 operation 都须一致；任意 syscall 或改变返回序列均拒绝。Bridge.Invoke/所有 adapter RAII 正常返回后，先经 Darwin `mach_vm_write` 给同线程已拥有栈的 `target_rsp-8` 准备一个对齐 RET 目标；成功才一次提交架构状态，随后用既有 RET 完成控制转移。保护页写失败以 EFAULT 返回，未提交寄存器；HLE 自身失败会取消 pending，连目标栈槽也不写。没有 host longjmp、没有跨 C++ 析构，也没有改 FEXCore。
+
+该实验消除了先前“完整状态只有设计／提交语义未证明”的一部分障碍；**它不是 sigreturn 实现，也不再作为当前交付前置**。15 场景／112 断言实 FEX 通过，证据为 Shared `evidence/architectural-continuation-current-1793008426366889000/result.json`。它只涉及 root、同栈、当前 TLS 的内部 continuation，不支持真实 signal 的 alt-stack/mask、跨边界 frame 生命周期或改变 TLS。后续如有实际信号路径命中，再针对具体 producer/frame 证据决定是否恢复研究；本轮不继续新增 producer。`sigreturn` 导入和 417 syscall 均未注册，两个普通恢复／分类门控保持原状，正式应用和正式数据没有更新。
+
+固定 libc consumer 后续试验不是通过项：17 次原始 get-register-address 调用已执行，之后分类 wrapper 在夹具中受保护退出，Shared `evidence/owned-signal-libc-consumer-1793009540705555000` 保留失败。不能把静态地址／偏移审计或这 17 次调用写成真实 signal 投递、展开、返回闭环成功。源 hash、偏移和运行时读取测试均保留；没有把用户 libc 原始字节放进公开源码或冻结 overlay。

@@ -23,7 +23,7 @@ def geometry_fields(runtime,layout):
  def word(at):return struct.unpack_from('<I',runtime,base+at)[0]
  fields={k:word(off)for k,off in [('num_outputs',0),('num_invocations',16),('output_vertices',20),('in_vertex_data_size',24),('out_vertex_data_size',28),('in_primitive',32),('mode',52)]}
  fields.update(outputs=list(runtime[base+4:base+16]),out_primitive=list(struct.unpack_from('<4I',runtime,base+36)))
- need(fields['num_outputs']<=32 and all(v<=22 for v in fields['outputs']),'GS output map/count')
+ need(fields['num_outputs']<=3 and all(v<=22 for v in fields['outputs']),'GS output map/count')
  need(1<=fields['num_invocations']<=32 and 1<=fields['output_vertices']<=1024,'GS invocation/output bound')
  need(fields['in_vertex_data_size']<=4096 and fields['out_vertex_data_size']<=4096,'GS vertex extent')
  need(fields['in_primitive']in(0,1,2,3,4,5,6,9,10,11,12,13,17,18,19,20,21)and fields['mode']in(0,1,2,3,4)and all(v in(0,1,2)for v in fields['out_primitive']),'GS primitive/scenario enum')

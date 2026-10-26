@@ -271,6 +271,24 @@ set_source_files_properties(shim/bbport_overlay.cpp PROPERTIES
     OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/fonts/DejaVuSans.ttf")
 target_include_directories(bbgpu PRIVATE shim layer games cp shadps4 ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
 target_compile_definitions(bbgpu PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
+
+# Automatic preparation capture: built by default for the supported native
+# backend, but no service/thread/IO exists until a verified cohort is configured.
+# The historical option name remains a build-only baseline escape hatch.
+option(BB_DEV_FETCH_CAPTURE "Automatic validated local compiler-input capture" ON)
+if(BB_DEV_FETCH_CAPTURE AND APPLE AND
+   (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64" OR
+    (NOT CMAKE_OSX_ARCHITECTURES AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")))
+    set(BB_FETCH_CAPTURE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
+    target_sources(bbgpu PRIVATE
+        ${BB_FETCH_CAPTURE_SRC}/fetch_compile_observer.cpp
+        ${BB_FETCH_CAPTURE_SRC}/fetch_compile_producer.cpp
+        ${BB_FETCH_CAPTURE_SRC}/fetch_compile_canonical.cpp
+        ${BB_FETCH_CAPTURE_SRC}/fetch_companion_store.cpp
+        ${BB_FETCH_CAPTURE_SRC}/fetch_register_store.cpp)
+    target_include_directories(bbgpu PRIVATE ${BB_FETCH_CAPTURE_SRC})
+    target_compile_definitions(bbgpu PRIVATE BB_DEV_FETCH_CAPTURE=1)
+endif()
 # bbport: the Linux interfaces used here, for macOS (shim/bbport_platform.h), in every source.
 target_compile_options(bbgpu PRIVATE -include ${CMAKE_CURRENT_SOURCE_DIR}/shim/bbport_platform.h)
 target_compile_options(bbgpu PRIVATE -Wno-deprecated-declarations -Wno-missing-field-initializers)

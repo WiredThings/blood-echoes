@@ -1,0 +1,262 @@
+"""Automatic private static-input preparation at the original launch boundary.
+
+Reuse the existing inventory, GNM and full-resource readers. This module owns
+only scheduling, integrity and incremental publication, never shader decoding or
+compilation. A static program identity is explicitly NOT a complete PSO recipe.
+The child process releases its temporary decompression/index memory before play.
+"""
+from pathlib import Path
+import argparse, hashlib, json, os, signal, stat, subprocess, sys, tempfile, time
+
+SCHEMA = 1
+MAX_FILES = 100000
+MAX_METADATA = 512 * 1024 * 1024
+MAX_LINE = 32 * 1024 * 1024
+TOOLS = Path(__file__).resolve().parent
+DEPENDENCIES = ('launcher_game_catalog.py', 'game_shader_catalog.py',
+                'gnm_shader_metadata.py', 'full_game_catalog.py',
+                'static_program_links.py', 'decode_shader_cache.py')
+
+
+def need(value, message):
+    if not value:
+        raise ValueError(message)
+
+
+def directory(path):
+    path = Path(path).absolute()
+    info = path.lstat()
+    need(path == path.resolve(strict=True) and stat.S_ISDIR(info.st_mode)
+         and info.st_uid == os.getuid(), 'owned canonical preparation directory')
+    return path
+
+
+def file_sha(path, check=lambda: None):
+    path = Path(path).absolute()
+    need(path == path.resolve(strict=True), 'linked source or metadata refused')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    with os.fdopen(fd, 'rb') as stream:
+        before = os.fstat(stream.fileno())
+        need(stat.S_ISREG(before.st_mode) and before.st_uid == os.getuid(), 'owned regular source required')
+        value = hashlib.sha256()
+        for piece in iter(lambda: stream.read(1024 * 1024), b''):
+            check()
+            value.update(piece)
+        after = os.fstat(stream.fileno())
+    stamp = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+    need(stamp(before) == stamp(after), 'source changed during preparation hash')
+    return value.hexdigest(), before.st_size
+
+
+def digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def write_json(path, value):
+    """Publish only a fully written successful metadata record; retain old files."""
+    path = Path(path)
+    need(not path.is_symlink(), 'linked metadata publication target')
+    fd, temporary = tempfile.mkstemp(prefix='.catalog-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(value, stream, sort_keys=True, separators=(',', ':'))
+            stream.write('\n'); stream.flush(); os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def source_inventory(game_root, check=lambda: None):
+    """Content hashes, including additions/removals; stat-only trust is not used."""
+    root = directory(game_root)
+    sources = []
+    for base, dirs, names in os.walk(root, followlinks=False):
+        check()
+        for name in dirs:
+            directory(Path(base) / name)
+        for name in sorted(names):
+            path = Path(base) / name
+            value, size = file_sha(path, check)
+            sources.append(dict(path=str(path.relative_to(root)), sha256=value, bytes=size))
+            need(len(sources) <= MAX_FILES, 'static input file-count budget')
+    need(sources, 'empty game source inventory')
+    return sorted(sources, key=lambda row: row['path'])
+
+
+def scanner_identity(source_root):
+    """Bind scanner/parser code, original SELF loader and native stage enum."""
+    files = {name: file_sha(TOOLS / name)[0] for name in DEPENDENCIES}
+    original_loader = TOOLS.parent / 'vendor/blood_echoes/loader/prepare.py'
+    files['original-self-loader'] = file_sha(original_loader)[0]
+    files['native-runtime-info'] = file_sha(Path(source_root) / 'shader_recompiler/runtime_info.h')[0]
+    return digest(files)
+
+
+def output_receipt(root):
+    files = []
+    total = 0
+    for path in sorted(Path(root).rglob('*')):
+        if path.is_dir():
+            directory(path); continue
+        if path.name == 'READY.json':
+            continue
+        value, size = file_sha(path)
+        total += size
+        need(total <= MAX_METADATA, 'static metadata disk budget')
+        files.append(dict(path=str(path.relative_to(root)), sha256=value, bytes=size))
+    return files
+
+
+def read_ready(root, identity):
+    path = Path(root) / 'READY.json'
+    if not path.exists():
+        return None
+    file_sha(path)
+    need(path.stat().st_size <= 8 * 1024 * 1024, 'catalogue receipt bound')
+    row = json.loads(path.read_text())
+    need(row['schema'] == SCHEMA and row['identity'] == identity, 'catalogue identity mismatch')
+    need(row['files'] == output_receipt(root), 'static metadata changed after publication')
+    return row
+
+
+def build_static(*, game_root, source_root, output, identity, source_files):
+    """One worker, existing decoders. Unknown fields remain explicit gaps."""
+    import game_shader_catalog as catalog_reader
+    import gnm_shader_metadata as gnm
+    import static_program_links as links
+    from full_game_catalog import Scanner
+    root = directory(game_root); output = directory(output)
+    need(not any(output.iterdir()), 'fresh catalogue generation required')
+    catalog = catalog_reader.inventory(root)
+    # The original inventory's SELF offsets and reconstructed ELF offsets are
+    # different domains. Reuse the original bounded loader for embedded code.
+    for package in catalog['packages']:
+        if package['kind'] != 'embedded':
+            continue
+        path = root / package['path']; raw = path.read_bytes()
+        need(hashlib.sha256(raw).hexdigest() == package['sha256'], 'embedded source changed')
+        elf, _header, _ph, _segments, missing = gnm.checked_elf(raw, package['path'])
+        scanned = catalog_reader.orb_metadata(elf)
+        package.update(binary_info=scanned['records'], rejected_signature_candidates=scanned['rejected'],
+                       elf_sha256=hashlib.sha256(elf).hexdigest(), offset_domain='reconstructed-elf-bytes',
+                       compressed_segments_not_decoded=False, missing_optional_program_headers=missing)
+        del raw, elf
+    catalog['programs'] = [dict(package=p['path'], entry=e.get('name'), debug=p['debug'], **r)
+                          for p in catalog['packages'] for e in
+                          (p.get('entries', []) if p['kind'] == 'shader' else [p] if p['kind'] == 'embedded' else [])
+                          for r in e.get('binary_info', [])]
+    catalog['summary'] = dict(packages=len(catalog['packages']), program_records=len(catalog['programs']),
+                            embedded_offset_domain='reconstructed-elf-bytes', complete_psos=0)
+    catalog_path = output / 'catalog.json'; write_json(catalog_path, catalog)
+    gnm.census(root, catalog_path, output / 'gnm')
+    gap_path = output / 'gaps.jsonl'
+    accepted = output / 'accepted-headers.jsonl'
+    with accepted.open('x') as good, gap_path.open('x') as gaps:
+        for row in links.rows(output / 'gnm/headers.jsonl'):
+            if row.get('rejected') or row.get('unassociated_programs'):
+                gnm.write_row(gaps, dict(kind='unresolved-static-header', source=row))
+            else:
+                gnm.write_row(good, row)
+        good.flush(); os.fsync(good.fileno())
+        records, _entries, summary = links.collect(accepted, catalog, Path(source_root) / 'shader_recompiler/runtime_info.h')
+        with (output / 'static-program-index.jsonl').open('x') as stream:
+            for row in records:
+                gnm.write_row(stream, row)
+                gnm.write_row(gaps, dict(kind='dynamic-compile-input-required', identity=row['identity'],
+                    missing=['draw-adjusted-runtime-info', 'resource-specializations', 'complete-pipeline-state'],
+                    capture='normal-runtime-owned-input', inferred=False))
+    full = output / 'resources'; full.mkdir(mode=0o700)
+    scanner = Scanner(root, catalog_path, full, TOOLS.parent)
+    try:
+        resource_summary = scanner.run()
+    finally:
+        for stream in scanner.streams.values():
+            if not stream.closed:
+                stream.close()
+    # Do not commit a generation if any input was changed while decoding.
+    need(source_inventory(root) == source_files, 'game inputs changed during static preparation')
+    receipt = dict(schema=SCHEMA, identity=identity, status='indexed',
+                   static=summary, resources=resource_summary, files=output_receipt(output),
+                   complete_pso_claim=False, game_started=False, formal_data_modified=False)
+    write_json(output / 'READY.json', receipt)
+    return receipt
+
+
+def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: None, runner=None):
+    """Default startup entry. Run expensive decoding in one reclaimable child."""
+    started = time.monotonic(); project = directory(project); gpu = directory(gpu_root)
+    need(gpu.is_relative_to(project / 'state') and gpu != project / 'state', 'isolated selected GPU root required')
+    game = directory(game_root)
+    need(game.is_relative_to(project.parent) and not gpu.is_relative_to(game), 'isolated actual app0 required')
+    check(); sources = source_inventory(game, check)
+    scan_identity = scanner_identity(source_root)
+    identity = digest(dict(schema=SCHEMA, source_files=sources, scanner=scan_identity))
+    cache = gpu / 'automatic-game-inputs'; cache.mkdir(mode=0o700, exist_ok=True); directory(cache)
+    generation = cache / identity
+    current = cache / 'current.json'
+    if current.exists():
+        file_sha(current)
+        need(current.stat().st_size <= 4096, 'static generation pointer budget')
+        selected = json.loads(current.read_text())
+        name = selected.get('generation')
+        need(isinstance(name, str) and Path(name).name == name, 'static generation pointer path')
+        if selected.get('identity') == identity:
+            need(name == identity or name.startswith(identity + '-retry-'), 'static generation pointer identity')
+            generation = cache / name
+    ready = read_ready(generation, identity) if generation.exists() else None
+    reused = ready is not None
+    if ready is None:
+        # An interrupted generation is retained for inspection, never trusted or
+        # overwritten as a completed generation. No previous cache is deleted.
+        if generation.exists():
+            generation = cache / (identity + '-retry-' + str(time.time_ns()))
+        generation.mkdir(mode=0o700)
+        request = project / 'state' / ('catalogue-request-' + str(time.time_ns()) + '.json')
+        write_json(request, dict(game_root=str(game), source_root=str(source_root), output=str(generation),
+                                 identity=identity, source_files=sources))
+        if runner is not None:
+            runner(request, check)
+        else:
+            log_path = project / 'state' / ('catalogue-worker-' + str(time.time_ns()) + '.log')
+            with log_path.open('x') as log:
+                proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--request', str(request)],
+                    stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+                    env={k: v for k, v in os.environ.items() if not k.startswith(('DYLD_', 'BB_'))})
+                try:
+                    while proc.poll() is None:
+                        check()
+                        need(time.monotonic() - started <= 1800, 'static preparation time budget')
+                        need(log_path.stat().st_size <= 8 * 1024 * 1024, 'static preparation log budget')
+                        try: proc.wait(timeout=.1)
+                        except subprocess.TimeoutExpired: pass
+                    need(proc.returncode == 0, 'static preparation worker failed; private log: ' + str(log_path))
+                finally:
+                    if proc.poll() is None:
+                        os.killpg(proc.pid, signal.SIGTERM)
+                        try: proc.wait(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(proc.pid, signal.SIGKILL); proc.wait()
+        ready = read_ready(generation, identity)
+        need(ready is not None, 'worker did not publish complete static metadata')
+        write_json(cache / 'current.json', dict(identity=identity, generation=generation.name))
+    check()
+    return dict(catalog=generation / 'catalog.json', index=generation / 'static-program-index.jsonl',
+                game_root=game, gpu_root=gpu, source_root=Path(source_root), cache_root=cache,
+                identity=identity, cohort=cohort, generation=generation,
+                report=dict(status='reused' if reused else 'indexed', identity=identity,
+                            source_files=len(sources), scanner_identity=scan_identity,
+                            seconds=time.monotonic() - started, ready=ready,
+                            full_pso_claim=False, default_enabled=True, formal_data_modified=False))
+
+
+def main():
+    parser = argparse.ArgumentParser(); parser.add_argument('--request', required=True, type=Path)
+    args = parser.parse_args(); file_sha(args.request)
+    need(args.request.stat().st_size <= 32 * 1024 * 1024, 'static worker request budget')
+    request = json.loads(args.request.read_text())
+    build_static(**request)
+
+
+if __name__ == '__main__':
+    main()

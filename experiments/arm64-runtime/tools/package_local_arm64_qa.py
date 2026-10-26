@@ -78,6 +78,11 @@ def main():
     for metadata in ('SOURCE-PARITY.json','ARM64-LOCAL-PREPARATION.json'):
         shutil.copy2(original/metadata,stage/metadata)
     shutil.copytree(original/'native-runtime-tools',stage/'native-runtime-tools',symlinks=False)
+    # Original bounded SELF/SFO parser closure for automatic source preparation.
+    # Only admitted source code, never game data or developer fixture inputs.
+    for relative,digest in prepared['manifest']['runtime_support'].items():
+        src=original/relative;assert sha(src)==digest
+        dst=stage/relative;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
     shutil.copy2(original/'tools/macos/local_metal_startup.py',stage/'tools/macos/local_metal_startup.py')
     # Keep a new cache/data target; preserve the previous QA cache and all formal data.
     old_gpu=Path(extra['BB_GPU_USER_DIR']).resolve(strict=True)
@@ -128,7 +133,8 @@ def main():
     # new SDL and its old absolute/rpath location (duplicate Objective-C classes).
     closure={f.name:f for f in (stage/'deps-metal-arm64/lib').glob('*.dylib')}
     net_lib=stage/'bin/gpu-net/libbbnet.dylib'
-    for binary in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker,*closure.values()]:
+    module_worker=stage/component['module_consumer']if component.get('module_consumer')else None
+    for binary in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker,*([module_worker]if module_worker else[]),*closure.values()]:
         changed=False
         links=deps(binary)
         if binary.suffix=='.dylib':links=links[1:] # first otool row is LC_ID_DYLIB
@@ -144,6 +150,7 @@ def main():
     # never carry the development worker/DSO SHA across relocation.
     component['worker_sha256']=component_sha(worker)
     component['library_sha256']=component_sha(gpu_lib)
+    if module_worker is not None:component['module_consumer_sha256']=component_sha(module_worker)
     (stage/'GAME-PSO-COMPONENT.json').write_text(json.dumps(component,indent=2)+'\n')
     from game_pso_component import load as load_component
     load_component(stage)
@@ -153,7 +160,7 @@ def main():
     native=dict(schema=1,default_enabled=True,minimum_os_major=27,
         renderer_architecture='arm64 CPU via FEX and independent arm64 Metal GPU; isolated prototype',
         production=False,baseline_revision=json.loads((P/'SOURCE.json').read_text())['blood_echoes_commit'],
-        frozen_runtime={str(f.relative_to(stage)):sha(f)for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker]})
+        frozen_runtime={str(f.relative_to(stage)):sha(f)for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker,*([module_worker]if module_worker else[])]})
     (stage/'NATIVE-METAL.json').write_text(json.dumps(native,indent=2)+'\n')
     manifest=dict(schema=2,created_ns=time.time_ns(),app=str(app),private_case=case,
         host_local_only=True,portable_installer=False,formal_data_modified=False,

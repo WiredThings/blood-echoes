@@ -17,6 +17,10 @@
 #include "shader_recompiler/specialization.h"
 #include "video_core/pipeline_cache_core_types.h"
 
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+#include "fetch_module_proof.h"
+#endif
+
 namespace AmdGpu {
 class Liverpool;
 union Regs;
@@ -40,13 +44,19 @@ struct Program {
     struct Module {
         ShaderModuleHandle module;
         Shader::StageSpecialization spec;
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        BbFetchCapture::BinaryProof capture_proof;
+#endif
     };
     static constexpr size_t MaxPermutations = 8;
     using ModuleList = boost::container::small_vector<Module, MaxPermutations>;
 
     Shader::Info info;
     ModuleList modules{};
-    size_t last_used = 0; ///< bbport: permutation of the previous lookup, compared first
+    size_t last_used = 0;
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+    bool capture_remaining=true,capture_retry=false;
+#endif ///< bbport: permutation of the previous lookup, compared first
     /// bbport: `info` as translated, for draw-preparation workers (they must not read `info`,
     /// whose user data the GPU thread rewrites every draw). Guarded by programs_mutex.
     std::unique_ptr<Shader::Info> info_template;
@@ -261,7 +271,11 @@ private:
                                                    std::string_view ext);
     ShaderModuleHandle CompileModule(Shader::Info& info, Shader::RuntimeInfo& runtime_info,
                                      const std::span<const u32>& code, size_t perm_idx,
-                                     Shader::Backend::Bindings& binding);
+                                     Shader::Backend::Bindings& binding
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+                                     ,BbFetchCapture::CompileOutput* capture=nullptr
+#endif
+                                     );
     const Shader::RuntimeInfo& BuildRuntimeInfo(PipelineSelection& sel, Shader::HwStage stage,
                                                 Shader::SwStage l_stage);
 

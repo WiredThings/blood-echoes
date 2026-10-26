@@ -27,7 +27,7 @@ def cases(base):
  packet('retired-pointer-policy','owned geometry span rebinding policy',lambda p,r:p['spec_rebinding'].update(retired_pointer_exported=True))
  packet('non-GS-packet-kind','runtime plain stage discriminators',lambda p,r:p.update(kind='owned-gcn-module-input'))
  spec('invocations2','bounded geometry output/invocation count',lambda b:setword(b,hw+16,2))
- spec('outputs33','bounded geometry output/invocation count',lambda b:setword(b,hw,33))
+ spec('outputs4','bounded geometry output/invocation count',lambda b:setword(b,hw,4))
  spec('output-map-invalid','geometry output enum',lambda b:setbyte(b,hw+4,255))
  spec('vertices0','bounded geometry vertex data',lambda b:setword(b,hw+20,0))
  spec('input-vertexsize3','bounded geometry vertex data',lambda b:setword(b,hw+24,3))

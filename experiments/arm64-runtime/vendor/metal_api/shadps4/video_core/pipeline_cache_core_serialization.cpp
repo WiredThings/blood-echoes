@@ -11,6 +11,9 @@
 #include "shader_recompiler/info.h"
 #include "video_core/cache_storage.h"
 #include "video_core/pipeline_cache_core.h"
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+#include "fetch_compile_producer.h"
+#endif
 
 namespace Serialization {
 /* You should increment versions below once corresponding serialization scheme is changed. */
@@ -249,6 +252,9 @@ bool PipelineCacheCore::LoadPipelineStage(Serialization::Archive& ar, size_t sta
     // at the exact position rather than append
 
     ShaderModuleHandle module{};
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+    BbFetchCapture::BinaryProof captured_binary;
+#endif
     // bbport: a module the driver rejects is a damaged entry (WarmUp rebuilds the cache), not a
     // fatal error as when compiling.
     const auto compile = [&] {
@@ -274,6 +280,10 @@ bool PipelineCacheCore::LoadPipelineStage(Serialization::Archive& ar, size_t sta
         if (!created) {
             throw Serialization::CorruptData{"cached SPIR-V rejected by the driver"};
         }
+        #if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+        if(BbFetchCapture::Producer::Enabled()&&!EmulatorSettings.IsPatchShaders())
+            captured_binary={BbFetchStore::WordDigest(spv),spv.size(),false};
+#endif
         return created;
     };
 
@@ -299,12 +309,18 @@ bool PipelineCacheCore::LoadPipelineStage(Serialization::Archive& ar, size_t sta
                 return false;
             }
             module = it->module;
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+            captured_binary=it->capture_proof;
+#endif
         } else {
             module = compile();
             if (!module) return false;
         }
     }
     it_pgm.value()->InsertPermut(module, std::move(spec), perm_idx);
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+    it_pgm.value()->modules[perm_idx].capture_proof=captured_binary;
+#endif
 
     sel.infos[stage] = &it_pgm.value()->info;
     sel.modules[stage] = module;

@@ -5,17 +5,63 @@ from game_pso_owned_audit import checked_bytes,load_canonical_layout
 HEX=re.compile('[0-9a-f]{64}')
 def need(v,m):
  if not v:raise ValueError(m)
-def sha(p):
+def sha(p,*,owner=None):
+ if owner is None:owner=os.getuid()
  p=Path(p);need(p.is_absolute()and p==p.resolve(strict=True),'canonical component input')
  fd=os.open(p,os.O_RDONLY|os.O_CLOEXEC|os.O_NOFOLLOW)
  try:
-  a=os.fstat(fd);need(stat.S_ISREG(a.st_mode)and a.st_uid==os.getuid()and a.st_size<=512*1024*1024,'owned bounded component')
+  a=os.fstat(fd);need(stat.S_ISREG(a.st_mode)and a.st_uid==owner and a.st_size<=512*1024*1024,'owned bounded component')
   with os.fdopen(fd,'rb',closefd=False)as f:h=hashlib.file_digest(f,'sha256').hexdigest()
   b=os.fstat(fd);need((a.st_dev,a.st_ino,a.st_size,a.st_mtime_ns)==(b.st_dev,b.st_ino,b.st_size,b.st_mtime_ns),'component changed')
   return h
  finally:os.close(fd)
 def relative(root,rel):
  p=Path(rel);need(not p.is_absolute()and '..'not in p.parts and str(p)==rel,'component relative path');return root/p
+
+def repair_input_sha(path):
+ """Artifacts stay user-owned; only the selected SDK settings may be root-owned."""
+ path=Path(path)
+ if path.stat().st_uid==os.getuid():return sha(path)
+ need(path.name=='SDKSettings.json'and path.stat().st_uid==0,'unowned repair input')
+ sdk=Path(subprocess.check_output(['/usr/bin/xcrun','--sdk','macosx','--show-sdk-path'],
+  env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin'},text=True,timeout=10).strip()).resolve(strict=True)
+ need(path==sdk/'SDKSettings.json'and sdk.stat().st_uid==0,'repair SDK is not the selected root-owned SDK')
+ return sha(path,owner=0)
+
+def bind_module_repair(component_path,repair_path,*,admission_root,output):
+ """Bind a tested main-only correction to the unchanged coherent GPU/ABI.
+ Never rewrite the completed base result or silently bless compiler overrides.
+ """
+ root=Path(admission_root).resolve(strict=True);output=Path(output).absolute()
+ need(output.is_relative_to(root/'evidence')and not output.exists(),'fresh isolated repaired component manifest')
+ base=json.loads(checked_bytes(Path(component_path),limit=1024*1024)[0])
+ repair=json.loads(checked_bytes(Path(repair_path),limit=1024*1024)[0])
+ need(base['schema']==repair['schema']==1 and base['kind']=='blood-echoes-game-pso-component'
+      and repair['kind']=='coherent-game-module-main-repair','exact component/repair contracts')
+ need(base.get('coherent_renderer')is True and base.get('diagnostic_only')is False
+      and repair.get('targeted_compiler_overrides')is False and repair.get('shared_abi_headers_unchanged')is True,
+      'coherent shared-ABI main repair only')
+ need(sha(Path(repair['base_result']))==repair['base_result_sha256']==base['coherent_build_result_sha256'],
+      'repair must reference the exact completed base')
+ need(repair['source_identity']==base['coherent_source_identity'],'same coherent GPU source identity')
+ need(repair['library']==base['library']and repair['library_sha256']==base['library_sha256'],
+      'repair may not replace the renderer')
+ for field in('library','worker'):
+  need(sha(Path(base[field]))==base[field+'_sha256'],'base artifact changed: '+field)
+ need(sha(Path(repair['module_consumer']))==repair['module_consumer_sha256'],'repaired module consumer changed')
+ need(sha(Path(repair['main_source']))==repair['main_source_sha256'],'repaired main source changed')
+ for path,want in repair['compiled_header_sha256'].items():
+  need(repair_input_sha(path)==want,'repaired consumer header changed')
+ load_canonical_layout(Path(base['layout']),Path(base['source_root']),base['layout_sha256'])
+ from warm_archive_manifest import resolve_gpu_identity
+ actual=resolve_gpu_identity(Path(repair['module_consumer']),root)
+ need(actual['library']==base['library']and actual['library_sha256']==base['library_sha256'],
+      'repaired consumer actual GPU edge mismatch')
+ result=dict(base,module_consumer=repair['module_consumer'],module_consumer_sha256=repair['module_consumer_sha256'],
+             module_main_repair=dict(manifest_sha256=sha(Path(repair_path)),source_sha256=repair['main_source_sha256'],
+                                   base_source_identity=repair['source_identity']))
+ with output.open('x')as stream:json.dump(result,stream,indent=2);stream.write('\n')
+ return result
 
 class _CapabilityExitWatch:
  """Observe exit without reaping, keeping the owned PID/group reserved."""
@@ -159,6 +205,22 @@ def freeze_inputs(stage,component,library,*,rewrite,admission_root):
   layout=str(dst.relative_to(stage)),layout_sha256=sha(dst),
   source_root=str(headers.relative_to(stage)),
   fixed_helper_seed_schema=fixed_helper_capability(worker,admission_root))
+ if m.get('module_consumer')is not None:
+  # Coherent module input conversion is optional only for historical component
+  # admission. New automatic builds provide it and the actual scalar capability.
+  module=Path(m['module_consumer']);need(m.get('coherent_renderer')is True and m.get('diagnostic_only')is False,
+      'module component must be a coherent non-diagnostic build')
+  need(sha(module)==m['module_consumer_sha256'],'module consumer source identity')
+  edge=resolve_gpu_identity(module,Path(admission_root).resolve(strict=True))
+  need(edge['library']==str(Path(m['library']).resolve(strict=True))and edge['library_sha256']==m['library_sha256'],
+      'module consumer actual GPU edge/source library identity mismatch')
+  target=stage/'bin/game-module-preparer';shutil.copy2(module,target)
+  rewrite(target,Path(m['library']),library)
+  frozen.update(module_consumer=str(target.relative_to(stage)),module_consumer_sha256=sha(target),
+                coherent_renderer=True,diagnostic_only=False)
+ if m.get('automatic_capture_schema')is not None:
+  need(m['automatic_capture_schema']==1,'unknown automatic capture schema')
+  frozen['automatic_capture_schema']=1
  (stage/'GAME-PSO-COMPONENT.json').write_text(json.dumps(frozen,indent=2)+'\n')
  return frozen
 
@@ -177,4 +239,19 @@ def load(stage):
  need(actual['library']==str(result['library'])and actual['library_sha256']==result['library_sha256'],
       'packaged worker actual GPU edge/library mismatch')
  result['native_layout']=load_canonical_layout(result['layout'],result['source_root'],result['layout_sha256'])
+ if m.get('module_consumer')is not None:
+  module=relative(stage,m['module_consumer'])
+  need(module==module.resolve(strict=True)and module.is_relative_to(stage),'linked/outside module consumer')
+  need(HEX.fullmatch(m['module_consumer_sha256'])and sha(module)==m['module_consumer_sha256'],
+       'packaged module consumer changed')
+  edge=resolve_gpu_identity(module,stage)
+  need(edge['library']==str(result['library'])and edge['library_sha256']==result['library_sha256'],
+       'packaged module consumer actual GPU mismatch')
+  need(m.get('coherent_renderer')is True and m.get('diagnostic_only')is False,'invalid module producer type')
+  result.update(module_consumer=module,backend_root=stage)
+ if m.get('automatic_capture_schema')is not None:
+  need(m['automatic_capture_schema']==1,'unknown packaged capture schema')
+  exports=subprocess.check_output(['/usr/bin/nm','-gjU',str(result['library'])],text=True,timeout=10).splitlines()
+  need('_bb_fetch_companion_configure_v1'in exports,'packaged capture capability is not compiled in')
+  need(sha(result['library'])==result['library_sha256'],'capture library changed during capability check')
  return result

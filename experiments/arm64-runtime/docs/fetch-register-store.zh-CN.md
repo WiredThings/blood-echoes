@@ -1,6 +1,6 @@
 # 已捕获 fetch RegisterRead 的独立磁盘契约
 
-这是隔离开发路径的可调用源码，尚未接入共享 queue、游戏热路径、启动器或正式缓存。它补的是现有 SRT 磁盘数据没有保存的 fetch V#，不从 VkFormat 推算 Buffer，不重新读取 guest 内存。
+这是隔离开发路径的独立磁盘契约。实际 producer 已通过默认关闭的编译门控接到新模块编译路径，见 [编译期被动 producer](fetch-compile-producer.zh-CN.md)；正式构建、启动器和正式缓存均不启用它。它补的是现有 SRT 磁盘数据没有保存的 fetch V#，不从 VkFormat 推算 Buffer，不重新读取 guest 内存。
 
 ## 接口与来源
 
@@ -14,6 +14,8 @@
 `Environment.compile_inputs` 需要由输入集 owner 根据完整 canonical runtime、特化、资源描述符和配方生成；不能只填 program hash、上游 git revision 或临时路径的摘要。该字段不由 store 猜测。实际 RegisterRead 的四字内容还会**自动**参与独立摘要与文件键；不能改 Buffer 内容却沿用旧键。
 
 同一 `(pointer_index,dword_offset)` 若重复且原始 16 字节一致，writer 将它们规范化为一次读；冲突重复拒绝。每个 fetch 属性必须有完整真实读，缺读和无关额外读均拒绝。磁盘中的 reads 必须唯一且按目标排序。fetch 最多 32 个属性，原 snapshot 仍受现有单项和总计 2 MiB 限制；不为收集复制一份大型快照。
+
+新增的 `CompileSnapshot::fetch_projection` 是另一条无地址语义来源；raw store 显式拒绝任何非空 projection，不把它反造成 Buffer，也不会漏算其动态内存后继续接受。原始无该成员的类型与新增类型都由编译期适配覆盖，持久化身份仍绑定实际 native ABI/编译器。
 
 ## 目录、原子写入与预算
 
@@ -31,13 +33,13 @@ marker 由隔离测试配置创建；store 不自动生成它，也不从环境�
 
 复用现有 `BbCpuCache::Hash`。发布沿用已有 Metal artifact 的“独占临时文件 → 完整写入 → fsync/close → 原子 rename”模式，并增加原始字节读回及严格 FD 检查。任何 commit 前失败/取消均清理本次 pending，保留旧文件；不会先截断目标。取消在创建前和 fsync/读回后检查。该协议保证完整文件的原子可见性，不宣称断电后的目录项持久化保证。
 
-## 建议接点
+## 实际 producer 与准备器边界
 
-1. 输入 owner 已在有序线程完整捕获快照后，将**同一个** `shared_ptr<const CompileSnapshot>` 交给既有有界工作项。不新增一次 live guest 读取，不在普通 draw/cache-hit 上调用 writer。
-2. 在后台/加载期已通过编译输入身份校验的工作项中调用 `WriteCapturedFetch()`。写成功后才发布相应 manifest 的 trusted Expected/内容引用；预算不足或取消只记明确缺口，不影响原同步编译。
-3. 本机准备器先按 manifest 的独立期望身份读取 store，再为同一 owned code/UD/flat/runtime companion 调用 `RestoreSnapshotReads()`，继续使用现有 owned GCN 编译与 regenerated SRT 一致性校验。此契约本身不授权最终 PSO 或正式运行时导入。
+1. `CompileModule` 内仅对本来要进行的新编译设置观察 scope；原 `ParseFetchShader` 和 `GetSharp` 把本来已获得的数据通知固定数组。没有为了记录再调用一次 `Capture()`、`ParseFetchShader()` 或 `ReadUdReg()`。
+2. 正常翻译/发射及后端模块创建成功后，在原输入仍存活时形成 owned 投影并生成完整身份；仅把小 record 交给两条容量的独立后台 mailbox。原有同步编译和 GPU cache 不受记录失败影响。
+3. 未来本机准备器先按 manifest 的独立期望身份读取 store，再为同一 owned code/UD/flat/runtime companion 调用 `RestoreSnapshotReads()`，继续使用现有 owned GCN 编译与 regenerated SRT 一致性校验。此契约本身不授权最终 PSO 或正式运行时导入。
 
-当前源码核对中，`PrepareOwnedShader()` 和 `CompileSnapshot::Capture()` 已有实现，但本分支 `video_core/shim/src` 未见生产调用 `Capture()`；实际调用目前见于作者测试。因此本轮交付的是可直接接入的 writer/reader，不冒称现在游戏已在自动保存 RegisterRead。共享 queue/runtime 的具体 owner 接线由根任务统一进行。
+先前查到 `CompileSnapshot::Capture()` 只有作者测试调用；这个函数自身还会读 V#，所以新 producer 没有重复调用它，而是被动复用正常编译已经发生的读取。当前已接入的门控路径与“未来完整 companion 输入持久化”仍是两件事：仅有 fetch sidecar，不能凭空补回旧 metadata 未保存的 program base 等上下文。本轮没有放宽离线 fetch consumer 的准入，也没有声称真实游戏已完成采集。
 
 ## 验证
 
@@ -45,4 +47,4 @@ marker 由隔离测试配置创建；store 不自动生成它，也不从环境�
 python3 -m unittest discover -s experiments/arm64-runtime/tests -p 'test_fetch_register_store.py' -v
 ```
 
-两项 Python 测试包含当前 Profile 字段完整性审计，以及使用**真实原生 CompileSnapshot/Buffer 类型**的 43 项 CPU 断言。覆盖原始 16 字节往返、全部九个 fetch 字段、重复/缺失/冲突读、snapshot 尺寸、身份和 Profile 变化、摘要篡改、额外尾部、读回恢复、开发目录准入、symlink/hardlink、字节/条目预算、fsync 后取消、pending 名称碰撞时不删除他人文件及旧文件保留。测试不链接 renderer/GPU 库，不启动游戏，不读取正式数据。
+两项 Python 测试包含当前 Profile 字段完整性审计，以及使用**真实原生 CompileSnapshot/Buffer 类型**的 44 项 CPU 断言。覆盖原始 16 字节往返、全部九个 fetch 字段、重复/缺失/冲突读、snapshot 尺寸、拒绝混入 semantic projection、身份和 Profile 变化、摘要篡改、额外尾部、读回恢复、开发目录准入、symlink/hardlink、字节/条目预算、fsync 后取消、pending 名称碰撞时不删除他人文件及旧文件保留。测试不链接 renderer/GPU 库，不启动游戏，不读取正式数据。

@@ -66,6 +66,11 @@ def cli(*,project=None,execution_root=None):
   (self.runtime/'gpu_candidate_identity.py').unlink()
   with self.assertRaises(ValueError):self.build()
   self.assertFalse((self.project/'launcher-component-stages').exists())
+ def test_new_local_import_cannot_escape_frozen_tool_closure(self):
+  (self.runtime/'not_frozen.py').write_text('raise AssertionError("never execute")\n')
+  with(self.runtime/'launcher_local_aot.py').open('a')as stream:stream.write('\ndef future_path():\n import not_frozen\n')
+  with self.assertRaisesRegex(ValueError,'local dependency is not frozen'):self.build()
+  self.assertFalse((self.project/'launcher-component-stages').exists())
  def test_external_tool_import_is_not_a_frozen_closure(self):
   with(self.runtime/'local_metal_builder.py').open('a')as f:f.write("\nsys.path.insert(0,str(PROJECT/'tools'))\n")
   with self.assertRaises(ValueError):self.build()
@@ -90,4 +95,11 @@ def cli(*,project=None,execution_root=None):
  def test_tampered_even_unused_dependency_refused(self):
   stage=Path(self.build()['stage']);(stage/'native-runtime-tools/warm_archive_manifest.py').write_text('modified')
   r,output=self.invoke(stage);self.assertEqual(r.returncode,74);self.assertFalse(output.exists());self.assertIn('identity changed',r.stderr)
+ def test_original_parser_support_is_frozen_and_relocation_safe(self):
+  result=self.build();stage=Path(result['stage'])
+  for relative,original in stage_prepare.SUPPORT.items():
+   self.assertEqual((stage/relative).read_bytes(),(self.original/original).read_bytes())
+   self.assertEqual(stage_prepare.sha(stage/relative),result['manifest']['runtime_support'][relative])
+  (stage/'vendor/blood_echoes/loader/prepare.py').write_text('modified parser')
+  r,output=self.invoke(stage);self.assertEqual(r.returncode,74);self.assertFalse(output.exists());self.assertIn('parser identity changed',r.stderr)
 if __name__=='__main__':unittest.main(verbosity=2)

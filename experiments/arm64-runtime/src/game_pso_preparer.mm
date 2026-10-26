@@ -65,14 +65,62 @@ struct Stage{
  std::string logical,hardware;u64 pgm{},permutation{},hash{};
  std::vector<u8> spec;std::vector<u32> spirv;std::unique_ptr<Metal::ShaderModule> module;
 };
+// Schema 1 retains its historical GS rejection. This independent contract is
+// only for SPIR-V actually retranslated from owned GCN by the module preparer.
+bool GeometryPacket(const Json& p){
+ const bool geometry=p.at("packet_schema")==2;
+ if(geometry)Need(p.at("geometry_pso_schema")==1&&p.at("kind")=="owned-gcn-geometry-pso-input","owned geometry PSO packet contract");
+ else Need(p.at("packet_schema")==1,"candidate packet version");
+ return geometry;
+}
+void GeometryKey(bool geometry,bool compute,const VideoCore::GraphicsPipelineKey&key){
+ Need(!geometry||!compute,"geometry packet cannot contain a compute key");
+ if(!compute)Need(!key.motion_vectors&&(geometry?bool(key.stage_hashes[u32(Shader::SwStage::Geometry)]):!key.stage_hashes[u32(Shader::SwStage::Geometry)]),"motion/GS key contract rejected");
+}
+void GeometrySpan(const std::vector<u8>&spec,const Json&rebind,size_t offset){
+ Need(Metal::FunctionIdentity::Hex(rebind.at("original_spec_sha256").get<std::string>())&&
+      rebind.at("runtime_span_offset")==offset&&rebind.at("bytes")==16&&
+      rebind.at("serialized_span_zeroed")==true&&rebind.at("retired_pointer_exported")==false,"geometry sanitized spec contract");
+ Need(offset<=spec.size()&&16<=spec.size()-offset,"geometry span extent");
+ for(size_t i=0;i<16;++i)Need(spec[offset+i]==0,"geometry retired span must be zero before typed reader");
+}
+void GeometryReceipt(const Json&r,const Json&proof,const std::string&profile,bool geometry){
+ Need(proof.at("module_retranslation_schema")==1&&proof.at("status")=="completed"&&
+      proof.at("candidate_only")==true&&proof.at("runtime_cache_import_allowed")==false&&
+      proof.at("gpu_started")==false&&proof.at("native_info_srt_deserialized")==false&&
+      proof.at("old_walker_executed")==false&&proof.at("guest_memory_read")==false,
+      "owned GCN module receipt required");
+ Need(proof.at("program_hash")==r.at("program_hash")&&proof.at("logical_stage")==r.at("logical_stage")&&
+      proof.at("hardware_stage")==r.at("hardware_stage")&&proof.at("input_spec_sha256")==r.at("spec").at("sha256")&&
+      proof.at("input_profile_sha256")==profile&&proof.at("spirv_sha256")==r.at("spirv").at("sha256")&&
+      proof.at("expected_spirv_equal")==true&&proof.at("current_generated_srt_verified")==true&&
+      proof.at("unknown_program_base_rejected_before_use")==true,"exact geometry module retranslation inputs");
+ const auto provenance=r.at("source_provenance");
+ Need(provenance.at("title_id")=="CUSA03173"&&provenance.at("app_ver")=="01.09"&&
+      provenance.at("code_prefix_verified")==true&&proof.at("source_provenance")==provenance,
+      "geometry source provenance mismatch");
+ Need(Metal::FunctionIdentity::Hex(r.at("module_input_packet_sha256").get<std::string>())&&
+      proof.at("input_packet_sha256")==r.at("module_input_packet_sha256")&&
+      proof.at("input_code_sha256")==provenance.at("code_sha256"),"geometry module packet/code binding");
+ for(const auto field:{"code_sha256","container_sha256","entry_sha256"})
+  Need(Metal::FunctionIdentity::Hex(provenance.at(field).get<std::string>()),"geometry source provenance digest");
+ if(geometry){const auto copy=r.at("gs_copy"),source=copy.at("source_provenance");
+  Need(proof.at("owned_geometry_copy_rebound")==true&&proof.at("gs_copy_sha256")==copy.at("code").at("sha256")&&
+       proof.at("gs_copy_source_provenance")==source&&source.at("title_id")=="CUSA03173"&&source.at("app_ver")=="01.09"&&
+       source.at("code_prefix_verified")==true&&source.at("code_sha256")==copy.at("code").at("sha256")&&
+       source.at("container_sha256")==provenance.at("container_sha256")&&source.at("entry_sha256")==provenance.at("entry_sha256"),"geometry owned copy proof");
+ }
+}
 size_t Software(std::string_view s){constexpr std::array<std::string_view,6>a{"fragment","tessellation_control","tessellation_eval","vertex","geometry","compute"};for(size_t i=0;i<a.size();++i)if(a[i]==s)return i;throw std::runtime_error("logical stage");}
 size_t Hardware(std::string_view s){constexpr std::array<std::string_view,7>a{"fragment","vertex","geometry","export","hull","local","compute"};for(size_t i=0;i<a.size();++i)if(a[i]==s)return i;throw std::runtime_error("hardware stage");}
 Metal::ShaderStage NativeStage(size_t logical){using S=Metal::ShaderStage;constexpr std::array<S,6>a{S::Fragment,S::TessellationControl,S::TessellationEval,S::Vertex,S::Geometry,S::Compute};return a.at(logical);}
 std::vector<u8> Reference(const Json& r,const fs::path& root,size_t& total){
  fs::path p=r.at("path").get<std::string>();Need(p.parent_path()==root&&p.filename()==r.at("name").get<std::string>(),"packet file outside one frozen root");
+ Need(Metal::FunctionIdentity::Hex(r.at("sha256").get<std::string>()),"required packet file SHA256 identity");
  auto bytes=Read(p,MaxBlob,r.at("sha256"));Need(bytes.size()==r.at("bytes").get<size_t>(),"packet file byte count");
  total+=bytes.size();Need(total<=MaxTotal,"whole owned recipe budget");return bytes;
 }
+#ifndef BB_GEOMETRY_PSO_CONTRACT_ONLY
 Json Function(const Metal::CompiledShader* s,std::string label){
  Need(s&&s->function&&s->persistent_identity.valid(),"successful persistent function identity required");
  const auto route=s->persistent_identity.route==Metal::PersistentLibraryRoute::LocalMetallib?"local-metallib":"source";
@@ -115,9 +163,11 @@ int FixedHelpers(const std::string&mode,const Json&p,const fs::path&scratch,Json
  result["status"]=critical?"stopped":complete?"completed":compile?"deferred":"inputs-collected";result["all_fixed_native_ready"]=native_complete;
  std::printf("FIXED_HELPER_RESULT %s\n",result.dump().c_str());return critical?BB_ARM_EXIT_HOST_PROTECTION:0;
 }
+#endif
 
 }
 
+#ifndef BB_GEOMETRY_PSO_CONTRACT_ONLY
 int main(int argc,char**argv){@autoreleasepool {
  if(argc==2&&std::string_view(argv[1])=="--fixed-helper-seed-schema"){
   std::printf("FIXED_HELPER_CAPABILITY %u\n",Metal::HostPso::FixedSeedSchema);return 0;
@@ -134,7 +184,8 @@ int main(int argc,char**argv){@autoreleasepool {
   Directory(packet.parent_path());Need(Child(packet.parent_path(),fs::path(Shared)/"state"),"Shared packet root required");
   auto raw=Read(packet,MaxPacket);Json p=Json::parse(raw);
   if(mode=="helpers-probe"||mode=="helpers-prepare")return FixedHelpers(mode,p,scratch,result);
-  Need(p.at("packet_schema")==1&&p.at("manifest_schema")==2&&p.at("candidate_only")==true&&p.at("runtime_cache_import_allowed")==false,"candidate packet schema/policy");
+  const bool geometry_packet=GeometryPacket(p);
+  Need(p.at("manifest_schema")==2&&p.at("candidate_only")==true&&p.at("runtime_cache_import_allowed")==false,"candidate packet schema/policy");
   Need(p.at("native_info_srt_allowed")==false&&p.at("walker_bytes_passed")==0,"forbidden metadata tail");
   Need(Metal::FunctionIdentity::Hex(p.at("cache_id").get<std::string>())&&Metal::FunctionIdentity::Hex(p.at("recipe_blob_identity").get<std::string>())&&Metal::FunctionIdentity::Hex(p.at("frozen_input_set_identity").get<std::string>()),"scoped packet identities");
   result["cache_id"]=p.at("cache_id");result["recipe_blob_identity"]=p.at("recipe_blob_identity");
@@ -154,23 +205,41 @@ int main(int argc,char**argv){@autoreleasepool {
   const bool compute=Word(keybytes,4)==1;
   Serialization::Archive keyar{std::vector<u8>(keybytes.begin()+8,keybytes.end())};
   VideoCore::GraphicsPipelineKey key{};Vulkan::ComputePipelineKey ckey{};Metal::GraphicsSerialization data;
-  if(compute)ckey.Deserialize(keyar);else{key.Deserialize(keyar);data.Deserialize(keyar);Need(!key.motion_vectors&&!key.stage_hashes[u32(Shader::SwStage::Geometry)],"motion/GS key rejected");}
+  if(compute)ckey.Deserialize(keyar);else{key.Deserialize(keyar);data.Deserialize(keyar);}
+  GeometryKey(geometry_packet,compute,key);
+  if(geometry_packet)Need(!data.vertex_attributes.empty()||key.vertex_buffer_formats[0]==vk::Format::eUndefined,"geometry pipeline missing original vertex attributes");
+  std::string retranslation_profile;
+  if(geometry_packet){auto profile=Reference(p.at("retranslation_profile"),packet.parent_path(),total);
+   Need(profile.size()==16+sizeof(Shader::Profile)&&Word(profile,0)==0x42425043&&Word(profile,4)==10&&Word(profile,8)==7&&Word(profile,12)==5,"geometry retranslation profile ABI");
+   retranslation_profile=p.at("retranslation_profile").at("sha256").get<std::string>();}
   Need(p.at("stages").size()>0&&p.at("stages").size()<=6,"stage count");
   std::vector<Stage> stages;std::array<bool,6> present{};
   for(const auto& r:p.at("stages")){
    Stage s;s.logical=r.at("logical_stage");s.hardware=r.at("hardware_stage");const auto sw=Software(s.logical),hw=Hardware(s.hardware);
-   Need(!present[sw]&&sw!=u32(Shader::SwStage::Geometry)&&hw!=u32(Shader::HwStage::Geometry),"duplicate/GS stage rejected");present[sw]=true;
+   Need(!present[sw]&&(geometry_packet||(sw!=u32(Shader::SwStage::Geometry)&&hw!=u32(Shader::HwStage::Geometry))),"duplicate/GS stage rejected");present[sw]=true;
+   if(geometry_packet)Need((sw==u32(Shader::SwStage::Vertex)&&(hw==u32(Shader::HwStage::Export)||hw==u32(Shader::HwStage::Vertex)))||
+     (sw==u32(Shader::SwStage::Geometry)&&hw==u32(Shader::HwStage::Geometry))||
+     (sw==u32(Shader::SwStage::Fragment)&&hw==u32(Shader::HwStage::Fragment)),"geometry ES/GS/FS stage set");
    s.pgm=Hash(r.at("program_hash"));s.permutation=r.at("permutation").get<u64>();s.hash=Hash(r.at("permutation_hash"));
    Need(s.hash==(compute?ckey.value:key.stage_hashes[sw]),"key/meta permutation equality");
    s.spec=Reference(r.at("spec"),packet.parent_path(),total);
    Need(r.at("spec").at("source_offset")==24&&r.at("spec").at("native_spec_only_reader_allowed")==true,"audited spec-only region");
    // Exact immutable spec interval was bounded-audited before packet creation.
    // This original reader does not touch Info, flat tables, SRT or walker code.
+   if(geometry_packet&&hw==u32(Shader::HwStage::Geometry)){
+    constexpr size_t span_offset=sizeof(Shader::Backend::Bindings)+offsetof(Shader::RuntimeInfo,hw)+offsetof(Shader::HwGeometryRuntimeInfo,vs_copy);
+    GeometrySpan(s.spec,r.at("spec_rebinding"),span_offset);
+   }
+   auto spv=Reference(r.at("spirv"),packet.parent_path(),total);
+   if(geometry_packet){auto receipt=Json::parse(Reference(r.at("retranslation_receipt"),packet.parent_path(),total));
+    GeometryReceipt(r,receipt,retranslation_profile,hw==u32(Shader::HwStage::Geometry));}
    SpecEnvelope(s.spec);Serialization::Archive specar{std::vector<u8>(s.spec)};Shader::StageSpecialization spec{};
    Need(spec.Deserialize(specar)&&specar.IsEoS(),"strict original spec-only reader extent");
    Need(u32(spec.runtime_info.sw_stage)==sw&&u32(spec.runtime_info.hw_stage)==hw,"actual spec logical/hardware stage");
    if(hw==u32(Shader::HwStage::Vertex))Need(!spec.runtime_info.hw.vs.motion_vectors,"actual motion VS rejected");
-   auto spv=Reference(r.at("spirv"),packet.parent_path(),total);
+   if(geometry_packet&&hw==u32(Shader::HwStage::Geometry)){const auto copy=r.at("gs_copy");auto code=Reference(copy.at("code"),packet.parent_path(),total);
+     Need(code.size()>=8&&code.size()%4==0&&Word(code,0)==0xBEEB03FF&&Hash(copy.at("program_hash"))==spec.runtime_info.hw.gs.vs_copy_hash,"geometry copy code/hash bound");
+   }
    Need(spv.size()%4==0&&spv.size()>=20&&Word(spv,0)==0x07230203,"complete SPIR-V shape");
    s.spirv.resize(spv.size()/4);memcpy(s.spirv.data(),spv.data(),spv.size());
    Need(Metal::ReadShaderStage(s.spirv)==NativeStage(sw),"actual SPIR-V stage");stages.push_back(std::move(s));
@@ -182,15 +251,26 @@ int main(int argc,char**argv){@autoreleasepool {
   Need(compiler.CacheDir()==scratch,"actual fresh source cache_dir");
   std::array<Metal::ShaderModule*,VideoCore::MaxShaderStages> modules{};
   for(auto& s:stages){Stop();auto name=VideoCore::PipelineCacheCore::GetShaderName(static_cast<Shader::HwStage>(Hardware(s.hardware)),s.pgm,s.permutation);
-   s.module=Metal::CachedVariants::BuildModule(compiler,s.spirv,name);Need(s.module&&s.module->status==Metal::CompileStatus::Ok,"original module compile failed");
+   s.module=Metal::CachedVariants::BuildModule(compiler,s.spirv,name);
+   // The runtime's variants_only GS path does not require a usable plain ES.
+   // Preserve that behavior; the three actual ES kernels must still all succeed.
+   const bool geometry_export=geometry_packet&&Software(s.logical)==u32(Shader::SwStage::Vertex);
+   Need(s.module&&(s.module->status==Metal::CompileStatus::Ok||
+        (geometry_export&&s.module->stage==Metal::ShaderStage::Vertex&&!s.module->spirv.empty())),"original module compile failed");
    modules[Software(s.logical)]=s.module.get();}
-  Json functions=Json::array();const Metal::CompiledShader* vs=nullptr,*fragment=nullptr,*cs=nullptr;Metal::TessellationInput tess;
+  Json functions=Json::array();const Metal::CompiledShader* vs=nullptr,*fragment=nullptr,*cs=nullptr;Metal::TessellationInput tess;Metal::GeometryPipelineInput geometry_input;
+  std::unique_ptr<Metal::Geometry::PassThroughCache> pass_through;
+  if(geometry_packet)pass_through=std::make_unique<Metal::Geometry::PassThroughCache>(device);
   std::string error;bool unsupported=false;const bool is_tess=present[u32(Shader::SwStage::TessellationControl)];
   bool rect=false;
   if(compute){cs=modules[u32(Shader::SwStage::Compute)]->shader.get();functions.push_back(Function(cs,"compute"));}
   else {
    if(present[u32(Shader::SwStage::Fragment)]){fragment=modules[u32(Shader::SwStage::Fragment)]->shader.get();functions.push_back(Function(fragment,"fragment"));}
-   if(is_tess){tess.vertex_attributes=data.vertex_attributes;const bool prepared=Metal::CachedVariants::Tessellation(compiler,modules,tess,error,unsupported);Need(prepared,error.c_str());
+   if(geometry_packet){geometry_input.vertex_attributes=data.vertex_attributes;
+    const bool prepared=Metal::CachedVariants::Geometry(compiler,*pass_through,key,modules,fragment,geometry_input,error,unsupported);Need(prepared,error.c_str());
+    for(size_t i=0;i<3;++i)functions.push_back(Function(geometry_input.es[i],"geometry-export-index-"+std::to_string(i)));
+    functions.push_back(Function(geometry_input.gs,"geometry-kernel"));functions.push_back(Function(geometry_input.pass_through,"geometry-pass-through"));}
+   else if(is_tess){tess.vertex_attributes=data.vertex_attributes;const bool prepared=Metal::CachedVariants::Tessellation(compiler,modules,tess,error,unsupported);Need(prepared,error.c_str());
     for(size_t i=0;i<3;++i)functions.push_back(Function(tess.vertex[i],"tess-vertex-"+std::to_string(i)));
     functions.push_back(Function(tess.control,"tess-control"));functions.push_back(Function(tess.eval,"tess-eval"));}
    else {auto*m=modules[u32(Shader::SwStage::Vertex)];rect=key.prim_type==AmdGpu::PrimitiveType::RectList;
@@ -198,7 +278,9 @@ int main(int argc,char**argv){@autoreleasepool {
   }
   Stop();result["functions"]=functions;result["fresh_actual_source_cache_dir"]=scratch.string();
   bool any_source=false;for(const auto& f:functions)any_source|=f.at("actual_route")=="source";result["source_fallback"]=any_source;
-  result["family"]=compute?"compute":is_tess?"tessellation":rect?"rectlist":"ordinary-graphics";
+  result["family"]=geometry_packet?"owned-gcn-geometry":compute?"compute":is_tess?"tessellation":rect?"rectlist":"ordinary-graphics";
+  if(geometry_packet){result["geometry_pso_schema"]=1;result["source_retranslation_receipts_verified"]=true;result["retired_geometry_span_read"]=false;
+   result["geometry_index_variants"]=3;result["expected_native_artifacts"]=5;result["native_function_count"]=functions.size();}
   if(mode=="prepare"){
    // Main archive never reads an old source-cache path. No full-game GPU Runtime.
    const char* persist=getenv("BB_MTL_PERSIST_WARM_ARCHIVE");Need(persist&&std::string_view(persist)=="0","headless main archive must be disabled before construction");
@@ -209,6 +291,15 @@ int main(int argc,char**argv){@autoreleasepool {
    pso.ReleaseWarmArchive();const bool allow=p.at("allow_compile").get<bool>();pso.SetArtifactPreparation(true,allow);
    bool ready=false;
    if(compute)ready=pso.GetComputePipeline(ckey,cs)!=nullptr;
+   else if(geometry_packet){const auto* pipeline=pso.GetGeometryPipeline(key,geometry_input,fragment);ready=pipeline!=nullptr;
+    // Preserve BB_GS_DEBUG's original internal fragment replacement and report
+    // its actual provenance too; never label the original FS as that function.
+    if(pipeline&&pipeline->render&&pipeline->render->fs&&pipeline->render->fs!=fragment){
+     auto actual=Function(pipeline->render->fs,"geometry-actual-render-fragment");functions.push_back(actual);
+     result["functions"]=functions;result["native_function_count"]=functions.size();
+     result["source_fallback"]=any_source||actual.at("actual_route")=="source";
+    }
+   }
    else if(is_tess)ready=pso.GetTessellationPipeline(key,tess,fragment)!=nullptr;
    else ready=pso.GetRenderPipeline(key,vs,fragment,{.vertex_attributes=data.vertex_attributes,.rect_list_triangles=rect})!=nullptr;
    result["native_pipeline_ready"]=ready;result["allow_compile"]=allow;
@@ -226,3 +317,4 @@ int main(int argc,char**argv){@autoreleasepool {
  }catch(const std::exception& e){result["status"]=interrupted?"stopped":"rejected";result["error"]=e.what();
   std::fprintf(stderr,"GAME_PSO_RESULT %s\n",result.dump().c_str());return interrupted?70:65;}
 }}
+#endif

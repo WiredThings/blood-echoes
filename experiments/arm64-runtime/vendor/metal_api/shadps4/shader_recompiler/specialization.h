@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "shader_recompiler/backend/bindings.h"
 #include "shader_recompiler/frontend/fetch_shader.h"
+#include "shader_recompiler/fetch_compile_projection.h"
 #include "shader_recompiler/info.h"
 #include "shader_recompiler/profile.h"
 
@@ -115,6 +116,14 @@ struct StageSpecialization {
         : info{&info_}, runtime_info{runtime_info_}, start{start_} {
         fetch_shader_data = Gcn::ParseFetchShader(info_);
         if (info_.sw_stage == SwStage::Vertex && fetch_shader_data) {
+            if(info_.compile_snapshot&&HasFetchCompileProjection(info_)) {
+                for(const auto& attribute:fetch_shader_data->attributes) {
+                    const auto& projection=*QueryFetchCompileProjection(info_,attribute);
+                    auto& spec=vs_attribs.emplace_back();
+                    spec.divisor=projection.divisor;spec.num_class=projection.number_class;
+                    spec.dst_select=projection.effective_dst_select;
+                }
+            } else {
             // Specialize shader on VS input number types to follow spec.
             ForEachSharp(vs_attribs, fetch_shader_data->attributes,
                          [this](auto& spec, const auto& desc, AmdGpu::Buffer sharp) {
@@ -130,6 +139,7 @@ struct StageSpecialization {
                              spec.num_class = AmdGpu::GetNumberClass(sharp.GetNumberFmt());
                              spec.dst_select = sharp.DstSelect();
                          });
+            }
         }
         const auto number_conversion = [failure](auto& spec, const auto& sharp, bool image) {
             if (!failure) {

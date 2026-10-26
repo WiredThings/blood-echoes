@@ -1,0 +1,30 @@
+{
+  "status": "frozen-source-readonly-reviewed",
+  "default_context_candidate_enabled": false,
+  "sigreturn_registered": false,
+  "unknown_import_diagnostic_retained": true,
+  "original_six_routes_retained": true,
+  "new_accessor_and_continuation_removed_from_runtime": true,
+  "private_game_bytes_in_overlay": false,
+  "overlay_payload_audit": "11 UTF8 source/JSON files only; test reads user boot at runtime; no extracted bytes/binary/frame/cache",
+  "source_sha256": {
+    "src/game_runtime.cpp": "0cb0de7fc043b54c2244dfde2ae17dc635f5ea7b50dd9fe3d602e44698422c0e",
+    "src/guest_process_parameters.h": "5c4d1add135a73bda1d10bdc388c534077ac5fc107dc7e3d2483339798d9eaed",
+    "src/guest_ordinary_unwind.h": "2dd6e6eada3b456657e35eaeb29754698e84d4ef91bd590285891f22b4e5ec97",
+    "src/guest_signal_return_classifier.h": "7756f6fc3bc35101603c25d38a8f258ed9833e1f4c3c1bfc2bb72e57f4b9793a",
+    "vendor/aether/src/core/fex/fex_guest_engine.h": "85a8c279ebd3b37ffde713f24177c96a01be33c9d3006d31c9336fa0bf38672c",
+    "vendor/aether/src/core/fex/fex_guest_engine.cpp": "5131f36ad8570a2ad058cbbc84e08179cc726c5431e673dbe4beff9fd32310b7",
+    "vendor/bb_runtime/src/runtime.h": "6209b4123f3fc6b26c5ef28cb7c0e2ff69c6f601eac7b887a71eaca6dded4c81",
+    "vendor/bb_runtime/src/runtime_kernel.c": "e37143fcb4635db2473c928a1753f9a3dfdd15f26ac6a555b29408a38c2839d8",
+    "vendor/bb_runtime/src/runtime_memory.c": "21bb7d249a53e95efe86ab59d6406cca7ec9a87e578c5adcac6b261cd3284ce6",
+    "vendor/bb_runtime/src/bounded_mlock.h": "69520e712c54ff23d632dd7a6e87d0e1d47742fb84b7d38b747ffdb64c884257",
+    "vendor/bb_runtime/src/runtime.c": "01ee33af21eac3e13f23e01bfb863383b81617927b36970de9f5ee42c0c5ae36",
+    "vendor/bb_runtime/src/runtime_thread.c": "6092cad70c380d601720dfbbdd4689b54a8b42ed0566b78dac646565eaa9e7c1"
+  },
+  "upstream_scope": {
+    "shadps4_2cdefaa1": "user-provided-investigation-not-rechecked-in-worktree",
+    "bbport_8185b88d": "existing bounded runtime.c/runtime_kernel.c/probe.c audit"
+  },
+  "new_game_or_signal_tests_run": false,
+  "formal_data_modified": false
+}
