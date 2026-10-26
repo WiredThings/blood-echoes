@@ -1,3 +1,6 @@
+# Project tools use Python 3.11 APIs. Reuse CMake's selected interpreter;
+# never rediscover python3 from a build subprocess's restricted PATH.
+find_package(Python 3.11 REQUIRED COMPONENTS Interpreter)
 # Compile-time source/generated/dependency locations are independent of the
 # existing private runtime root. Legacy defaults keep old developer builds valid;
 # configure.py's normal path supplies every location explicitly.
@@ -339,7 +342,7 @@ else()
  set(BB_CPU_CACHE_RENDERER_ROOT "${BB_ARM_GPU_LIBRARY_DIR}")
 endif()
 add_custom_command(OUTPUT ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANIFEST}
- COMMAND /usr/bin/env python3 ${BB_ARM64_PROTOTYPE_DIR}/tools/make_cpu_cache_build.py
+ COMMAND "${Python_EXECUTABLE}" ${BB_ARM64_PROTOTYPE_DIR}/tools/make_cpu_cache_build.py
   --source-root "${BB_ARM64_PROTOTYPE_DIR}" --build-root "${CMAKE_BINARY_DIR}"
   --renderer-root "${BB_CPU_CACHE_RENDERER_ROOT}"
   --runtime-part fex=$<TARGET_FILE:FEXCore>
