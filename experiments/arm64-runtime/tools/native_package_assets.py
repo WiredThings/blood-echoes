@@ -100,7 +100,12 @@ class Relocator:
                 any(candidate.is_relative_to(root) for root in (loader.parent, *self.search_dirs)))
 
     def _expand(self, value, loader, executable):
-        if value.startswith('@loader_path/'):
+        if value == '@loader_path':
+            path = loader.parent
+        elif value == '@executable_path':
+            need(executable is not None, 'executable context required')
+            path = executable.parent
+        elif value.startswith('@loader_path/'):
             path = loader.parent / value[len('@loader_path/'):]
         elif value.startswith('@executable_path/'):
             need(executable is not None, 'executable context required')
@@ -108,7 +113,7 @@ class Relocator:
         elif value.startswith('/'):
             path = Path(value)
         else:
-            raise ValueError('unsupported load path')
+            raise ValueError('unsupported load path: '+value)
         path = path.resolve(strict=False)
         need(self._allowed(path, loader), 'dependency escapes declared source roots')
         return path

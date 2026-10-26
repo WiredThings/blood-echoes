@@ -136,6 +136,22 @@ class Assets(unittest.TestCase):
         r = self.relocator(); r.copy(app, self.engine / 'app')
         self.assertIn(self.engine / 'deps-metal-arm64/lib/c', r.machos)
 
+    def test_bare_loader_runpath_uses_actual_owner_directory(self):
+        app = self.binary('app', True); lib = self.binary('lib/a'); other = self.binary('lib/b')
+        self.edges[app] = [str(lib)]; self.edges[lib] = ['@rpath/b']
+        self.cmds[lib] = [('LC_RPATH','@loader_path')]
+        r = self.relocator(); r.copy(app,self.engine/'app')
+        self.assertIn(self.engine/'deps-metal-arm64/lib/b',r.machos)
+
+    def test_bare_executable_runpath_requires_and_uses_real_main(self):
+        app = self.binary('app', True); lib = self.binary('lib/a'); other = self.binary('b')
+        self.edges[app] = [str(lib)]; self.edges[lib] = ['@rpath/b']
+        self.cmds[lib] = [('LC_RPATH','@executable_path')]
+        r = self.relocator(); r.copy(app,self.engine/'app')
+        self.assertIn(self.engine/'deps-metal-arm64/lib/b',r.machos)
+        with self.assertRaisesRegex(ValueError,'context'):
+            self.relocator()._expand('@executable_path',lib,None)
+
     def test_false_system_traversal_rejected(self):
         app = self.binary('app', True); self.edges[app] = ['/usr/lib/../../tmp/not-system']
         with self.assertRaisesRegex(ValueError, 'system'): self.relocator().copy(app, self.engine / 'app')
