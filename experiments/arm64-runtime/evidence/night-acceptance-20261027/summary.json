@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "in-progress-not-promoted",
+  "status": "local-code-installed-awaiting-user-acceptance",
   "original_swift_conditions": {
     "BB_MTL_keys": 92,
     "four_resource_protections": true
@@ -51,11 +51,11 @@
     "strict_pso_hits": 8,
     "strict_pso_attempts": 8
   },
-  "local_app_replaced": false,
+  "local_app_replaced": true,
   "release_updated": false,
   "published_documentation_updated": false,
   "formal_saves_settings_cache_modified": false,
-  "qualification": "Latest staged formal layout passed original F2/new-checkpoint/F3/offline supervisor/automatic continue with actual nested ARM64 CPU and pre/post whole-app seals. Scripted QA API, not physical keys or full visual/network acceptance. Original QA source save unchanged; formal app/data untouched. Matched Rosetta cold/warm run in progress.",
+  "qualification": "Latest formal-layout code passed isolated cold/warm, real Local/strict-PSO reuse, F2/new-checkpoint/F3/offline supervisor/automatic continue and pre/post whole-app seals. Normal ARM64 binaries, native load identities and106 ARM64 MachO files verified. Scripted QA API, not physical keys or complete visual/network/long exploration acceptance. Short static samples do not establish whole-game memory stability or a stable speedup. Local application code atomically replaced only after these checks; previous app code retained; formal data untouched. Goal remains active; Release/public docs await human feedback.",
   "targeted_python_controls": null,
   "normal_rebuild": {
     "source_base_revision": "f8d35f4f",
@@ -92,10 +92,7 @@
     "revised_reader_actual_log_replay_passed": true,
     "revised_reader_fresh_live_run_pending": true
   },
-  "remaining_code_blockers": [
-    "Matched cold/warm scene performance and memory comparison pending; conditional local install not yet performed",
-    "First empty-cache F3 repeated full preparation (343.24s); seeded same-supervisor fast path already passed (41.11s)"
-  ],
+  "remaining_code_blockers": [],
   "targeted_results": {
     "initial_receipt_clone_metadata_scope_cache_controls": 143,
     "phase_and_original_launcher_controls": 36,
@@ -203,5 +200,137 @@
     "F3_to_scene_seconds": 343.24084962497,
     "swap_growth_mib": 599.0,
     "peak_pressure": 2
-  }
+  },
+  "Rosetta_reference": {
+    "evidence": "original-launch-benchmark-1793050009750057000",
+    "source": "code-only installed 0.2.51 copy; two Note attributes and unsigned image seals normalized only in isolated copy",
+    "runs": [
+      {
+        "run": 1,
+        "status": "sampled",
+        "scene_ready": 21.56592795799952,
+        "scene_sample": {
+          "frames": 1465,
+          "fps": 48.80505893585649,
+          "p95_ms": 21.24,
+          "p99_ms": 22.39,
+          "gpu_ms": 19.28762457337884,
+          "draws_median": 1367,
+          "camera": {
+            "cam_x": "-190.784",
+            "cam_y": "-27.226",
+            "cam_z": "71.116"
+          },
+          "combined_footprint_mib": 5716.294326782227
+        },
+        "swap_growth_mib": 111.8125,
+        "peak_pressure": 2,
+        "source_save_unchanged": true
+      },
+      {
+        "run": 2,
+        "status": "sampled",
+        "scene_ready": 17.434423082973808,
+        "scene_sample": {
+          "frames": 1441,
+          "fps": 48.01665554830622,
+          "p95_ms": 21.34,
+          "p99_ms": 22.06,
+          "gpu_ms": 19.60179042331714,
+          "draws_median": 1367,
+          "camera": {
+            "cam_x": "-190.784",
+            "cam_y": "-27.226",
+            "cam_z": "71.116"
+          },
+          "combined_footprint_mib": 5646.723670959473
+        },
+        "swap_growth_mib": -57.4375,
+        "peak_pressure": 2,
+        "source_save_unchanged": true
+      }
+    ]
+  },
+  "empty_queue_F3_fix": {
+    "source_revision": "340e9c86",
+    "author_controls": 38,
+    "same_native_binaries": true,
+    "QA12_archive_sha256": "6629a74eb7f307449bb6c127ff4629be3c540d337d3aa9f2024853349f6e13fa",
+    "real_formal_profile_functional_test": "functional-checked",
+    "formal_MachO_files": 106,
+    "formal_MachO_architectures": [
+      "arm64"
+    ],
+    "reference_and_ARM_same_settings": true,
+    "private_evidence": "original-launch-benchmark-1793051466746064000",
+    "F2_new_checkpoint": true,
+    "F3_offline_supervisor": true,
+    "native_automatic_continue": true,
+    "F3_to_scene_seconds": 84.68811645894311,
+    "game_preparation_reuse_seconds": 0.817793,
+    "whole_app_pre_and_post_seal": "verified",
+    "source_QA_save_unchanged": true,
+    "swap_growth_mib": 65.0,
+    "peak_pressure": 2
+  },
+  "ARM_matched_performance": {
+    "status": "sampled",
+    "evidence": "original-launch-benchmark-1793050432977251000",
+    "comparison": "matched-performance.json",
+    "stable_speedup_claim": false,
+    "combined_footprint_difference_mib": [
+      112.09342193603516,
+      293.2111358642578
+    ],
+    "same_camera_and_draw_count": true,
+    "pressure_max_both_runtimes": 2
+  },
+  "runtime_reuse": {
+    "counter_semantics": "sum complete per-frame delta rows; last row is not cumulative",
+    "ARM_initial": {
+      "runtime_compiles": 390,
+      "source_calls": 237,
+      "source_failed": 0,
+      "local_calls": 9,
+      "local_failed": 0
+    },
+    "ARM_warm": {
+      "runtime_compiles": 6,
+      "source_calls": 4,
+      "source_failed": 0,
+      "local_calls": 11,
+      "local_failed": 0,
+      "strict_pso_hits": 13,
+      "strict_pso_attempts": 13
+    },
+    "final_F3": {
+      "runtime_compiles": 0,
+      "source_calls": 0,
+      "source_failed": 0,
+      "local_calls": 11,
+      "local_failed": 0,
+      "strict_pso_hits": 13,
+      "strict_pso_attempts": 13
+    },
+    "qualification": "Counts after GPU-ready include loading/menu. Matched scene final30s compiles=0; this is not a whole-game coverage claim. Final functional frame file belongs to the replacement process."
+  },
+  "local_install": {
+    "installed_app": "/Applications/Blood Echoes.app",
+    "source_revision": "340e9c8685f5d70ec76c332a64b00ac422f5fad8",
+    "code_backup_evidence": "local-code-install-1793052095936738000",
+    "atomic_exchange": true,
+    "post_copy_and_install_seal": "verified",
+    "bundle_id_preserved": true,
+    "formal_GUI_started": false,
+    "QA_progress_adopted": false,
+    "old_QA_GUI_closed": true,
+    "archive_sha256": "72ca0f481753128d96ed5ae767e1f7b6845b1c2ec480b27942bc3c62ec0dc8e1",
+    "archive_bytes": 50876110,
+    "archive_entries": 987
+  },
+  "remaining_acceptance_and_delivery": [
+    "User morning gameplay acceptance (combat/new areas/online/full visual behavior not retested tonight)",
+    "Release and public documentation intentionally deferred until user confirmation",
+    "Source archive normal native build verified; dependency prefixes were reused, not a fresh all-dependency build"
+  ]
 }

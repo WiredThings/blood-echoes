@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "same_original_Swift_receipt": true,
+  "same_settings_mods_patch_hashes": true,
+  "same_camera_and_draw_count": true,
+  "silent": true,
+  "Cua": false,
+  "screen_capture": false,
+  "profiler": false,
+  "scene_seconds_each": 90,
+  "result_window_seconds": 30,
+  "private_empty_then_warm_cache": true,
+  "formal_data_modified": false,
+  "runs": {
+    "Rosetta": [
+      {
+        "run": 1,
+        "status": "sampled",
+        "startup_seconds": 21.56592795799952,
+        "scene": {
+          "frames": 1465,
+          "fps": 48.80505893585649,
+          "p95_ms": 21.24,
+          "p99_ms": 22.39,
+          "gpu_ms": 19.28762457337884,
+          "draws_median": 1367,
+          "camera": {
+            "cam_x": "-190.784",
+            "cam_y": "-27.226",
+            "cam_z": "71.116"
+          },
+          "combined_footprint_mib": 5716.294326782227
+        },
+        "swap_growth_mib": 111.8125,
+        "peak_pressure": 2,
+        "pre_seal": "verified",
+        "post_seal": "verified",
+        "source_save_unchanged": true
+      },
+      {
+        "run": 2,
+        "status": "sampled",
+        "startup_seconds": 17.434423082973808,
+        "scene": {
+          "frames": 1441,
+          "fps": 48.01665554830622,
+          "p95_ms": 21.34,
+          "p99_ms": 22.06,
+          "gpu_ms": 19.60179042331714,
+          "draws_median": 1367,
+          "camera": {
+            "cam_x": "-190.784",
+            "cam_y": "-27.226",
+            "cam_z": "71.116"
+          },
+          "combined_footprint_mib": 5646.723670959473
+        },
+        "swap_growth_mib": -57.4375,
+        "peak_pressure": 2,
+        "pre_seal": "verified",
+        "post_seal": "verified",
+        "source_save_unchanged": true
+      }
+    ],
+    "ARM64": [
+      {
+        "run": 1,
+        "status": "sampled",
+        "startup_seconds": 443.20390770805534,
+        "scene": {
+          "frames": 1467,
+          "fps": 48.878819178356046,
+          "p95_ms": 21.39,
+          "p99_ms": 22.53,
+          "gpu_ms": 19.271199727334697,
+          "draws_median": 1367,
+          "camera": {
+            "cam_x": "-190.784",
+            "cam_y": "-27.226",
+            "cam_z": "71.116"
+          },
+          "combined_footprint_mib": 5828.387748718262
+        },
+        "swap_growth_mib": 499.0,
+        "peak_pressure": 2,
+        "pre_seal": "verified",
+        "post_seal": "verified",
+        "source_save_unchanged": true
+      },
+      {
+        "run": 2,
+        "status": "sampled",
+        "startup_seconds": 345.2257305829553,
+        "scene": {
+          "frames": 1397,
+          "fps": 46.55377127202431,
+          "p95_ms": 25.22,
+          "p99_ms": 38.86,
+          "gpu_ms": 19.85710808876163,
+          "draws_median": 1367,
+          "camera": {
+            "cam_x": "-190.784",
+            "cam_y": "-27.226",
+            "cam_z": "71.116"
+          },
+          "combined_footprint_mib": 5939.9348068237305
+        },
+        "swap_growth_mib": -5.4375,
+        "peak_pressure": 2,
+        "pre_seal": "verified",
+        "post_seal": "verified",
+        "source_save_unchanged": true
+      }
+    ]
+  },
+  "qualification": "Two sequential runs per runtime, not randomized ABBA or sustained exploration. ARM warm final30s slowed while first30s was49.34 and middle30s48.76FPS; no scene compiles and no substantial concurrent pageins. Combined footprints may double-count shared pages. Comparable overall throughput, no stable speedup claim; no evidence of sustained growth in these short static samples."
+}
