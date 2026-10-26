@@ -93,8 +93,8 @@
     "revised_reader_fresh_live_run_pending": true
   },
   "remaining_code_blockers": [
-    "Actual formal bundle/role consumers and original non-Shared root integration; no new ticket protocol or full scope-prototype requirement",
-    "F3 same-supervisor preparation scheduling candidate needs new package/live proof; default full integrity checks retained"
+    "Native module helper must add interpreter-level -B beside -I to prevent signed-app bytecode writes; small CPU rebuild and new staged code required",
+    "Actual staged formal-layout CLI/F3 and matched scene-memory acceptance pending; source QA is clone-only and formal GUI remains unlaunched"
   ],
   "targeted_results": {
     "initial_receipt_clone_metadata_scope_cache_controls": 143,
@@ -173,6 +173,9 @@
     "after_pressure": 1,
     "Cua_and_screenshots": false,
     "formal_native_profile_live_pass": false,
-    "local_app_replaced": false
+    "local_app_replaced": false,
+    "post_run_bundle_signature": "failed-new-stdlib-pyc-files-original-sealed-bytes-unchanged",
+    "post_run_bundle_code_restored_from_original_zip": true,
+    "new_bytecode_preserved_in_private_evidence": true
   }
 }

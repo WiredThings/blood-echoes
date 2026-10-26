@@ -57,7 +57,9 @@ inline std::filesystem::path Prepare(const std::filesystem::path&boot,const std:
  if(std::filesystem::is_symlink(output))throw std::runtime_error("linked module metadata output");
  const char*python=getenv("BB_QUICKSAVE_PYTHON");if(!python||!*python)python="/usr/bin/python3";
  const auto selected=ActualHelper();
- std::vector<std::string> args{python,"-I",selected.helper.string(),"--boot",boot.string(),"--app0",app0.string(),"--out",output.string()};
+ // -I ignores PYTHONDONTWRITEBYTECODE. Disable writes at interpreter startup,
+ // before pathlib/stdlib imports can modify a signed bundled Python tree.
+ std::vector<std::string> args{python,"-I","-B",selected.helper.string(),"--boot",boot.string(),"--app0",app0.string(),"--out",output.string()};
  if(selected.bundled){args.insert(args.end(),{"--code-root",selected.code_root.string(),"--runtime-executable",selected.executable.string()});}
  std::vector<char*> pointers;for(auto&arg:args)pointers.push_back(arg.data());pointers.push_back(nullptr);
  posix_spawnattr_t attr;posix_spawnattr_init(&attr);
