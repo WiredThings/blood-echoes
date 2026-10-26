@@ -142,6 +142,22 @@ def copy_stage_dependency(original,target,name):
             copied.unlink()
             copied.symlink_to(destination,target_is_directory=source.is_dir())
 
+def validate_runtime_tools(tools):
+    for name in TOOLS:
+        path=tools/name
+        if not path.is_file()or path.is_symlink():raise ValueError('missing/linked tool dependency: '+name)
+        ast.parse(path.read_text())
+    validate_import_closure(tools)
+    tool_api(tools/'launcher_local_aot.py','main',('project','execution_root'))
+    tool_api(tools/'launcher_local_aot.py','cli',('project','execution_root'))
+    tool_api(tools/'prepare_game_psos.py','prepare',('services',))
+    runner=(tools/'prepare_game_psos.py').read_text()
+    if "sys.path.insert(0,str(P/'tools'))"in runner:
+        raise ValueError('PSO runner imports code from external data P/tools')
+    builder=(tools/'local_metal_builder.py').read_text()
+    if "sys.path.insert(0,str(PROJECT/'tools'))"in builder:
+        raise ValueError('builder still imports code from external data PROJECT/tools')
+
 def build_stage(*,project,repository,runtime_tools=None,destination=None):
     project=owned_dir(project);repository=owned_dir(repository)
     original=owned_dir(project/'launcher-component-stage')
@@ -162,20 +178,7 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
     new_log=(repository/log_relative).read_text()
     if new_log!=runtime_log_revision(old_log):
         raise ValueError('run_optimized.sh changed beyond the exact FEX runtime log correction')
-    for name in TOOLS:
-        path=tools/name
-        if not path.is_file()or path.is_symlink():raise ValueError('missing/linked tool dependency: '+name)
-        ast.parse(path.read_text())
-    validate_import_closure(tools)
-    tool_api(tools/'launcher_local_aot.py','main',('project','execution_root'))
-    tool_api(tools/'launcher_local_aot.py','cli',('project','execution_root'))
-    tool_api(tools/'prepare_game_psos.py','prepare',('services',))
-    runner=(tools/'prepare_game_psos.py').read_text()
-    if "sys.path.insert(0,str(P/'tools'))"in runner:
-        raise ValueError('PSO runner imports code from external data P/tools')
-    builder=(tools/'local_metal_builder.py').read_text()
-    if "sys.path.insert(0,str(PROJECT/'tools'))"in builder:
-        raise ValueError('builder still imports code from external data PROJECT/tools')
+    validate_runtime_tools(tools)
     parent=project/'launcher-component-stages'
     parent.mkdir(mode=0o700,exist_ok=True);owned_dir(parent)
     target=Path(destination).absolute()if destination else parent/('local-aot-'+str(time.time_ns()))
@@ -223,6 +226,118 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
         if sha(original/relative)!=digest:raise RuntimeError('previous stage changed during preparation')
         if relative not in changed and sha(target/relative)!=digest:raise RuntimeError('unexpected original script delta')
     return dict(stage=str(target),manifest=manifest,parity=parity)
+SOURCE_SCRIPTS=('run.sh','tools/macos/run_optimized.sh','tools/macos/supervise_restart.sh',
+ 'tools/macos/quicksave.py','patches/Bloodborne.xml','scripts/link_libc.py',
+ 'scripts/chinese_translation.py','scripts/online.py','scripts/content_profile.py',
+ 'scripts/link_modules.py','scripts/patches.py','scripts/game_check.py','scripts/mods.py',
+ 'scripts/prepare.py','scripts/ultrawide_ui.py','tools/macos/run.sh')
+HOOK_ANCHOR='if [[ -n ${mod_game:-} ]]; then\n'
+FINAL_EXEC='exec "$probe" "${probe_args[@]}"\n'
+
+def projected_launcher_scripts(run,log):
+    """Only the exact existing hook/log transform; no old revision is invented."""
+    if run.count(HOOK)>1:raise ValueError('duplicate final-exec hook')
+    had_hook=run.count(HOOK)==1
+    original_run=run.replace(HOOK,'',1)if had_hook else run
+    if 'local_metal_startup'in original_run or '# Native-runtime component preparation'in original_run:
+        raise ValueError('partial or ambiguous final-exec hook')
+    if original_run.count(HOOK_ANCHOR)!=1 or original_run.count(FINAL_EXEC)!=1:
+        raise ValueError('unique original final-exec insertion anchor required')
+    prefix,tail=original_run.split(HOOK_ANCHOR,1)
+    if not prefix.rstrip().splitlines()or not prefix.rstrip().splitlines()[-1].startswith('probe_args=(')or FINAL_EXEC not in tail:
+        raise ValueError('final-exec hook is not immediately after original probe arguments')
+    effective_run=original_run.replace(HOOK_ANCHOR,HOOK+HOOK_ANCHOR,1)
+    if had_hook and effective_run!=run:raise ValueError('existing hook is not in the exact original final-exec position')
+    if log.count(FEX_RENDER_LOG)>1:raise ValueError('duplicate FEX runtime log')
+    had_log=log.count(FEX_RENDER_LOG)==1
+    original_log=log.replace(FEX_RENDER_LOG,LEGACY_RENDER_LOG,1)if had_log else log
+    if 'FEX game runtime'in original_log:raise ValueError('partial or ambiguous FEX runtime log')
+    effective_log=runtime_log_revision(original_log)
+    if had_log and effective_log!=log:raise ValueError('FEX log projection failed its original forward proof')
+    return original_run,effective_run,original_log,effective_log,dict(hook_already_present=had_hook,log_already_present=had_log,
+      original_identity_kind='current-repository-exact-known-projection'if had_hook or had_log else'current-repository-bytes')
+
+def _source_bytes(path,limit=4*1024*1024):
+    path=Path(path).absolute()
+    if path!=path.resolve(strict=True):raise ValueError('source closure input must be canonical and unlinked')
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
+    try:
+        before=os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode)or before.st_uid!=os.getuid()or before.st_nlink!=1 or before.st_size<=0 or before.st_size>limit:
+            raise ValueError('bounded owned regular source closure input required')
+        with os.fdopen(fd,'rb',closefd=False)as stream:raw=stream.read(limit+1)
+        stamp=lambda x:(x.st_dev,x.st_ino,x.st_uid,x.st_mode,x.st_nlink,x.st_size,x.st_mtime_ns,x.st_ctime_ns)
+        if len(raw)!=before.st_size or stamp(before)!=stamp(os.fstat(fd))or stamp(before)!=stamp(path.lstat()):
+            raise ValueError('source closure input changed while reading')
+        return raw
+    finally:os.close(fd)
+
+def write_source_closure(*,source,repository,runtime_tools,destination,project):
+    """Fresh code-only payload from a checkout; no QA artifacts or runtime ready claim.
+
+    source is the explicit D source root; repository holds the sixteen original
+    launcher scripts. project is only the unchanged development fallback literal
+    embedded by bootstrap(), and is neither required to exist nor read here.
+    """
+    source=owned_dir(source);repository=owned_dir(repository);tools=owned_dir(runtime_tools)
+    if source==repository or not source.is_relative_to(repository)or tools==source or not tools.is_relative_to(source):
+        raise ValueError('explicit runtime source/tools must belong to the selected repository')
+    project=Path(project)
+    if project!=PRIVATE_PROJECT:raise ValueError('unchanged development fallback literal required')
+    target=Path(destination).absolute();parent=owned_dir(target.parent)
+    if target.parent!=parent or target!=target.resolve()or os.path.lexists(target):
+        raise ValueError('source closure destination must be fresh and canonical')
+    if any(target.is_relative_to(p)or p.is_relative_to(target)for p in(source,repository,tools)):
+        raise ValueError('source closure output must not overlap source inputs')
+    # All source and import/API validation precedes creation of the fresh root.
+    files={name:_source_bytes(repository/name)for name in SOURCE_SCRIPTS}
+    tool_files={name:_source_bytes(tools/name)for name in TOOLS}
+    validate_runtime_tools(tools)
+    old_run,new_run,old_log,new_log,projection=projected_launcher_scripts(files['run.sh'].decode(),files['tools/macos/run_optimized.sh'].decode())
+    original={name:hashlib.sha256(raw).hexdigest()for name,raw in files.items()}
+    original['run.sh']=hashlib.sha256(old_run.encode()).hexdigest()
+    original['tools/macos/run_optimized.sh']=hashlib.sha256(old_log.encode()).hexdigest()
+    payload=dict(files);payload['run.sh']=new_run.encode();payload['tools/macos/run_optimized.sh']=new_log.encode()
+    for name,raw in tool_files.items():payload['native-runtime-tools/'+name]=raw
+    support={}
+    for name,original_name in SUPPORT.items():payload[name]=files[original_name];support[name]=hashlib.sha256(payload[name]).hexdigest()
+    startup='tools/macos/local_metal_startup.py';payload[startup]=bootstrap(project).encode()
+    if sum(map(len,payload.values()))>32*1024*1024:raise ValueError('source closure total byte budget')
+    # No source-side import, subprocess or state tree is needed to emit code.
+    inputs={str(repository/name):hashlib.sha256(raw).hexdigest()for name,raw in files.items()}
+    inputs.update({str(tools/name):hashlib.sha256(raw).hexdigest()for name,raw in tool_files.items()})
+    effective={name:hashlib.sha256(payload[name]).hexdigest()for name in SOURCE_SCRIPTS}
+    changed=[name for name in SOURCE_SCRIPTS if original[name]!=effective[name]]
+    parity=dict(original_sources=original,effective_sources=effective,script_bodies_changed=changed,final_exec_hook_only=True,
+      runtime_log_only_correction='tools/macos/run_optimized.sh'in changed,source_projection=projection,
+      source_repository_modified=False,previous_stage_read=False)
+    manifest=dict(schema=1,host_local_only=True,portable_installer=False,production=False,code_closure_only=True,
+      runtime_project=str(project),runtime_tools={name:hashlib.sha256(raw).hexdigest()for name,raw in tool_files.items()},
+      runtime_support=support,startup_bootstrap_sha256=hashlib.sha256(payload[startup]).hexdigest(),default_mode='auto',
+      unchanged_original_scripts=16-len(changed),game_or_data_copied=False,source_repository=str(repository),
+      game_pso_component_manifest='GAME-PSO-COMPONENT.json',default_game_pso_preparation='when-final-component-verified',
+      native_components_included=False,final_component_verified=False)
+    for path,want in inputs.items():
+        if hashlib.sha256(_source_bytes(path)).hexdigest()!=want:raise ValueError('source closure input changed before publication')
+    target.mkdir(mode=0o700)
+    for relative,raw in payload.items():
+        out=target/relative;out.parent.mkdir(parents=True,exist_ok=True)
+        for parent in out.parents:
+            if parent==target:break
+            parent.chmod(0o755)
+        with out.open('xb')as stream:stream.write(raw)
+        out.chmod(0o644)
+        if hashlib.sha256(out.read_bytes()).hexdigest()!=hashlib.sha256(raw).hexdigest():raise ValueError('copied source closure changed')
+    (target/startup).chmod(0o755)
+    for name,value in [('SOURCE-PARITY.json',parity),('ARM64-LOCAL-PREPARATION.json',manifest)]:
+        with(target/name).open('x')as stream:json.dump(value,stream,indent=2);stream.write('\n')
+        (target/name).chmod(0o644)
+    for path,want in inputs.items():
+        if hashlib.sha256(_source_bytes(path)).hexdigest()!=want:raise ValueError('source closure input changed during publication')
+    return dict(status='source-code-closure-written',stage=str(target),source=str(source),manifest=manifest,parity=parity,
+      input_sha256=inputs,game_or_data_copied=False,native_components_included=False,formal_profile_enabled=False)
+
+
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--source-repository',type=Path,required=True)
     ap.add_argument('--runtime-tools',type=Path);args=ap.parse_args()
