@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "status": "packaged-hash-and-load-edge-verified-not-game-accepted",
+  "host_local_only": true,
+  "portable_installer": false,
+  "archive_sha256": "569e6261281dc54b806f34b83c0a83affbeafb355c225a4aa824f1842b76dc23",
+  "archive_bytes": 45172873,
+  "game_runtime": "fex-arm64",
+  "local_metal_preparation": "auto",
+  "metal_features": [
+    "recent-staging-reuse"
+  ],
+  "automatic_capture_schema": 1,
+  "frozen_native_components": 7,
+  "current_launcher_code_matches_build": true,
+  "launcher_resources_match_files": 7,
+  "unchanged_original_scripts": 14,
+  "formal_data_modified": false,
+  "game_started": false,
+  "GUI_opened": false,
+  "full_runtime_acceptance": false
+}

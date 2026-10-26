@@ -26,6 +26,7 @@ class StageTests(unittest.TestCase):
   (self.original/'savedata').mkdir();(self.original/'savedata/never-copy').write_text('authored excluded data')
   self.repository=self.temp/'repository';self.repository.mkdir()
   old=(self.original/'run.sh').read_text();(self.repository/'run.sh').write_text(old.replace('exec author\n',stage_prepare.HOOK+'exec author\n'))
+  dst=self.repository/'tools/macos/run_optimized.sh';dst.parent.mkdir(parents=True);dst.write_text((self.original/'tools/macos/run_optimized.sh').read_text())
   self.runtime=self.temp/'runtime-tools';self.runtime.mkdir()
   for name in stage_prepare.TOOLS:(self.runtime/name).write_text('# authored isolated dependency\n')
   (self.runtime/'prepare_game_psos.py').write_text('def prepare(config,*,services=None):pass\n')
@@ -80,6 +81,18 @@ def cli(*,project=None,execution_root=None):
  def test_unrelated_new_run_change_is_refused(self):
   with(self.repository/'run.sh').open('a')as f:f.write('unexpected change\n')
   with self.assertRaises(ValueError):self.build()
+ def test_only_exact_fex_log_revision_is_admitted(self):
+  rel='tools/macos/run_optimized.sh';old='# author wrapper\n'+stage_prepare.LEGACY_RENDER_LOG
+  (self.original/rel).write_text(old)
+  parity=json.loads((self.original/'SOURCE-PARITY.json').read_text());parity['original_sources'][rel]=stage_prepare.sha(self.original/rel)
+  (self.original/'SOURCE-PARITY.json').write_text(json.dumps(parity))
+  (self.repository/rel).write_text(stage_prepare.runtime_log_revision(old))
+  result=self.build();self.assertEqual(result['manifest']['unchanged_original_scripts'],14)
+  self.assertTrue(result['parity']['runtime_log_only_correction'])
+  self.assertEqual((self.original/rel).read_text(),old)
+ def test_unrelated_wrapper_change_is_refused(self):
+  with(self.repository/'tools/macos/run_optimized.sh').open('a')as f:f.write('export BB_FPS=30\n')
+  with self.assertRaisesRegex(ValueError,'exact FEX runtime log'):self.build()
  def invoke(self,stage):
   output=self.temp/'observed.json';env=dict(os.environ,AUTHOR_STAGE_OUTPUT=str(output))
   r=subprocess.run([sys.executable,str(stage/'tools/macos/local_metal_startup.py')],env=env,capture_output=True,text=True,timeout=5)

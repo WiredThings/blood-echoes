@@ -152,7 +152,8 @@ final class LauncherModel: ObservableObject {
 
     var keyboardMap: KeyboardMap { KeyboardMap(ini: ini.values, prefs: prefs) }
 
-    var profile: OptimizedProfile { OptimizedProfile(prefs: prefs, game: game) }
+    var runtimeCapabilities: LauncherRuntime { LauncherRuntime.load(from: repoURL) }
+    var profile: OptimizedProfile { OptimizedProfile(prefs: prefs, game: game, runtime: runtimeCapabilities) }
 
     static var applicationSupportURL: URL {
         if let root = qaApplicationSupportURL(
@@ -194,6 +195,7 @@ final class LauncherModel: ObservableObject {
         !isRunning && !saveBusy && !uiModBusy && !chineseTranslationBusy && !uiModStatus.blocksPlay
             && (!prefs.usesCommunityChinese || chineseTranslationValid)
             && repoCheck.allowsPlay && gameCheck.allowsPlay
+            && runtimeCapabilities.supports(renderer: prefs.renderer)
     }
 
 

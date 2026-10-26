@@ -4,7 +4,7 @@ This is deliberately host-local: external dependencies and private QA paths rema
 under the prepared Shared development tree. No game/save/cache is put in the zip.
 """
 from pathlib import Path
-import argparse, hashlib, json, os, plistlib, shutil, subprocess, sys, time, zipfile, stat
+import argparse, hashlib, json, os, plistlib, shutil, subprocess, sys, time, zipfile, stat, struct, tempfile
 
 P=Path(__file__).resolve().parents[1]
 if P.name!='arm64-runtime-prototype':
@@ -19,6 +19,27 @@ from game_pso_component import freeze_inputs,sha as component_sha
 
 def sha(p):
     with Path(p).open('rb')as f:return hashlib.file_digest(f,'sha256').hexdigest()
+
+def launcher_code_identity(binary,scratch):
+    """Compare all GUI code/data across the expected app-specific re-signing.
+    Only a new scratch copy is stripped. codesign retains __LINKEDIT vmsize
+    rounded for the old signature, so exclude that size word, never code bytes.
+    """
+    with tempfile.TemporaryDirectory(prefix='launcher-code-',dir=scratch)as tmp:
+        copy=Path(tmp)/'launcher';shutil.copy2(binary,copy)
+        subprocess.run(['/usr/bin/codesign','--remove-signature',str(copy)],check=True,capture_output=True)
+        data=bytearray(copy.read_bytes());assert len(data)>=32
+        magic,cpu,_,kind,count,size,_,_=struct.unpack_from('<8I',data)
+        assert magic==0xfeedfacf and cpu==0x0100000c and kind==2 and 0<count<1024 and 32+size<=len(data)
+        offset=32;linkedit=0
+        for _ in range(count):
+            command,length=struct.unpack_from('<II',data,offset)
+            assert length>=8 and offset+length<=32+size
+            if command==0x19 and data[offset+8:offset+24].split(b'\0')[0]==b'__LINKEDIT':
+                assert length>=72;data[offset+32:offset+40]=b'\0'*8;linkedit+=1
+            offset+=length
+        assert offset==32+size and linkedit==1
+        return hashlib.sha256(data).hexdigest()
 
 def deps(p):
     return [s.strip().split(' (compatibility')[0]for s in subprocess.check_output(['/usr/bin/otool','-L',str(p)],text=True).splitlines()[1:]]
@@ -53,7 +74,7 @@ def load_cpu_runtime_manifest(path,expected_gpu_sha256=None):
     return record
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,required=True);ap.add_argument('--source-repository',type=Path,required=True);ap.add_argument('--gpu-app-manifest',type=Path,required=True);ap.add_argument('--cpu-runtime-manifest',type=Path,required=True);ap.add_argument('--runtime-tools',type=Path);ap.add_argument('--game-pso-component',type=Path,required=True);ap.add_argument('--python-provider',type=Path);ap.add_argument('--gpu-cache-seed-manifest',type=Path);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,required=True);ap.add_argument('--source-repository',type=Path,required=True);ap.add_argument('--gpu-app-manifest',type=Path,required=True);ap.add_argument('--cpu-runtime-manifest',type=Path,required=True);ap.add_argument('--runtime-tools',type=Path);ap.add_argument('--game-pso-component',type=Path,required=True);ap.add_argument('--python-provider',type=Path);ap.add_argument('--gpu-cache-seed-manifest',type=Path);ap.add_argument('--launcher-products',type=Path,required=True);a=ap.parse_args()
     require_no_games()
     assert not a.game_pso_component.is_symlink() and a.game_pso_component.resolve(strict=True).is_relative_to(P/'evidence'), 'admitted Shared game preparation manifest required'
     cpu_runtime=load_cpu_runtime_manifest(a.cpu_runtime_manifest)
@@ -64,6 +85,20 @@ def main():
     admitted_stage=Path(prepared['stage'])
     raw=subprocess.check_output([sys.executable,str(P/'tools/prepare_launcher_gui_qa.py')],text=True)
     case=json.loads(raw);app=Path(case['app']);resources=app/'Contents/Resources'
+    # The QA shell generator supplies isolated paths, not authority to reuse an
+    # old GUI binary. Require the explicitly selected current native build.
+    products=a.launcher_products.resolve(strict=True)
+    assert products.is_relative_to(P/'evidence'), 'fresh isolated launcher build required'
+    launcher=products/'BBLauncher';bundle=products/'BBLauncher_BBLauncher.bundle'
+    assert launcher.is_file() and not launcher.is_symlink() and bundle.is_dir() and not bundle.is_symlink()
+    assert subprocess.check_output(['/usr/bin/lipo','-archs',str(launcher)],text=True).strip()=='arm64'
+    shutil.copy2(launcher,app/'Contents/MacOS/bbport')
+    assert sha(launcher)==sha(app/'Contents/MacOS/bbport'),'GUI changed during copying'
+    launcher_identity=launcher_code_identity(launcher,output)
+    # Replace only the newly generated QA shell's stale resource bundle.
+    old_bundle=resources/'BBLauncher_BBLauncher.bundle'
+    assert old_bundle.is_relative_to(app) and not old_bundle.is_symlink()
+    shutil.rmtree(old_bundle);shutil.copytree(bundle,old_bundle,symlinks=False)
     prefs=plistlib.loads(Path(case['preferences']).read_bytes())
     extra=dict(row.split('=',1)for row in prefs['extraEnv'].splitlines()if row)
     validate_manual_environment(extra)
@@ -158,6 +193,7 @@ def main():
     # The unchanged entry chooses the app wrapper first and still checks this path.
     (stage/'bin/gpu-metal-arm64/bb-gpu').symlink_to('../Bloodborne Metal.app/Contents/MacOS/bb-gpu')
     native=dict(schema=1,default_enabled=True,minimum_os_major=27,
+        game_runtime='fex-arm64',local_metal_preparation='auto',metal_features=['recent-staging-reuse'],
         renderer_architecture='arm64 CPU via FEX and independent arm64 Metal GPU; isolated prototype',
         production=False,baseline_revision=json.loads((P/'SOURCE.json').read_text())['blood_echoes_commit'],
         frozen_runtime={str(f.relative_to(stage)):sha(f)for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker,*([module_worker]if module_worker else[])]})
@@ -168,6 +204,7 @@ def main():
         python_sqlite_closure=python_closure,local_metal_preparation=prepared['manifest'],game_pso_component=component,default_game_pso_preparation=True,
         private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,gpu_cache_seed=cache_seed,
         frozen_runtime=native['frozen_runtime'],cpu_runtime_manifest=dict(path=str(a.cpu_runtime_manifest.resolve()),sha256=sha(a.cpu_runtime_manifest),protocol_version=cpu_runtime['protocol_version'],live_payload_version=cpu_runtime['live_payload_version'],author_instrumentation=cpu_runtime.get('author_instrumentation',False)),
+        launcher_build=dict(path=str(products),source_executable_sha256=sha(launcher),code_identity_sha256=launcher_identity),
         upstream_inputs=dict(cpu=sha(cpu_game_source),cpu_library=sha(cpu_source),gpu_library=sha(gpu_source),net_library=sha(original/'bin/gpu-net/libbbnet.dylib')),
         original_scripts=baseline,effective_scripts=source,controlled_changes=['run.sh final-exec hook','local Metal preparation runtime tools'],manual_physical_input=True,silent=True,
         diagnostic_capture=False,performance_logging=False,
@@ -180,6 +217,7 @@ def main():
     (resources/'ARM64-QA-MANIFEST.json').write_text(json.dumps(manifest,indent=2)+'\n')
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(app)],check=True)
     subprocess.run(['/usr/bin/codesign','--verify','--strict',str(app)],check=True)
+    assert launcher_code_identity(app/'Contents/MacOS/bbport',output)==launcher_identity,'signed GUI code differs from selected build'
     for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker]:subprocess.run(['/usr/bin/codesign','--verify','--strict',str(f)],check=True)
     instructions='''Blood Echoes ARM64 本机隔离测试包
 

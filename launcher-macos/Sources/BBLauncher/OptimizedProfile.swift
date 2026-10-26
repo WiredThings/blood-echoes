@@ -7,6 +7,13 @@ import Foundation
 struct OptimizedProfile {
     let prefs: LauncherPrefs
     let game: GameSettings
+    let runtime: LauncherRuntime
+
+    init(prefs: LauncherPrefs, game: GameSettings, runtime: LauncherRuntime = .legacy) {
+        self.prefs = prefs
+        self.game = game
+        self.runtime = runtime
+    }
 
     var resolution: String { prefs.ultrawide ? prefs.wideResolution : prefs.resolution }
 
@@ -71,6 +78,12 @@ struct OptimizedProfile {
             "BB_LIVE_RES": "0", "BB_PATCHES": "",
         ]
         env.merge(MetalOptimizations.environment(prefs: prefs, metalFXActive: settings.upscaler == "metalfx")) { _, selected in selected }
+        if !runtime.supportsRecentStagingReuse { env.removeValue(forKey: "BB_MTL_HOT_STAGING_REUSE") }
+        if runtime.requiresNativeMetalHost && prefs.renderer == "metal" {
+            // FEX has no in-process Metal execution route. Keep any old optional
+            // Rosetta preference stored, but never apply it to this engine.
+            env["BB_METAL_ARM64"] = "1"
+        }
         if prefs.usesCommunityChinese {
             env["BB_CHINESE_LANGUAGE"] = prefs.language
             env["BB_CHINESE_TRANSLATION_DIR"] = prefs.chineseTranslationFolder

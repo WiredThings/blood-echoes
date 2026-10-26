@@ -132,13 +132,17 @@ func checkRepository(_ url: URL?) -> Check {
 }
 
 /// The launcher must never silently fall back to the old in-process renderer.
-func checkOptimizedEngine(_ repo: URL?, packaged: Bool, renderer: String = "vulkan") -> Check {
+func checkOptimizedEngine(_ repo: URL?, packaged: Bool, renderer: String = "vulkan", rosettaAvailable: Bool? = nil) -> Check {
     guard let repo, isRepository(repo), isFile(repo.appendingPathComponent("tools/macos/run_optimized.sh")) else {
         return Check(level: .error, message: L10n.key("Choose the optimized source checkout in Settings."))
     }
     let native = packaged || isFile(repo.appendingPathComponent("src/runtime_quicksave_bindings.h"))
             ? repo : repo.appendingPathComponent("out/native-05-checkout").resolvingSymlinksInPath()
     let bin = native.appendingPathComponent(packaged ? "bin" : "out")
+    let runtime = LauncherRuntime.load(from: repo)
+    if !runtime.supports(renderer: renderer) {
+        return Check(level: .error, message: L10n.key("This ARM64 runtime currently supports Metal only."))
+    }
     for path in renderer == "metal" ? ["bb-probe-metal"] : ["bb-probe", "gpu-arm64/bb-gpu"] {
         if !FileManager.default.isExecutableFile(atPath: bin.appendingPathComponent(path).path) {
             return Check(level: .error, message: L10n.key("The optimized native build is missing. See Settings for the source checkout."))
@@ -158,13 +162,45 @@ func checkOptimizedEngine(_ repo: URL?, packaged: Bool, renderer: String = "vulk
         if !FileManager.default.isExecutableFile(atPath: repo.appendingPathComponent("python/bin/python3").path) {
             return Check(level: .error, message: L10n.key("The app is incomplete: its bundled runtime is missing."))
         }
-        if !FileManager.default.fileExists(atPath: rosettaPath) {
+        if runtime.isFexArm64 {
+            // Metadata alone cannot remove an architecture prerequisite. Confirm
+            // the declared native entry/host and mandatory independent renderer.
+            for (path, kind) in [("bb-probe-metal", UInt32(2)), ("gpu-metal/libbbgpu.dylib", 6),
+                                 ("gpu-metal-arm64/bb-gpu", 2), ("gpu-metal-arm64/libbbgpu.dylib", 6)] {
+                if !isThinARM64MachO(bin.appendingPathComponent(path), kind: kind) {
+                    return Check(level: .error, message: L10n.key("The ARM64 runtime is incomplete or has the wrong architecture."))
+                }
+            }
+            if runtime.automaticMetalPreparation {
+                for path in ["game-pso-preparer", "game-module-preparer"] {
+                    if !isThinARM64MachO(bin.appendingPathComponent(path), kind: 2) {
+                        return Check(level: .error, message: L10n.key("The ARM64 runtime is incomplete or has the wrong architecture."))
+                    }
+                }
+                if !isFile(repo.appendingPathComponent("GAME-PSO-COMPONENT.json")) {
+                    return Check(level: .error, message: L10n.key("The ARM64 runtime is incomplete or has the wrong architecture."))
+                }
+            }
+        } else if !(rosettaAvailable ?? FileManager.default.fileExists(atPath: rosettaPath)) {
             return Check(level: .error, message: L10n.key("Install Rosetta 2 to run the game. See Help → User Guide."))
         }
     } else if findPython() == nil {
         return Check(level: .error, message: L10n.key("Python 3 is required to prepare the game."))
     }
     return Check(level: .ok, message: L10n.key("Optimized native renderer ready"))
+}
+
+/// Cheap UI preflight only; the existing signed runtime/component admission still
+/// verifies full artifacts and actual load edges before executing them.
+private func isThinARM64MachO(_ url: URL, kind: UInt32) -> Bool {
+    if kind == 2 && !FileManager.default.isExecutableFile(atPath: url.path) { return false }
+    guard let file = try? FileHandle(forReadingFrom: url) else { return false }
+    defer { try? file.close() }
+    guard let data = try? file.read(upToCount: 16), data.count == 16 else { return false }
+    let words = data.withUnsafeBytes { raw in
+        (0..<4).map { raw.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian }
+    }
+    return words[0] == 0xfeedfacf && words[1] == 0x0100000c && words[3] == kind
 }
 
 // MARK: - Release app

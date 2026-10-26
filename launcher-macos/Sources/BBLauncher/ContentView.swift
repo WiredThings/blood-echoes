@@ -461,9 +461,16 @@ struct DisplaySection: View {
     var body: some View {
         Section {
             Picker(L10n.key("Renderer backend"), selection: $model.prefs.renderer) {
-                ForEach(Catalog.renderers) { Text(L10n.key($0.label)).tag($0.value) }
+                ForEach(Catalog.renderers) {
+                    Text(L10n.key($0.label)).tag($0.value)
+                        .disabled(!model.runtimeCapabilities.supports(renderer: $0.value))
+                }
             }
             .onChange(of: model.prefs.renderer) { _ in model.normalizeRendererSettings() }
+            if model.runtimeCapabilities.isFexArm64 {
+                Text(L10n.key("This ARM64 runtime currently supports Metal only."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             if model.prefs.renderer == "metal" {
                 Toggle(L10n.key("Occlusion culling (experimental)"), isOn: $model.prefs.metalOcclusion)
                 Text(L10n.key("Conservative visibility queries. Disable if objects or lights flicker; applies on next launch."))

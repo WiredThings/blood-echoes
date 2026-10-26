@@ -18,6 +18,16 @@ TOOLS=('launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py'
        'game_companion_modules.py')
 SUPPORT={'vendor/blood_echoes/loader/prepare.py':'scripts/prepare.py',
          'vendor/blood_echoes/loader/game_check.py':'scripts/game_check.py'}
+LEGACY_RENDER_LOG='        echo "Metal: direct Metal API, ARM64 host, Rosetta game, shared no-copy buffers"\n'
+FEX_RENDER_LOG='''        if [[ ${BB_ARM_LAUNCHER_COMPAT:-0} == 1 ]]; then
+            echo "Metal: direct Metal API, ARM64 host, FEX game runtime, shared no-copy buffers"
+        else
+            echo "Metal: direct Metal API, ARM64 host, Rosetta game, shared no-copy buffers"
+        fi
+'''
+def runtime_log_revision(text):
+    if text.count(LEGACY_RENDER_LOG)>1:raise ValueError('ambiguous runtime log revision')
+    return text.replace(LEGACY_RENDER_LOG,FEX_RENDER_LOG,1)
 HOOK='''# Native-runtime component preparation happens after the original patch/mod
 # pipeline, before either game process exists. The wrapper execs this same probe.
 if [[ ${BB_ARM_LAUNCHER_COMPAT:-0} == 1 && ${BB_RENDERER:-} == metal ]]; then
@@ -134,6 +144,11 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
     new_run=(repository/'run.sh').read_text();old_run=(original/'run.sh').read_text()
     if new_run.count(HOOK)!=1 or new_run.replace(HOOK,'',1)!=old_run:
         raise ValueError('new run.sh is not exactly the admitted final-exec hook')
+    log_relative='tools/macos/run_optimized.sh'
+    old_log=(original/log_relative).read_text()
+    new_log=(repository/log_relative).read_text()
+    if new_log!=runtime_log_revision(old_log):
+        raise ValueError('run_optimized.sh changed beyond the exact FEX runtime log correction')
     for name in TOOLS:
         path=tools/name
         if not path.is_file()or path.is_symlink():raise ValueError('missing/linked tool dependency: '+name)
@@ -163,6 +178,7 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
     # Previous stage and its sixteen source bodies remain untouched. Record both
     # the old admitted source set and the effective new hook explicitly.
     shutil.copy2(repository/'run.sh',target/'run.sh')
+    shutil.copy2(repository/log_relative,target/log_relative)
     native_tools=target/'native-runtime-tools';native_tools.mkdir()
     hashes={}
     for name in TOOLS:
@@ -175,21 +191,24 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
     startup=target/'tools/macos/local_metal_startup.py'
     startup.write_text(bootstrap(project));startup.chmod(0o755)
     effective=dict(source);effective['run.sh']=sha(target/'run.sh')
+    effective[log_relative]=sha(target/log_relative)
+    changed=[name for name in source if effective[name]!=source[name]]
     parity=dict(original_sources=source,effective_sources=effective,
-        script_bodies_changed=['run.sh'],final_exec_hook_only=True,
+        script_bodies_changed=changed,final_exec_hook_only=True,
+        runtime_log_only_correction=log_relative in changed,
         previous_stage=str(original),previous_stage_modified=False)
     (target/'SOURCE-PARITY.json').write_text(json.dumps(parity,indent=2)+'\n')
     manifest=dict(schema=1,host_local_only=True,portable_installer=False,
         runtime_project=str(project),runtime_tools=hashes,runtime_support=support,
         startup_bootstrap_sha256=sha(startup),default_mode='auto',
-        unchanged_original_scripts=15,original_stage_modified=False,
+        unchanged_original_scripts=16-len(changed),original_stage_modified=False,
         game_or_data_copied=False,source_repository=str(repository),
         game_pso_component_manifest='GAME-PSO-COMPONENT.json',
         default_game_pso_preparation='when-final-component-verified')
     (target/'ARM64-LOCAL-PREPARATION.json').write_text(json.dumps(manifest,indent=2)+'\n')
     for relative,digest in source.items():
         if sha(original/relative)!=digest:raise RuntimeError('previous stage changed during preparation')
-        if relative!='run.sh'and sha(target/relative)!=digest:raise RuntimeError('unexpected original script delta')
+        if relative not in changed and sha(target/relative)!=digest:raise RuntimeError('unexpected original script delta')
     return dict(stage=str(target),manifest=manifest,parity=parity)
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--source-repository',type=Path,required=True)

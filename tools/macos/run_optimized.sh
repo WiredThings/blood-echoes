@@ -174,7 +174,11 @@ echo "Resolution patch: ${BB_PATCHES:-none (16:9)}"
 echo "Game language: ${BB_LANGUAGE:-1}; Chinese source: ${BB_CHINESE_SOURCE:-official} (community request: ${BB_CHINESE_LANGUAGE:-none})"
 if [[ $renderer == metal ]]; then
     if [[ ${BB_METAL_ARM64:-0} == 1 ]]; then
-        echo "Metal: direct Metal API, ARM64 host, Rosetta game, shared no-copy buffers"
+        if [[ ${BB_ARM_LAUNCHER_COMPAT:-0} == 1 ]]; then
+            echo "Metal: direct Metal API, ARM64 host, FEX game runtime, shared no-copy buffers"
+        else
+            echo "Metal: direct Metal API, ARM64 host, Rosetta game, shared no-copy buffers"
+        fi
     else
         echo "Metal: direct Metal API, Rosetta host, no-copy guest buffers; cache=metal1"
     fi

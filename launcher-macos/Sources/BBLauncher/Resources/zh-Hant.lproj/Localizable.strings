@@ -550,3 +550,14 @@
 
 "Reuse identical Metal libraries" = "重用相同著色器程式庫";
 "Avoids duplicate compilation; practical benefit is unconfirmed." = "減少重複編譯，實際收益待確認。";
+
+// Runtime capabilities
+"This runtime requires a native ARM64 Metal renderer host." = "此執行環境需要原生 ARM64 Metal 算繪宿主。";
+"Metal libraries are prepared automatically on this Mac before play." = "啟動遊戲前，自動在這台 Mac 上準備 Metal 程式庫。";
+
+"This ARM64 runtime currently supports Metal only." = "此 ARM64 執行環境目前僅支援 Metal。";
+
+"Reuse recent DeviceLocal staging blocks" = "重用最近的 DeviceLocal 暫存區塊";
+"Tries recently used DeviceLocal staging blocks first. Capacity and completion fences are unchanged; performance benefit is unconfirmed." = "優先嘗試最近使用的 DeviceLocal 暫存區塊。容量和完成柵欄保持不變，效能收益尚未確認。";
+
+"The ARM64 runtime is incomplete or has the wrong architecture." = "ARM64 執行環境不完整或元件架構不符。";

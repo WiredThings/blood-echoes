@@ -2,31 +2,93 @@ import XCTest
 @testable import BBLauncher
 
 final class MetalOptimizationTests: XCTestCase {
+    func testRequiredNativeHostIsNotAnOptionalFexToggle() {
+        let nativeHost = MetalOptimization(id: "BB_METAL_ARM64", title: "ARM64 renderer host", note: "Legacy optional host", defaultOn: true, evidence: .adoptedExperimental)
+        let candidates = [nativeHost] + MetalOptimizations.all.filter { $0.id != nativeHost.id }
+        let fex = LauncherRuntime(isFexArm64: true, automaticMetalPreparation: true, supportsRecentStagingReuse: true)
+        XCTAssertTrue(MetalOptimizations.visibleOptions(candidates, runtime: .legacy).contains { $0.id == nativeHost.id })
+        let visible = MetalOptimizations.visibleOptions(candidates, runtime: fex)
+        XCTAssertFalse(visible.contains { $0.id == nativeHost.id })
+        XCTAssertEqual(visible.map(\.id), candidates.filter { $0.id != nativeHost.id }.map(\.id))
+    }
+
+    func testRestoringVisibleDefaultsPreservesHiddenLegacyHostChoice() {
+        let fex = LauncherRuntime(isFexArm64: true, automaticMetalPreparation: true)
+        let existing = ["BB_METAL_ARM64": false, "BB_MTL_TWO_LEVEL_BDA": false, "BB_MTL_HOT_STAGING_REUSE": true]
+        let restored = MetalOptimizations.visibleDefaults(runtime: fex, preserving: existing)
+        XCTAssertEqual(restored["BB_METAL_ARM64"], false)
+        XCTAssertEqual(restored["BB_MTL_TWO_LEVEL_BDA"], true)
+        XCTAssertEqual(restored["BB_MTL_HOT_STAGING_REUSE"], true)
+        XCTAssertNil(MetalOptimizations.visibleDefaults(runtime: fex, preserving: [:])["BB_METAL_ARM64"])
+        let legacyDefaults = MetalOptimizations.visibleDefaults(runtime: .legacy, preserving: existing)
+        XCTAssertEqual(legacyDefaults["BB_MTL_HOT_STAGING_REUSE"], true)
+        XCTAssertEqual(legacyDefaults["BB_MTL_TWO_LEVEL_BDA"], true)
+        XCTAssertNil(MetalOptimizations.visibleDefaults(runtime: .legacy, preserving: [:])["BB_MTL_HOT_STAGING_REUSE"])
+    }
+
+    func testRecentStagingImportsDeveloperChoiceAndSavedSwitchWins() throws {
+        let name = "bbport.recent-staging.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        XCTAssertEqual(MetalOptimizations.defaults["BB_MTL_HOT_STAGING_REUSE"], false)
+        defaults.set(["BB_MTL_DIRECT_COPY": true], forKey: "metalOptimizations")
+        defaults.set("BB_MTL_HOT_STAGING_REUSE=1", forKey: "extraEnv")
+        let runtime = LauncherRuntime(supportsRecentStagingReuse: true)
+        var prefs = LauncherPrefs.load(from: defaults)
+        XCTAssertEqual(prefs.metalOptimizations["BB_MTL_HOT_STAGING_REUSE"], true)
+        var profile = OptimizedProfile(prefs: prefs, game: GameSettings(), runtime: runtime)
+        XCTAssertEqual(profile.applyingEnvironment(to: [:])["BB_MTL_HOT_STAGING_REUSE"], "1")
+        prefs.metalOptimizations["BB_MTL_HOT_STAGING_REUSE"] = false
+        prefs.save(to: defaults)
+        prefs = LauncherPrefs.load(from: defaults)
+        XCTAssertEqual(prefs.metalOptimizations["BB_MTL_HOT_STAGING_REUSE"], false)
+        profile = OptimizedProfile(prefs: prefs, game: GameSettings(), runtime: runtime)
+        XCTAssertEqual(profile.applyingEnvironment(to: ["BB_MTL_HOT_STAGING_REUSE": "1"])["BB_MTL_HOT_STAGING_REUSE"], "0")
+        XCTAssertEqual(prefs.extraEnv, "BB_MTL_HOT_STAGING_REUSE=1")
+    }
+
     func testDefaultsMatchAcceptedProfileAndExperimentsStayOff() {
-        XCTAssertEqual(MetalOptimizations.all.count, 35)
-        XCTAssertEqual(Set(MetalOptimizations.all.map(\.id)).count, 35)
-        XCTAssertEqual(MetalOptimizations.adopted.count, 21)
-        XCTAssertEqual(MetalOptimizations.optionalExperiments.count, 14)
+        let optionalHost = MetalOptimizations.nativeHostAvailable ? 1 : 0
+        XCTAssertEqual(MetalOptimizations.all.count, 36 + optionalHost)
+        XCTAssertEqual(Set(MetalOptimizations.all.map(\.id)).count, 36 + optionalHost)
+        XCTAssertEqual(MetalOptimizations.adopted.count, 21 + optionalHost)
+        XCTAssertEqual(MetalOptimizations.optionalExperiments.count, 15)
         let prefs = LauncherPrefs()
         var game = GameSettings(); game.upscaler = "metalfx"
         let env = OptimizedProfile(prefs: prefs, game: game).environment
-        for option in MetalOptimizations.all {
+        for option in MetalOptimizations.visibleOptions(MetalOptimizations.all, runtime: .legacy) {
             XCTAssertEqual(env[option.id], option.defaultOn ? "1" : "0", option.id)
             XCTAssertEqual(option.defaultOn, [.adopted, .adoptedExperimental, .bundle].contains(option.evidence))
             for parent in option.requires { XCTAssertTrue(MetalOptimizations.all.contains { $0.id == parent }) }
         }
         XCTAssertEqual(env["BB_MTL_PERSIST_WARM_ARCHIVE"], "0")
+        XCTAssertNil(env["BB_MTL_HOT_STAGING_REUSE"])
         XCTAssertFalse(MetalOptimizations.all.contains { $0.id.contains("OFFLINE") })
     }
 
     func testEveryVisibleToggleReachesTheProfileEnvironment() {
-        for option in MetalOptimizations.all {
-            var prefs = LauncherPrefs()
-            prefs.metalOptimizations[option.id] = !option.defaultOn
-            var game = GameSettings(); game.upscaler = "metalfx"
-            for parent in option.requires { prefs.metalOptimizations[parent] = true }
-            let env = OptimizedProfile(prefs: prefs, game: game).environment
-            XCTAssertEqual(env[option.id], option.defaultOn ? "0" : "1", option.id)
+        let runtimes = [LauncherRuntime.legacy,
+                        LauncherRuntime(isFexArm64: true, automaticMetalPreparation: true, supportsRecentStagingReuse: true),
+                        LauncherRuntime(supportsRecentStagingReuse: true)]
+        for runtime in runtimes {
+            for option in MetalOptimizations.visibleOptions(MetalOptimizations.all, runtime: runtime) {
+                var prefs = LauncherPrefs()
+                prefs.metalOptimizations[option.id] = !option.defaultOn
+                var game = GameSettings(); game.upscaler = "metalfx"
+                for parent in option.requires { prefs.metalOptimizations[parent] = true }
+                let env = OptimizedProfile(prefs: prefs, game: game, runtime: runtime).environment
+                XCTAssertEqual(env[option.id], option.defaultOn ? "0" : "1", option.id)
+            }
+        }
+    }
+
+    func testRecentStagingVisibilityRequiresDeclaredFeatureNotArchitecture() {
+        let options = MetalOptimizations.all
+        for runtime in [LauncherRuntime.legacy, LauncherRuntime(isFexArm64: true)] {
+            XCTAssertFalse(MetalOptimizations.visibleOptions(options, runtime: runtime).contains { $0.id == "BB_MTL_HOT_STAGING_REUSE" })
+        }
+        for runtime in [LauncherRuntime(supportsRecentStagingReuse: true), LauncherRuntime(isFexArm64: true, supportsRecentStagingReuse: true)] {
+            XCTAssertTrue(MetalOptimizations.visibleOptions(options, runtime: runtime).contains { $0.id == "BB_MTL_HOT_STAGING_REUSE" })
         }
     }
 

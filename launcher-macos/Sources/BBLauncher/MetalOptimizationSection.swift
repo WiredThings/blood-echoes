@@ -10,14 +10,22 @@ struct MetalOptimizationSection: View {
         Section {
             Text(L10n.key("Applies on the next game launch. Resolution, effects and cache capacities are not changed by these defaults."))
                 .font(.caption).foregroundStyle(.secondary)
+            if model.runtimeCapabilities.requiresNativeMetalHost {
+                Text(L10n.key("This runtime requires a native ARM64 Metal renderer host."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if model.runtimeCapabilities.automaticMetalPreparation {
+                Text(L10n.key("Metal libraries are prepared automatically on this Mac before play."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             DisclosureGroup(L10n.key("Adopted optimizations (default on)"), isExpanded: $showAdopted) {
-                ForEach(MetalOptimizations.adopted) { option in row(option) }
+                ForEach(MetalOptimizations.visibleOptions(MetalOptimizations.adopted, runtime: model.runtimeCapabilities)) { option in row(option) }
             }
             DisclosureGroup(L10n.key("Experimental optimizations (default off)"), isExpanded: $showExperiments) {
-                ForEach(MetalOptimizations.optionalExperiments) { option in row(option) }
+                ForEach(MetalOptimizations.visibleOptions(MetalOptimizations.optionalExperiments, runtime: model.runtimeCapabilities)) { option in row(option) }
             }
             Button(L10n.key("Restore recommended optimization defaults")) {
-                model.prefs.metalOptimizations = MetalOptimizations.defaults
+                model.prefs.metalOptimizations = MetalOptimizations.visibleDefaults(runtime: model.runtimeCapabilities, preserving: model.prefs.metalOptimizations)
             }
         } header: {
             Text(L10n.key("Metal optimizations"))

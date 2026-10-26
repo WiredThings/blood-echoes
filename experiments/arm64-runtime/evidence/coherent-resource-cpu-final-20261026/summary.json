@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "status": "built-not-run",
+  "seconds": 47.090663583017886,
+  "before": {
+    "locked": false,
+    "pressure": 1,
+    "swap_mib": 7825.625
+  },
+  "after": {
+    "locked": false,
+    "pressure": 1,
+    "swap_mib": 7825.625
+  },
+  "selected_cpu_units": 30,
+  "avplayer_overrides": 2,
+  "gpu_units_recompiled": 0,
+  "gpu_library_sha256": "df2719a07631f0316ce4ed85578663fe7c88993d4f7aa6d5115a1316fdca0cbc",
+  "source_identity": "850529ad963627bacf91e2c8222b1d1765dbd005bdfd65a02c53575a5508b653",
+  "plan_sha256": "4883edb238189787e1b05aa65734ee17414fcfb010e4e1a35e23615b056af368",
+  "game_started": false,
+  "formal_writes": false,
+  "prepared_dependencies_reused": true,
+  "clean_checkout_build_proven": false,
+  "cpu_runtime_manifest_sha256": "0873f863b4a5957a1aba7d74bc6d54d02ab49314448de0bb7c1dcd526a097084",
+  "game_sha256": "adaca80df8877e7ff0e5b39960f059f37a8df6a79fc27b97a0f417630c1e976a",
+  "host_sha256": "c6608270e148489e6ad42aa2c326d971d5639e094246bdf6058011f3167f572d",
+  "authored_controls_passed": 19,
+  "actual_menu_header_in_game_depfile": true,
+  "actual_menu_header_in_cpu_cache_identity": true,
+  "runtime_function_or_performance_validated": false
+}

@@ -62,6 +62,7 @@ enum MetalOptimizations {
         .init(id: "BB_LAYER_USE_CACHE", title: "Memoize conservative residency bookkeeping", note: "Keeps full resource ranges and invalidates on demotion. Correctness checks passed; the earlier M4 comparison was 3.3% slower.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_COPY_PAIR", title: "Merge identical physical copy stores", note: "Skips the second store only when both resolved pointers match. Correctness checks passed; the earlier M4 comparison was 1% slower.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_RENDER_UPDATES", title: "Write small parameters within the render pass", note: "Retains all writes and barriers; unknown fragment conflicts fall back. The earlier M4 comparison was 8.6% slower; adds a small host pipeline.", defaultOn: false, evidence: .experimental, requires: ["BB_MTL_INLINE_UPDATES"]),
+        .init(id: "BB_MTL_HOT_STAGING_REUSE", title: "Reuse recent DeviceLocal staging blocks", note: "Tries recently used DeviceLocal staging blocks first. Capacity and completion fences are unchanged; performance benefit is unconfirmed.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_GATHER_REUSE", title: "Reuse cross-chunk reads within one draw", note: "Reuses complete or contained read snapshots within one draw or dispatch. Writes, mapping changes and ring wrap invalidate them. No extra GPU buffers; FPS benefit is not established.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_FRAGMENT_UNIFORMS", title: "Specialize fragment parameter reads", note: "Correctness tested, but repeatable gameplay benefit is unconfirmed; may increase compilation or resource overhead.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_LIBRARY_REUSE", title: "Reuse identical Metal libraries", note: "Avoids duplicate compilation; practical benefit is unconfirmed.", defaultOn: false, evidence: .experimental),
@@ -76,6 +77,26 @@ enum MetalOptimizations {
     static var adopted: [MetalOptimization] { all.filter { $0.defaultOn } }
     static var optionalExperiments: [MetalOptimization] { all.filter { !$0.defaultOn } }
     static var defaults: [String: Bool] { Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0.defaultOn) }) }
+
+    /// Runtime requirements are read-only capabilities, independent of saved preferences.
+    static func visibleOptions(_ options: [MetalOptimization], runtime: LauncherRuntime) -> [MetalOptimization] {
+        options.filter { option in
+            if option.id == "BB_METAL_ARM64", runtime.requiresNativeMetalHost { return false }
+            if option.id == "BB_MTL_HOT_STAGING_REUSE", !runtime.supportsRecentStagingReuse { return false }
+            return true
+        }
+    }
+
+    /// Restoring visible defaults must not rewrite a hidden legacy engine preference.
+    static func visibleDefaults(runtime: LauncherRuntime, preserving existing: [String: Bool]) -> [String: Bool] {
+        var restored = Dictionary(uniqueKeysWithValues: visibleOptions(all, runtime: runtime).map { ($0.id, $0.defaultOn) })
+        let hidden = ["BB_METAL_ARM64": runtime.requiresNativeMetalHost,
+                      "BB_MTL_HOT_STAGING_REUSE": !runtime.supportsRecentStagingReuse]
+        for (key, isHidden) in hidden where isHidden {
+            if let oldChoice = existing[key] { restored[key] = oldChoice }
+        }
+        return restored
+    }
 
     static func requested(_ option: MetalOptimization, prefs: LauncherPrefs) -> Bool {
         prefs.metalOptimizations[option.id] ?? option.defaultOn

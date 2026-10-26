@@ -1,3 +1,7 @@
+# 2026-10-26 最新对账
+
+以[当前UI功能审计](docs/launcher-feature-audit.zh-CN.md)为准。原35 Metal开关都有代码消费，新补recent staging实验开关。已修正FEX必需宿主、无Rosetta原生包准入和不支持的Vulkan入口、自动准备说明与原System菜单零副作用失败语义；本轮Swift40/stage14/菜单7定向控制通过，最新整包及真实功能集中验收尚未完成。下面是历史记录，不将其中旧“未接入”状态当当前结论。
+
 # 原启动器功能接入审查（2026-10-24）
 
 > 续进状态：System 菜单 FEX 调用桥已补齐并编译，116 项无真实游戏回归通过；游戏内 UI、真实手柄和新构建性能仍待验收。以本节及 `evidence/game-menu-bridge-status.json` 为当前状态，下面的“未接入”描述保留为本轮审查时发现的问题。

@@ -550,3 +550,14 @@
 
 "Reuse identical Metal libraries" = "Reuse identical Metal libraries";
 "Avoids duplicate compilation; practical benefit is unconfirmed." = "Avoids duplicate compilation; practical benefit is unconfirmed.";
+
+// Runtime capabilities
+"This runtime requires a native ARM64 Metal renderer host." = "This runtime requires a native ARM64 Metal renderer host.";
+"Metal libraries are prepared automatically on this Mac before play." = "Metal libraries are prepared automatically on this Mac before play.";
+
+"This ARM64 runtime currently supports Metal only." = "This ARM64 runtime currently supports Metal only.";
+
+"Reuse recent DeviceLocal staging blocks" = "Reuse recent DeviceLocal staging blocks";
+"Tries recently used DeviceLocal staging blocks first. Capacity and completion fences are unchanged; performance benefit is unconfirmed." = "Tries recently used DeviceLocal staging blocks first. Capacity and completion fences are unchanged; performance benefit is unconfirmed.";
+
+"The ARM64 runtime is incomplete or has the wrong architecture." = "The ARM64 runtime is incomplete or has the wrong architecture.";
