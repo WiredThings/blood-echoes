@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "status": "default-preparation-completed-runtime-initialized-guard-stopped",
+  "preparation": {
+    "fixed_helpers": "completed",
+    "game_pso": "completed",
+    "reason": "prepared",
+    "requested": "auto",
+    "status": "prepared"
+  },
+  "runtime_startup_local_library_hits": 538,
+  "runtime_startup_helper_library_hits": 11,
+  "native_game_first_seen_guard_seconds": 908.6100224999245,
+  "guard_reason": "unexpected >1GiB swap growth within5s",
+  "guard_seconds": 916.4625339159975,
+  "before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 7770.0625
+  },
+  "after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 8973.8125
+  },
+  "sampled_pressure_max": 4,
+  "full_scene_and_fps_verified": false,
+  "formal_data_modified": false,
+  "blank_shader_cache_claim": false,
+  "selected_existing_QA_shader_cache": true,
+  "existing_QA_pipeline_inputs_prepared": 409,
+  "preparation_native_ready": 409,
+  "preparation_strict_archive_hits": 65,
+  "source_snapshot_preserved": true,
+  "temporary_catalogue_peak_bytes": 1028145152,
+  "Cua_during_runtime": false
+}

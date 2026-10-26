@@ -7,9 +7,15 @@
 1. 三项归上游与正式 Rosetta 既有缺口：保留两个默认关闭的门控候选及测试；完整sigreturn停止扩展。27/282不是游戏命中证据；未知导入仍明确诊断，不能隐藏统计或零返回。接口代理已停止 owned producer/417 专项，收口其未启用成果，不回退六项。系统目标正文现已由用户原地更新并回读active。
 2. 原六项独立核对正确性和集成状态。主线仍是原启动器兼容与默认自动扫描→本机增量编译持久化→runtime复用，动态缺口正常捕获，不手工逐批补输入。
 3. 已接原 final-exec 自动静态入口、模块controller与GS同队列接口；新 Mod/汉化 source-view 复用原合并算法，实际 APFS clonefile 作者正反例通过，不放宽原严格reader。36个准备工具与2个原parser已纳入冻结闭包。
-4. 新编译/暖命中companion封口已接源码并有CPU/实际TU控制。235 GPU TU与两helper已同源-j1构建（320.3秒，无game/GPU，swap未增长），ABI与36工具/2原parser的隔离code stage亦已生成。typed消费原生10项通过，异常路径JSON移动后再次抛错已修复；仅重建main、保持同一DSO/ABI并生成新组件清单，旧consumer不用于最终QA。原入口真实全量静态扫描已完成（28852文件、390.9秒、无游戏/GPU），不代表完整PSO或runtime命中。FEX CPU/生产host已按当前D重建，菜单修复也进入真实depfile与cache身份（47.09秒、无swap增长）。Swift40/stage14/菜单7定向控制通过，最新整包已生成（arm64-ui-audit-20261026-03），40项Swift/14stage/7菜单控制及包内代码/资源/原生组件冻结核对通过；正在使用原GUI验证默认准备与运行时闭环。当前真正未收尾是整包源与产物核验、原入口首启/冷暖/失效/真实命中及长帧/启动/内存验收；随后集中匹配性能、最新包功能回归、干净检出构建和交付。此coherent构建不含FEX CPU，不冒称clean checkout或可移植交付。
+4. 新编译/暖命中companion封口已接源码并有CPU/实际TU控制。235 GPU TU与两helper已同源-j1构建（320.3秒，无game/GPU，swap未增长），ABI与36工具/2原parser的隔离code stage亦已生成。typed消费原生10项通过，异常路径JSON移动后再次抛错已修复；仅重建main、保持同一DSO/ABI并生成新组件清单，旧consumer不用于最终QA。原入口真实全量静态扫描已完成（28852文件、390.9秒、无游戏/GPU），不代表完整PSO或runtime命中。FEX CPU/生产host已按当前D重建，菜单修复也进入真实depfile与cache身份（47.09秒、无swap增长）。Swift40/stage14/菜单7定向控制通过，最新整包已生成（arm64-ui-audit-20261026-06），41项Swift/14stage/7菜单控制及包内代码/资源/原生组件冻结核对通过；正在使用原GUI验证默认准备与运行时闭环。当前真正未收尾是整包源与产物核验、原入口首启/冷暖/失效/真实命中及长帧/启动/内存验收；随后集中匹配性能、最新包功能回归、干净检出构建和交付。此coherent构建不含FEX CPU，不冒称clean checkout或可移植交付。
 
 本轮QA实际启动补证：原UI的UserDefaults与Shared数据目录准入已对齐，41项Swift及7项偏好隔离控制通过。当前整包为`arm64-ui-audit-20261026-05`；原入口日志确认1.09、快速存档、六文件社区汉化和FEX/Metal设置均按QA偏好消费。默认首启已实际进入完整资源扫描/关联，游戏进程尚未启动，不冒称runtime命中或性能验收完成。Cua已停止，单份隔离运行由原严重压力/异常swap/锁屏保护监控。
+
+首启实测修订：package05在1500秒时间预算内成功发布静态READY，尚未启动游戏即由测试保护器停止；压力最高警告级、swap未增长，不能叫游戏崩溃或完整闭环通过。已确认包内Python缺`_hashlib`导致慢SHA实现；复用SQLite闭包补齐受限原生哈希模块，9控制和新副本原生加载/摘要正控通过，64MiB微测约450→2215–2903MiB/s，额外临时峰值约2.3MiB。源码`f18bbdd0`、`dd6a9640`已推送；package06实际重新跑原GUI首启，完整启动提速/runtime命中仍待验证。见docs/packaged-python-hashing.zh-CN.md。
+
+package06完整准备已通过原GUI自动执行，409个既有QA输入实际native-ready，65次严格archive命中；渲染器启动初始化538次Local库命中、11次helper库命中。随后游戏加载在5秒内swap新增>1GiB，保护器停止该次运行（期间短时pressure4），不是格式崩溃；不冒称空shader缓存、场景/FPS或内存验收完成。用户已关闭其它App并授权继续，旧05 QA已正常退出，仅留06；当前同缓存暖启动在保护器下继续，Cua已停止。最新证据evidence/original-gui-prepared-runtime-20261026/summary.json。
+
+正常构建源码入口也已参数化，真实Clang桥生成及FEX配置通过；18项配置/身份根控制通过。正常metadata target实际构建运行，215原生ABI字段一致且无renderer加载边；完整layout来源/fixture封口、全新依赖与CPU/GPU/helper实际构建/新加载边和最终打包仍待收口，不能叫只剩验收。
 
 `aad1668f`及其前置源码检查点已推送开发分支；本轮继续正常CMake构建入口和隔离真实运行验收，收口后同步新增源码。不更新正式应用/Release，不动正式存档、设置和缓存。画质、持续内存及保护规则不变，目标保持 active。
 

@@ -1,3 +1,21 @@
+# Compile-time source/generated/dependency locations are independent of the
+# existing private runtime root. Legacy defaults keep old developer builds valid;
+# configure.py's normal path supplies every location explicitly.
+set(BB_ARM64_GENERATED_DIR "${BB_ARM64_PROTOTYPE_DIR}/generated" CACHE PATH "Native bridge generated output")
+set(BB_ARM64_RUNTIME_ROOT "${BB_ARM64_PROTOTYPE_DIR}" CACHE PATH "Existing private development runtime root")
+set(BB_ARM64_DEPENDENCY_INCLUDE_DIRS "/opt/homebrew/include" CACHE STRING "Explicit native dependency headers")
+set(BB_ARM64_SDL_LIBRARY "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/deps-metal-arm64/lib/libSDL3.0.dylib" CACHE FILEPATH "SDL used by the selected native renderer")
+set(BB_ARM64_RENDERER_BUILD_DIR "" CACHE PATH "Normal configured renderer build directory")
+set(BB_ARM64_RENDERER_LIBRARY "" CACHE FILEPATH "Normal GPU-side renderer artifact")
+set(BB_ARM64_CPU_HOST_LIBRARY "" CACHE FILEPATH "Explicit CPU-side host artifact; distinct from GPU renderer")
+set(BB_ARM64_RENDERER_TARGET "bbgpu" CACHE STRING "Normal renderer CMake target")
+set(BB_ARM64_RENDERER_BUILD_JOBS "1" CACHE STRING "Bounded renderer build parallelism")
+if(BB_ARM64_RENDERER_BUILD_DIR)
+ if(NOT IS_ABSOLUTE "${BB_ARM64_CPU_HOST_LIBRARY}")
+  message(FATAL_ERROR "Declare the explicit CPU-side host artifact/candidate for this normal build")
+ endif()
+ set(BB_ARM_GPU_LIBRARY "${BB_ARM64_CPU_HOST_LIBRARY}" CACHE FILEPATH "Explicit CPU-side host artifact" FORCE)
+endif()
 set(AETHER ${BB_ARM64_PROTOTYPE_DIR}/vendor/aether)
 add_library(bb_fex_embedding STATIC
  ${AETHER}/src/core/fex/fex_guest_engine.cpp
@@ -5,7 +23,7 @@ add_library(bb_fex_embedding STATIC
  ${AETHER}/src/core/guest_cpu/hle_call_adapter.cpp
  ${AETHER}/src/core/guest_cpu/fex_hle_bridge.cpp)
 target_compile_features(bb_fex_embedding PUBLIC cxx_std_20)
-target_include_directories(bb_fex_embedding PUBLIC ${AETHER}/src ${CMAKE_BINARY_DIR}/generated ${CMAKE_SOURCE_DIR}/Source/Tools/CommonTools ${CMAKE_SOURCE_DIR}/FEXCore/Source)
+target_include_directories(bb_fex_embedding PUBLIC ${AETHER}/src ${CMAKE_BINARY_DIR}/generated ${BB_ARM64_GENERATED_DIR} ${CMAKE_SOURCE_DIR}/Source/Tools/CommonTools ${CMAKE_SOURCE_DIR}/FEXCore/Source)
 target_link_libraries(bb_fex_embedding PUBLIC FEXCore Common CommonTools JemallocLibs ${PTHREAD_LIB})
 add_executable(test_lookup ${BB_ARM64_PROTOTYPE_DIR}/tests/test_lookup.cpp)
 target_compile_features(test_lookup PRIVATE cxx_std_20)
@@ -15,7 +33,7 @@ add_executable(test_abi ${BB_ARM64_PROTOTYPE_DIR}/tests/test_abi.cpp)
 target_link_libraries(test_abi PRIVATE bb_fex_embedding)
 add_executable(bb-runtime-arm64 ${BB_ARM64_PROTOTYPE_DIR}/src/runtime.cpp ${BB_ARM64_PROTOTYPE_DIR}/src/metal_peer.cpp)
 target_include_directories(bb-runtime-arm64 PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes)
-target_compile_definitions(bb-runtime-arm64 PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_PROTOTYPE_DIR}")
+target_compile_definitions(bb-runtime-arm64 PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_RUNTIME_ROOT}")
 target_link_libraries(bb-runtime-arm64 PRIVATE bb_fex_embedding)
 add_executable(test_lifetime ${BB_ARM64_PROTOTYPE_DIR}/tests/test_lifetime.cpp ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes/bbport_resource_lifetime.cpp)
 target_include_directories(test_lifetime PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes)
@@ -29,10 +47,10 @@ target_compile_features(test_abi_original PRIVATE cxx_std_20)
 target_include_directories(test_abi_original PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/tests ${AETHER}/src ${AETHER}/src/core/guest_cpu)
 target_compile_definitions(test_abi_original PRIVATE BB_ABI_ORIGINAL)
 enable_language(C)
-file(GLOB BB_NATIVE_BRIDGES CONFIGURE_DEPENDS ${BB_ARM64_PROTOTYPE_DIR}/generated/*_bridge.c)
-add_library(bb_native_runtime STATIC ${BB_NATIVE_BRIDGES} ${BB_ARM64_PROTOTYPE_DIR}/generated/native_registry.c ${BB_ARM64_PROTOTYPE_DIR}/vendor/bb_runtime/src/low_heap.c ${BB_ARM64_PROTOTYPE_DIR}/vendor/bb_runtime/src/runtime_quicksave.c ${BB_ARM64_PROTOTYPE_DIR}/src/native_stubs.c ${BB_ARM64_PROTOTYPE_DIR}/src/native_restart.c)
+file(GLOB BB_NATIVE_BRIDGES CONFIGURE_DEPENDS ${BB_ARM64_GENERATED_DIR}/*_bridge.c)
+add_library(bb_native_runtime STATIC ${BB_NATIVE_BRIDGES} ${BB_ARM64_GENERATED_DIR}/native_registry.c ${BB_ARM64_PROTOTYPE_DIR}/vendor/bb_runtime/src/low_heap.c ${BB_ARM64_PROTOTYPE_DIR}/vendor/bb_runtime/src/runtime_quicksave.c ${BB_ARM64_PROTOTYPE_DIR}/src/native_stubs.c ${BB_ARM64_PROTOTYPE_DIR}/src/native_restart.c)
 target_include_directories(bb_native_runtime PUBLIC ${BB_ARM64_PROTOTYPE_DIR}/vendor/bb_runtime ${BB_ARM64_PROTOTYPE_DIR}/vendor/bb_runtime/src)
-target_include_directories(bb_native_runtime PRIVATE /opt/homebrew/include)
+target_include_directories(bb_native_runtime PRIVATE ${BB_ARM64_DEPENDENCY_INCLUDE_DIRS})
 target_include_directories(bb_native_runtime PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src)
 target_sources(bb_native_runtime PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src/native_net_threads.c)
 target_sources(bb_native_runtime PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src/native_network.c)
@@ -41,22 +59,24 @@ target_compile_options(bb_native_runtime PRIVATE -Wno-incompatible-pointer-types
 target_compile_features(bb_native_runtime PRIVATE c_std_11)
 file(GLOB BB_ATRAC_SOURCES CONFIGURE_DEPENDS ${BB_ARM64_PROTOTYPE_DIR}/vendor/bb_runtime/third_party/LibAtrac9/C/src/*.c)
 add_library(bb_atrac STATIC ${BB_ATRAC_SOURCES})
-target_link_libraries(bb_native_runtime PUBLIC bb_atrac ${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/deps-metal-arm64/lib/libSDL3.0.dylib)
+target_link_libraries(bb_native_runtime PUBLIC bb_atrac ${BB_ARM64_SDL_LIBRARY})
 add_executable(bb-game-arm64 ${BB_ARM64_PROTOTYPE_DIR}/src/game_runtime.cpp)
-target_include_directories(bb-game-arm64 PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/generated ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes)
-target_compile_definitions(bb-game-arm64 PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_PROTOTYPE_DIR}")
+target_include_directories(bb-game-arm64 PRIVATE ${BB_ARM64_GENERATED_DIR} ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes)
+target_compile_definitions(bb-game-arm64 PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_RUNTIME_ROOT}")
 target_link_libraries(bb-game-arm64 PRIVATE bb_fex_embedding bb_native_runtime)
 add_executable(test_jit_scope ${BB_ARM64_PROTOTYPE_DIR}/tests/test_jit_scope.cpp)
 target_link_libraries(test_jit_scope PRIVATE bb_fex_embedding)
 add_executable(test_jit_scope_original ${BB_ARM64_PROTOTYPE_DIR}/tests/test_jit_scope.cpp)
 target_compile_definitions(test_jit_scope_original PRIVATE BB_OLD_JIT_SCOPE)
 target_link_libraries(test_jit_scope_original PRIVATE bb_fex_embedding)
-include(${BB_ARM64_PROTOTYPE_DIR}/generated/gpu_flags.cmake)
-add_library(bb_gpu_adapters OBJECT ${BB_ARM64_PROTOTYPE_DIR}/generated/gpu_adapters.cpp)
+include(${BB_ARM64_GENERATED_DIR}/gpu_flags.cmake)
+add_library(bb_gpu_adapters OBJECT ${BB_ARM64_GENERATED_DIR}/gpu_adapters.cpp)
+target_compile_features(bb_gpu_adapters PRIVATE cxx_std_23)
 target_compile_options(bb_gpu_adapters PRIVATE ${BB_GPU_HEADER_FLAGS} -Wno-ignored-attributes)
 target_include_directories(bb_gpu_adapters BEFORE PRIVATE ${BB_GPU_HEADER_INCLUDES})
 target_link_libraries(bb_gpu_adapters PRIVATE bb_fex_embedding)
 add_library(bb_avplayer_adapters OBJECT ${BB_ARM64_PROTOTYPE_DIR}/src/avplayer_bridge.cpp)
+target_compile_features(bb_avplayer_adapters PRIVATE cxx_std_23)
 target_compile_options(bb_avplayer_adapters PRIVATE ${BB_GPU_HEADER_FLAGS} -Wno-ignored-attributes)
 target_include_directories(bb_avplayer_adapters BEFORE PRIVATE ${BB_GPU_HEADER_INCLUDES} ${BB_ARM64_PROTOTYPE_DIR}/src)
 target_link_libraries(bb_avplayer_adapters PRIVATE bb_fex_embedding)
@@ -64,10 +84,11 @@ target_link_libraries(bb_avplayer_adapters PRIVATE bb_fex_embedding)
 
 target_compile_definitions(bb_native_runtime PRIVATE BB_WITH_NATIVE_GPU=1)
 target_sources(bb-game-arm64 PRIVATE $<TARGET_OBJECTS:bb_gpu_adapters> $<TARGET_OBJECTS:bb_avplayer_adapters>)
-set(BB_ARM_GPU_LIBRARY "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/bin/gpu-metal-arm64/libbbgpu.avplayer-candidate.dylib" CACHE FILEPATH "Private CPU-side GPU library with AvPlayer thread completion revision 1")
+set(BB_ARM_GPU_LIBRARY "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/bin/gpu-metal-arm64/libbbgpu.avplayer-candidate.dylib" CACHE FILEPATH "Selected normal native renderer library")
 target_link_libraries(bb-game-arm64 PRIVATE ${BB_ARM_GPU_LIBRARY})
 target_link_options(bb-game-arm64 PRIVATE -Wl,-export_dynamic)
-set_target_properties(bb-game-arm64 PROPERTIES BUILD_RPATH "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/bin/gpu-metal-arm64")
+get_filename_component(BB_ARM_GPU_LIBRARY_DIR "${BB_ARM_GPU_LIBRARY}" DIRECTORY)
+set_target_properties(bb-game-arm64 PROPERTIES BUILD_RPATH "${BB_ARM_GPU_LIBRARY_DIR}")
 
 add_executable(test_heap_bridge ${BB_ARM64_PROTOTYPE_DIR}/tests/test_heap_bridge.cpp ${BB_ARM64_PROTOTYPE_DIR}/vendor/metal_api/shim/bbport_heap_sites.cpp)
 target_include_directories(test_heap_bridge PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/vendor/metal_api/shim)
@@ -112,11 +133,11 @@ add_executable(test_published_ranges ${BB_ARM64_PROTOTYPE_DIR}/tests/test_publis
 target_link_libraries(test_published_ranges PRIVATE bb_fex_embedding)
 target_compile_options(test_published_ranges PRIVATE -UNDEBUG)
 
-target_compile_definitions(bb_native_runtime PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_PROTOTYPE_DIR}")
+target_compile_definitions(bb_native_runtime PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_RUNTIME_ROOT}")
 
 add_executable(test_native_restart ${BB_ARM64_PROTOTYPE_DIR}/tests/test_native_restart.c ${BB_ARM64_PROTOTYPE_DIR}/src/native_restart.c)
 target_include_directories(test_native_restart PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/vendor/bb_runtime/src)
-target_compile_definitions(test_native_restart PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_PROTOTYPE_DIR}")
+target_compile_definitions(test_native_restart PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_RUNTIME_ROOT}")
 add_executable(test_session_state ${BB_ARM64_PROTOTYPE_DIR}/tests/test_session_state.cpp)
 target_include_directories(test_session_state PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src)
 target_compile_features(test_session_state PRIVATE cxx_std_20)
@@ -128,12 +149,12 @@ target_link_libraries(test_thread_bootstrap PRIVATE bb_fex_embedding)
 target_compile_options(test_thread_bootstrap PRIVATE -UNDEBUG)
 
 add_executable(bb-game-arm64-old-stack-snapshot ${BB_ARM64_PROTOTYPE_DIR}/src/game_runtime.cpp)
-target_include_directories(bb-game-arm64-old-stack-snapshot PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/generated ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes)
-target_compile_definitions(bb-game-arm64-old-stack-snapshot PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_PROTOTYPE_DIR}" BB_OLD_THREAD_BOOTSTRAP)
+target_include_directories(bb-game-arm64-old-stack-snapshot PRIVATE ${BB_ARM64_GENERATED_DIR} ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes)
+target_compile_definitions(bb-game-arm64-old-stack-snapshot PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_RUNTIME_ROOT}" BB_OLD_THREAD_BOOTSTRAP)
 target_sources(bb-game-arm64-old-stack-snapshot PRIVATE $<TARGET_OBJECTS:bb_gpu_adapters> $<TARGET_OBJECTS:bb_avplayer_adapters>)
 target_link_libraries(bb-game-arm64-old-stack-snapshot PRIVATE bb_fex_embedding bb_native_runtime ${BB_ARM_GPU_LIBRARY})
 target_link_options(bb-game-arm64-old-stack-snapshot PRIVATE -Wl,-export_dynamic)
-set_target_properties(bb-game-arm64-old-stack-snapshot PROPERTIES BUILD_RPATH "${BB_ARM64_PROTOTYPE_DIR}/backend/bbport/bin/gpu-metal-arm64")
+set_target_properties(bb-game-arm64-old-stack-snapshot PROPERTIES BUILD_RPATH "${BB_ARM_GPU_LIBRARY_DIR}")
 
 # Private diagnostic and immutable hardware-TSO admission headers.
 set_property(SOURCE "${CMAKE_SOURCE_DIR}/FEXCore/Source/Interface/Core/Core.cpp" TARGET_DIRECTORY FEXCore_object APPEND PROPERTY INCLUDE_DIRECTORIES "${BB_ARM64_PROTOTYPE_DIR}/src")
@@ -312,8 +333,15 @@ foreach(header IN LISTS BB_CPU_FRONTEND_HEADERS)
 endforeach()
 set(BB_CPU_CACHE_BUILD_HEADER ${CMAKE_BINARY_DIR}/generated/bb_cpu_cache_build.h)
 set(BB_CPU_CACHE_BUILD_MANIFEST ${CMAKE_BINARY_DIR}/generated/cpu_cache_build.json)
+if(BB_ARM64_RENDERER_BUILD_DIR)
+ set(BB_CPU_CACHE_RENDERER_ROOT "${BB_ARM64_RENDERER_BUILD_DIR}")
+else()
+ set(BB_CPU_CACHE_RENDERER_ROOT "${BB_ARM_GPU_LIBRARY_DIR}")
+endif()
 add_custom_command(OUTPUT ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANIFEST}
  COMMAND /usr/bin/env python3 ${BB_ARM64_PROTOTYPE_DIR}/tools/make_cpu_cache_build.py
+  --source-root "${BB_ARM64_PROTOTYPE_DIR}" --build-root "${CMAKE_BINARY_DIR}"
+  --renderer-root "${BB_CPU_CACHE_RENDERER_ROOT}"
   --runtime-part fex=$<TARGET_FILE:FEXCore>
   --runtime-part embedding=$<TARGET_FILE:bb_fex_embedding>
   --runtime-part common=$<TARGET_FILE:Common>
@@ -383,3 +411,21 @@ add_executable(test_signal_audit ${BB_ARM64_PROTOTYPE_DIR}/tests/test_signal_aud
 target_include_directories(test_signal_audit PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src)
 target_compile_features(test_signal_audit PRIVATE cxx_std_20)
 target_compile_options(test_signal_audit PRIVATE -UNDEBUG)
+
+# Optional ordinary cross-build edge, never a historical compiler command table.
+# Configuring does not invoke this; only an explicit CPU target build does.
+if(BB_ARM64_RENDERER_BUILD_DIR)
+ if(NOT IS_ABSOLUTE "${BB_ARM64_RENDERER_BUILD_DIR}" OR
+    NOT EXISTS "${BB_ARM64_RENDERER_BUILD_DIR}/CMakeCache.txt" OR
+    NOT BB_ARM64_RENDERER_TARGET MATCHES "^[A-Za-z_][A-Za-z_0-9.-]*$" OR
+    NOT BB_ARM64_RENDERER_BUILD_JOBS MATCHES "^[1-9][0-9]*$")
+  message(FATAL_ERROR "Invalid explicit native renderer build target")
+ endif()
+ add_custom_target(bb-normal-native-renderer
+  COMMAND ${CMAKE_COMMAND} --build "${BB_ARM64_RENDERER_BUILD_DIR}"
+   --target "${BB_ARM64_RENDERER_TARGET}" --parallel "${BB_ARM64_RENDERER_BUILD_JOBS}"
+  BYPRODUCTS "${BB_ARM64_RENDERER_LIBRARY}"
+  VERBATIM)
+ add_dependencies(bb-game-arm64 bb-normal-native-renderer)
+ add_dependencies(bb-game-arm64-old-stack-snapshot bb-normal-native-renderer)
+endif()

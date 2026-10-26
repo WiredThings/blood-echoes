@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 """Generate ABI-exact host C shims from Clang's parsed declarations, no size guessing."""
 from pathlib import Path
-import subprocess,json,re
+import argparse,subprocess,json,re
 from native_abi_declarations import is_guest_definition
-P=Path(__file__).resolve().parents[1]
-R=P/'vendor/bb_runtime';G=P/'generated';G.mkdir(exist_ok=True)
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--source-root',type=Path,default=Path(__file__).resolve().parents[1])
+parser.add_argument('--output-dir',type=Path)
+parser.add_argument('--include-dir',type=Path,action='append',default=[])
+parser.add_argument('--compiler',default='clang')
+options=parser.parse_args()
+P=options.source_root.resolve(strict=True)
+R=P/'vendor/bb_runtime';G=(options.output_dir or P/'generated').absolute()
+G.mkdir(parents=True,exist_ok=True)
+if G!=G.resolve(strict=True):raise ValueError('generated output must not be linked')
+# Explicit includes replace the legacy native Homebrew default. The normal
+# build entry supplies these from the current renderer's actual CMake fields.
+extra_includes=options.include_dir or [Path('/opt/homebrew/include')]
+
 names=['runtime','runtime_thread','runtime_kernel','runtime_memory','runtime_mutex','runtime_sema','runtime_rwlock','runtime_time','runtime_content','runtime_file','runtime_services','runtime_savedata','runtime_rtc','runtime_ajm','runtime_audio','runtime_pad']
 metadata=[];calls=[]
 # Clang gives physical ABI types, but C void* declarations cannot express code
@@ -48,7 +60,7 @@ def typ(t):
     return ('bool' if raw=='_Bool' else raw,kind)
 for name in names:
     source=R/'src'/f'{name}.c';text=source.read_bytes().decode('latin1')
-    cmd=['clang','-arch','arm64','-std=c11','-DBB_GENERATING_NATIVE_ABI=1','-I/opt/homebrew/include','-Wno-ignored-attributes','-I'+str(R),'-I'+str(R/'src'),'-I'+str(P/'src'),'-Xclang','-ast-dump=json','-fsyntax-only',str(source)]
+    cmd=[options.compiler,'-arch','arm64','-std=c11','-DBB_GENERATING_NATIVE_ABI=1','-Wno-ignored-attributes','-I'+str(R),'-I'+str(R/'src'),'-I'+str(P/'src')]+['-I'+str(p)for p in extra_includes]+['-Xclang','-ast-dump=json','-fsyntax-only',str(source)]
     result=subprocess.run(cmd,capture_output=True,text=True)
     if result.returncode:raise RuntimeError(name+'\n'+result.stderr[-5000:])
     tree=json.loads(result.stdout);body=['// Generated from Clang AST.','#include <stdbool.h>','#include "runtime_exit_codes.h"',' #include "'+str(source)+'"']

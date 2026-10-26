@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "host_plan": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/resource-cpu-execution-1793008000000000005/plan.json",
+  "renderer_plan": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/coherent-game-preparation-20261026-02/plan.json",
+  "objects": [
+    {
+      "source": "avplayer_state.cpp",
+      "normalized_commands_equal": true,
+      "host_object": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/resource-cpu-execution-1793008000000000005/cpu-avplayer_state.o",
+      "renderer_object": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/coherent-game-preparation-20261026-02/objects/gpu-191.o",
+      "host_object_sha256": "7247a91ec9847bc93262fec63a816768b5b152ba2e8ef31f308e9d0bb2a00229",
+      "renderer_object_sha256": "7247a91ec9847bc93262fec63a816768b5b152ba2e8ef31f308e9d0bb2a00229",
+      "current_source_matches_coherent": true
+    },
+    {
+      "source": "avplayer_source.cpp",
+      "normalized_commands_equal": true,
+      "host_object": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/resource-cpu-execution-1793008000000000005/cpu-avplayer_source.o",
+      "renderer_object": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/coherent-game-preparation-20261026-02/objects/gpu-190.o",
+      "host_object_sha256": "5ad9d99195350af380b8d22be3cabcb95c2ab7a850d9eb97278b9a75dc1352cc",
+      "renderer_object_sha256": "5ad9d99195350af380b8d22be3cabcb95c2ab7a850d9eb97278b9a75dc1352cc",
+      "current_source_matches_coherent": true
+    }
+  ],
+  "normalized_link_fields": 301,
+  "normalized_links_equal": true,
+  "current_thread_header_matches_coherent": true,
+  "conclusion": "Two host overrides repeat byte-identical AvPlayer objects; same-source normal bbgpu reuse is a candidate. New-build load/native ABI is unvalidated.",
+  "new_build_validated": false
+}

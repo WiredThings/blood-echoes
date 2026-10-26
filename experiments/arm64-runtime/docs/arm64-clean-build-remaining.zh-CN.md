@@ -15,11 +15,11 @@
 ## 尚未闭合的具体输入
 
 - prepared builder 使用 `evidence/resource-writeback-integration/gpu-build-inputs.json`、`evidence/tiling-library-integration-20261026/native/build.json`，以及固定 `/private/tmp/blood-echoes-arm64-metal-20261023/build`。仍复用该目录生成的 host-shader headers、sirit／FSR archives、SPIRV-Cross archives、Homebrew headers／libraries 和既有 DSO load-edge 来源。下一步必须由新依赖前缀与新 CMake build 生成这些输入，不能复制旧清单冒充 fresh 构建。`BB_FONT_PATH` 是 `.incbin` 的编译输入，应绑定当前源码字体；不是运行时外置字体要求。
-- [`configure.py`](../configure.py) 仅替换 `evidence/configure.json` 中的旧 prototype 根；[`targets.cmake`](../targets.cmake) 仍直连 `backend/bbport` 下的 SDL、candidate GPU DSO 和 RPATH。`generated/*_bridge.c`、`generated/gpu_adapters.cpp`、`generated/gpu_flags.cmake` 实际包含 Shared／私有 tmp／Homebrew Cellar 绝对路径。新检出需重跑 [`generate_native.py`](../tools/generate_native.py)、[`generate_gpu.py`](../tools/generate_gpu.py)，并从新 renderer CMake target／compile commands 导出 flags；不要直接沿用这些旧生成文件。
+- [`configure.py`](../configure.py) 现已改用显式配置入口，不再重放 `evidence/configure.json`；两生成器可使用独立源码／输出目录，`targets.cmake` 可显式选择 generated、依赖／SDL、正常 renderer build／artifact／RPATH，并保持固定 Shared 开发运行根。新入口从当前正常 CMake File API／compile commands 提取头字段；原 `generated/*` 仍保留历史绝对路径，**不得作为新入口的生成输入复用**。十项作者控制、八项身份根控制、真实桥生成与 FEX configure 已通过，实际 target 构建／身份生成／链接仍未完成。正常同源 bbgpu 的 CPU-host 复用有旧对象等字节依据，但新产物仍需实际 native 加载验证。具体命令和未闭合事项见 [`explicit-native-configuration.zh-CN.md`](explicit-native-configuration.zh-CN.md)。
 
 ## 最短落地顺序
 
-1. 初始化仓库及递归子模块；renderer 邻接 `macos`／`tests` 源闭包已补齐，将 dependency prefix、build 目录、GPU target 和生成输入显式参数化仍未完成。
+1. 初始化仓库及递归子模块；renderer 邻接 `macos`／`tests` 源闭包和 dependency prefix／build／GPU target／生成输入的显式参数入口已补齐，尚未执行完整新前缀构建。
 2. 复用仓库根 `tools/macos/setup_deps.sh`（`BB_ARCH=arm64`）、`tools/macos/setup_metal_deps.sh`（`BB_METAL_ARCH=arm64`）和 `tools/macos/build_metal_arm64.sh` 的 ARM 依赖／CMake配置，在新前缀重建依赖及 host shaders。纯 ARM setup 的 Rosetta 硬依赖已修复。`vendor/macos/build-deps.sh` 保留字节相等的旧元数据源；它与实际原入口 `engines/metal/macos/build.sh` 均硬写 x86_64／Rosetta／MoltenVK，不能原样当作纯 ARM 入口；该树没有 `build_macos.sh`。
 3. 从当前源码构建 renderer、两个 helper、实际 layout exporter 和 FEX CPU，重新生成 typed bridges、flags 与身份清单。helper／layout 正常 CMake targets 已接入，但完整 ARM 构建入口与最终清单尚须切到它们，完成实际链接后的同 DSO／纯系统 metadata 加载边验证，才能摆脱历史 baseline 命令清单。
 4. 复用仓库根 `tools/macos/build_from_source.sh`、`package_optimized.py`、`package_metal.py` 的“源码生成基础包再组装”骨架，接入上述 ARM CPU／helpers。现有原入口尚不构建本实验的 FEX CPU，不能仅调用它便宣布本轮交付完成。
