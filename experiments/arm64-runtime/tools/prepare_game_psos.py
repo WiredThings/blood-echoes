@@ -17,6 +17,21 @@ def need(v,why):
  if not v:raise Refused(why)
 def digest(v):return hashlib.sha256(json.dumps(v,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 def sha(v):return hashlib.sha256(v).hexdigest()
+def wait_owned_worker(proc,log,check,clock,start,seconds):
+ """Wake on exit; preserve the original supervision/owned-group cleanup."""
+ try:
+  while proc.poll()is None:
+   # Keep the same whole-preparation deadline, not a new per-worker budget.
+   check()
+   if clock()-start>=seconds:raise Deferred('preparation time budget')
+   if log.stat().st_size>8*MAX_BLOB:raise Stopped('bounded worker log budget')
+   try:proc.wait(timeout=.1)
+   except subprocess.TimeoutExpired:pass
+ finally:
+  if proc.poll()is None:
+   os.killpg(proc.pid,signal.SIGTERM)
+   try:proc.wait(timeout=3)
+   except subprocess.TimeoutExpired:os.killpg(proc.pid,signal.SIGKILL);proc.wait()
 def directory(p):
  p=Path(p);s=p.lstat();need(p.is_absolute()and p==p.resolve(strict=True)and stat.S_ISDIR(s.st_mode)and s.st_uid==os.getuid(),'owned canonical directory');return p
 def owned(p,maximum,expected=None):
@@ -269,18 +284,7 @@ def prepare(config,*,services=None):
   log=case/'console.log';command=[str(Path(a.worker).resolve()),phase,str(packetdir/'packet.json'),str(scratch)]
   with log.open('w')as stream:
    proc=subprocess.Popen(command,env=env,cwd=case,stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
-   try:
-    while proc.poll()is None:
-     # Use the same wall-clock deadline during the actual owned-byte worker.
-     check()
-     if clock()-start>=a.seconds:raise Deferred('preparation time budget')
-     if log.stat().st_size>8*MAX_BLOB:raise Stopped('bounded worker log budget')
-     time.sleep(.1)
-   finally:
-    if proc.poll()is None:
-     os.killpg(proc.pid,signal.SIGTERM)
-     try:proc.wait(timeout=3)
-     except subprocess.TimeoutExpired:os.killpg(proc.pid,signal.SIGKILL);proc.wait()
+   wait_owned_worker(proc,log,check,clock,start,a.seconds)
   need(sum(map(len,held.values()))<=MAX_TOTAL,'retained original read-set budget');del held
   events=[];workers=[];loaded=set()
   with log.open()as stream:

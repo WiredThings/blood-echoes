@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "status": "source-and-existing-evidence-audit",
+  "game_started": false,
+  "GPU_started": false,
+  "new_long_test": false,
+  "formal_data_modified": false,
+  "quality_changed": false,
+  "source_sha256": {
+    "tools/launcher_local_aot.py": "1e7591a9fd70f7b19fcfd717a3b1384d08f7ca586dc5e443d75a226c5b95fdb7",
+    "tools/launcher_fixed_helpers.py": "0295e0930a28f32f0f099f201aa1f901a0a955315a49286de53c840d8bfd5db9",
+    "tools/launcher_game_pso.py": "6da25f747320908b92725a7cb9329ac97a5a23828ba8d03b5f78842d180a9aa5",
+    "tools/game_pso_component.py": "98086042b42def75ceda37bf7af7a4c05b642c0a56d5bc5cee393ee2b3fdfbaa",
+    "tools/game_pso_candidates.py": "1b25b10123361bb530fd12f84b472ba7bc980ecbabb85394ed65888fe0a7351f",
+    "tools/inventory_shader_cache.py": "a1b97bdd7224060fed0670f63aa2a7bd9ab949550b2295206273d5743db779a2",
+    "tools/game_pso_queue.py": "cedae88d4a879eb6e56709240685415625f7e2737fc300d2af8b196a26a05813",
+    "tools/local_aot_policy.py": "6cbb7118600145666cb169390d75a3db02565a5adba3cd1cc71aedf5faa522b8",
+    "tools/local_metal_builder.py": "cb36d199294b2b85c87525f123497df225923e52f2f2455b5d49509d98f2658c",
+    "tools/prepare_game_psos.py": "93ccd0cb1c9b282b35e6d24e458139b90c284a24f306818e5da917f72fd3dee0",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_local_library.h": "22a071f5cf709861216453d3da71da6785598f8a8d136afb87bc0d1c1e15c54e",
+    "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_local_aot.h": "b6bec9cee9dbfbdc606f4d07ed5aa9ac933bf2a44153089a00a52db269eaf843",
+    "src/game_pso_preparer.mm": "37353bf4fecd2598332edd1c2e823b55dc7fd3051d79f6c5891b8480faa4768e",
+    "tests/test_game_pso_worker_wait.py": "ba5ace82589442d81f97ac534bdfe41ba011c3550976f42b1357b28a9ca2447b"
+  },
+  "historical_default_startup": {
+    "libraries": 14,
+    "fixed_PSOs": 8,
+    "source_files": 1426,
+    "rows": [
+      {
+        "name": "cold-v2",
+        "helper_seconds": 8.85589545906987,
+        "scene_ready_seconds": 395.3747910830425,
+        "game_preparation": {
+          "wall_seconds": 349.7558285839623,
+          "outcome_count": 1212,
+          "completed": 404,
+          "recorded": 404,
+          "strict_lookup_attempts": 404,
+          "initial_local_calls": 1,
+          "final_local_calls": 1,
+          "warm_fast_path": false
+        },
+        "builder": {
+          "calls": 2,
+          "full_builds": 2,
+          "reuses": 0,
+          "seconds": 128.0685279170284,
+          "full_build_seconds": 127.74229333305266,
+          "metadata_entries": 112
+        },
+        "nonbuilder_wall_residual_seconds": 221.68730066693388,
+        "raw_result_sha256": "25362e7f694709a049bf89570cfa732e961b0574591ccafb75f9667305a40b99"
+      },
+      {
+        "name": "warm",
+        "helper_seconds": 0.28140004095621407,
+        "scene_ready_seconds": 231.68662054196466,
+        "game_preparation": {
+          "wall_seconds": 169.49067054199986,
+          "outcome_count": 848,
+          "completed": 424,
+          "recorded": 0,
+          "strict_lookup_attempts": 424,
+          "initial_local_calls": 1,
+          "final_local_calls": 1,
+          "warm_fast_path": false
+        },
+        "builder": {
+          "calls": 2,
+          "full_builds": 1,
+          "reuses": 1,
+          "seconds": 16.727513374993578,
+          "full_build_seconds": 15.878065792028792,
+          "metadata_entries": 2052
+        },
+        "nonbuilder_wall_residual_seconds": 152.76315716700628,
+        "raw_result_sha256": "0db2e2d9befb2fc8b23b72f362d7e800b4ba6812e4a8fd88aefd3dc90a6d3ddf"
+      },
+      {
+        "name": "warm-stable",
+        "helper_seconds": 0.17810349992942065,
+        "scene_ready_seconds": 140.66605966701172,
+        "game_preparation": {
+          "wall_seconds": 90.48271829204168,
+          "outcome_count": 424,
+          "completed": 424,
+          "recorded": 0,
+          "strict_lookup_attempts": 424,
+          "initial_local_calls": 1,
+          "final_local_calls": 0,
+          "warm_fast_path": true
+        },
+        "builder": {
+          "calls": 1,
+          "full_builds": 1,
+          "reuses": 0,
+          "seconds": 14.766957667074166,
+          "full_build_seconds": 14.43323208403308,
+          "metadata_entries": 2052
+        },
+        "nonbuilder_wall_residual_seconds": 75.71576062496752,
+        "raw_result_sha256": "a2b295e2835ba77d4c99ac0087810ffb42222a9347e94d431d1705d58d8a6629"
+      }
+    ],
+    "qualification": "three cold/warm observations on prior frozen fourteen-library package; not a matched current-source timing or new performance result"
+  },
+  "repeated_native_library_hash": {
+    "bytes_per_child": 18745312,
+    "stable_warm_children": 424,
+    "logical_bytes_total": 7948012288,
+    "qualification": "logical read/hash volume, not physical SSD traffic or measured CPU time"
+  },
+  "current_source_inferences": {
+    "stable_warm_full_local_builder_calls_across_outer_and_inner": 3,
+    "scope": "outer before helpers, inner initial prepare, outer after game preparation; not three measured current timings",
+    "existing_same_prepare_session": true,
+    "cross_outer_helper_shared_session": false
+  },
+  "minimal_fix": {
+    "source": "tools/prepare_game_psos.py",
+    "change": "existing worker supervision moved to wait_owned_worker; only unconditional sleep(.1) becomes proc.wait(timeout=.1)",
+    "protection_changed": false,
+    "cleanup_policy_changed": false,
+    "tests": 6,
+    "test_seconds": 0.4337980829877779,
+    "test_result_sha256": "7a4f429808b7bd8696ae92a61dc88f3bd0a907e579ec0ad751ba18634360872d",
+    "test_execution_root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/warm-worker-wait-1793000679958084000",
+    "game_benchmark_gain_measured": false
+  },
+  "recommendations_only": [
+    "single-launch bounded tool/component admission reuse with stat and environment invalidation",
+    "share existing PreparationSession across outer preparation scopes",
+    "bounded multi-recipe native worker to amortize startup/load, retaining per-recipe strict final validation",
+    "single-owned-read/page-bounded cache inventory reuse",
+    "reuse already-proven partial-warm outcomes only with complete unchanged environment/artifact proof"
+  ]
+}
