@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "status": "clean-native-build-and-source-closure-verified-final-assembler-pending",
+  "native_source_revision": "4d634fc30862fcf7ca36534704b122a7f518b083",
+  "closure_source_revision": "aac9cdca716945ffea9c37376bd7c79df6192b09",
+  "installed_app_revision": "340e9c8685f5d70ec76c332a64b00ac422f5fad8",
+  "installed_app_changed_this_turn": false,
+  "formal_data_modified": false,
+  "game_started": false,
+  "release_updated": false,
+  "public_documentation_updated": false,
+  "renderer": {
+    "status": "normal-targets-built",
+    "seconds": 312.05028916697484,
+    "renderer_translation_units": 236,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9408.0625
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9376.0
+    }
+  },
+  "CPU": {
+    "status": "normal-CPU-targets-built",
+    "seconds": 71.73360512498766,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9376.0
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9128.0
+    },
+    "artifacts": {
+      "bb-game-arm64": {
+        "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/clean-project-build-1793052720002517000/cpu/Bin/bb-game-arm64",
+        "sha256": "54b25383b20a2eaae31ee50a3830e3a9ccc68b01fd2025f3ae120651141e98c0"
+      },
+      "bb-cpu-cache-generator": {
+        "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/clean-project-build-1793052720002517000/cpu/Bin/bb-cpu-cache-generator",
+        "sha256": "ffda3eb47fa6984eaa380b1424616a70b7e0cfde2fa0ed790e276997bbbee693"
+      }
+    }
+  },
+  "bbnet": {
+    "status": "normal-bbnet-built",
+    "seconds": 73.08732004091144,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9088.0
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9088.0
+    },
+    "library": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/clean-project-build-1793052720002517000/net-3/libbbnet.dylib",
+    "sha256": "b0defb49a2995892bbdbe8ee7e3e5336ba746c28e49adb5f86a4818a477dd1d6",
+    "dependency_packages": {
+      "protobuf": "36.2",
+      "miniupnpc": "2.3.3",
+      "nlohmann-json": "3.12.0",
+      "OpenSSL": "explicit openssl@3"
+    },
+    "module_loaded": false,
+    "game_or_account_used": false
+  },
+  "source_closure": {
+    "schema": 1,
+    "status": "source-code-closure-written",
+    "source_revision": "aac9cdca716945ffea9c37376bd7c79df6192b09",
+    "source_archive_sha256": "1a415d1d57f86e6c24f4821a65bd9d9ec51ea143d82967ab8769963e8ea5a880",
+    "temporary_root": "/private/tmp/blood-echoes-source-only-she9nece",
+    "private_QA_tree_reads_denied": true,
+    "private_QA_tree_read_attempts": 0,
+    "game_or_data_copied": false,
+    "native_components_included": false,
+    "formal_profile_enabled": false,
+    "files": 61,
+    "source_scripts": 16,
+    "runtime_tools": 40,
+    "script_projection": {
+      "hook_already_present": true,
+      "log_already_present": true,
+      "original_identity_kind": "current-repository-exact-known-projection"
+    },
+    "qualification": "Actual clean-source file emission only; final native/layout/capability/Python/dependency assembly remains pending."
+  },
+  "validation": {
+    "build_config_controls": 18,
+    "new_code_closure_controls": 13,
+    "legacy_QA_stage_controls": 15
+  },
+  "qualification": "Clean tracked project sources were compiled without prepared project objects. External dependency packages and developer-only monitoring helpers were reused; this is not an all-dependency rebuild or a completed QA-free app assembler.",
+  "remaining": [
+    "Wire existing native/layout/8-role sealing and code closure into original GUI/Python/dependency assembly without a QA app, cache, save or old formal app input",
+    "Decouple source/layout freezing from old Shared scalar capability lookup; run actual final worker scalar contract in existing code-only formal scratch, never fake game inputs",
+    "Add ARM64 standalone bbnet to normal source build orchestration, including explicit compatible protobuf compiler and dependency discovery",
+    "Validate final fresh package and payload, then await human gameplay acceptance before Release/public docs"
+  ]
+}
