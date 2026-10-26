@@ -276,10 +276,17 @@ target_compile_definitions(bbgpu PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
 # backend, but no service/thread/IO exists until a verified cohort is configured.
 # The historical option name remains a build-only baseline escape hatch.
 option(BB_DEV_FETCH_CAPTURE "Automatic validated local compiler-input capture" ON)
+option(BB_BUILD_GAME_PREPARATION "Build the native game preparation helpers" OFF)
+set(BB_GAME_PREPARATION_SOURCE_ROOT "" CACHE PATH
+    "Compile-time ARM runtime source root; does not select runtime data directories")
 if(BB_DEV_FETCH_CAPTURE AND APPLE AND
    (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64" OR
     (NOT CMAKE_OSX_ARCHITECTURES AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")))
-    set(BB_FETCH_CAPTURE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
+    if(BB_GAME_PREPARATION_SOURCE_ROOT)
+        set(BB_FETCH_CAPTURE_SRC "${BB_GAME_PREPARATION_SOURCE_ROOT}/src")
+    else()
+        set(BB_FETCH_CAPTURE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
+    endif()
     target_sources(bbgpu PRIVATE
         ${BB_FETCH_CAPTURE_SRC}/fetch_compile_observer.cpp
         ${BB_FETCH_CAPTURE_SRC}/fetch_compile_producer.cpp
@@ -322,6 +329,14 @@ if (APPLE)
         "-framework Foundation" "-framework Security" -lbz2 -lz -liconv)
 else()
     target_link_libraries(bbgpu PUBLIC PkgConfig::FFMPEG PkgConfig::X11)
+endif()
+
+# Explicit source targets, never an import of a historical compile/link plan.
+# The native application build opts in; standalone renderer builds do not
+# implicitly build these preparation consumers.
+if(BB_BUILD_GAME_PREPARATION)
+    include(cmake/GamePreparation.cmake)
+    bb_add_game_preparation_targets()
 endif()
 
 # Explicit test targets; neither launches the game nor needs a Vulkan device.

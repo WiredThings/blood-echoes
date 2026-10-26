@@ -551,6 +551,7 @@ func qaApplicationSupportURL(bundleIdentifier: String?, previewPath: String?) ->
     let candidate = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
     // Foundation resolves existing /private/tmp directories to the /tmp alias on macOS.
     let normalized = candidate.path.hasPrefix("/tmp/") ? "/private" + candidate.path : candidate.path
-    guard normalized.hasPrefix("/private/tmp/") else { return fallback }
+    let developmentState = "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/state/"
+    guard normalized.hasPrefix("/private/tmp/") || normalized.hasPrefix(developmentState) else { return fallback }
     return URL(fileURLWithPath: normalized, isDirectory: true)
 }

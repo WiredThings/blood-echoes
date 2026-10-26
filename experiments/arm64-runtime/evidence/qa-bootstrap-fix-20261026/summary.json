@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "status": "targeted-controls-and-package-seed-readback-passed",
+  "swift_contracts": 41,
+  "qa_preference_controls": 7,
+  "production_domain_import_allowed": false,
+  "actual_data_root_acceptance_pending": false,
+  "actual_data_root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/state/gui-root-1793019576634241000/optimized-launcher",
+  "actual_original_launch_log_confirmed": true,
+  "actual_launch": {
+    "package": "arm64-ui-audit-20261026-05",
+    "quicksave": true,
+    "community_chinese_files": 6,
+    "runtime": "fex-arm64",
+    "mods_and_linked_image_prepared": true,
+    "default_local_preparation_started": true,
+    "game_process_started": false,
+    "runtime_cache_hits_verified": false
+  },
+  "game_started": false,
+  "formal_data_modified": false,
+  "build_seconds": 26.012738666962832,
+  "before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 7801.625
+  },
+  "after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 7801.625
+  },
+  "source_sha256": {
+    "tools/package_local_arm64_qa.py": "fc72105bcf4a96afd1a63e1082ddcf2fb501990edec929e4924e9512a2f32354",
+    "tests/test_qa_preference_seed.py": "c475fc5e0fccd9b9a947ad16854529bd01ad14cb39b5a7a95aabfb66095e304c"
+  }
+}

@@ -23,6 +23,18 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    func testSharedRuntimeQADataRootIsNarrowAndProductionCannotUseIt() throws {
+        let root = "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/state/"
+        let candidate = root + "gui-root-authored-test"
+        let identifier = "io.github.bbport.optimized.options-qa.arm64.gui.authored"
+        XCTAssertEqual(qaApplicationSupportURL(bundleIdentifier: identifier, previewPath: candidate)?.path, candidate)
+        for path in ["/Users/Shared/unrelated", root + "../outside", "/Users/test/Documents/QA"] {
+            let result = try XCTUnwrap(qaApplicationSupportURL(bundleIdentifier: identifier, previewPath: path))
+            XCTAssertTrue(result.path.hasPrefix("/private/tmp/bbport-launcher-qa/"))
+        }
+        XCTAssertNil(qaApplicationSupportURL(bundleIdentifier: "io.github.bbport.optimized", previewPath: candidate))
+    }
+
     func testCommunityChineseRoutingPersistenceAndStaleEnvironment() throws {
         let suite = "bbport.community.tests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

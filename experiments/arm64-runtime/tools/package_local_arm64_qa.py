@@ -4,7 +4,7 @@ This is deliberately host-local: external dependencies and private QA paths rema
 under the prepared Shared development tree. No game/save/cache is put in the zip.
 """
 from pathlib import Path
-import argparse, hashlib, json, os, plistlib, shutil, subprocess, sys, time, zipfile, stat, struct, tempfile
+import argparse, hashlib, json, os, plistlib, shutil, subprocess, sys, time, zipfile, stat, struct, tempfile, re
 
 P=Path(__file__).resolve().parents[1]
 if P.name!='arm64-runtime-prototype':
@@ -40,6 +40,34 @@ def launcher_code_identity(binary,scratch):
             offset+=length
         assert offset==32+size and linkedit==1
         return hashlib.sha256(data).hexdigest()
+
+def seed_qa_preferences(case,*,project=P,runner=subprocess.run):
+    """Use the original launcher's UserDefaults, only for a fresh isolated QA ID.
+    BBPreviewPreferencesPath is not a production preferences loader. Do not add
+    another settings implementation to the UI just for the test packager.
+    """
+    project=project.resolve(strict=True);identifier=case['bundle_id']
+    assert re.fullmatch(r'io\.github\.bbport\.optimized\.options-qa\.arm64\.gui\.[0-9]+',identifier),'fresh QA bundle only'
+    app=Path(case['app']);info=plistlib.loads((app/'Contents/Info.plist').read_bytes())
+    assert info['CFBundleIdentifier']==identifier and app.resolve().is_relative_to(project/'apps')
+    path=Path(case['preferences']);assert path==path.resolve(strict=True) and path.is_relative_to(project/'state')
+    values=plistlib.loads(path.read_bytes())
+    assert values.get('optimizedFoldersImported')is True and values.get('cloudSaves')is False and values.get('online')is False
+    for key in('gameFolder','userFolder'):
+        folder=Path(values[key]).resolve(strict=True)
+        assert folder.is_relative_to(project.parent) and folder!=project.parent
+    assert values['userFolder']==case['user'] and info['BBPreviewDataPath']==case['root']
+    assert Path(case['root']).resolve(strict=True).is_relative_to(project/'state')
+    before=runner(['/usr/bin/defaults','export',identifier,'-'],capture_output=True,check=False)
+    # macOS also reports an unknown domain as a successful empty plist. Admit
+    # only absence/empty values; malformed or any existing value is never cleared.
+    assert before.returncode!=0 or plistlib.loads(before.stdout)=={},'refuse overwriting existing preferences values'
+    runner(['/usr/bin/defaults','import',identifier,str(path)],capture_output=True,check=True)
+    result=runner(['/usr/bin/defaults','export',identifier,'-'],capture_output=True,check=True)
+    actual=plistlib.loads(result.stdout)
+    assert all(actual.get(key)==value for key,value in values.items()),'QA preferences readback differs'
+    return dict(bundle_id=identifier,imported_into_original_user_defaults=True,
+                source_sha256=sha(path),verified_keys=len(values),existing_values_overwritten=False)
 
 def deps(p):
     return [s.strip().split(' (compatibility')[0]for s in subprocess.check_output(['/usr/bin/otool','-L',str(p)],text=True).splitlines()[1:]]
@@ -135,6 +163,7 @@ def main():
     prefs['extraEnv']='\n'.join(k+'='+v for k,v in extra.items())
     Path(case['preferences']).write_bytes(plistlib.dumps(prefs))
     validate_manual_environment(extra)
+    preferences_seed=seed_qa_preferences(case)
     for name in ['python','deps-metal-arm64','bin/gpu-net']:
         dst=stage/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copytree((original/name).resolve(),dst,symlinks=False)
     python_closure=complete_python_sqlite(stage/'python',writable_stage=stage,provider=a.python_provider)
@@ -204,7 +233,7 @@ def main():
         python_sqlite_closure=python_closure,local_metal_preparation=prepared['manifest'],game_pso_component=component,default_game_pso_preparation=True,
         private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,gpu_cache_seed=cache_seed,
         frozen_runtime=native['frozen_runtime'],cpu_runtime_manifest=dict(path=str(a.cpu_runtime_manifest.resolve()),sha256=sha(a.cpu_runtime_manifest),protocol_version=cpu_runtime['protocol_version'],live_payload_version=cpu_runtime['live_payload_version'],author_instrumentation=cpu_runtime.get('author_instrumentation',False)),
-        launcher_build=dict(path=str(products),source_executable_sha256=sha(launcher),code_identity_sha256=launcher_identity),
+        launcher_build=dict(path=str(products),source_executable_sha256=sha(launcher),code_identity_sha256=launcher_identity),qa_preferences_seed=preferences_seed,
         upstream_inputs=dict(cpu=sha(cpu_game_source),cpu_library=sha(cpu_source),gpu_library=sha(gpu_source),net_library=sha(original/'bin/gpu-net/libbbnet.dylib')),
         original_scripts=baseline,effective_scripts=source,controlled_changes=['run.sh final-exec hook','local Metal preparation runtime tools'],manual_physical_input=True,silent=True,
         diagnostic_capture=False,performance_logging=False,
