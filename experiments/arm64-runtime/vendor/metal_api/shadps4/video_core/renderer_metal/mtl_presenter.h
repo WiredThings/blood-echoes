@@ -27,6 +27,9 @@ class Device;
 class Rasterizer;
 class Runtime;
 class Scheduler;
+// Pure scalar provider of the original frame attachment format; no Presenter,
+// Window, texture or CAMetalLayer construction is involved.
+u32 PresentationFrameFormat() noexcept;
 
 /// A frame of the pool. The game's video-out image is rendered (post process pass) into the
 /// frame's texture (Impl::textures[index]) on the draw scheduler; Present draws that texture into

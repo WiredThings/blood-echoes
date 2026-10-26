@@ -712,4 +712,6 @@ void Presenter::Present(VideoCore::PresentFrame* present_frame, bool is_reusing_
     }
 }
 
+u32 PresentationFrameFormat() noexcept { return static_cast<u32>(FramePixelFormat); }
+
 } // namespace Metal

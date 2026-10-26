@@ -18,25 +18,33 @@ def unit(i,eligible=True):
   execution_policy=dict(runtime_cache_import_allowed=False,candidate_preparation=dict(policy_eligible=eligible,
     frozen_input_set_identity=digest([profile,key,metadata,spirv]))))
 class NativeAuthor:
- def __init__(self):self.artifacts=set();self.record_calls=collections.Counter();self.compile_calls=collections.Counter();self.probe_calls=collections.Counter();self.elapsed=0;self.reject=set();self.defer=set();self.stop=None;self.worker_only=False;self.phase_calls=[]
+ def __init__(self):self.artifacts=set();self.sources=set();self.libraries=set();self.environment_epoch=0;self.anchor_epoch=None;self.record_calls=collections.Counter();self.compile_calls=collections.Counter();self.probe_calls=collections.Counter();self.elapsed=0;self.reject=set();self.defer=set();self.stop=None;self.worker_only=False;self.phase_calls=[]
  def clock(self):return self.elapsed
  def check(self):pass
- def local(self,phase,guard):guard();self.phase_calls.append(phase);return dict(status='prepared'if phase=='prepare'else'record')
+ def local(self,phase,guard):
+  guard();self.phase_calls.append(phase)
+  identity=digest(['author-environment',self.environment_epoch])
+  if phase=='snapshot':self.anchor_epoch=self.environment_epoch;return dict(status='environment-captured',environment_identity=identity)
+  if phase=='verify':return dict(status='environment-verified'if self.anchor_epoch==self.environment_epoch else'changed',environment_identity=identity)
+  if phase=='prepare':
+   self.libraries.update(self.sources)
+   return dict(status='prepared'if self.libraries or self.artifacts else'record',build_id=digest(['author-toolchain',self.environment_epoch]),built=0)
+  return dict(status='record')
  def execute(self,u,phase,allow,ordinal):
   rid=u['recipe_blob_identity'];self.elapsed+=1
   if self.stop==rid:raise Stopped('author native safety')
   if rid in self.reject:return dict(phase=phase,exit=65,worker=dict(status='rejected'),artifact_events=[])
-  if phase=='record':self.record_calls[rid]+=1;return dict(phase=phase,exit=0,worker=dict(status='source-requests-recorded'),artifact_events=[])
+  if phase=='record':self.record_calls[rid]+=1;self.sources.add(rid);return dict(phase=phase,exit=0,worker=dict(status='source-requests-recorded'),artifact_events=[])
   if not allow:self.probe_calls[rid]+=1
-  hit=rid in self.artifacts
+  hit=rid in self.artifacts;local=rid in self.libraries or hit
   built=not hit and allow and rid not in self.defer and not self.worker_only
   if built:self.compile_calls[rid]+=1;self.artifacts.add(rid)
   good=(hit or built) and not self.worker_only
-  return dict(phase=phase,exit=0,worker=dict(native_pipeline_ready=good,artifact_publication_observed=good,allow_compile=allow,source_fallback=False,
-   functions=[dict(actual_route='local-metallib',identity=digest(['actual-author-function',rid]))],
+  return dict(phase=phase,exit=0,worker=dict(native_pipeline_ready=good,artifact_publication_observed=good,allow_compile=allow,source_fallback=not local,
+   functions=[dict(actual_route='local-metallib'if local else'source',identity=digest(['actual-author-function',rid]))],
    artifact_counts=dict(attempts=1,hits=int(hit),built=int(built),deferred=int(not good),failed=0,critical=0,unavailable=0,compile_attempts=int(built))),
    artifact_events=[dict(state=1 if hit else 2 if built else 3,archive_sha256='a'*64 if good else'',
-    key=digest(['author-key',rid]),descriptor=digest(['author-descriptor',rid]),primary=digest(['actual-author-function',rid]),primary_route=2,fragment='',fragment_route=0)])
+    key=digest(['author-key',rid]),descriptor=digest(['author-descriptor',rid]),primary=digest(['actual-author-function',rid]),primary_route=2 if local else 1,fragment='',fragment_route=0)])
 class Controls(unittest.TestCase):
  def setUp(self):
   self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name).resolve();self.progress=self.root/'progress';self.progress.mkdir();self.manifest=self.root/'manifest.jsonl';self.native=NativeAuthor();self.context=dict(worker='a'*64,dso='b'*64,cohort='c'*64,layout='d'*64,options='e'*64)
@@ -61,7 +69,7 @@ class Controls(unittest.TestCase):
   self.write(unit(i)for i in range(80))
   r=run_manifest(self.manifest,progress_root=self.progress,context=self.context,execute=self.native.execute,prepare_phase=self.native.local,
    check=self.native.check,ready=preparation_ready,clock=self.native.clock,seconds=50,page_size=16)
-  self.assertEqual(r['status'],'partial');self.assertTrue(r['budget_deferred']);self.assertGreater(r['completed'],0)
+  self.assertEqual(r['status'],'partial');self.assertTrue(r['budget_deferred']);self.assertGreater(r['cycle_collected'],0)
   successful=set(self.native.artifacts);before=dict(self.native.compile_calls);self.native.elapsed=0
   r2=self.run_queue();self.assertEqual(r2['status'],'completed',r2)
   self.assertTrue(all(self.native.compile_calls[k]==before[k]for k in successful))
@@ -70,7 +78,7 @@ class Controls(unittest.TestCase):
   self.write([unit(1)]);r=self.run_queue();self.assertEqual(r['completed'],1)
   self.native.artifacts.clear();self.native.elapsed=0
   r2=self.run_queue();self.assertEqual(r2['completed'],1);self.assertEqual(self.native.compile_calls[unit(1)['recipe_blob_identity']],2)
-  self.assertEqual(self.native.probe_calls[unit(1)['recipe_blob_identity']],2)
+  self.assertEqual(self.native.probe_calls[unit(1)['recipe_blob_identity']],1)
  def test_worker_exit_zero_is_not_preparation_success(self):
   self.write([unit(1)]);self.native.worker_only=True;r=self.run_queue()
   self.assertEqual((r['status'],r['completed'],r['deferred']),('partial',0,1));self.assertFalse(r['full_manifest_preparation_verified'])
@@ -92,7 +100,7 @@ class Controls(unittest.TestCase):
   self.assertEqual(r['status'],'stopped')
  def test_explicit_recipe_budget_is_resumable_not_total_cap(self):
   self.write(unit(i)for i in range(9));r=self.run_queue(max_recipes=3)
-  self.assertEqual((r['completed'],r['not_visited']),(3,6));self.assertEqual(r['status'],'partial')
+  self.assertEqual((r['completed'],r['cycle_collected'],r['work_units']),(0,3,3));self.assertEqual(r['status'],'partial')
   self.native.elapsed=0;r2=self.run_queue();self.assertEqual(r2['completed'],9);self.assertEqual(len(self.native.artifacts),9)
  def test_no_cross_cache_merge_on_same_recipe_blob(self):
   a=unit(1);b=unit(2);b['recipe_blob_identity']=a['recipe_blob_identity'];self.write([a,b]);r=self.run_queue()

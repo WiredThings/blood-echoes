@@ -383,3 +383,6 @@ Current header changes require the complete build_owned_shader_candidate.py path
 the earlier body-only incremental tool deliberately rejects that baseline mismatch.
 Local AOT regressions accept --candidate evidence/owned-shader-gpu-build-current.json
 to validate the actual full-build library. Prepared local dependencies are required.
+
+
+2026-10-26 更新：默认首启准备八类固定 Metal 内核，游戏目录改为整批收集后统一建库；原生及准备验收已通过，暖场景完成一次采样，匹配性能与内存对照仍未完成。范围、失败记录和复现命令见 [固定内核与整批建库](docs/fixed-helper-startup.zh-CN.md)。

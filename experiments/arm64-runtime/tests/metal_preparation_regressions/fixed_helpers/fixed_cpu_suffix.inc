@@ -1,0 +1,24 @@
+} // namespace Metal
+using namespace Metal;
+void Set(HostKernels&h,const HostPso::Recipe&r,HostPso::ArtifactState state){h.artifact_outcome.state=state;h.artifact_outcome.archive_sha256=std::string(64,'e');h.artifact_outcome.origin_count=r.entry1.empty()?1:2;h.artifact_outcome.actual_routes={LocalLibrary::Route::LocalMetallib,LocalLibrary::Route::LocalMetallib};}
+int main(){
+ using namespace Metal::HostPso;HostKernels h;Recipe sentinel;h.expected_recipe=&sentinel;h.artifact_outcome.state=ArtifactState::Unavailable;h.artifact_outcome.archive_sha256="owned-original-sentinel";h.artifact_outcome.origin_count=1;h.artifact_outcome.actual_routes[0]=LocalLibrary::Route::Source;
+ const auto restored=[&]{ck(!h.warming&&h.warm_allow_compile&&h.expected_recipe==&sentinel&&h.artifact_outcome.archive_sha256=="owned-original-sentinel"&&h.artifact_outcome.origin_count==1&&h.artifact_outcome.actual_routes[0]==LocalLibrary::Route::Source);};
+ h.replay=[](auto&self,const auto&r){Set(self,r,ArtifactState::Hit);return true;};auto ready=h.PrepareFixedSeeds(false,{});ck(ready.progress.ready==8&&ready.progress.state==WarmState::Complete);restored();
+ for(auto&i:ready.items)ck(i.inputs_verified&&i.native_ready&&i.origin_count==(i.kind==Kind::PostProcess?2:1)&&i.actual_routes[0]==LocalLibrary::Route::LocalMetallib);
+ h.replay=[](auto&self,const auto&r){Set(self,r,ArtifactState::Deferred);ck(!self.warm_allow_compile);return false;};auto pending=h.PrepareFixedSeeds(false,{});ck(pending.progress.ready==0&&pending.progress.deferred==8&&pending.progress.state==WarmState::Deferred);for(auto&i:pending.items)ck(i.inputs_verified&&!i.native_ready);restored();
+ h.replay=[](auto&,const auto&)->bool{throw std::runtime_error("author replay exception");};auto failed=h.PrepareFixedSeeds(true,{});ck(failed.progress.failed==8&&failed.progress.ready==0);restored();
+ h.describe_hook=[](){throw std::runtime_error("author describe exception");};auto desc=h.PrepareFixedSeeds(true,{});ck(desc.progress.failed==8);h.describe_hook={};restored();
+ auto cancel=h.PrepareFixedSeeds(true,[]{return true;});ck(cancel.cancelled&&cancel.progress.processed==0&&cancel.progress.deferred==8);restored();
+ try{h.PrepareFixedSeeds(true,[]()->bool{throw std::runtime_error("cancel callback exception");});ck(false);}catch(const std::runtime_error&){restored();}
+ severe=true;auto pressure=h.PrepareFixedSeeds(true,{});ck(pressure.progress.state==WarmState::Critical&&pressure.progress.processed==0);severe=false;restored();
+ bool nested=false;h.replay=[&](auto&self,const auto&r){if(!nested){nested=true;auto*outer=self.expected_recipe;const auto allow=self.warm_allow_compile;auto child=self.PrepareFixedSeeds(!allow,[]{return true;});ck(child.cancelled&&self.expected_recipe==outer&&self.warming&&self.warm_allow_compile==allow);}Set(self,r,ArtifactState::Built);return true;};auto nesting=h.PrepareFixedSeeds(true,{});ck(nesting.progress.ready==8&&nesting.progress.built==8);restored();
+ // A later call cannot overwrite already returned bounded route VALUES.
+ h.replay=[](auto&self,const auto&r){Set(self,r,ArtifactState::Hit);self.artifact_outcome.actual_routes[0]=LocalLibrary::Route::Source;return true;};auto source=h.PrepareFixedSeeds(true,{});ck(source.items[0].actual_routes[0]==LocalLibrary::Route::Source);ck(ready.items[0].actual_routes[0]==LocalLibrary::Route::LocalMetallib);restored();
+ frame_format=0;auto unsupported=h.PrepareFixedSeeds(true,{});ck(unsupported.progress.failed==1&&unsupported.progress.ready==7);frame_format=80;restored();
+ h.replay=[](auto&self,const auto&r){Set(self,r,ArtifactState::Critical);return false;};auto during=h.PrepareFixedSeeds(true,{});ck(during.progress.state==WarmState::Critical&&during.progress.processed==1);restored();
+ unsigned visited=0;h.replay=[](auto&self,const auto&r){Set(self,r,ArtifactState::Hit);return true;};auto midway=h.PrepareFixedSeeds(false,[&]{return visited++==3;});ck(midway.cancelled&&midway.progress.processed==3&&midway.progress.ready==3&&midway.progress.deferred==5);restored();
+ bool full_nested=false;h.replay=[&](auto&self,const auto&r){if(!full_nested){full_nested=true;auto*outer=self.expected_recipe;const auto allow=self.warm_allow_compile;auto inner=self.PrepareFixedSeeds(!allow,{});ck(inner.progress.ready==8&&self.expected_recipe==outer&&self.warming&&self.warm_allow_compile==allow);}Set(self,r,ArtifactState::Hit);return true;};auto full=h.PrepareFixedSeeds(false,{});ck(full.progress.ready==8);restored();
+ h.pso_cache=nullptr;auto inactive=h.PrepareFixedSeeds(true,{});ck(inactive.items.empty()&&inactive.progress.state==WarmState::Inactive);h.pso_cache=&h.cache;
+ RouteSnapshotControls();std::cout<<"actual PrepareFixedSeeds CPU flow/RAII/route controls "<<checks<<" passed; authored Descriptor/Replay/Sha only; no native/GPU\n";
+}

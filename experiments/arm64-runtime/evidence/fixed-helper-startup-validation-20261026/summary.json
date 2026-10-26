@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "status": "native-and-directory-passed-one-warm-scene-passed-comparison-pending",
+  "native": {
+    "schema": 1,
+    "gpu_library_sha256": "c2de2687f6af2cf0fb53a958de0e8321217cc684fe7b09ca9ed5fede71dce5e9",
+    "core_processes": 11,
+    "core_passed": true,
+    "fixed_processes": 4,
+    "fixed_passed": true,
+    "fixed_local_libraries": 8,
+    "fixed_cold_ready": 0,
+    "fixed_warm_ready": 8,
+    "fixed_warm_compile_attempts": 0,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 6745.625
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 6745.625
+    },
+    "game_performance_claim": false,
+    "formal_data_modified": false
+  },
+  "game_preparation": {
+    "status": "completed",
+    "completed": 404,
+    "deferred": 0,
+    "rejected": 0,
+    "recorded": 404,
+    "strict_lookup_attempts": 404,
+    "initial_local_calls": 1,
+    "final_local_calls": 1,
+    "warm_fast_path": false,
+    "full_manifest_preparation_verified": true,
+    "policy_eligible_records": 404,
+    "policy_excluded": 5,
+    "seconds": 385.6264204159379,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 6745.625
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 6745.625
+    },
+    "builder_session": {
+      "calls": 2,
+      "full_builds": 2,
+      "reuses": 0,
+      "invalidations": 1,
+      "metadata_entries": 43,
+      "seconds": 150.5529353750171,
+      "full_build_seconds": 150.112963126041,
+      "reuse_validation_seconds": 0.0,
+      "events": [
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        }
+      ]
+    }
+  },
+  "game_loading": {
+    "passed": false,
+    "exit": 143,
+    "stop": "unexpected >1GiB swap growth within5s",
+    "scene_camera_seen": false,
+    "seconds": 427.0007761250017,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 6745.625
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8431.25
+    }
+  },
+  "formal_data_modified": false,
+  "release_updated": false,
+  "warm_scene_record": "warm-scene.json"
+}

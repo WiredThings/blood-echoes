@@ -18,6 +18,7 @@
 #include "common/assert.h"
 #include "common/logging/log.h"
 #include "video_core/renderer_metal/mtl_runtime_impl.h"
+#include "video_core/renderer_metal/mtl_presenter.h"
 #include "video_core/renderer_metal/mtl_format_convert_source.h"
 #include "video_core/renderer_metal/mtl_texture_tiling.h"
 #include "video_core/frame_capture.h"

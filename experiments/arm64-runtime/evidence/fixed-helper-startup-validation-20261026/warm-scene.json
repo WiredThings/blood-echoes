@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "passed": true,
+  "game": [
+    {
+      "engine": "arm64",
+      "qa_cpu_qos": null,
+      "fps": 48.93467969770427,
+      "p95_ms": 21.13,
+      "p99_ms": 21.57,
+      "gpu_ms": 19.18583390061266,
+      "draws_median": 1367,
+      "camera": [
+        [
+          "-190.784",
+          "-27.226",
+          "71.116"
+        ]
+      ],
+      "cpu_percent": {
+        "bb-game-arm64": 274.84759311668637,
+        "bb-gpu": 139.21255397853477
+      },
+      "combined_footprint_mib": 5851.301914215088,
+      "max_pressure": 4,
+      "swap_change_mib": 856.625,
+      "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+      "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+      "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+      "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f"
+    }
+  ],
+  "ready": 248.82066133292392,
+  "total_seconds": 342.30793512496166,
+  "preparation": {
+    "status": "completed",
+    "completed": 416,
+    "deferred": 0,
+    "recorded": 0,
+    "verified_artifact_hits": 404,
+    "initial_local_calls": 1,
+    "final_local_calls": 1,
+    "warm_fast_path": false,
+    "seconds": 175.2722193330992,
+    "builder_session": {
+      "calls": 2,
+      "full_builds": 1,
+      "reuses": 1,
+      "invalidations": 0,
+      "metadata_entries": 2013,
+      "seconds": 21.457538334070705,
+      "full_build_seconds": 20.468315958045423,
+      "reuse_validation_seconds": 0.5339894170174375,
+      "events": []
+    }
+  },
+  "actual_native_api": {
+    "csv_fields": 35,
+    "metal_fields": 17,
+    "complete_rows": 5836,
+    "incomplete_final_row": 1,
+    "since_gpu_ready": {
+      "metal_source_calls": 4.0,
+      "metal_source_failed": 0.0,
+      "metal_source_api_ms": 3.035,
+      "metal_local_calls": 7.0,
+      "metal_local_failed": 0.0,
+      "metal_local_api_ms": 0.085,
+      "metal_strict_pso_attempts": 8.0,
+      "metal_strict_pso_hits": 8.0,
+      "metal_strict_pso_api_ms": 0.639,
+      "metal_render_calls": 9.0,
+      "metal_compute_calls": 6.0,
+      "metal_pso_failed": 0.0,
+      "metal_pso_api_ms": 6.024,
+      "metal_archive_add_calls": 0.0,
+      "metal_archive_add_failed": 0.0,
+      "metal_archive_add_api_ms": 0.0
+    },
+    "last_30_seconds": {
+      "metal_source_calls": 0.0,
+      "metal_source_failed": 0.0,
+      "metal_source_api_ms": 0.0,
+      "metal_local_calls": 0.0,
+      "metal_local_failed": 0.0,
+      "metal_local_api_ms": 0.0,
+      "metal_strict_pso_attempts": 0.0,
+      "metal_strict_pso_hits": 0.0,
+      "metal_strict_pso_api_ms": 0.0,
+      "metal_render_calls": 0.0,
+      "metal_compute_calls": 0.0,
+      "metal_pso_failed": 0.0,
+      "metal_pso_api_ms": 0.0,
+      "metal_archive_add_calls": 0.0,
+      "metal_archive_add_failed": 0.0,
+      "metal_archive_add_api_ms": 0.0
+    }
+  },
+  "formal_data_modified": false,
+  "performance_comparison_claim": false
+}

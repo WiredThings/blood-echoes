@@ -9,6 +9,7 @@
 #import <Metal/Metal.h>
 
 #include <map>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -18,6 +19,7 @@
 
 #include "video_core/renderer_metal/msl_host_shader.h"
 #include "video_core/renderer_metal/mtl_host_pso_recipe.h"
+#include "video_core/renderer_metal/mtl_fixed_helper_seeds.h"
 #include "video_core/renderer_metal/mtl_library_origin.h"
 #include "video_core/renderer_metal/mtl_format_convert_impl.h"
 #include "video_core/renderer_metal/mtl_device_impl.h"
@@ -45,6 +47,10 @@ public:
     ~HostKernels();
     void BindPsoCache(PsoCache* cache);
     HostPso::WarmResult WarmPipelines();
+    // Startup-only standalone worker: fixed complete requests, no Storage,
+    // renderer owner slots, guest memory, framebuffers or extra state maps.
+    HostPso::FixedSeedResult PrepareFixedSeeds(bool allow_compile,
+        const std::function<bool()>& cancelled);
     HostPso::WarmResult FinishPreparation();
     const HostPso::WarmResult& PreparationResult()const{return warm_result;}
     void ConfigureFaultParser(u32 page_bits,u32 max_faults);

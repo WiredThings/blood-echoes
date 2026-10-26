@@ -17,7 +17,7 @@ enum class Kind:U {Tiling=1,TextureTiling,FaultParser,InlineUpdate,RenderInlineU
 enum class Type:U {Bool=1,U32,I32,F32};
 inline constexpr U Version=2,MaxConstants=14,MaxWarm=64,MaxBytes=2048,MaxMetadata=4096;
 enum class ArtifactState {Unavailable,Hit,Built,Deferred,Failed,Critical};
-struct ArtifactOutcome {ArtifactState state=ArtifactState::Unavailable;bool compiled=false;std::string archive_sha256;bool ready()const{return state==ArtifactState::Hit||state==ArtifactState::Built;}};
+struct ArtifactOutcome {ArtifactState state=ArtifactState::Unavailable;bool compiled=false;std::string archive_sha256;std::array<LocalLibrary::Route,2> actual_routes{};U origin_count{};bool ready()const{return state==ArtifactState::Hit||state==ArtifactState::Built;}};
 enum class WarmState {Inactive,Complete,Deferred,Critical};
 struct WarmResult {WarmState state=WarmState::Inactive;U known{},processed{},ready{},built{},rejected{},failed{},deferred{};bool catalog_complete=true;};
 struct Invocation {

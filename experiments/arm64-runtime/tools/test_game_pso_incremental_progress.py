@@ -81,11 +81,11 @@ class Controls(unittest.TestCase):
   def execute(u,phase,allow,ordinal):
    events.append((u['recipe_blob_identity'],phase,allow))
    hit=u['recipe_blob_identity']==a['recipe_blob_identity'];built=not hit and allow;good=hit or built
-   return dict(exit=0,phase=phase,worker=dict(status='source-requests-recorded'if phase=='record'else'ready',allow_compile=allow,source_fallback=False,
-     functions=[dict(actual_route='local-metallib',identity=H(b'author-function'))],artifact_counts=dict(attempts=1,hits=int(hit),built=int(built),compile_attempts=int(built))),
-     artifact_events=[dict(state=1 if hit else 2 if built else 3,archive_sha256='a'*64 if good else'',key=H(b'author-key'),descriptor=H(b'author-descriptor'),primary=H(b'author-function'),primary_route=2,fragment='',fragment_route=0)],native_author_gate=good)
-  result=q.run_manifest(self.manifest([a,b]),progress_root=self.progress,context=self.context,execute=execute,prepare_phase=lambda *args:dict(status='prepared'),check=lambda:None,ready=lambda row:row['native_author_gate'],seconds=1)
-  self.assertEqual(result['completed'],2);self.assertEqual([e[1:]for e in events if e[0]==a['recipe_blob_identity']],[('prepare',False)]);self.assertEqual([e[1:]for e in events if e[0]==b['recipe_blob_identity']],[('prepare',False),('record',False),('prepare',True)])
+   return dict(exit=0,phase=phase,worker=dict(status='source-requests-recorded'if phase=='record'else'ready',allow_compile=allow,source_fallback=not good,
+     functions=[dict(actual_route='local-metallib'if good else'source',identity=H(b'author-function'))],artifact_counts=dict(attempts=1,hits=int(hit),built=int(built),compile_attempts=int(built))),
+     artifact_events=[dict(state=1 if hit else 2 if built else 3,archive_sha256='a'*64 if good else'',key=H(b'author-key'),descriptor=H(b'author-descriptor'),primary=H(b'author-function'),primary_route=2 if good else 1,fragment='',fragment_route=0)],native_author_gate=good)
+  result=q.run_manifest(self.manifest([a,b]),progress_root=self.progress,context=self.context,execute=execute,prepare_phase=lambda phase,*args:dict(status={'snapshot':'environment-captured','verify':'environment-verified','record':'record'}.get(phase,'prepared'),environment_identity='e'*64),check=lambda:None,ready=lambda row:row['native_author_gate'],seconds=1)
+  self.assertEqual(result['completed'],2);self.assertEqual([e[1:]for e in events if e[0]==a['recipe_blob_identity']],[('prepare',False),('prepare',True)]);self.assertEqual([e[1:]for e in events if e[0]==b['recipe_blob_identity']],[('prepare',False),('record',False),('prepare',True)])
  def test_guard_stop_and_false_ready_hint_not_swallowed(self):
   a=self.unit(1);self.seed([a]);called=[]
   def execute(u,phase,allow,ordinal):

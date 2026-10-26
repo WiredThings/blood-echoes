@@ -84,6 +84,11 @@ id<MTLComputePipelineState> HostKernels::MakeCompute(MTLComputePipelineDescripto
  std::optional<HostPso::Recipe> recipe;
  try{recipe=Describe(i,d);}catch(...){if(warming){artifact_outcome.state=HostPso::ArtifactState::Failed;return nil;}}
  if(warming&&(!recipe||!expected_recipe||*recipe!=*expected_recipe||!HostFunctionEntries(*recipe,d))){artifact_outcome.state=HostPso::ArtifactState::Failed;return nil;}
+ // Copy only bounded route enum VALUES before any reentrant native operation.
+ // No caller Origin reference, function object, wrapper or guest pointer survives.
+ std::array<LocalLibrary::Route,2> actual_routes{};
+ const auto origin_count=origins.size()<=2?u32(origins.size()):0u;
+ for(u32 n=0;n<origin_count;++n)actual_routes[n]=origins[n].route;
  id<MTLComputePipelineState> state=nil;
  try {
  if(pso_cache&&recipe&&HostFunctionEntries(*recipe,d)){
@@ -101,6 +106,7 @@ id<MTLComputePipelineState> HostKernels::MakeCompute(MTLComputePipelineDescripto
   artifact_outcome.state=HostPso::ArtifactState::Failed;
   if(!warming&&!state){d.binaryArchives=@[];{BbMetalPhase::Call bb_metal_call_101{BbMetalPhase::Kind::Compute}; state=[dev.device newComputePipelineStateWithFunction:d.computeFunction error:error]; bb_metal_call_101.Finish(bool(state));}}
  }
+ artifact_outcome.actual_routes=actual_routes;artifact_outcome.origin_count=origin_count;
  if(state)RecordRecipe(i,d);return state;
 }
 id<MTLRenderPipelineState> HostKernels::MakeRender(MTLRenderPipelineDescriptor*d,const HostPso::Invocation&i,std::span<const LocalLibrary::Origin> origins,NSError**error) {
@@ -108,6 +114,11 @@ id<MTLRenderPipelineState> HostKernels::MakeRender(MTLRenderPipelineDescriptor*d
  std::optional<HostPso::Recipe> recipe;
  try{recipe=Describe(i,d);}catch(...){if(warming){artifact_outcome.state=HostPso::ArtifactState::Failed;return nil;}}
  if(warming&&(!recipe||!expected_recipe||*recipe!=*expected_recipe||!HostFunctionEntries(*recipe,d))){artifact_outcome.state=HostPso::ArtifactState::Failed;return nil;}
+ // Copy only bounded route enum VALUES before any reentrant native operation.
+ // No caller Origin reference, function object, wrapper or guest pointer survives.
+ std::array<LocalLibrary::Route,2> actual_routes{};
+ const auto origin_count=origins.size()<=2?u32(origins.size()):0u;
+ for(u32 n=0;n<origin_count;++n)actual_routes[n]=origins[n].route;
  id<MTLRenderPipelineState> state=nil;
  try {
  if(pso_cache&&recipe&&HostFunctionEntries(*recipe,d)){
@@ -125,6 +136,7 @@ id<MTLRenderPipelineState> HostKernels::MakeRender(MTLRenderPipelineDescriptor*d
   artifact_outcome.state=HostPso::ArtifactState::Failed;
   if(!warming&&!state){d.binaryArchives=@[];{BbMetalPhase::Call bb_metal_call_125{BbMetalPhase::Kind::Render}; state=[dev.device newRenderPipelineStateWithDescriptor:d error:error]; bb_metal_call_125.Finish(bool(state));}}
  }
+ artifact_outcome.actual_routes=actual_routes;artifact_outcome.origin_count=origin_count;
  if(state)RecordRecipe(i,d);return state;
 }
 bool HostKernels::Replay(const HostPso::Recipe&r) {
@@ -203,6 +215,45 @@ HostPso::WarmResult HostKernels::WarmPipelines() {
  }
  std::printf("Metal host PSO preparation: state=%u known=%u processed=%u ready=%u built=%u rejected=%u failed=%u deferred=%u catalog-complete=%d; temporary states, original maps unchanged\n",unsigned(warm_result.state),warm_result.known,warm_result.processed,warm_result.ready,warm_result.built,warm_result.rejected,warm_result.failed,warm_result.deferred,warm_result.catalog_complete);
  return warm_result;
+}
+HostPso::FixedSeedResult HostKernels::PrepareFixedSeeds(bool allow_compile,
+ const std::function<bool()>& cancelled) {
+ HostPso::FixedSeedResult result;result.allow_compile=allow_compile;
+ if(!pso_cache||!HostPso::Hex(pso_cache->DiscoveryIdentity()))return result;
+ const auto seeds=HostPso::FixedSeeds(PresentationFrameFormat());
+ result.progress.known=seeds.size();result.items.reserve(seeds.size());
+ const bool old_warming=warming,old_allow=warm_allow_compile;
+ const auto*old_expected=expected_recipe;const auto old_outcome=artifact_outcome;
+ warming=true;warm_allow_compile=allow_compile;
+ SCOPE_EXIT{warming=old_warming;warm_allow_compile=old_allow;expected_recipe=old_expected;artifact_outcome=old_outcome;};
+ const auto start=std::chrono::steady_clock::now();
+ for(const auto&invocation:seeds){
+  if(cancelled&&cancelled()){result.cancelled=true;break;}
+  if(HostSeverePressure()){result.progress.state=HostPso::WarmState::Critical;break;}
+  if(std::chrono::steady_clock::now()-start>std::chrono::seconds(10))break;
+  HostPso::FixedSeedItem item;item.kind=invocation.kind;
+  @autoreleasepool {try{
+   auto descriptor=Descriptor(invocation);auto request=Describe(invocation,descriptor);
+   if(request){const auto bytes=HostPso::Encode(*request);item.request_sha256=LocalAot::Sha(bytes.data(),bytes.size());item.descriptor_sha256=request->descriptor;
+    expected_recipe=&*request;artifact_outcome={};const bool accepted=Replay(*request);item.outcome=artifact_outcome;item.actual_routes=item.outcome.actual_routes;item.origin_count=item.outcome.origin_count;
+    // A probe can be Deferred only AFTER actual entries/typed constants and
+    // complete descriptor identity were accepted by MakeCompute/MakeRender.
+    // It is never reported as an already-created native pipeline.
+    item.inputs_verified=item.outcome.ready()||item.outcome.state==HostPso::ArtifactState::Deferred;
+    item.native_ready=accepted&&item.outcome.ready();
+   }
+  }catch(...){item.outcome.state=HostPso::ArtifactState::Failed;}}
+  expected_recipe=nullptr;++result.progress.processed;
+  if(item.native_ready){++result.progress.ready;if(item.outcome.state==HostPso::ArtifactState::Built)++result.progress.built;}
+  else if(item.outcome.state==HostPso::ArtifactState::Deferred)++result.progress.deferred;
+  else ++result.progress.failed;
+  const bool critical=item.outcome.state==HostPso::ArtifactState::Critical;result.items.push_back(std::move(item));
+  if(critical){result.progress.state=HostPso::WarmState::Critical;break;}
+ }
+ result.progress.deferred+=result.progress.known-result.progress.processed;
+ if(result.progress.state!=HostPso::WarmState::Critical)result.progress.state=
+  result.cancelled||result.progress.failed||result.progress.deferred?HostPso::WarmState::Deferred:HostPso::WarmState::Complete;
+ return result;
 }
 HostPso::WarmResult HostKernels::FinishPreparation(){
  if(HostSeverePressure()){warm_result.state=HostPso::WarmState::Critical;return warm_result;}

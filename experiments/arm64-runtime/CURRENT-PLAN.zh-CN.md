@@ -280,3 +280,12 @@ UpscaleMerge、Presenter后处理和Camera共享原冷工厂，原owner槽/算�
 handle15658 terminal passed：P/evidence/launcher-engine-abba-1792975355830020000，worker1792975405838075000。424/424、record74、strict350，准备241秒、进场325秒；source API0，ready后13strict全命中、2ordinary，tail30 API0；17列实际结构再次通过。48.54FPS/合计footprint5967MiB/maxpressure2/swap+9。与c2ec包49.70/5808的跨轮差异未归因，不能承诺性能/内存无退化；3匹配顶点样本字节同/有效env同也不证明全缓存等价。详见原生文档。
 
 原生23源文件、项目自有Format fixture和计数/ARC作者源及准确汇总已整理，源仅同步dev；正式应用/数据/Release保持。新测试包0d86536f已两轮原入口通过，未包含当前独立两遍/8fixed种子草稿。当前无游戏运行，原agents正在仅CPU验证后两项，冻结E6不可修改。目标active。
+
+
+## 2026-10-26 固定内核与整批建库整合
+
+已实现并默认接到隔离原 final-exec：8类可确定完整输入的固定内核；真实能力查询；全目录先收集再统一建库；当前native/环境准入后提交，不以磁盘hint授权。230 GPU/30 CPU/2AvPlayer/1窗口main同源构建，11核心原生进程和4固定种子进程过，固定暖8/8 strict，0普通compile。原入口路径含空格解析错误已修并补7定向控制；capability stdout运行中4097B/10s有界。
+
+真实冷准备404/404、record404、首审1/最终build1、385.63秒，准备swap0；随后的加载触发既有5秒swap增长保护，未取得冷场景结果。暖准备416/416、record0、175.27秒；原入口暖场景90秒通过，48.935FPS/p95 21.13/p99 21.57ms，合并footprint5851.3MiB（不去重），全程swap+856.625MiB、短暂压力4但不持续。GPU ready后Source4/3.035ms、最后30秒计数0；不是全驱动编译0，也不是已证FPS提升/内存达标。详docs/fixed-helper-startup.zh-CN.md和公开summary/warm-scene。
+
+剩余：匹配性能/峰值内存对照和瞬态严重压力归因、全游戏完整PSO状态目录和静态可确定调用的持续覆盖、3个signal/context入口、干净源码ARM构建、CPU/GPU及FEX专用化、硬件TSO准入。白模已确认风险的回写生命周期收口不再扩大；死亡/在线/菜单实测继续暂缓。正式app/data/cache/Release不动。整个目标仍active，不能以本轮准备通过标完成。

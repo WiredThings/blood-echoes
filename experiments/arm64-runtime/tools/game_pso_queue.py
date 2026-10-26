@@ -7,6 +7,7 @@ PAGE_MAX=64
 PREVIEW_MAX=64
 class Deferred(RuntimeError):pass
 class Stopped(RuntimeError):pass
+class Pending(RuntimeError):pass
 class Rejected(ValueError):pass
 
 def need(value,why):
@@ -33,31 +34,32 @@ def fingerprint(path,check):
   return h.hexdigest()
  finally:os.close(fd)
 
-def strict_lookup_ready(row,ready):
- """Only actual current Local functions + strict archive hits, never a hint.
+def local_inputs_ready(row):
+ """Current Local function/descriptor graph; not PSO success or old-cache trust."""
+ w=row.get('worker',{});c=w.get('artifact_counts',{});fs=w.get('functions',[]);events=row.get('artifact_events',[])
+ if type(w.get('allow_compile'))is not bool:return False
+ if not isinstance(c,dict)or any(type(c.get(k,0))is not int or c.get(k,0)<0 for k in('attempts','hits','built','deferred','failed','critical','unavailable','compile_attempts')):return False
+ n=c.get('attempts',0)
+ if n<=0 or not isinstance(events,list)or len(events)!=n or sum(c.get(k,0)for k in('hits','built','deferred'))!=n:return False
+ if w.get('allow_compile')is False and(c.get('built',0)or c.get('compile_attempts',0)):return False
+ if (w.get('source_fallback')is not False or not isinstance(fs,list)or not 0<len(fs)<=6 or
+     not isinstance(events,list)or not events or not isinstance(c,dict)or
+     any(c.get(k,0)for k in('failed','critical','unavailable'))):return False
+ def h(v):return isinstance(v,str)and re.fullmatch('[0-9a-f]{64}',v)
+ if not all(isinstance(f,dict)and f.get('actual_route')=='local-metallib'and h(f.get('identity'))for f in fs):return False
+ return all(isinstance(e,dict)and type(e.get('state'))is int and e['state']in(1,2,3)and (h(e.get('archive_sha256'))if e['state']in(1,2)else e.get('archive_sha256','')=='')and h(e.get('key'))and h(e.get('descriptor'))and h(e.get('primary'))and
+    e.get('primary_route')==2 and ((e.get('fragment_route')==0 and e.get('fragment')=='')or(e.get('fragment_route')==2 and h(e.get('fragment'))))for e in events)
 
- allow_compile=False restricts PSO creation, not MSL compilation. A successful
- Source fallback is therefore not an admission to skip record/build.
- """
- try:
-  if not ready(row):return False
+def local_preparation_ready(row,ready):
+ try:return bool(ready(row))and local_inputs_ready(row)
  except (KeyError,TypeError,ValueError,AttributeError):return False
- worker=row.get('worker',{});counts=worker.get('artifact_counts',{});functions=worker.get('functions',[]);events=row.get('artifact_events',[])
- n=counts.get('attempts',0)
- if (worker.get('allow_compile')is not False or worker.get('source_fallback')is not False or
-     type(n)is not int or n<=0 or any(type(counts.get(k))is not int for k in('hits','built','compile_attempts'))or counts.get('hits')!=n or counts.get('built')!=0 or
-     counts.get('compile_attempts')!=0 or not isinstance(functions,list)or not 0<len(functions)<=6 or
-     not isinstance(events,list)or len(events)!=n):return False
- if not all(isinstance(f,dict)and f.get('actual_route')=='local-metallib'and
-            isinstance(f.get('identity'),str)and re.fullmatch('[0-9a-f]{64}',f['identity'])for f in functions):return False
- def hex64(value):return isinstance(value,str)and re.fullmatch('[0-9a-f]{64}',value)
- # PsoCache can create helper functions after worker.functions/source_fallback
- # were collected. Its actual per-artifact routes must also remain Local.
- return all(isinstance(e,dict)and e.get('state')==1 and hex64(e.get('archive_sha256'))and
-            hex64(e.get('key'))and hex64(e.get('descriptor'))and hex64(e.get('primary'))and
-            e.get('primary_route')==2 and
-            ((e.get('fragment_route')==0 and e.get('fragment')=='')or
-             (e.get('fragment_route')==2 and hex64(e.get('fragment'))))for e in events)
+
+def strict_lookup_ready(row,ready):
+ if not local_preparation_ready(row,ready):return False
+ w=row['worker'];c=w['artifact_counts'];n=c.get('attempts',0)
+ return (w.get('allow_compile')is False and type(n)is int and n>0 and
+   all(type(c.get(k))is int for k in('hits','built','compile_attempts'))and c['hits']==n and c['built']==c['compile_attempts']==0 and
+   len(row['artifact_events'])==n and all(e['state']==1 for e in row['artifact_events']))
 
 class Queue:
  """Versioned scheduling hints. Only a fully indexed current snapshot is executable.
@@ -91,7 +93,8 @@ class Queue:
        pending_scan TEXT DEFAULT '',pending_ordinal INTEGER,pending_payload TEXT,pending_payload_sha TEXT,
        pending_execution_sha TEXT,pending_conflict INTEGER DEFAULT 0,
        ready_hint INTEGER DEFAULT 0,recorded_hint INTEGER DEFAULT 0,last_visit INTEGER DEFAULT 0,run_mark TEXT DEFAULT '')""")
-   self._sql('CREATE INDEX IF NOT EXISTS units_visit ON units(active,last_visit,ordinal)');self.db.commit()
+   self._sql('CREATE INDEX IF NOT EXISTS units_visit ON units(active,last_visit,ordinal)')
+   self._sql('CREATE TABLE IF NOT EXISTS phase_units(id TEXT PRIMARY KEY,cycle TEXT,state TEXT,outcome_sha TEXT,final_run TEXT DEFAULT \'\',final_state TEXT DEFAULT \'\')');self.db.commit()
   except BaseException:self.close();raise
  def _progress(self):
   try:self.check()
@@ -175,6 +178,48 @@ class Queue:
   need(self.get('indexed',False),'cannot mark an unactivated manifest')
   seq=self.get('visit_sequence')+1;self.put('visit_sequence',seq)
   self._sql('UPDATE units SET ready_hint=?,recorded_hint=?,last_visit=?,run_mark=? WHERE id=? AND active=1',(int(ready),int(recorded),seq,run,item['id']));self.db.commit()
+ def begin_cycle(self,phase,run):
+  old=self.get('phase_cycle',None)
+  fresh=not(isinstance(old,dict)and old.get('schema')==1 and old.get('manifest_sha')==self.manifest_sha and old.get('phase')==phase and old.get('stage')in('collect','build','prepare'))
+  if fresh:
+   old=dict(schema=1,id=uuid.uuid4().hex,manifest_sha=self.manifest_sha,phase=phase,stage='prepare'if phase=='prepare'else'collect')
+   self.put('phase_cycle',old)
+   if phase=='prepare':self._sql("INSERT OR REPLACE INTO phase_units(id,cycle,state,outcome_sha) SELECT id,?,'pending','' FROM units WHERE active=1",(old['id'],))
+   self.db.commit()
+  return old,fresh
+ def set_stage(self,cycle,stage):
+  cycle['stage']=stage;self.put('phase_cycle',cycle);self.db.commit()
+ def phase_count(self,cycle,state=None):
+  sql='SELECT COUNT(*) FROM phase_units p JOIN units u ON u.id=p.id WHERE u.active=1 AND p.cycle=?';args=[cycle['id']]
+  if state is not None:sql+=' AND p.state=?';args.append(state)
+  return self._sql(sql,args).fetchone()[0]
+ def phase_page(self,cycle,run,size,kind):
+  self.check();need(self.get('indexed',False),'incoming manifest not fully indexed/activated')
+  if kind=='collect':
+   where='(p.cycle IS NULL OR p.cycle!=?)';args=[cycle['id']]
+  elif kind=='prepare':
+   where="p.cycle=? AND p.state!='rejected' AND p.final_run!=?";args=[cycle['id'],run]
+  elif kind=='commit':
+   where="p.cycle=? AND p.final_run=? AND p.final_state IN('ready-hit','ready-built') AND u.run_mark!=?";args=[cycle['id'],run,run]
+  elif kind=='warm':
+   where="p.cycle=? AND p.state='provisional' AND u.run_mark!=?";args=[cycle['id'],run]
+  else:raise Rejected('unknown internal pass')
+  rows=self._sql("SELECT u.id,u.payload,u.payload_sha,u.ready_hint,u.recorded_hint,p.state,p.outcome_sha,p.final_state FROM units u LEFT JOIN phase_units p ON p.id=u.id WHERE u.active=1 AND "+where+' ORDER BY u.last_visit,u.ordinal LIMIT ?',(*args,size)).fetchall()
+  result=[]
+  for uid,payload,ph,rh,rec,state,outcome,final_state in rows:
+   need(hashlib.sha256(payload.encode()).hexdigest()==ph,'progress payload changed');u=json.loads(payload);need(digest(input_identity(u))==uid,'progress unit identity')
+   result.append(dict(id=uid,unit=u,ready_hint=bool(rh),recorded_hint=bool(rec),collection_state=state,collection_outcome_sha=outcome,native_hit=final_state=='ready-hit'))
+  return result
+ def collect(self,item,cycle,state,row=None):
+  need(state in('provisional','local-inputs','recorded','unavailable','rejected'),'collection state')
+  self._sql('INSERT OR REPLACE INTO phase_units(id,cycle,state,outcome_sha) VALUES(?,?,?,?)',(item['id'],cycle['id'],state,digest(row)if row else''))
+  seq=self.get('visit_sequence')+1;self.put('visit_sequence',seq)
+  self._sql('UPDATE units SET last_visit=?,recorded_hint=? WHERE id=?',(seq,int(state in('provisional','local-inputs','recorded')),item['id']));self.db.commit()
+ def provisional_final(self,item,cycle,run,row):
+  self._sql("UPDATE phase_units SET final_run=?,final_state=?,outcome_sha=? WHERE id=? AND cycle=?",(run,'ready-hit'if row['worker']['artifact_counts'].get('built',0)==0 else'ready-built',digest(row),item['id'],cycle['id']))
+  seq=self.get('visit_sequence')+1;self.put('visit_sequence',seq);self._sql('UPDATE units SET last_visit=? WHERE id=?',(seq,item['id']));self.db.commit()
+ def terminal_final(self,item,cycle,run,state):
+  self._sql('UPDATE phase_units SET final_run=?,final_state=? WHERE id=? AND cycle=?',(run,state,item['id'],cycle['id']));self.db.commit()
  def total(self):return self._sql('SELECT COUNT(*) FROM units WHERE active=1').fetchone()[0]
  def hint_count(self):return self._sql('SELECT COUNT(*) FROM units WHERE active=1 AND ready_hint=1').fetchone()[0]
  def close(self):
@@ -183,101 +228,138 @@ class Queue:
 
 def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,ready,phase='all',page_size=16,max_recipes=None,
                  seconds=600,clock=time.monotonic,event_sink=None):
- """Startup API. Callbacks are native executor services; tests use authors only.
+ """Disk-backed collect -> one final build -> native prepare. No module batches.
 
- execute(unit,phase,allow_compile,ordinal)->actual row. A hint never counts as
- success: ready(row) must validate the current native strict artifact outcome.
+ Internal prepare_phase also supports snapshot/verify for a real same-session
+ source/tool/environment anchor. These are not CLI phases or artifact authority.
  """
- need(phase in ('all','record','prepare') and 0<page_size<=PAGE_MAX and seconds>0,'bounded page/phase/time budget')
- need(max_recipes is None or type(max_recipes) is int and max_recipes>0,'optional recipe work budget')
- start=clock();run=uuid.uuid4().hex;queue=None;active=None;ordinal=0
- report=dict(schema=1,progress_schema=2,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,
-             verified_artifact_hits=0,strict_lookup_attempts=0,visited=0,events_preview=[],event_count=0,max_page_items=0,
-             full_manifest_preparation_verified=False,state_is_artifact_authority=False)
+ need(phase in('all','record','prepare')and 0<page_size<=PAGE_MAX and seconds>0,'bounded page/phase/time budget')
+ need(max_recipes is None or type(max_recipes)is int and max_recipes>0,'optional recipe work budget')
+ start=clock();run=uuid.uuid4().hex;queue=None;cycle=None;active=None;ordinal=0;fresh=False
+ report=dict(schema=1,progress_schema=2,orchestration_schema=1,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,
+   verified_artifact_hits=0,collection_strict_hits=0,strict_lookup_attempts=0,visited=0,work_units=0,collected=0,provisional_native=0,provisional_artifact_hits=0,source_late_deferred=0,
+   events_preview=[],event_count=0,max_page_items=0,initial_local_calls=0,final_local_calls=0,warm_fast_path=False,
+   full_manifest_preparation_verified=False,state_is_artifact_authority=False)
  def guard():
   check()
   if clock()-start>=seconds:raise Deferred('preparation time budget')
+ def work_guard():
+  guard()
+  if max_recipes is not None and report['work_units']>=max_recipes:raise Deferred('recipe phase work budget')
  def event(item,state,**extra):
-  value=dict(unit_id=item['id'],recipe=item['unit']['recipe_blob_identity'],state=state,**extra)
-  report['event_count']+=1
-  if len(report['events_preview'])<PREVIEW_MAX:report['events_preview'].append(value)
-  if event_sink:event_sink(value)
+  v=dict(unit_id=item['id'],recipe=item['unit']['recipe_blob_identity'],state=state,**extra);report['event_count']+=1
+  if len(report['events_preview'])<PREVIEW_MAX:report['events_preview'].append(v)
+  if event_sink:event_sink(v)
  def finish(item,state,*,recorded=False,row=None):
-  report['visited']+=1;report[state]+=1
-  queue.mark(item,run,ready=state=='completed',recorded=recorded or state=='completed')
-  event(item,state,worker_phase=row.get('phase') if row else None)
+  report['visited']+=1;report[state]+=1;queue.mark(item,run,ready=state=='completed',recorded=recorded or state=='completed');event(item,state,worker_phase=row.get('phase')if row else None)
  def call(item,p,allow):
   nonlocal ordinal,active
-  guard();active=item;ordinal+=1
-  row=execute(item['unit'],p,allow,ordinal)
-  if row.get('exit') in (70,79):raise Stopped('native worker protection/interruption')
-  worker=row.get('worker')
-  if row.get('exit')!=0 or not isinstance(worker,dict):raise Rejected('native worker rejected or malformed result')
-  if p=='record' and worker.get('status')!='source-requests-recorded':raise Rejected('worker completion did not record validated source requests')
-  need(isinstance(worker.get('artifact_counts',{}),dict),'worker artifact count shape')
-  if worker.get('artifact_counts',{}).get('critical',0):raise Stopped('native critical memory pressure')
+  guard();active=item;ordinal+=1;row=execute(item['unit'],p,allow,ordinal)
+  if row.get('exit')in(70,79):raise Stopped('native worker protection/interruption')
+  w=row.get('worker')
+  if row.get('exit')!=0 or not isinstance(w,dict):raise Rejected('native worker rejected or malformed result')
+  if p=='record'and w.get('status')!='source-requests-recorded':raise Rejected('worker completion did not record validated source requests')
+  if p=='prepare'and not allow:need(w.get('allow_compile')is False,'native lookup allow flag mismatch')
+  need(isinstance(w.get('artifact_counts',{}),dict),'worker artifact count shape')
+  if w.get('artifact_counts',{}).get('critical',0):raise Stopped('native critical memory pressure')
   return row
  def local(p):
-  guard();result=prepare_phase(p,guard);guard()
-  if result.get('status')=='stopped':raise Stopped(result.get('error','local library protection stop'))
-  return result
- try:
-  queue=Queue(manifest,progress_root,context,guard);queue.index()
-  report.update(job_id=queue.job,manifest_sha256=queue.manifest_sha,index_complete=True,
-      manifest_records=queue.get('records'),policy_eligible_records=queue.get('eligible'),
-      index_rejected=queue.get('rejected'),policy_excluded=queue.get('excluded'),exact_duplicates=queue.get('duplicates'),conflicting_uids=queue.get('conflicts'))
+  guard();r=prepare_phase(p,guard);guard()
+  if r.get('status')=='stopped':raise Stopped(r.get('error','local library protection stop'))
+  return r
+ def commit(kind):
   while True:
-   guard()
-   if max_recipes is not None and report['visited']>=max_recipes:raise Deferred('recipe work budget')
-   page=queue.page(run,min(page_size,max_recipes-report['visited']) if max_recipes is not None else page_size)
+   guard();page=queue.phase_page(cycle,run,page_size,kind)
    if not page:break
-   report['max_page_items']=max(report['max_page_items'],len(page));pending=[]
-   # Native artifacts may remain valid after a runner/context update. Probe
-   # every current candidate when a real current load environment is available;
-   # old progress hints neither authorize nor gate the attempt.
+   for item in page:
+    finish(item,'completed',recorded=True)
+    if kind=='commit':
+     report['provisional_native']-=1
+     if item['native_hit']:report['verified_artifact_hits']+=1;report['provisional_artifact_hits']-=1
+ try:
+  queue=Queue(manifest,progress_root,context,guard);queue.index();cycle,fresh=queue.begin_cycle(phase,run)
+  report.update(job_id=queue.job,manifest_sha256=queue.manifest_sha,index_complete=True,manifest_records=queue.get('records'),policy_eligible_records=queue.get('eligible'),index_rejected=queue.get('rejected'),policy_excluded=queue.get('excluded'),exact_duplicates=queue.get('duplicates'),conflicting_uids=queue.get('conflicts'),cycle_id=cycle['id'],resumed_collection=not fresh)
+  initial={};initial_anchor={};record_open=False
+  if queue.total()==0:queue.set_stage(cycle,'done')
+  if cycle['stage']=='collect':
    if phase!='record':
-    env=local('prepare')
+    report['initial_local_calls']+=1;initial=local('prepare');report['initial_local']=initial
+    if initial.get('status')=='prepared':initial_anchor=local('snapshot')
+   while True:
+    guard();page=queue.phase_page(cycle,run,page_size,'collect')
+    if not page:break
+    report['max_page_items']=max(report['max_page_items'],len(page))
     for item in page:
+     work_guard();report['work_units']+=1;active=item;state=None;row=None
+     if phase!='record'and initial.get('status')=='prepared':
+      try:
+       report['strict_lookup_attempts']+=1;row=call(item,'prepare',False)
+       if strict_lookup_ready(row,ready):state='provisional'
+       elif local_inputs_ready(row):state='local-inputs'
+      except (Rejected,ValueError,OSError)as error:event(item,'collection-lookup-not-admitted',error=str(error)[:512])
+     if state is None:
+      if phase in('all','record'):
+       if not record_open:local('record');record_open=True
+       try:
+        # Only the explicit record CLI keeps its old recorded scheduling hint;
+        # default collection never accepts an old hint instead of current work.
+        if phase!='record'or not item['recorded_hint']:
+         row=call(item,'record',False);report['recorded']+=1
+        state='recorded'
+       except (Rejected,ValueError,OSError)as error:state='rejected';event(item,'record-rejection',error=str(error)[:512])
+      else:state='unavailable'
+     queue.collect(item,cycle,state,row);report['collected']+=1
+     if state=='provisional':report['collection_strict_hits']+=1
+     event(item,'collected-'+state)
+     if state=='rejected':finish(item,'rejected')
+     elif phase=='record':finish(item,'deferred',recorded=True)
+   if phase=='record':queue.set_stage(cycle,'done')
+   else:
+    all_strict=queue.phase_count(cycle,'provisional')==queue.total()and queue.total()>0
+    if fresh and all_strict and not record_open and initial_anchor.get('status')=='environment-captured':
+     proof=local('verify');report['warm_environment_verification']=proof
+     if proof.get('status')=='environment-verified'and proof.get('environment_identity')==initial_anchor.get('environment_identity'):
+      report['warm_fast_path']=True;commit('warm');report['verified_artifact_hits']=report['completed'];queue.set_stage(cycle,'done')
+    if cycle['stage']!='done':queue.set_stage(cycle,'build')
+  if cycle['stage']in('build','prepare'):
+   # Exactly one post-collection builder call per invocation, never per page.
+   work_guard();report['final_local_calls']+=1;final=local('prepare');report['final_local']=final
+   if final.get('status')!='prepared':
+    while True:
+     guard();unready=queue.phase_page(cycle,run,page_size,'prepare')
+     if not unready:break
+     for item in unready:queue.terminal_final(item,cycle,run,'deferred');finish(item,'deferred')
+    raise Pending('final local libraries unavailable; disk collection retained')
+   anchor=local('snapshot');queue.set_stage(cycle,'prepare')
+   while True:
+    guard();page=queue.phase_page(cycle,run,page_size,'prepare')
+    if not page:break
+    report['max_page_items']=max(report['max_page_items'],len(page))
+    for item in page:
+     work_guard();report['work_units']+=1;active=item
      try:
-      if env.get('status')=='prepared':
-       report['strict_lookup_attempts']+=1
-       row=call(item,'prepare',False)
-       if strict_lookup_ready(row,ready):
-        report['verified_artifact_hits']+=1;finish(item,'completed',recorded=True,row=row);continue
-      # A failed/Source lookup requires the original record -> build -> prepare,
-      # even if an old scheduling hint had recorded=True.
-      item['recorded_hint']=False;pending.append(item)
-     except (Rejected,ValueError,OSError) as error:
-      item['recorded_hint']=False;pending.append(item);event(item,'strict-lookup-not-admitted',error=str(error)[:512])
-   else:pending=page
-   recorded=[]
-   if phase in ('all','record') and pending:
-    local('record')
-    for item in pending:
-     try:
-      if not item['recorded_hint']:
-       row=call(item,'record',False);report['recorded']+=1
-       # Intermediate scheduling hint cannot approve artifact reads or success.
-       queue.mark(item,'',ready=False,recorded=True);item['recorded_hint']=True
-      recorded.append(item)
-      if phase=='record':finish(item,'deferred',recorded=True)
-     except (Rejected,ValueError,OSError) as error:finish(item,'rejected');event(item,'rejection-detail',error=str(error)[:512])
-   else:recorded=pending
-   if phase!='record' and recorded:
-    env=local('prepare')
-    for item in recorded:
-     try:
-      if env.get('status')!='prepared':finish(item,'deferred',recorded=False);continue
       row=call(item,'prepare',True)
-      if ready(row):finish(item,'completed',recorded=True,row=row)
-      elif row['worker'].get('artifact_counts',{}).get('failed',0):finish(item,'rejected',row=row)
-      else:finish(item,'deferred',recorded=False,row=row)
-     except (Rejected,ValueError,OSError) as error:finish(item,'rejected');event(item,'rejection-detail',error=str(error)[:512])
-  report['status']=('partial'if queue.get('rejected')else'no-candidates') if queue.total()==0 else 'completed' if phase!='record' and report['deferred']==report['rejected']==0 else 'partial'
-  report['full_manifest_preparation_verified']=report['status']=='completed' and report.get('index_rejected',0)==0
+      if local_preparation_ready(row,ready):
+       queue.provisional_final(item,cycle,run,row);report['provisional_native']+=1
+       if row['worker']['artifact_counts'].get('built',0)==0:report['provisional_artifact_hits']+=1
+       event(item,'native-ready-provisional')
+      else:
+       state='rejected'if row['worker'].get('artifact_counts',{}).get('failed',0)else'deferred'
+       if not local_inputs_ready(row):report['source_late_deferred']+=1
+       queue.terminal_final(item,cycle,run,state);finish(item,state,row=row)
+     except (Rejected,ValueError,OSError)as error:
+      queue.terminal_final(item,cycle,run,'rejected');finish(item,'rejected');event(item,'prepare-rejection',error=str(error)[:512])
+   proof=local('verify')if anchor.get('status')=='environment-captured'else dict(status='unavailable')
+   report['final_environment_verification']=proof
+   if proof.get('status')=='environment-verified'and proof.get('environment_identity')==anchor.get('environment_identity'):
+    commit('commit');queue.set_stage(cycle,'done')
+   else:raise Pending('final environment changed/unverified; native outcomes remain provisional')
+  report['status']='no-candidates'if queue.total()==0 else'completed'if phase!='record'and report['visited']==queue.total()and report['deferred']==report['rejected']==0 and queue.phase_count(cycle,'rejected')==0 else'partial'
+  report['full_manifest_preparation_verified']=report['status']=='completed'and report.get('index_rejected',0)==0
+ except Pending as error:report.update(status='partial',pending_preparation=True,error=str(error))
  except Deferred as error:report.update(status='partial',budget_deferred=True,error=str(error))
- except (Stopped,KeyboardInterrupt) as error:
-  report.update(status='stopped',error=str(error) or 'interrupted');report['protection_stops']+=1
+ except (Stopped,KeyboardInterrupt)as error:
+  report.update(status='stopped',error=str(error)or'interrupted');report['protection_stops']+=1
   if active:event(active,'protection-stopped')
  except Exception as error:report.update(status='failed',error=str(error)[:1024])
  finally:
@@ -285,9 +367,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
   if queue is not None:
    queue.db.set_progress_handler(None,0)
    report.update(unique_units=queue.total(),observed_ready_hint_count=queue.hint_count(),index_complete=queue.get('indexed',False),active_manifest_sha256=queue.get('active_manifest',None),incoming_manifest_sha256=queue.manifest_sha)
-   report['not_visited']=max(0,report['unique_units']-report['visited'])
-   report['budget_deferred_remaining']=report['not_visited'] if report['index_complete'] else None
-   report['rejected_total']=report['rejected']+queue.get('rejected')
-   report['deferred_total_known']=report['deferred']+report['not_visited']
-   queue.close()
+   if cycle is not None:report.update(cycle_stage=cycle['stage'],cycle_collected=queue.phase_count(cycle)if phase!='prepare'else 0,cycle_first_pass_strict=queue.phase_count(cycle,'provisional'),cycle_rejected=queue.phase_count(cycle,'rejected'))
+   report['not_visited']=max(0,report['unique_units']-report['visited']);report['budget_deferred_remaining']=report['not_visited']if report['index_complete']else None
+   report['rejected_total']=report['rejected']+queue.get('rejected');report['deferred_total_known']=report['deferred']+report['not_visited'];queue.close()
  return report

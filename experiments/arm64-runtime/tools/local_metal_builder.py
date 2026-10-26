@@ -498,12 +498,13 @@ class PreparationSession:
     selected toolchain, checks authenticated binary pins and all input stat pins.
     """
     def __init__(self,private_tmp,*,clock=time.monotonic):
-        self.tmp=Path(private_tmp);self.clock=clock;self.snapshot=None;self.toolchain=None;self.summary=None;self.scope=None;self.environment=None
+        self.tmp=Path(private_tmp);self.clock=clock;self.snapshot=None;self.toolchain=None;self.summary=None;self.scope=None;self.environment=None;self.audit=None;self.validation_generation=0
         self.stats=dict(calls=0,full_builds=0,reuses=0,invalidations=0,metadata_entries=0,seconds=0.0,full_build_seconds=0.0,reuse_validation_seconds=0.0,events=[])
     def invalidate(self,reason='explicit'):
+        self.validation_generation+=1
         if self.snapshot is not None:self.snapshot.close()
         if self.summary is not None:self.stats['invalidations']+=1
-        self.snapshot=self.toolchain=self.summary=self.scope=self.environment=None
+        self.snapshot=self.toolchain=self.summary=self.scope=self.environment=self.audit=None
         if len(self.stats['events'])<64:self.stats['events'].append(dict(state='invalidated',reason=reason))
     def _tools_unchanged(self,toolchain,guard):
         # Original fixed xcrun selector checks + original guard; no alternate tool.
@@ -538,6 +539,7 @@ class PreparationSession:
                     if lock is not None:os.close(lock)
                 self.invalidate('inputs-or-tools-changed')
             elif self.summary is not None:self.invalidate('scope-changed')
+            self.audit=None
             self.stats['full_builds']+=1;actual=toolchain_factory();before=None;environment_before=None
             session=self
             class EnclosedToolchain:
@@ -559,22 +561,69 @@ class PreparationSession:
             try:
                 summary=build(root,cohort,enabled=True,guard=guard,toolchain=EnclosedToolchain())
                 self.stats['full_build_seconds']+=self.clock()-started
-                if summary.get('status')=='passed'and summary.get('built')==0 and summary.get('requests',0)>0 and before is not None:
+                if summary.get('status')=='passed'and summary.get('requests',0)>0:
                     try:
-                        if self._tools_unchanged(actual,guard)and actual.preparation_environment(guard)==environment_before and before.unchanged(guard):
+                        stable_tools=self._tools_unchanged(actual,guard)and environment_before is not None and actual.preparation_environment(guard)==environment_before
+                        if stable_tools:
+                            # This is only an anchor for FUTURE actual native
+                            # validation, never a successful-build memo.
+                            self.audit=(scope,actual,dict(summary),environment_before)
+                        if stable_tools and summary.get('built')==0 and before is not None and before.unchanged(guard):
                             self.snapshot=before;before=None;self.toolchain=actual;self.scope=scope;self.summary=dict(summary);self.environment=environment_before
                             self.stats['metadata_entries']=self.snapshot.count
                     except (OSError,ValueError,Refused)as error:
                         if isinstance(error,Stopped):raise
-                        # Optional memo failure cannot replace the original full
-                        # audit result. It never supplies a synthetic passed result.
+                        # Optional anchors cannot replace the original full audit.
                 return dict(summary,session_reused=False)
             finally:
                 if before is not None:before.close()
         finally:self.stats['seconds']+=self.clock()-started
+    def begin_validation(self,root,cohort,guard):
+        """Capture before native validation; no memo/native success authority."""
+        if self.audit is None or self.audit[0]!=(str(Path(root)),cohort):return None
+        scope,toolchain,summary,environment=self.audit;lock=None;snapshot=None
+        try:
+            checked_root(Path(root));guard.check(preflight=True)
+            lock=os.open(Path(root)/cohort/'artifacts/.builder.lock',os.O_RDWR|os.O_NOFOLLOW)
+            row=os.fstat(lock)
+            if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1:raise Refused('invalid validation builder lock')
+            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            if not self._tools_unchanged(toolchain,guard)or toolchain.preparation_environment(guard)!=environment:return None
+            snapshot=_SessionSnapshot((Path(root)/cohort/'requests',Path(root)/cohort/'artifacts'/summary['build_id']),self.tmp,guard)
+            return _ValidationAnchor(self,Path(root),cohort,toolchain,environment,snapshot)
+        except (OSError,ValueError,Refused)as error:
+            if snapshot is not None:snapshot.close()
+            if isinstance(error,Stopped):raise
+            return None
+        finally:
+            if lock is not None:os.close(lock)
     def close(self):
+        self.validation_generation+=1
         if self.snapshot is not None:self.snapshot.close()
-        self.snapshot=self.toolchain=self.summary=self.scope=self.environment=None
+        self.snapshot=self.toolchain=self.summary=self.scope=self.environment=self.audit=None
+
+
+
+class _ValidationAnchor:
+    """Unchanged interval proof, valid only together with actual native outcomes."""
+    def __init__(self,session,root,cohort,toolchain,environment,snapshot):
+        self.session=session;self.root=root;self.cohort=cohort;self.toolchain=toolchain;self.environment=environment;self.snapshot=snapshot;self.generation=session.validation_generation
+    def unchanged(self,guard):
+        if self.snapshot is None or self.session.validation_generation!=self.generation:return False
+        lock=None
+        try:
+            checked_root(self.root);guard.check(preflight=True)
+            lock=os.open(self.root/self.cohort/'artifacts/.builder.lock',os.O_RDWR|os.O_NOFOLLOW);row=os.fstat(lock)
+            if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1:raise Refused('invalid validation builder lock')
+            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            return self.session._tools_unchanged(self.toolchain,guard)and self.toolchain.preparation_environment(guard)==self.environment and self.snapshot.unchanged(guard)
+        except (OSError,ValueError,Refused)as error:
+            if isinstance(error,Stopped):raise
+            return False
+        finally:
+            if lock is not None:os.close(lock)
+    def close(self):
+        if self.snapshot is not None:self.snapshot.close();self.snapshot=None
 
 
 def main():

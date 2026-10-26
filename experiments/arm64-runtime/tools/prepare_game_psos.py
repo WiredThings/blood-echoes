@@ -213,6 +213,7 @@ def prepare(config,*,services=None):
  samples_path=run/'samples.jsonl';outcomes_path=run/'outcomes.jsonl';events_path=run/'events.jsonl'
  builder_tmp=fresh(run,'local-builder-tmp');result={}
  session_factory=services.get('builder_session_factory');builder_session=session_factory(builder_tmp)if session_factory else None
+ validation_anchor=None;validation_environment=None
  def check():
   nonlocal sample_count
   elapsed=clock()-start
@@ -224,7 +225,7 @@ def prepare(config,*,services=None):
   reason=policy.observe(elapsed,s)
   if reason:raise Stopped(reason)
  def prep_phase(phase,guard):
-  nonlocal stop_error
+  nonlocal stop_error,validation_anchor,validation_environment
   if phase=='record'and builder_session is not None:builder_session.invalidate('record-phase')
   class BuilderGuard:
    def check(self,**kwargs):
@@ -234,6 +235,19 @@ def prepare(config,*,services=None):
      if kwargs.get('preflight'):require_no_games()
     except (Deferred,Stopped,KeyboardInterrupt)as error:
      stop_error=error;raise services['builder_stopped'](str(error))
+  if phase in('snapshot','verify'):
+   try:
+    guard();current=digest(phase_env.get('prepare',{}))
+    if phase=='snapshot':
+     if validation_anchor is not None:validation_anchor.close()
+     validation_anchor=builder_session.begin_validation(gpu/'local-metal',a.cohort,BuilderGuard())if builder_session is not None else None
+     validation_environment=current
+     return dict(status='environment-captured'if validation_anchor is not None else'unavailable',environment_identity=current)
+    valid=validation_anchor is not None and validation_environment==current and validation_anchor.unchanged(BuilderGuard())
+    return dict(status='environment-verified'if valid else'changed',environment_identity=current,read_only_verification=True)
+   except services['builder_stopped']as error:
+    if stop_error is not None:raise stop_error
+    raise Stopped('environment verification safety stop: '+str(error))from error
   def builder(root,cohort,**kwargs):
    if builder_session is not None:
     return builder_session.build(root,cohort,guard=BuilderGuard(),toolchain_factory=lambda:services['toolchain'](services['runner'](builder_tmp)),**kwargs)
@@ -294,6 +308,7 @@ def prepare(config,*,services=None):
   result=run_manifest(a.manifest,progress_root=progress,context=context,execute=execute,prepare_phase=prep_phase,check=check,
        ready=preparation_ready,phase=a.phase,page_size=a.page_size,max_recipes=a.max_recipes,seconds=a.seconds,clock=clock,event_sink=event)
  finally:
+  if validation_anchor is not None:validation_anchor.close()
   if builder_session is not None:
    builder_session.close();result['builder_session']=dict(builder_session.stats)
   result.update(before=before,after=observer.system(),samples_preview=samples,sample_count=sample_count,samples_jsonl=str(samples_path),

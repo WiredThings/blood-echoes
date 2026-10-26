@@ -18,6 +18,8 @@
 #include "shader_recompiler/specialization.h"
 #include "video_core/renderer_metal/mtl_device.h"
 #include "video_core/renderer_metal/mtl_cached_variants.h"
+#include "video_core/renderer_metal/mtl_runtime_impl.h"
+#include "runtime_exit_codes.h"
 
 namespace {
 using Json=PreparationJson::Value;namespace fs=std::filesystem;
@@ -76,20 +78,54 @@ Json Function(const Metal::CompiledShader* s,std::string label){
  const auto route=s->persistent_identity.route==Metal::PersistentLibraryRoute::LocalMetallib?"local-metallib":"source";
  return {{"label",label},{"identity",s->persistent_identity.hex()},{"actual_route",route}};
 }
+int FixedHelpers(const std::string&mode,const Json&p,const fs::path&scratch,Json&result){
+ Need(p.at("packet_schema")==1&&p.at("fixed_helper_seed_schema")==Metal::HostPso::FixedSeedSchema&&p.at("candidate_only")==true&&p.at("runtime_cache_import_allowed")==false,"fixed helper packet schema");
+ const char* cohort=getenv("BB_MTL_ARCHIVE_COMPATIBILITY_ID");const char* discovery=getenv("BB_MTL_LOCAL_AOT_COHORT");const char* gpu_value=getenv("BB_GPU_USER_DIR");
+ Need(cohort&&discovery&&gpu_value&&Metal::HostPso::Hex(cohort)&&std::string(cohort)==discovery&&p.at("current_cohort")==cohort,"verified helper cohort");
+ const fs::path gpu=gpu_value,artifact=p.at("artifact_cache_dir").get<std::string>();Directory(gpu);Directory(artifact);
+ Need(Child(gpu,fs::path(Shared)/"state")&&artifact.filename()=="metal"&&artifact.parent_path().parent_path()==gpu/"cache","actual renderer artifact cache required");
+ const auto title=artifact.parent_path().filename().string();Need(title.size()==9&&title.starts_with("CUSA")&&title.find_first_not_of("0123456789",4)==title.npos,"actual title cache required");
+ Need(artifact!=scratch&&!Child(artifact,scratch)&&!Child(scratch,artifact),"helper scratch/artifact separation");
+ const char* persist=getenv("BB_MTL_PERSIST_WARM_ARCHIVE");const char* replay=getenv("BB_MTL_REPLAY_THREAD");const char*aot=getenv("BB_MTL_LOCAL_AOT_MODE");
+ Need(persist&&std::string_view(persist)=="0"&&replay&&std::string_view(replay)=="0","headless helper main/replay policy");
+ Need(aot&&(std::string_view(aot)=="record"||std::string_view(aot)=="load"),"actual helper local library phase");
+ const bool compile=mode=="helpers-prepare";
+ if(compile){const char*build=getenv("BB_MTL_LOCAL_AOT_BUILD_ID");Need(std::string_view(aot)=="load"&&build&&Metal::HostPso::Hex(build),"fixed prepare requires verified local build");}
+ Stop();Metal::Device device;Metal::Scheduler scheduler(device,"fixed helper preparation");Metal::PsoCache cache(device,artifact,Metal::ReadFloatRules()==Metal::FloatRules::RelaxedMath);cache.ReleaseWarmArchive();
+ Metal::HostKernels kernels(device.GetImpl(),scheduler);kernels.BindPsoCache(&cache);
+ const auto prepared=kernels.PrepareFixedSeeds(compile,[]{return bool(interrupted);});kernels.BindPsoCache(nullptr);Stop();
+ result["mode"]=mode;result["fixed_helper_seed_schema"]=Metal::HostPso::FixedSeedSchema;result["fixed_only"]=true;result["storage_opened"]=false;result["renderer_owners_constructed"]=false;result["guest_Runtime_constructed"]=false;
+ result["known"]=prepared.progress.known;result["processed"]=prepared.progress.processed;result["ready"]=prepared.progress.ready;result["built"]=prepared.progress.built;result["deferred"]=prepared.progress.deferred;result["failed"]=prepared.progress.failed;result["cancelled"]=prepared.cancelled;
+ bool all_local=prepared.items.size()==Metal::HostPso::FixedSeedCount;
+ Json rows=Json::array();for(const auto&item:prepared.items){
+  const bool local=item.origin_count==(item.kind==Metal::HostPso::Kind::PostProcess?2u:1u)&&std::all_of(item.actual_routes.begin(),item.actual_routes.begin()+item.origin_count,[](auto route){return route==Metal::LocalLibrary::Route::LocalMetallib;});all_local&=local;
+  Json routes=Json::array();for(unsigned i=0;i<item.origin_count;++i)routes.push_back(unsigned(item.actual_routes[i]));
+  rows.push_back({{"kind",u32(item.kind)},{"request_sha256",item.request_sha256},{"descriptor_sha256",item.descriptor_sha256},{"inputs_verified",item.inputs_verified},{"native_ready",item.native_ready},{"outcome",unsigned(item.outcome.state)},{"archive_sha256",item.outcome.archive_sha256},{"actual_routes",routes}});}
+ result["items"]=rows;result["all_actual_libraries_local"]=all_local;
+ const auto&c=cache.GetCounters();result["artifact_counts"]={{"attempts",c.artifact_attempts.load()},{"hits",c.artifact_hits.load()},{"built",c.artifact_built.load()},{"compile_attempts",c.artifact_compile_attempts.load()},{"failed",c.artifact_failed.load()},{"deferred",c.artifact_deferred.load()},{"critical",c.artifact_critical.load()}};
+ const bool critical=prepared.progress.state==Metal::HostPso::WarmState::Critical;const bool complete=prepared.progress.state==Metal::HostPso::WarmState::Complete&&prepared.progress.ready==Metal::HostPso::FixedSeedCount&&all_local;
+ result["status"]=critical?"stopped":complete?"completed":compile?"deferred":"inputs-collected";result["all_fixed_native_ready"]=complete;
+ std::printf("FIXED_HELPER_RESULT %s\n",result.dump().c_str());return critical?BB_ARM_EXIT_HOST_PROTECTION:0;
+}
+
 }
 
 int main(int argc,char**argv){@autoreleasepool {
+ if(argc==2&&std::string_view(argv[1])=="--fixed-helper-seed-schema"){
+  std::printf("FIXED_HELPER_CAPABILITY %u\n",Metal::HostPso::FixedSeedSchema);return 0;
+ }
  // This executable has its own worker contract; never emits launcher restart 75/76.
- if(argc!=4){std::fprintf(stderr,"usage: game-pso-preparer record|prepare packet.json fresh-scratch\n");return 64;}
+ if(argc!=4){std::fprintf(stderr,"usage: game-pso-preparer record|prepare|helpers-probe|helpers-prepare packet.json fresh-scratch\n");return 64;}
  signal(SIGINT,Signal);signal(SIGTERM,Signal);
  Json result{{"candidate_only",true},{"runtime_cache_import_allowed",false},{"actual_final_read_admission",{{"allowed",false}}},
   {"native_info_srt_deserialize",false},{"walker_registered_or_executed",false},{"artifact_publication_observed",false}};
  try {
-  const std::string mode=argv[1];Need(mode=="record"||mode=="prepare","worker mode");
+  const std::string mode=argv[1];Need(mode=="record"||mode=="prepare"||mode=="helpers-probe"||mode=="helpers-prepare","worker mode");
   const fs::path packet=argv[2],scratch=argv[3];Directory(scratch);
   Need(Child(scratch,fs::path(Shared)/"state")&&fs::is_empty(scratch),"fresh empty Shared source scratch required");
   Directory(packet.parent_path());Need(Child(packet.parent_path(),fs::path(Shared)/"state"),"Shared packet root required");
   auto raw=Read(packet,MaxPacket);Json p=Json::parse(raw);
+  if(mode=="helpers-probe"||mode=="helpers-prepare")return FixedHelpers(mode,p,scratch,result);
   Need(p.at("packet_schema")==1&&p.at("manifest_schema")==2&&p.at("candidate_only")==true&&p.at("runtime_cache_import_allowed")==false,"candidate packet schema/policy");
   Need(p.at("native_info_srt_allowed")==false&&p.at("walker_bytes_passed")==0,"forbidden metadata tail");
   Need(Metal::FunctionIdentity::Hex(p.at("cache_id").get<std::string>())&&Metal::FunctionIdentity::Hex(p.at("recipe_blob_identity").get<std::string>())&&Metal::FunctionIdentity::Hex(p.at("frozen_input_set_identity").get<std::string>()),"scoped packet identities");

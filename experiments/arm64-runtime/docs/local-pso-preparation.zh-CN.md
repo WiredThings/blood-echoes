@@ -104,3 +104,6 @@ v2 暖启实际执行424次 prepare、0次 record；419份沿用调度提示但�
 新包原入口已通过：424配方全部严格探测成功、0record，原生496hit/0built/0failed；27次本机库审核只有1次full、26次复用，审核合计26.66秒，整体准备103.72秒。启动至同一可操作场景155.91秒（前轮519.31秒）；boot/content/patch/settings/camera完全一致，但旧轮仍补过5配方、4PSO，不能把整轮差额全部单独归于memo。场景90秒约49.70FPS、p95/p99 20.94/21.43ms，合计footprint5808MiB不是去重RAM，最高压力2、swap净增205MiB；没有据此宣称帧率或RAM收益。运行时527条Hit、25条Deferred日志与旧暖轮相同，538本机库命中/0源码事件，仍不能推断所有驱动编译零。
 
 18项会话作者控制、16项strict-first、原26项builder及19项queue、11项增量控制通过。源/收据损坏、同字节替换并还原mtime、工具/SDK/OS变更、失败不缓存、预算禁memo、冷无requests、假hint、工厂内部Source回退和保护停止均有反例。完整游戏/审核摘要分别见 `session-reuse-game-aggregate.json` 与 `real-session-audit-aggregate.json`，同目录保留前轮汇总。新FormatConvert和阶段计数仍是独立私有工程，尚未纳入此包。
+
+
+2026-10-26 更新：默认首启准备八类固定 Metal 内核，游戏目录改为整批收集后统一建库；原生及准备验收已通过，暖场景完成一次采样，匹配性能与内存对照仍未完成。范围、失败记录和复现命令见 [固定内核与整批建库](fixed-helper-startup.zh-CN.md)。

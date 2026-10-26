@@ -54,7 +54,7 @@ def launcher_inputs(arguments, environment, project):
 
 
 def prepare_launch(executable, arguments, environment, *, project=PROJECT,
-                   execution_root=None, archive_prepare=None, local_prepare=None, observe=None, game_prepare=None):
+                   execution_root=None, archive_prepare=None, local_prepare=None, observe=None, game_prepare=None, fixed_helper_prepare=None):
     """One startup-only preparation; imports and toolchain work stay out of draws."""
     project = Path(project).resolve(strict=True)
     env = dict(environment)
@@ -99,15 +99,15 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
         observer = NativeObserver()
         try:
             return _prepared(executable, arguments, env, project, inputs, options,
-                             explicit, archive_prepare, local_prepare, observer.system, backend_root, code_root, game_prepare)
+                             explicit, archive_prepare, local_prepare, observer.system, backend_root, code_root, game_prepare, fixed_helper_prepare)
         finally:
             observer.close()
     return _prepared(executable, arguments, env, project, inputs, options,
-                     explicit, archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare)
+                     explicit, archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare, fixed_helper_prepare)
 
 
 def _prepared(executable, arguments, env, project, inputs, options, mode,
-              archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare):
+              archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare, fixed_helper_prepare=None):
     before = observe()
     if before['locked'] or before['pressure'] == 4:
         raise RuntimeError('locked or severe pressure before local Metal preparation')
@@ -121,6 +121,14 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
                                    cohort=cohort, engine='arm64', graphics=True)
     env.update(updates)
+    if fixed_helper_prepare is None:
+        from launcher_fixed_helpers import prepare as fixed_helper_prepare
+    helper_updates, helper_report = fixed_helper_prepare(project=project, execution_root=code_root,
+        arguments=arguments, environment=env, cohort=cohort, options=options, observe=observe,
+        mode=mode or 'auto', local_prepare=local_prepare, protection_baseline=before)
+    env.update(helper_updates)
+    if 'local' in helper_report:
+        report = helper_report['local']
     game_report = dict(status='deferred', reason='local toolchain is not ready')
     if report['status'] in ('prepared', 'record', 'source-fallback') and mode != 'record':
         if game_prepare is None:
@@ -145,7 +153,7 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     if report['status'] not in ('record', 'prepared', 'source-fallback'):
         raise RuntimeError('local Metal preparation refused: '+report['status'])
     manifest = dict(schema=1, status=report['status'], requested=mode or 'auto',
-                    local=report, game_pso=game_report, cohort=cohort, before=before, after=after,
+                    local=report, game_pso=game_report, fixed_helpers=helper_report, cohort=cohort, before=before, after=after,
                     original_arguments_preserved=True, formal_data_modified=False)
     return env, manifest
 
@@ -162,6 +170,7 @@ def main(argv=None, *, project=PROJECT, execution_root=None):
     visible={k:report[k]for k in ('status','requested')if k in report}
     if report.get('local',{}).get('reason'):visible['reason']=report['local']['reason']
     if 'game_pso'in report:visible['game_pso']=report['game_pso'].get('status')
+    if 'fixed_helpers'in report:visible['fixed_helpers']=report['fixed_helpers'].get('status')
     print('Metal local preparation: '+json.dumps(visible,sort_keys=True),flush=True)
     os.execve(executable, [executable, *arguments], env)
 
