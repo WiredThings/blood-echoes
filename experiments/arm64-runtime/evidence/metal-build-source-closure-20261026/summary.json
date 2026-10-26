@@ -1,0 +1,18 @@
+{
+  "returncode": 0,
+  "seconds": 1.8010784579673782,
+  "configure_only": true,
+  "no_targets_built": true,
+  "prepared_dependencies_reused": true,
+  "clean_checkout_build_proven": false,
+  "schema": 1,
+  "status": "configured",
+  "source_closure_files": 67,
+  "explicit_cmake_test_sources": 61,
+  "authored_controls_passed": 9,
+  "game_started": false,
+  "GPU_started": false,
+  "formal_data_modified": false,
+  "source_closure_sha256": "f96b0039ae61b3dd670206698f86472f05deb9a4accc4a2502f6a979f22b1f6e",
+  "configure_result_sha256": "91259e3fed0f71afabd5b7a6557ce0557319e2ca5d4c6e69bb7609c15e7bd95d"
+}

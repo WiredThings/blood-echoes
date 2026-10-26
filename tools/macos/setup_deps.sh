@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# tools/macos/setup_deps.sh: one-time toolchain for the macOS (x86-64 / Rosetta 2) build.
+# tools/macos/setup_deps.sh: dependencies for the selected macOS architecture.
 # BB_ARCH=arm64 builds the same libraries natively into deps-arm64 instead, for the native GPU
 # process under development (docs/macos-native-gpu.md); the x86-64 build does not need it.
 #
-# The game's code runs inside our process, so every library linked into bb-probe and
-# libbbgpu must be x86-64. Build tools only run at build time and stay native (arm64).
+# Legacy in-process x86-64 needs matching x86-64 libraries and Rosetta. Native
+# ARM64 consumers use ARM64 libraries and do not need Rosetta for this setup.
+# Build tools run natively (arm64).
 #   native (Apple Silicon Homebrew): cmake ninja pkgconf glslang spirv-tools python3
 #   x86-64, built here into $PREFIX:   SDL3 fmt xxHash Vulkan-Headers Vulkan-Loader FFmpeg
 #                                      KosmicKrisp (Mesa's Vulkan-on-Metal driver)
@@ -32,7 +33,9 @@ step "Checks"
 [[ $(uname -s) == Darwin ]] || die "run this on the Mac"
 # KosmicKrisp, the only Vulkan driver that runs bbport on the Mac, needs macOS 26.
 (( $(sw_vers -productVersion | cut -d. -f1) >= 26 )) || die "macOS 26 or later required (this Mac: $(sw_vers -productVersion))"
-arch -x86_64 /usr/bin/true 2>/dev/null || die "Rosetta 2 missing: softwareupdate --install-rosetta --agree-to-license"
+if [[ $ARCH == x86_64 ]]; then
+    arch -x86_64 /usr/bin/true 2>/dev/null || die "Rosetta 2 missing: softwareupdate --install-rosetta --agree-to-license"
+fi
 xcrun --find clang >/dev/null 2>&1 || die "Command Line Tools missing: xcode-select --install"
 BREW=$(command -v brew || true)
 [[ -z $BREW && -x /opt/homebrew/bin/brew ]] && BREW=/opt/homebrew/bin/brew
