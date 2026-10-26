@@ -28,6 +28,7 @@ class StageTests(unittest.TestCase):
   old=(self.original/'run.sh').read_text();(self.repository/'run.sh').write_text(old.replace('exec author\n',stage_prepare.HOOK+'exec author\n'))
   self.runtime=self.temp/'runtime-tools';self.runtime.mkdir()
   for name in stage_prepare.TOOLS:(self.runtime/name).write_text('# authored isolated dependency\n')
+  (self.runtime/'prepare_game_psos.py').write_text('def prepare(config,*,services=None):pass\n')
   (self.runtime/'local_aot_policy.py').write_text('from pathlib import Path\nP=Path(__file__).parents[1]\n')
   (self.runtime/'local_metal_builder.py').write_text('from pathlib import Path\nPROJECT=Path(__file__).parents[1]\n')
   (self.runtime/'launcher_local_aot.py').write_text('''from pathlib import Path

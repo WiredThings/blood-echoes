@@ -7,7 +7,8 @@ from qa_build_guard import require_no_games
 def sha(f):
  with Path(f).open('rb')as s:return hashlib.file_digest(s,'sha256').hexdigest()
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('folder',type=Path);a=ap.parse_args();require_no_games();folder=a.folder.resolve();manifest=json.loads((folder/'runtime-manifest.json').read_text());app=Path(manifest['app']);assert app.resolve()==app and app.is_relative_to(P/'apps');assert manifest['host_local_only']and not manifest['formal_data_modified']
+ global P
+ ap=argparse.ArgumentParser();ap.add_argument('folder',type=Path);ap.add_argument('--project',type=Path,default=P);a=ap.parse_args();P=a.project.resolve(strict=True);assert (P/'state').is_dir()and(P/'apps').is_dir();require_no_games();folder=a.folder.resolve();manifest=json.loads((folder/'runtime-manifest.json').read_text());app=Path(manifest['app']);assert app.resolve()==app and app.is_relative_to(P/'apps');assert manifest['host_local_only']and not manifest['formal_data_modified']
  stage=app/'Contents/Resources/bbport';assert all(sha(stage/n)==h for n,h in manifest['frozen_runtime'].items());exe=stage/'bin/bb-probe-metal';expected_lib=stage/'bin/gpu-metal/libbbgpu.dylib'
  e=P/'evidence'/('frozen-contract-package-'+str(time.time_ns()));e.mkdir();root=P/'state'/e.name;root.mkdir();gpu=root/'gpu';gpu.mkdir();home=root/'home';home.mkdir();env=dict(PATH='/usr/bin:/bin:/usr/sbin:/sbin',HOME=str(home),BB_GPU_USER_DIR=str(gpu),BB_AUDIO='none',BB_ONLINE='0',DYLD_PRINT_LIBRARIES='1');rows=[]
  for mode,expected in [('msync-image',0),('msync-query-bad-output',74)]:

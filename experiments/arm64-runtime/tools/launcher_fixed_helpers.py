@@ -14,7 +14,7 @@ def validate_result(row,phase):
  if r.get('status')=='stopped':raise ProtectionStopped('fixed helper protected stop')
  if type(row['exit'])is not int or row['exit']!=0:raise RuntimeError('fixed helper worker failed')
  items=r.get('items',[])
- if type(r.get('fixed_helper_seed_schema'))is not int or r['fixed_helper_seed_schema']!=1 or type(r.get('known'))is not int or r['known']!=8 or not isinstance(items,list)or len(items)>8:raise ValueError('fixed helper response shape')
+ if type(r.get('fixed_helper_seed_schema'))is not int or r['fixed_helper_seed_schema']!=2 or type(r.get('known'))is not int or r['known']!=8 or not isinstance(items,list)or len(items)>8:raise ValueError('fixed helper response shape')
  if type(r.get('ready'))is not int or not 0<=r['ready']<=8 or type(r.get('all_fixed_native_ready'))is not bool:raise ValueError('fixed helper ready count')
  kinds=[i['kind']for i in items]
  if len(set(kinds))!=len(kinds)or any(type(k)is not int or k not in (4,5,6,9,10,11,12,13)for k in kinds):raise ValueError('fixed helper response kinds')
@@ -28,8 +28,25 @@ def validate_result(row,phase):
   if i['native_ready']and(not i['inputs_verified']or i['outcome']not in(1,2)or not isinstance(i['archive_sha256'],str)or not HEX.fullmatch(i['archive_sha256'])):raise ValueError('fixed helper ready receipt identity')
   if phase=='helpers-probe'and i['outcome']==2:raise ValueError('fixed helper probe cannot publish a built pipeline')
  if r['ready']!=sum(i['native_ready']for i in items):raise ValueError('fixed helper ready/item mismatch')
- complete=r['all_fixed_native_ready']
- if complete and(set(kinds)!={4,5,6,9,10,11,12,13}or r['ready']!=8 or not all(i['native_ready']and i['actual_routes']in([2],[2,2])for i in items)):raise ValueError('fixed helper incomplete success')
+ libraries=r.get('tiling_libraries')
+ if not isinstance(libraries,dict)or type(libraries.get('schema'))is not int or libraries['schema']!=1 or type(libraries.get('known'))is not int or libraries['known']!=14 or libraries.get('final_psos_prepared')is not False:raise ValueError('tiling library schema/PSO separation')
+ entries=libraries.get('items');expected={(b,m,False)for b in(8,16,32,64,96,128)for m in(False,True)}|{(b,True,True)for b in(32,64)}
+ if not isinstance(entries,list)or len(entries)>14 or type(libraries.get('complete'))is not bool:raise ValueError('tiling library response shape')
+ seen=set();local=0
+ for item in entries:
+  if not isinstance(item,dict)or type(item.get('bits'))is not int or type(item.get('macro'))is not bool or type(item.get('texture'))is not bool or type(item.get('entry_ready'))is not bool or type(item.get('actual_route'))is not int:raise ValueError('tiling library item types')
+  key=(item['bits'],item['macro'],item['texture'])
+  if key not in expected or key in seen or item['actual_route']not in(0,1,2):raise ValueError('tiling library identity domain')
+  seen.add(key)
+  if item['entry_ready']:
+   if item['actual_route']not in(1,2)or not HEX.fullmatch(item.get('source_sha256','')):raise ValueError('tiling library successful origin')
+   if item['actual_route']==2:
+    if not HEX.fullmatch(item.get('request_key',''))or not HEX.fullmatch(item.get('library_sha256','')):raise ValueError('tiling library local receipt')
+    local+=1
+ if type(libraries.get('processed'))is not int or libraries['processed']!=len(entries)or type(libraries.get('local_ready'))is not int or libraries['local_ready']!=local:raise ValueError('tiling library counts')
+ if libraries['complete']and(seen!=expected or local!=14):raise ValueError('tiling library incomplete success')
+ complete=r['all_fixed_native_ready'] and libraries['complete']
+ if r['all_fixed_native_ready'] and(set(kinds)!={4,5,6,9,10,11,12,13}or r['ready']!=8 or not all(i['native_ready']and i['actual_routes']in([2],[2,2])for i in items)):raise ValueError('fixed helper incomplete success')
  count=r.get('artifact_counts',{}).get('compile_attempts')
  if type(count)is not int or not 0<=count<=64:raise ValueError('fixed helper compile count')
  if phase=='helpers-probe'and count!=0:raise ValueError('fixed helper probe ordinary compile forbidden')
@@ -46,7 +63,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  if component_loader is None:
   from game_pso_component import load as component_loader
  component=component_loader(stage)
- if component is None or component.get('fixed_helper_seed_schema')!=1:
+ if component is None or component.get('fixed_helper_seed_schema')!=2:
   return {},dict(status='unavailable',reason='fixed helper worker ABI unavailable')
  if toolchain_probe is None:
   from local_aot_policy import available_toolchain as toolchain_probe
@@ -73,7 +90,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  def execute(phase,env,ordinal):
   check();require_no_games();case=job/(phase+'-'+str(ordinal));case.mkdir(mode=0o700)
   scratch=case/'scratch';scratch.mkdir();tmp=case/'tmp';tmp.mkdir();packet=case/'packet.json'
-  packet.write_text(json.dumps(dict(packet_schema=1,fixed_helper_seed_schema=1,candidate_only=True,
+  packet.write_text(json.dumps(dict(packet_schema=1,fixed_helper_seed_schema=2,candidate_only=True,
    runtime_cache_import_allowed=False,current_cohort=cohort,artifact_cache_dir=str(artifact)),sort_keys=True)+'\n')
   child={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))}
   child.update({k:v for k,v in env.items()if k=='BB_GS_DEBUG'or k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))or k in ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES','MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')})
@@ -124,16 +141,25 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   report['local']=local;nextenv={**environment,**updates}
   if local.get('status')in('stopped','failed-protection'):raise ProtectionStopped('fixed helper local preparation safety stop')
   if nextenv.get('BB_MTL_LOCAL_AOT_MODE')!='load':report.update(status='source-fallback',reason='local-library-build-unavailable');return updates,report
-  previous=-1
+  previous=None
   # At most8 fixed entries, same10-second/64-attempt HostKernels limits; each
   # attempt resumes through strict hits, never discards successful artifacts.
   for ordinal in range(1,9):
    prepared,complete=execute('helpers-prepare',nextenv,ordinal)
    if complete:report.update(status='completed',ready=8);return updates,report
-   ready=prepared.get('ready',0)
-   if ready<=previous:break
-   previous=ready
-  report.update(status='deferred',ready=max(previous,0),reason='bounded-fixed-preparation-incomplete');return updates,report
+   ready=prepared.get('ready',0);libraries=prepared['tiling_libraries']
+   progress=(ready,libraries['local_ready'],libraries['processed'])
+   if progress==previous:break
+   previous=progress
+   if not libraries['complete']:
+    # A ten-second collection budget may discover requests after the first
+    # build. Consume only the new requests with the same verified policy; the
+    # existing success files and warm-map admission remain unchanged.
+    more,local=local_prepare(mode=mode,gpu_root=gpu,cohort=cohort,engine='arm64',graphics=True)
+    report['local']=local;updates.update(more);nextenv.update(more)
+    if local.get('status')in('stopped','failed-protection'):raise ProtectionStopped('fixed helper incremental local preparation safety stop')
+    if nextenv.get('BB_MTL_LOCAL_AOT_MODE')!='load':report.update(status='source-fallback',reason='incremental-local-library-build-unavailable');return updates,report
+  report.update(status='deferred',ready=previous[0]if previous else 0,tiling_libraries_ready=previous[1]if previous else 0,reason='bounded-fixed-preparation-incomplete');return updates,report
  except TimeoutError:
   report.update(status='deferred',reason='fixed-helper-time-budget');return updates,report
  except BaseException as error:

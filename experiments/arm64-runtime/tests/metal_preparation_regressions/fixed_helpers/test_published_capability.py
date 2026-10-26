@@ -21,5 +21,5 @@ class Publishing(unittest.TestCase):
    with patch.dict(sys.modules,{'warm_archive_manifest':types.SimpleNamespace(resolve_gpu_identity=resolve)}),patch.dict(ns,{'fixed_helper_capability':query}):result=ns['freeze_inputs'](stage,manifest,dstlib,rewrite=rewrite,admission_root=root)
    self.assertEqual(result['fixed_helper_seed_schema'],expected);self.assertEqual(result['worker'],'bin/game-pso-preparer');self.assertEqual([e[0]for e in events],['rewrite','actual-query']);self.assertEqual(list((root/'state').iterdir()),[])
  def test_old_worker_cannot_be_authorized_by_claimed_manifest(self):self.run_case(a.worker_old,1,0)
- def test_new_actual_output_wins_without_manifest_claim(self):self.run_case(a.worker_new,0,1)
+ def test_new_actual_output_wins_without_manifest_claim(self):self.run_case(a.worker_new,0,2)
 if __name__=='__main__':unittest.main(verbosity=2)

@@ -157,10 +157,12 @@
     "reason": "author harness accidentally retained schema1; rejected before Device; corrected fixture and kept old evidence"
   },
   "uncompleted": [
-    "negative missing entry/corrupt library tests for all14",
-    "coherent CPU/app packaging and actual original-entry cold/warm integration",
-    "full-game final PSO catalogue and all remaining original goals"
+    "full-game final PSO catalogue and other original goals",
+    "matched old/new performance and peak-memory acceptance"
   ],
   "local_pixel_followup": "../tiling-local-pixel-validation-20261026/summary.json",
-  "original_pixel_cases_are_historical_source_fallback": true
+  "original_pixel_cases_are_historical_source_fallback": true,
+  "isolated_default_followup": "../tiling-default-startup-20261026/summary.json",
+  "negative_followup": "../tiling-library-negatives-20261026/summary.json",
+  "historical_checkpoint_enabled_field_is_not_current_isolated_status": true
 }

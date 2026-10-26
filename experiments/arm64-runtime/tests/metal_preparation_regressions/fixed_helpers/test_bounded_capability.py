@@ -26,8 +26,8 @@ class RealChildren(unittest.TestCase):
   leader=int(worker.with_suffix('.pid').read_text())
   with self.assertRaises(ChildProcessError):os.waitpid(leader,os.WNOHANG)
  def run_query(self,worker,timeout=.5):return ns['_run_bounded_capability']([str(worker),'--fixed-helper-seed-schema'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=timeout,env={'PATH':'/usr/bin:/bin','HOME':str(self.root),'TMPDIR':str(self.root)})
- def test_default_new1_actual_process(self):
-  w=self.worker('new','print("FIXED_HELPER_CAPABILITY 1",flush=True)');self.assertEqual(ns['fixed_helper_capability'](w,self.root),1);self.collect(w)
+ def test_default_new2_actual_process(self):
+  w=self.worker('new','print("FIXED_HELPER_CAPABILITY 2",flush=True)');self.assertEqual(ns['fixed_helper_capability'](w,self.root),2);self.collect(w)
  def test_default_old64_actual_process(self):
   w=self.worker('old','sys.exit(64)');self.assertEqual(ns['fixed_helper_capability'](w,self.root),0);self.collect(w)
  def test_exact_limit_is_captured(self):
@@ -76,7 +76,7 @@ class RealChildren(unittest.TestCase):
   for duration in [0,-1,11]:
    with self.assertRaises(ValueError):ns['_run_bounded_capability'](['/nonexistent'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=duration,env={})
  def test_cleanup_sigkill_even_if_grace_interrupted(self):
-  w=self.worker('grace-cancel','signal.signal(signal.SIGTERM,signal.SIG_IGN)\nprint("FIXED_HELPER_CAPABILITY 1",flush=True)')
+  w=self.worker('grace-cancel','signal.signal(signal.SIGTERM,signal.SIG_IGN)\nprint("FIXED_HELPER_CAPABILITY 2",flush=True)')
   original=ns['time'].sleep
   def interrupt_grace(seconds):
    if seconds==.05:raise KeyboardInterrupt('author cleanup grace interruption')

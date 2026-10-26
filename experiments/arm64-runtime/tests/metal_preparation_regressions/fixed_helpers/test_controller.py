@@ -5,15 +5,16 @@ import argparse,contextlib,importlib.util,json,os,sys,tempfile,types,unittest
 from unittest.mock import patch
 p=argparse.ArgumentParser(add_help=False);p.add_argument('--source-root',type=Path,default=Path(__file__).resolve().parents[1]);a,left=p.parse_known_args();sys.argv=[sys.argv[0],*left]
 s=importlib.util.spec_from_file_location('fixed_helpers',a.source_root/'tools/launcher_fixed_helpers.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
-def response(ready=8,stopped=False):
+from tiling_fixture import libraries
+def response(ready=8,stopped=False,local=14,processed=14):
  items=[dict(kind=k,outcome=1 if n<ready else 3,request_sha256='a'*64,descriptor_sha256='b'*64,inputs_verified=True,native_ready=n<ready,archive_sha256='c'*64 if n<ready else'',actual_routes=[2,2]if k==10 else[2])for n,k in enumerate([4,5,6,9,10,11,12,13])]
- return dict(exit=0,result=dict(status='stopped'if stopped else'completed'if ready==8 else'inputs-collected',fixed_helper_seed_schema=1,known=8,ready=ready,all_fixed_native_ready=ready==8,artifact_counts={'compile_attempts':0},items=items))
+ return dict(exit=0,result=dict(status='stopped'if stopped else'completed'if ready==8 else'inputs-collected',fixed_helper_seed_schema=2,known=8,ready=ready,all_fixed_native_ready=ready==8,artifact_counts={'compile_attempts':0},items=items,tiling_libraries=libraries(local,processed)))
 class Policy:
  def __init__(self,before):self.baseline=before['swap_mib']
  def observe(self,*_):return None
 class Controller(unittest.TestCase):
  def setUp(self):
-  self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name).resolve();(self.root/'state').mkdir();self.stage=self.root/'stage';self.stage.mkdir();self.gpu=self.root/'state/gpu';self.gpu.mkdir();self.calls=[];self.build_calls=[];self.env={'BB_GPU_PROCESS':str(self.stage/'renderer'),'BB_GPU_USER_DIR':str(self.gpu),'BB_MTL_LOCAL_AOT_MODE':'record','BB_MTL_LOCAL_AOT_ROOT':str(self.gpu/'local-metal'),'BB_MTL_LOCAL_AOT_COHORT':'e'*64};self.component=dict(fixed_helper_seed_schema=1,library_sha256='d'*64,worker=self.stage/'worker',library=self.stage/'library');self.modules={'warm_archive_manifest':types.SimpleNamespace(resolve_gpu_identity=lambda *_:{'library_sha256':'d'*64}),'launcher_game_pso':types.SimpleNamespace(title_id=lambda *_:'CUSA00000'),'qa_memory_policy':types.SimpleNamespace(MemoryPolicy=Policy),'qa_build_guard':types.SimpleNamespace(require_no_games=lambda:None)};self.ctx=patch.dict(sys.modules,self.modules);self.ctx.start()
+  self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name).resolve();(self.root/'state').mkdir();self.stage=self.root/'stage';self.stage.mkdir();self.gpu=self.root/'state/gpu';self.gpu.mkdir();self.calls=[];self.build_calls=[];self.env={'BB_GPU_PROCESS':str(self.stage/'renderer'),'BB_GPU_USER_DIR':str(self.gpu),'BB_MTL_LOCAL_AOT_MODE':'record','BB_MTL_LOCAL_AOT_ROOT':str(self.gpu/'local-metal'),'BB_MTL_LOCAL_AOT_COHORT':'e'*64};self.component=dict(fixed_helper_seed_schema=2,library_sha256='d'*64,worker=self.stage/'worker',library=self.stage/'library');self.modules={'warm_archive_manifest':types.SimpleNamespace(resolve_gpu_identity=lambda *_:{'library_sha256':'d'*64}),'launcher_game_pso':types.SimpleNamespace(title_id=lambda *_:'CUSA00000'),'qa_memory_policy':types.SimpleNamespace(MemoryPolicy=Policy),'qa_build_guard':types.SimpleNamespace(require_no_games=lambda:None)};self.ctx=patch.dict(sys.modules,self.modules);self.ctx.start()
  def tearDown(self):self.ctx.stop();self.temp.cleanup()
  def observe(self):return {'pressure':1,'locked':False,'swap_mib':0}
  def build(self,**kw):self.build_calls.append(kw);return {'BB_MTL_LOCAL_AOT_MODE':'load','BB_MTL_LOCAL_AOT_BUILD_ID':'f'*64},{'status':'prepared'}
@@ -42,6 +43,13 @@ class Controller(unittest.TestCase):
  def test_no_progress_is_deferred(self):
   def run(cmd,*_):self.calls.append((cmd,{}));return response(0 if cmd[1]=='helpers-probe'else 7)
   u,r=self.call(runner=run);self.assertEqual(r['status'],'deferred');self.assertEqual(len(self.calls),3)
+ def test_late_library_requests_resume_even_when_fixed_psos_are_already_ready(self):
+  responses=iter([response(8,local=3,processed=3),response(8,local=3),response(8)])
+  def run(cmd,*_):self.calls.append((cmd,{}));return next(responses)
+  _,r=self.call(runner=run);self.assertEqual(r['status'],'completed');self.assertEqual(len(self.calls),3);self.assertEqual(len(self.build_calls),2)
+ def test_library_no_progress_does_not_claim_complete_or_loop(self):
+  def run(cmd,*_):self.calls.append((cmd,{}));return response(8,local=13)
+  _,r=self.call(runner=run);self.assertEqual(r['status'],'deferred');self.assertEqual(r['ready'],8);self.assertEqual(r['tiling_libraries_ready'],13);self.assertEqual(len(self.calls),3);self.assertEqual(len(self.build_calls),2)
  def test_local_stop_not_source_fallback(self):
   def stop(**_):return {},{'status':'stopped'}
   with self.assertRaises(RuntimeError):self.call(local_prepare=stop)

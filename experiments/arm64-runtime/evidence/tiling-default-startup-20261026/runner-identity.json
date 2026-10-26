@@ -1,0 +1,7 @@
+{
+  "base": "../../tools/run_launcher_engine_abba.py",
+  "base_sha256": "ba5d19c31ec1c04d2cb9b39cddb887248834753b671b5b08d0e20c4d4b7a6872",
+  "patch_sha256": "f467d982782e4daf905e76a7dce1fd0bcd3a3b1634d900c18fec302fcf7b8dcd",
+  "tested_result_sha256": "f60a94fc6c787c8aebb9ae429ced49c6dd8bd547f58e3e06db983db4035f19f7",
+  "scope": "test runner only; explicit frozen QA stage and new prepared cache; add prep/compiler descendant footprint; original runtime guards unchanged"
+}

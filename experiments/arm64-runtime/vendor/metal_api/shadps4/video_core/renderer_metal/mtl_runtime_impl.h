@@ -51,6 +51,11 @@ public:
     // renderer owner slots, guest memory, framebuffers or extra state maps.
     HostPso::FixedSeedResult PrepareFixedSeeds(bool allow_compile,
         const std::function<bool()>& cancelled);
+    HostPso::TilingLibraryResult PrepareTilingLibraries(const std::function<bool()>& cancelled);
+    // Shared original source/options/typed-entry factory; no native PSO creation.
+    id<MTLLibrary> TextureTilingLibrary(const HostShaders::Shader& shader,bool half,
+        MTLFunctionConstantValues* values,id<MTLFunction> __strong* function,
+        LocalLibrary::Origin* origin,NSError** error);
     HostPso::WarmResult FinishPreparation();
     const HostPso::WarmResult& PreparationResult()const{return warm_result;}
     void ConfigureFaultParser(u32 page_bits,u32 max_faults);

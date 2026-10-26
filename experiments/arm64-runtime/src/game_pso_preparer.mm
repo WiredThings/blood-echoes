@@ -93,7 +93,15 @@ int FixedHelpers(const std::string&mode,const Json&p,const fs::path&scratch,Json
  if(compile){const char*build=getenv("BB_MTL_LOCAL_AOT_BUILD_ID");Need(std::string_view(aot)=="load"&&build&&Metal::HostPso::Hex(build),"fixed prepare requires verified local build");}
  Stop();Metal::Device device;Metal::Scheduler scheduler(device,"fixed helper preparation");Metal::PsoCache cache(device,artifact,Metal::ReadFloatRules()==Metal::FloatRules::RelaxedMath);cache.ReleaseWarmArchive();
  Metal::HostKernels kernels(device.GetImpl(),scheduler);kernels.BindPsoCache(&cache);
- const auto prepared=kernels.PrepareFixedSeeds(compile,[]{return bool(interrupted);});kernels.BindPsoCache(nullptr);Stop();
+ const auto libraries=kernels.PrepareTilingLibraries([]{return bool(interrupted);});Stop();
+ const auto prepared=libraries.critical?Metal::HostPso::FixedSeedResult{}:kernels.PrepareFixedSeeds(compile,[]{return bool(interrupted);});kernels.BindPsoCache(nullptr);Stop();
+ Json library_rows=Json::array();for(const auto&item:libraries.items)library_rows.push_back({
+  {"bits",item.bits},{"macro",item.macro},{"texture",item.texture},{"entry_ready",item.entry_ready},
+  {"actual_route",unsigned(item.origin.route)},{"source_sha256",item.origin.source_sha256},
+  {"request_key",item.origin.key},{"library_sha256",item.origin.library_sha256}});
+ result["tiling_libraries"]={{"schema",Metal::HostPso::TilingLibrarySchema},{"known",Metal::HostPso::TilingLibraryCount},
+  {"processed",libraries.items.size()},{"local_ready",libraries.local_ready},{"complete",libraries.complete},
+  {"final_psos_prepared",false},{"items",library_rows}};
  result["mode"]=mode;result["fixed_helper_seed_schema"]=Metal::HostPso::FixedSeedSchema;result["fixed_only"]=true;result["storage_opened"]=false;result["renderer_owners_constructed"]=false;result["guest_Runtime_constructed"]=false;
  result["known"]=prepared.progress.known;result["processed"]=prepared.progress.processed;result["ready"]=prepared.progress.ready;result["built"]=prepared.progress.built;result["deferred"]=prepared.progress.deferred;result["failed"]=prepared.progress.failed;result["cancelled"]=prepared.cancelled;
  bool all_local=prepared.items.size()==Metal::HostPso::FixedSeedCount;
@@ -103,8 +111,8 @@ int FixedHelpers(const std::string&mode,const Json&p,const fs::path&scratch,Json
   rows.push_back({{"kind",u32(item.kind)},{"request_sha256",item.request_sha256},{"descriptor_sha256",item.descriptor_sha256},{"inputs_verified",item.inputs_verified},{"native_ready",item.native_ready},{"outcome",unsigned(item.outcome.state)},{"archive_sha256",item.outcome.archive_sha256},{"actual_routes",routes}});}
  result["items"]=rows;result["all_actual_libraries_local"]=all_local;
  const auto&c=cache.GetCounters();result["artifact_counts"]={{"attempts",c.artifact_attempts.load()},{"hits",c.artifact_hits.load()},{"built",c.artifact_built.load()},{"compile_attempts",c.artifact_compile_attempts.load()},{"failed",c.artifact_failed.load()},{"deferred",c.artifact_deferred.load()},{"critical",c.artifact_critical.load()}};
- const bool critical=prepared.progress.state==Metal::HostPso::WarmState::Critical;const bool complete=prepared.progress.state==Metal::HostPso::WarmState::Complete&&prepared.progress.ready==Metal::HostPso::FixedSeedCount&&all_local;
- result["status"]=critical?"stopped":complete?"completed":compile?"deferred":"inputs-collected";result["all_fixed_native_ready"]=complete;
+ const bool critical=libraries.critical||prepared.progress.state==Metal::HostPso::WarmState::Critical;const bool native_complete=prepared.progress.state==Metal::HostPso::WarmState::Complete&&prepared.progress.ready==Metal::HostPso::FixedSeedCount&&all_local;const bool complete=libraries.complete&&native_complete;
+ result["status"]=critical?"stopped":complete?"completed":compile?"deferred":"inputs-collected";result["all_fixed_native_ready"]=native_complete;
  std::printf("FIXED_HELPER_RESULT %s\n",result.dump().c_str());return critical?BB_ARM_EXIT_HOST_PROTECTION:0;
 }
 

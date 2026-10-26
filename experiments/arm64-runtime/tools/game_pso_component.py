@@ -123,8 +123,11 @@ def fixed_helper_capability(worker,admission_root,*,runner=None):
    stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10,env=env)
   need(isinstance(result.stdout,bytes)and len(result.stdout)<=4096,'worker capability output bound')
   if result.returncode==64:return 0
-  need(result.returncode==0 and len(result.stdout)<=4096 and result.stdout==b'FIXED_HELPER_CAPABILITY 1\n','worker fixed helper ABI query failed')
-  return 1
+  # A relocated schema1 worker is a known older component, unavailable for the
+  # stronger schema2 library contract. Never silently interpret it as schema2.
+  if result.returncode==0 and result.stdout==b'FIXED_HELPER_CAPABILITY 1\n':return 0
+  need(result.returncode==0 and len(result.stdout)<=4096 and result.stdout==b'FIXED_HELPER_CAPABILITY 2\n','worker fixed helper ABI query failed')
+  return 2
 
 def freeze_inputs(stage,component,library,*,rewrite,admission_root):
  """Call AFTER dependency relocation/signing; bind final copied GPU and worker."""

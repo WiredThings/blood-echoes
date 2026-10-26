@@ -386,3 +386,6 @@ to validate the actual full-build library. Prepared local dependencies are requi
 
 
 2026-10-26 更新：默认首启准备八类固定 Metal 内核，游戏目录改为整批收集后统一建库；原生及准备验收已通过，暖场景完成一次采样，匹配性能与内存对照仍未完成。范围、失败记录和复现命令见 [固定内核与整批建库](docs/fixed-helper-startup.zh-CN.md)。
+
+
+2026-10-26追加：十四类平铺Metal源码库现已接到隔离ARM64版默认首启准备，和原八类固定最终PSO分别验收。56项逐类失败反例及冷/暖/稳定暖三轮通过；稳定暖424项首遍strict、约141秒进入场景。正式应用与Release未变，未声称旧新FPS或内存收益。见[十四类库默认准备与冷暖验证](docs/tiling-default-startup.zh-CN.md)。

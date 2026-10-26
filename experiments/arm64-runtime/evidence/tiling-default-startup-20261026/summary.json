@@ -1,0 +1,248 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "scope": "isolated-default-fourteen-library-startup-and-fixed-QA-scene",
+  "isolated_default_enabled": true,
+  "production_enabled": false,
+  "formal_data_modified": false,
+  "original_cache_modified": false,
+  "source_QA_catalogue_rechecked_unchanged": true,
+  "loader_checks_modified": false,
+  "quality_changed": false,
+  "screen_capture": false,
+  "audio_muted": true,
+  "original_scripts_preserved": true,
+  "upstream_gpu_sha256": "ffbbdbd1292340e6d491ef0d735c7109f0690363a589860bf037553e5c043ec3",
+  "packaged_gpu_sha256": "406f9a60422b5223a297383118988cb4c8477bd7a77523949522dd80341feaee",
+  "cpu_runtime_sha256": "b555d10f5ccce1cc2aa335cf4f7145d7d53adbbaae32c642cfc8ec0d5928ee0d",
+  "known_local_library_domain": 14,
+  "known_fixed_final_PSO_domain": 8,
+  "source_input_files": 1426,
+  "initial_eligible_game_pipelines": 404,
+  "cold_definition": "empty local-metal and final Metal pipeline outputs; existing QA shader input catalogue only; OS driver cache not cleared",
+  "rows": [
+    {
+      "name": "cold-v2",
+      "status": "passed",
+      "scene_ready_seconds": 395.3747910830425,
+      "sample_seconds": 90,
+      "helper": {
+        "seconds": 8.85589545906987,
+        "first_probe_ready": false,
+        "calls": 2,
+        "tiling_local_ready": [
+          0,
+          14
+        ],
+        "fixed_native_ready": 8
+      },
+      "game_preparation": {
+        "completed": 404,
+        "recorded": 404,
+        "collection_strict_hits": 0,
+        "verified_artifact_hits": 52,
+        "warm_fast_path": false,
+        "wall_seconds": 349.7558285839623
+      },
+      "startup_api": "Metal native API startup: phase=pre_gpu_ready settled=1 source=26/26/0/5.048 local_data=521/521/0/2.950 strict_render=365/365/0/29.183 strict_compute=112/112/0/4.144 render=6/6/0/1.911 compute=21/21/0/1.968 archive_render=0/0/0/0.000 archive_compute=0/0/0/0.000VideoOut: vblank 480 Hz, frame limit 0 FPS",
+      "original_boundary_result": "Metal local preparation: {\"fixed_helpers\": \"completed\", \"game_pso\": \"completed\", \"reason\": \"prepared\", \"requested\": \"auto\", \"status\": \"prepared\"}",
+      "memory": {
+        "preparation_descendant_peak_footprint_mib": 630.3302764892578,
+        "preparation_sample_count": 1489,
+        "all_descendant_peak_footprint_mib": 6231.873519897461,
+        "steady_aggregate_footprint_mib": 5974.506320953369,
+        "max_pressure": 2,
+        "swap_change_mib": 20.3125,
+        "before": {
+          "pressure": 1,
+          "locked": false,
+          "swap_mib": 9533.625
+        },
+        "after": {
+          "pressure": 1,
+          "locked": false,
+          "swap_mib": 9553.9375
+        }
+      },
+      "metrics": {
+        "fps": 47.22310166130672,
+        "p95_ms": 22.88,
+        "p99_ms": 27.17,
+        "gpu_ms": 20.105059985885674,
+        "draws_median": 1367
+      },
+      "matching_inputs": {
+        "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+        "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+        "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+        "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ]
+      },
+      "raw_report_sha256": "342ac4cc14bc5d5eaaeb39841eef035cf727641bc31389e4f48998dbb9d20a53"
+    },
+    {
+      "name": "warm",
+      "status": "passed",
+      "scene_ready_seconds": 231.68662054196466,
+      "sample_seconds": 90,
+      "helper": {
+        "seconds": 0.28140004095621407,
+        "first_probe_ready": true,
+        "calls": 1,
+        "tiling_local_ready": [
+          14
+        ],
+        "fixed_native_ready": 8
+      },
+      "game_preparation": {
+        "completed": 424,
+        "recorded": 0,
+        "collection_strict_hits": 404,
+        "verified_artifact_hits": 404,
+        "warm_fast_path": false,
+        "wall_seconds": 169.49067054199986
+      },
+      "startup_api": "Metal native API startup: phase=pre_gpu_ready settled=1 source=0/0/0/0.000 local_data=564/564/0/2.771 strict_render=386/386/0/25.785 strict_compute=128/128/0/3.940 render=6/6/0/1.387 compute=34/34/0/2.725 archive_render=0/0/0/0.000 archive_compute=14/14/0/0.362 units=calls/ok/failed/api_wall_ms; not_gpu_or_pure_compile_time",
+      "original_boundary_result": "Metal local preparation: {\"fixed_helpers\": \"completed\", \"game_pso\": \"completed\", \"reason\": \"prepared\", \"requested\": \"auto\", \"status\": \"prepared\"}",
+      "memory": {
+        "preparation_descendant_peak_footprint_mib": 633.7365493774414,
+        "preparation_sample_count": 833,
+        "all_descendant_peak_footprint_mib": 6215.904724121094,
+        "steady_aggregate_footprint_mib": 5970.123474121094,
+        "max_pressure": 2,
+        "swap_change_mib": 124.8125,
+        "before": {
+          "pressure": 1,
+          "locked": false,
+          "swap_mib": 9553.9375
+        },
+        "after": {
+          "pressure": 1,
+          "locked": false,
+          "swap_mib": 9678.75
+        }
+      },
+      "metrics": {
+        "fps": 47.992241254330544,
+        "p95_ms": 21.95,
+        "p99_ms": 23.51,
+        "gpu_ms": 19.702222222222222,
+        "draws_median": 1367.0
+      },
+      "matching_inputs": {
+        "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+        "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+        "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+        "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ]
+      },
+      "raw_report_sha256": "95cc99392c589a97e3de7901b8816afc4482545ae7befb0da93d4dfbe1a1575f"
+    },
+    {
+      "name": "warm-stable",
+      "status": "passed",
+      "scene_ready_seconds": 140.66605966701172,
+      "sample_seconds": 90,
+      "helper": {
+        "seconds": 0.17810349992942065,
+        "first_probe_ready": true,
+        "calls": 1,
+        "tiling_local_ready": [
+          14
+        ],
+        "fixed_native_ready": 8
+      },
+      "game_preparation": {
+        "completed": 424,
+        "recorded": 0,
+        "collection_strict_hits": 424,
+        "verified_artifact_hits": 424,
+        "warm_fast_path": true,
+        "wall_seconds": 90.48271829204168
+      },
+      "startup_api": "Metal native API startup: phase=pre_gpu_ready settled=1 source=0/0/0/0.000 local_data=564/564/0/2.653 strict_render=386/386/0/23.589 strict_compute=128/128/0/4.054 render=6/6/0/1.450 compute=20/20/0/1.345 archive_render=0/0/0/0.000VideoOut: vblank 480 Hz, frame limit 0 FPS",
+      "original_boundary_result": "Metal local preparation: {\"fixed_helpers\": \"completed\", \"game_pso\": \"completed\", \"reason\": \"prepared\", \"requested\": \"auto\", \"status\": \"prepared\"}",
+      "memory": {
+        "preparation_descendant_peak_footprint_mib": 633.4084243774414,
+        "preparation_sample_count": 485,
+        "all_descendant_peak_footprint_mib": 6190.217269897461,
+        "steady_aggregate_footprint_mib": 5944.326599121094,
+        "max_pressure": 2,
+        "swap_change_mib": -24.0,
+        "before": {
+          "pressure": 1,
+          "locked": false,
+          "swap_mib": 9670.75
+        },
+        "after": {
+          "pressure": 1,
+          "locked": false,
+          "swap_mib": 9646.75
+        }
+      },
+      "metrics": {
+        "fps": 48.18994436494251,
+        "p95_ms": 21.82,
+        "p99_ms": 23.24,
+        "gpu_ms": 19.70396265560166,
+        "draws_median": 1367.0
+      },
+      "matching_inputs": {
+        "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+        "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+        "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+        "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "camera": [
+          [
+            "-190.784",
+            "-27.226",
+            "71.116"
+          ]
+        ]
+      },
+      "raw_report_sha256": "907d91df1db7f371f3df783166cfaafcaf9090d2825c09597973554496d0cec7"
+    }
+  ],
+  "all_matching_inputs": true,
+  "archive": {
+    "filename": "Blood-Echoes-ARM64-Local-QA.zip",
+    "sha256": "b6f44b74023a8e276aa612716e6e11a1b3150232c5df4a6aa7adcac21987e304",
+    "bytes": 44752772,
+    "host_local_only": true,
+    "portable_installer": false,
+    "release_uploaded": false
+  },
+  "memory_policy": {
+    "schema": 2,
+    "severe_seconds": 5.0,
+    "swap_total_mib": 2048.0,
+    "burst_window_seconds": 5.0,
+    "burst_growth_mib": 1024.0,
+    "warning_stops": false,
+    "lock_stops": true
+  },
+  "qualification": [
+    "Metal-output cold with an existing QA input catalogue, not virgin-machine or cleared OS driver caches",
+    "Cold/warm observations are not a matched old/new FPS or peak RAM benefit test",
+    "Process footprint totals can count shared pages more than once",
+    "Fourteen source-library identities are not all final tiling PSO variants or all game pipelines",
+    "No death, online, menu or new combat/white-model acceptance"
+  ],
+  "retained_failures": [
+    "First new CPU build script retained its old overlay path and correctly refused; rebuilt against exact frozen E10 path",
+    "First cold test clone omitted profile.bin: helper14 completed but game catalogue was deferred; kept as partial test, excluded from accepted cold/warm comparison"
+  ],
+  "controller_boundary_fix": "bounded incremental library collection/build, tracks library progress independently of eight fixed PSOs; no false success if library progress stops"
+}

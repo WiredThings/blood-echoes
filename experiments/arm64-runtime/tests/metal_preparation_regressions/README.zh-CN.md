@@ -19,3 +19,17 @@
 `metal_phase_counters.cpp`是纯标准C++统计/阶段/并发/异常控制，包含项目头，可用C++23、pthread与`-UNDEBUG`编译，输出仅放新Shared或系统临时目录；它不执行Metal。`metal_phase_arc.mm`为作者ObjC接口声明的LLVM IR对照源，不链接/运行Metal；`metal_phase_pointer_rejected.mm`应编译失败，防对象指针误入BOOL返回包装。不要将这些作者输入冒充真实pipeline质量或整场景开销证明。
 
 实际新库230TU、32独立GPU进程与首次游戏/17列CSV证据见docs/native-format-and-phase-counters.zh-CN.md；纯C++作者原总reporter exit1的边界也保留在文档中。
+
+
+## 十四库默认入口与失败控制
+
+fixed_helpers的现行能力/response为schema2，tiling_fixture.py将14库与8最终PSO分别建模；controller覆盖晚请求继续建库、库无进展deferred、取消/保护等。源根需要显式传入：
+
+```sh
+python3 tests/metal_preparation_regressions/fixed_helpers/test_controller.py --source-root .
+python3 tests/metal_preparation_regressions/fixed_helpers/test_response_bounds.py --source-root .
+```
+
+在experiments/arm64-runtime执行。tools/run_tiling_library_negatives.py消费已准备native manifest，实际逐类验证缺库、无main0的有效库、坏摘要与损坏内容；始终建立全新fixture克隆，原目录不动。tools/run_tiling_local_pixels.py对Source/Local实际输出做摘要对照，并保持错误根目录拒绝。它们不是无依赖的clean build或全游戏验收。冷暖控制器的精确基线/补丁身份保存在evidence/tiling-default-startup-20261026/runner-identity.json；只对新临时副本应用对应patch，保持内存/锁屏保护。结果详docs/tiling-default-startup.zh-CN.md。
+
+本机隔离包合同测试支持显式`--project /Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype`，仍只允许该project/apps中的冻结QA包，不读取正式存档。

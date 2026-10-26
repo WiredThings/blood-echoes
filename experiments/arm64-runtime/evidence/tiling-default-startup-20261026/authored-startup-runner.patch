@@ -1,0 +1,105 @@
+--- a/run_launcher_engine_abba.py
++++ b/run_launcher_engine_abba.py
+@@ -1,6 +1,8 @@
+ #!/usr/bin/env python3
+ """Matched CPU-engine QA through the unchanged launcher's explicit benchmark entry."""
+ from pathlib import Path
++import sys
++sys.path.insert(0,"/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/tools")
+ import argparse,csv,hashlib,json,os,secrets,shutil,signal,statistics,subprocess,sys,time
+ from native_observer import NativeObserver
+ from native_vm_observer import NativeVMObserver
+@@ -12,12 +14,24 @@
+ from qa_memory_policy import MemoryPolicy
+ from launcher_environment import load as metal_environment
+ from launcher_language_policy import load as language_environment
+-from run_game import usage
++from run_game import Usage,libproc,TIMEBASE
++import ctypes
++def usage(lines):
++ # Include prep workers and compiler descendants in the same process-footprint
++ # accounting; shared pages may still be double counted across processes.
++ rows=[]
++ for line in lines:
++  fields=line.strip().split(None,3)
++  if len(fields)!=4:continue
++  value=Usage()
++  if libproc.proc_pid_rusage(int(fields[0]),0,ctypes.byref(value))==0:
++   rows.append(dict(pid=int(fields[0]),role=Path(fields[3]).name,footprint_bytes=value.footprint,resident_bytes=value.resident,cpu_user_ns=value.user*TIMEBASE.numer//TIMEBASE.denom,cpu_system_ns=value.system*TIMEBASE.numer//TIMEBASE.denom,cpu_user_ticks=value.user,cpu_system_ticks=value.system,pageins=value.pageins))
++ return rows
+ from run_hle_lookup_abba import complete_rows
+-P=Path(__file__).resolve().parents[1]
++P=Path('/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype')
+ def digest(f):return hashlib.sha256(f.read_bytes()).hexdigest()
+ def main(gpu_load_identity=None):
+- ap=argparse.ArgumentParser();ap.add_argument('--host-cpu-audit',action='store_true');ap.add_argument('--memory-timeline',action='store_true',help='record system-wide VM counters without character actions; diagnostic only');ap.add_argument('--schedule-audit',action='store_true');ap.add_argument('--cpu-qos-order');ap.add_argument('--cpu-stack-sample',action='store_true');ap.add_argument('--producer-waits',action='store_true');ap.add_argument('--unaligned-audit',action='store_true');ap.add_argument('--shader-phases',action='store_true');ap.add_argument('--startup-shader-phases',action='store_true');ap.add_argument('--component-stage',type=Path);ap.add_argument('--post-action-hold',type=int,default=0);ap.add_argument('--diagnostic-app-cache',type=Path);ap.add_argument('--gpu-variant',choices=['baseline','first-upload','submit-diagnostic','partial-audit','present-image','layout-audit','tiler-bounds','raw-write-audit','owned-shader'],default='baseline');ap.add_argument('--tiler-bounds',choices=['0','1']);ap.add_argument('--exploration-diagnostic',action='store_true');ap.add_argument('--texture-action',choices=['none','blood','attack'],default='none');ap.add_argument('--inspection-seconds',type=int,default=0);ap.add_argument('--library-reuse',choices=['0','1']);ap.add_argument('--compile-audit',action='store_true');ap.add_argument('--producer-trace',action='store_true');ap.add_argument('--require-full-trace',action='store_true');ap.add_argument('--action-trace',action='store_true');ap.add_argument('--texture-capture',action='store_true');ap.add_argument('--game-images',action='store_true');ap.add_argument('--external-image-control',action='store_true');ap.add_argument('--lifecycle',action='store_true');ap.add_argument('--save-seed',type=Path);ap.add_argument('--order',default='arm64,rosetta,rosetta,arm64');ap.add_argument('--memory-snapshot',action='store_true');ap.add_argument('--fex-mapping-audit',action='store_true');ap.add_argument('--seconds',type=int,default=120);a=ap.parse_args();order=a.order.split(',');assert 90<=a.seconds<=(600 if a.lifecycle else 300 if a.external_image_control else 180) and order and len(order)<=4 and set(order)<={'arm64','rosetta'}
++ ap=argparse.ArgumentParser();ap.add_argument('--resource-prewrite',choices=['0','1'],required=True);ap.add_argument('--prepared-gpu-cache',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=900);ap.add_argument('--host-cpu-audit',action='store_true');ap.add_argument('--schedule-audit',action='store_true');ap.add_argument('--cpu-qos-order');ap.add_argument('--cpu-stack-sample',action='store_true');ap.add_argument('--producer-waits',action='store_true');ap.add_argument('--unaligned-audit',action='store_true');ap.add_argument('--shader-phases',action='store_true');ap.add_argument('--startup-shader-phases',action='store_true');ap.add_argument('--component-stage',type=Path);ap.add_argument('--post-action-hold',type=int,default=0);ap.add_argument('--diagnostic-app-cache',type=Path);ap.add_argument('--gpu-variant',choices=['baseline','first-upload','submit-diagnostic','partial-audit','present-image','layout-audit','tiler-bounds','raw-write-audit','owned-shader'],default='baseline');ap.add_argument('--tiler-bounds',choices=['0','1']);ap.add_argument('--exploration-diagnostic',action='store_true');ap.add_argument('--texture-action',choices=['none','blood','attack'],default='none');ap.add_argument('--inspection-seconds',type=int,default=0);ap.add_argument('--library-reuse',choices=['0','1']);ap.add_argument('--compile-audit',action='store_true');ap.add_argument('--producer-trace',action='store_true');ap.add_argument('--require-full-trace',action='store_true');ap.add_argument('--action-trace',action='store_true');ap.add_argument('--texture-capture',action='store_true');ap.add_argument('--game-images',action='store_true');ap.add_argument('--external-image-control',action='store_true');ap.add_argument('--lifecycle',action='store_true');ap.add_argument('--save-seed',type=Path);ap.add_argument('--order',default='arm64,rosetta,rosetta,arm64');ap.add_argument('--memory-snapshot',action='store_true');ap.add_argument('--fex-mapping-audit',action='store_true');ap.add_argument('--seconds',type=int,default=120);a=ap.parse_args();order=a.order.split(',');assert 90<=a.seconds<=(600 if a.lifecycle else 300 if a.external_image_control else 180) and order and len(order)<=4 and set(order)<={'arm64','rosetta'}
+  assert (a.tiler_bounds is None) == (a.gpu_variant!='tiler-bounds'),'explicit isolated tiler switch required'
+  qos_order=a.cpu_qos_order.split(',')if a.cpu_qos_order else [None]*len(order)
+  assert len(qos_order)==len(order)and all(q in(None,'inherit','user-initiated')for q in qos_order),'one supported QoS mode per run required'
+@@ -41,7 +55,10 @@
+  assert 0<=a.inspection_seconds<=60 and (not a.inspection_seconds or a.texture_capture),'window inspection is diagnostic-only'
+  assert not a.compile_audit or a.action_trace,'detailed compile logging is diagnostic-only'
+  assert a.diagnostic_app_cache is None or (a.compile_audit and a.action_trace and order==['arm64']),'separate application cache is diagnostic-only'
+- cache=P/'state/gpu-stutter-fresh-1792770276384734000'
++ assert a.component_stage is not None, 'new frozen resource component required'
++ component_meta=json.loads((a.component_stage.parent/'ARM64-QA-MANIFEST.json').read_text())
++ cache=a.prepared_gpu_cache.absolute();assert cache==cache.resolve(strict=True)and cache.parent==P/'state'and cache.name.startswith('gui-gpu-local-aot-'),'new packaged QA cache only'
++ assert 120<=a.startup_seconds<=900
+  if a.diagnostic_app_cache is not None:
+   requested=a.diagnostic_app_cache.absolute();cache=requested.resolve()
+   assert requested==cache and cache.parent==P/'state' and cache.name.startswith('gpu-diagnostic-'),'direct private diagnostic cache required'
+@@ -59,16 +76,17 @@
+  assert save_seed.is_relative_to(P/'state')and save_seed.is_dir()and not(a.save_seed and a.save_seed.is_symlink())and(save_seed/'savedata').is_dir(),'private existing QA save required'
+  assert not any(f.is_symlink()for f in(save_seed/'savedata').rglob('*')),'QA savedata must not link to another namespace'
+  source_saves={str(f.relative_to(save_seed/'savedata')):digest(f)for f in(save_seed/'savedata').rglob('*')if f.is_file()}
+- observer=NativeObserver();vm_observer=NativeVMObserver()if (a.producer_trace or a.memory_timeline) else None;s=observer.system();assert not s['locked']and s['pressure']!=4
++ observer=NativeObserver();vm_observer=NativeVMObserver()if a.producer_trace else None;s=observer.system();assert not s['locked']and s['pressure']!=4
+  table=subprocess.check_output(['/bin/ps','-axo','pid,comm'],text=True);assert not any(l.rstrip().endswith(('/bb-game-arm64','/bb-gpu','/bb-probe-metal','/bb-probe'))for l in table.splitlines())
+  cua=subprocess.run(['/Users/k.d./.local/bin/cua-driver','status'],capture_output=True,text=True);assert a.texture_capture or a.action_trace or 'daemon is running'not in cua.stdout.lower(),'visual service must be stopped'
+  if a.shader_phases:assert 'daemon is not running'in(cua.stdout+cua.stderr).lower(),'shader phase tests require stopped Cua, including diagnostic cohorts'
+- e=P/'evidence'/('launcher-engine-abba-'+str(time.time_ns()));e.mkdir();report=dict(tiler_bounds=a.tiler_bounds,shader_phases=a.shader_phases,startup_shader_phases=a.startup_shader_phases,external_image_control=a.external_image_control,exploration_profile="straight-forward-images"if a.game_images else"original-turn-move",game_frame_capture=a.game_images,desktop_capture=False,unaligned_audit=a.unaligned_audit,producer_waits=a.producer_waits,cpu_stack_sample=a.cpu_stack_sample,qa_cpu_qos_order=qos_order,process_schedule_audit=a.schedule_audit,host_cpu_audit=a.host_cpu_audit,post_action_hold=a.post_action_hold,system_VM_counters=(a.producer_trace or a.memory_timeline),memory_timeline=a.memory_timeline,passed=False,runs=[],seconds=a.seconds,order=order,original_benchmark_entry=True,screen_capture=a.game_images,profiler=a.cpu_stack_sample,silent=True,formal_data_modified=False,memory_snapshot=a.memory_snapshot,performance_evidence=not(a.memory_snapshot or a.lifecycle or a.texture_capture or a.action_trace or a.memory_timeline),action_trace=a.action_trace,texture_capture=a.texture_capture,lifecycle=a.lifecycle,CPU_time_schema=2,memory_policy=MemoryPolicy.MANIFEST,fex_mapping_audit=a.fex_mapping_audit,library_reuse=a.library_reuse,compile_audit=a.compile_audit,exploration_diagnostic=a.exploration_diagnostic,gpu_variant=('frozen-component'if a.component_stage is not None else a.gpu_variant),application_cache=dict(path=str(cache),initial=cache_before,separate=a.diagnostic_app_cache is not None,OS_driver_cache_policy="not cleared or directly edited by runner; driver may update naturally"))
++ e=P/'evidence'/('launcher-engine-abba-'+str(time.time_ns()));e.mkdir();report=dict(tiler_bounds=a.tiler_bounds,shader_phases=a.shader_phases,startup_shader_phases=a.startup_shader_phases,external_image_control=a.external_image_control,exploration_profile="straight-forward-images"if a.game_images else"original-turn-move",game_frame_capture=a.game_images,desktop_capture=False,unaligned_audit=a.unaligned_audit,producer_waits=a.producer_waits,cpu_stack_sample=a.cpu_stack_sample,qa_cpu_qos_order=qos_order,process_schedule_audit=a.schedule_audit,host_cpu_audit=a.host_cpu_audit,post_action_hold=a.post_action_hold,system_VM_counters=a.producer_trace,passed=False,runs=[],seconds=a.seconds,order=order,original_benchmark_entry=True,screen_capture=a.game_images,profiler=a.cpu_stack_sample,silent=True,formal_data_modified=False,memory_snapshot=a.memory_snapshot,performance_evidence=not(a.memory_snapshot or a.lifecycle or a.texture_capture or a.action_trace),action_trace=a.action_trace,texture_capture=a.texture_capture,lifecycle=a.lifecycle,CPU_time_schema=2,memory_policy=MemoryPolicy.MANIFEST,fex_mapping_audit=a.fex_mapping_audit,library_reuse=a.library_reuse,compile_audit=a.compile_audit,exploration_diagnostic=a.exploration_diagnostic,gpu_variant=('frozen-component'if a.component_stage is not None else a.gpu_variant),application_cache=dict(path=str(cache),initial=cache_before,separate=a.diagnostic_app_cache is not None,OS_driver_cache_policy="not cleared or directly edited by runner; driver may update naturally"))
+  stage=P/'launcher-component-stage';source=json.loads((stage/'SOURCE-PARITY.json').read_text())['original_sources']
+  if a.component_stage is not None:
+   stage=a.component_stage.absolute();assert stage==stage.resolve()and stage.is_relative_to(P/'apps')and stage.parts[-2:]==('Resources','bbport'),'frozen QA component root required'
+   frozen=json.loads((stage.parent/'ARM64-QA-MANIFEST.json').read_text())
+   assert frozen['host_local_only']and frozen['formal_data_modified']is False and frozen['original_scripts']==source
++  source=frozen['effective_scripts'] # only the admitted eight-line final-exec hook differs
+   assert all(digest(stage/f)==h for f,h in frozen['frozen_runtime'].items()),'frozen QA binary identity mismatch'
+   report['frozen_component']=dict(stage=str(stage),runtime=frozen['frozen_runtime'],upstream_inputs=frozen['upstream_inputs'])
+   gpu_load_identity=verify_gpu_candidate(dict(target=str(stage/'bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'),library=str(stage/'bin/gpu-metal-arm64/libbbgpu.dylib'),library_sha256=frozen['frozen_runtime']['bin/gpu-metal-arm64/libbbgpu.dylib']),stage)
+@@ -123,6 +141,7 @@
+   if a.lifecycle:
+    travel=user/'world-warper';travel.mkdir();(user/'.private-world-warper').write_text(nonce);env['BB_DEV_WORLD_WARPER_DIR']=str(travel)
+   env.update(metal_environment());env.update(language_environment(P/'fixtures/current-launcher-language.json'))
++  env.update(BB_ARM_PAYLOAD_GATE='1',BB_ARM_RAW_PREWRITE=a.resource_prewrite,BB_LAYER_READ_TRAPS='1',BB_GPU_LIFETIME='1')
+   if a.exploration_diagnostic:env['BB_PATCHES']='Player No Dead (Read note)'
+   if a.library_reuse is not None:env['BB_MTL_LIBRARY_REUSE']=a.library_reuse
+   if a.compile_audit:env['BB_MTL_COMPILE_AUDIT']='1'
+@@ -261,7 +280,8 @@
+      if a.memory_snapshot and ready is not None and elapsed-ready>=45 and memory_child is None:
+       cpus=[i for i,j,path in rows if path in(str(P/'build/fex/Bin/bb-game-arm64'),str(P/'rosetta-reference/bin/bb-probe-metal'))];gpu_target=Path(json.loads((P/'evidence/first-upload-gpu-app.json').read_text())['target'])if a.gpu_variant=='first-upload'else P/'backend/bbport/bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu';gpus=[i for i,j,path in rows if path==str(gpu_target)];assert len(cpus)==len(gpus)==1
+       memory_log=(case/'memory-capture-console.log').open('w');memory_child=subprocess.Popen([sys.executable,str(P/'tools/capture_launcher_memory.py'),str(case),str(cpus[0]),str(gpus[0])]+(['--fex-mapping-audit']if a.fex_mapping_audit else[]),stdout=memory_log,stderr=memory_log)
+-     if elapsed>=a.seconds:stop='time budget'
++     if ready is None and elapsed>=a.startup_seconds:stop='startup time budget'
++     if ready is not None and elapsed-ready>=a.seconds:stop='time budget'
+      if stop:stop_owned();break
+      time.sleep(.25)
+    finally:
+@@ -278,13 +298,13 @@
+   result=dict(engine=engine,qa_cpu_qos=qos_order[index],exit=proc.returncode,stop=stop,ready=ready,seconds=time.monotonic()-started,before=before,after=observer.system(),samples=samples)
+   (case/'run.json').write_text(json.dumps(result,indent=2)+'\n')
+   try:
+-   assert stop in(('private action trace completed',)if a.action_trace else ('private texture capture completed',)if a.texture_capture else ('time budget','private test completed')if a.lifecycle else('time budget',))and proc.returncode==143 and ready is not None and (a.texture_capture or a.action_trace or a.lifecycle or a.seconds-ready>=45),'incomplete guarded scene case'
++   assert stop in(('private action trace completed',)if a.action_trace else ('private texture capture completed',)if a.texture_capture else ('time budget','private test completed')if a.lifecycle else('time budget',))and proc.returncode==143 and ready is not None and (a.texture_capture or a.action_trace or a.lifecycle or elapsed-ready>=45),'incomplete guarded scene case'
+    if a.memory_snapshot:assert memory_child is not None and memory_child.returncode==0 and(case/'memory.parsed.json').is_file(),'kernel memory capture incomplete'
+    text=(out/'last-run.log').read_text(errors='replace');assert 'ARM FATAL'not in text and 'ARM RESOURCE invalid metadata'not in text
+    assert text.count('benchmark stream muted; original audio backend and cadence retained')>=2,'normal silent audio cadence not verified'
+    if engine=='arm64':assert 'ARM LAUNCHER HLE published lookup=1;'in text,'component default did not activate'
+    if engine=='arm64':
+-    for marker in('ARM VENEER layout=darwin-packed-guest-ro-v1','ARM RESOURCE 10/10 startup FEX detours','ARM RESOURCE leaf-dispatch=1','ARM RESOURCE dispatch-filter=1','ARM EXTRA 5/5 actual heap hooks installed'):assert marker in text,'component default missing: '+marker
++    for marker in('ARM VENEER layout=darwin-packed-guest-ro-v1','ARM RESOURCE 10/10 startup FEX detours','ARM RESOURCE leaf-dispatch=0','ARM RESOURCE dispatch-filter=0','ARM PAYLOAD gate=1 requested-fast=1 requested-leaf=1 effective-fast=0 effective-leaf=0','ARM EXTRA 5/5 actual heap hooks installed'):assert marker in text,'component default missing: '+marker
+    if a.cpu_stack_sample:assert stack_sampler.report and stack_sampler.report.get('passed'),'CPU stack sample incomplete'
+    if a.action_trace:
+     assert (external_ready if a.external_image_control else action_cycle==2)and gate_closed,'action trace incomplete'

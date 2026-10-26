@@ -248,8 +248,6 @@ id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDi
     if(const auto i=texture_tiling.find(key);!warming&&i!=texture_tiling.end())return i->second;
     if(!warming&&texture_tiling.size()>=32)return nil;
     const auto& shader=TilingShader(dispatch.key.num_bits,true);
-    const auto source=TextureTilingSource(shader.msl,dispatch.key.num_bits==64);
-    if(source.empty()) {if(!warming)texture_tiling.emplace(key,nil);return nil;}
     NSError* error=nil;
     MTLFunctionConstantValues* values=[MTLFunctionConstantValues new];
     for(const auto& spec:shader.spec_constants) {
@@ -267,11 +265,9 @@ id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDi
     const u32 scale=proxy?2u:1u;[values setConstantValue:&scale type:MTLDataTypeUInt atIndex:12];
     id<MTLFunction> function=nil;
     std::array<LocalLibrary::Origin,1> origins;
-    auto library=LocalLibrary::Build(dev.device, @(source.c_str()), CompileOptions(), &error,
-        [&](id<MTLLibrary> local) {
-            function=[local newFunctionWithName:@"main0" constantValues:values error:nil];
-            return bool(function);
-        },true,&origins[0]);
+    auto library=TextureTilingLibrary(shader,dispatch.key.num_bits==64,values,&function,&origins[0],&error);
+    // Includes unsupported rewrite shape: retain the original nil-slot short circuit.
+    if(!library){if(!warming)texture_tiling.emplace(key,nil);return nil;}
     if(!function&&library)function=[library newFunctionWithName:@"main0" constantValues:values error:&error];
     HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::TextureTiling;
     invocation.bits=dispatch.key.num_bits;invocation.macro=1;invocation.proxy=proxy;invocation.bounded=bounded;invocation.count=dispatch.num_constants;
@@ -281,6 +277,51 @@ id<MTLComputePipelineState> HostKernels::TextureTiling(const VideoCore::TilingDi
     if(!pipeline)LOG_WARNING(Render,"Texture tiling unavailable; original staging retained: {}",ErrorText(error));
     if(!warming)texture_tiling.emplace(key,pipeline);
     return pipeline;
+}
+
+id<MTLLibrary> HostKernels::TextureTilingLibrary(const H::Shader&shader,bool half,
+ MTLFunctionConstantValues*values,id<MTLFunction> __strong*function,
+ LocalLibrary::Origin*origin,NSError**error){
+ const auto source=TextureTilingSource(shader.msl,half);
+ if(function)*function=nil;if(origin)*origin={};if(source.empty())return nil;
+ return LocalLibrary::Build(dev.device,@(source.c_str()),CompileOptions(),error,
+  [&](id<MTLLibrary>local){auto entry=[local newFunctionWithName:@"main0" constantValues:values error:nil];
+   if(function)*function=entry;return bool(entry);},true,origin);
+}
+HostPso::TilingLibraryResult HostKernels::PrepareTilingLibraries(const std::function<bool()>&cancelled){
+ HostPso::TilingLibraryResult result;result.items.reserve(HostPso::TilingLibraryCount);
+ // The fresh headless HostKernels keeps no original runtime library/PSO slots.
+ const bool old_warming=warming;warming=true;SCOPE_EXIT{warming=old_warming;};
+ const auto start=std::chrono::steady_clock::now();
+ const auto collect=[&](u32 bits,bool macro,bool texture){
+  if(cancelled&&cancelled()){result.cancelled=true;return false;}
+  if(HostSeverePressure()){result.critical=true;return false;}
+  if(std::chrono::steady_clock::now()-start>std::chrono::seconds(10))return false;
+  HostPso::TilingLibraryItem item;item.bits=bits;item.macro=macro;item.texture=texture;
+  @autoreleasepool {try{
+   const auto&shader=TilingShader(bits,macro);id<MTLFunction>function=nil;
+   MTLFunctionConstantValues*values=[MTLFunctionConstantValues new];
+   if(texture){
+    // Original non-proxy scale; source admission only, no invented final PSO.
+    const u32 scale=1;const bool bounded=false;
+    [values setConstantValue:&scale type:MTLDataTypeUInt atIndex:12];
+    [values setConstantValue:&bounded type:MTLDataTypeBool atIndex:13];
+    NSError*error=nil;auto library=TextureTilingLibrary(shader,bits==64,values,&function,&item.origin,&error);
+    item.entry_ready=bool(library&&function);
+   }else{
+    // Omitted constants use the defaults encoded in the original generated MSL.
+    auto library=Library(shader,values,false,&function,&item.origin);
+    item.entry_ready=bool(library&&function);
+   }
+  }catch(...){item.entry_ready=false;item.origin={};}}
+  if(item.entry_ready&&item.origin.valid()&&item.origin.route==LocalLibrary::Route::LocalMetallib)++result.local_ready;
+  result.items.push_back(std::move(item));return true;
+ };
+ for(const auto bits:{8u,16u,32u,64u,96u,128u})for(const bool macro:{false,true})
+  if(!collect(bits,macro,false))return result;
+ for(const auto bits:{32u,64u})if(!collect(bits,true,true))return result;
+ result.complete=result.items.size()==HostPso::TilingLibraryCount&&result.local_ready==HostPso::TilingLibraryCount;
+ return result;
 }
 
 void HostKernels::ConfigureFaultParser(u32 page_bits,u32 max_faults){
