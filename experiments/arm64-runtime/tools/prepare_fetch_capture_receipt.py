@@ -10,15 +10,15 @@ import gnm_shader_metadata as gnm
 from game_shader_catalog import game_identity
 
 MARKER=b'Blood Echoes isolated fetch input storage v1\n'
-def sha(path):
+def sha(path,*,code_owners=None):
  path=regular(path,512*1024*1024);fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
  with os.fdopen(fd,'rb')as stream:
-  before=os.fstat(stream.fileno());need(before.st_uid==os.getuid()and before.st_nlink==1,'owned single-link producer input');value=hashlib.file_digest(stream,'sha256').digest();after=os.fstat(stream.fileno());stable=lambda s:(s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns)
+  before=os.fstat(stream.fileno());need(before.st_uid in((os.getuid(),)if code_owners is None else code_owners)and before.st_nlink==1,'owned single-link producer input');value=hashlib.file_digest(stream,'sha256').digest();after=os.fstat(stream.fileno());stable=lambda s:(s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns)
   need(stable(before)==stable(after),'producer source changed during hashing');return value
-def receipt(*,game_root,catalog,index,backend,runtime_source_root=None):
+def receipt(*,game_root,catalog,index,backend,runtime_source_root=None,code_owners=None):
  game=Path(game_root);need(game.is_absolute()and game.resolve(strict=True)==game,'canonical fixed game root')
  catalog_path=regular(catalog);index=regular(index);backend=regular(backend,512*1024*1024)
- initial={p:sha(p)for p in(catalog_path,index,backend,regular(game/'sce_sys/param.sfo',65536))}
+ initial={p:sha(p,code_owners=code_owners if p==backend else None)for p in(catalog_path,index,backend,regular(game/'sce_sys/param.sfo',65536))}
  source_catalog=read_json(catalog_path);sfo=regular(game/'sce_sys/param.sfo',65536).read_bytes();identity=game_identity(sfo)
  need(identity==source_catalog['game_identity']and identity['APP_VER']=='01.09','fixed 1.09 game/catalog SFO identity')
  title=identity['TITLE_ID'].encode('ascii');version=identity['APP_VER'].encode('ascii');need(len(title)==9 and title.startswith(b'CUSA')and title[4:].isdigit()and len(version)==5,'title/version fixed receipt shape')
@@ -44,9 +44,9 @@ def receipt(*,game_root,catalog,index,backend,runtime_source_root=None):
   programs.append((stage,int(ident['program_hash'],16),bytes.fromhex(ident['code_sha256']),length))
  programs.sort();need(0<len(programs)<=32768 and len({p[:3]for p in programs})==len(programs),'bounded unambiguous static program proofs')
  body=b''.join(struct.pack('<IQ32sI',*p)for p in programs)
- need(all(sha(p)==value for p,value in initial.items()),'producer source changed during receipt preparation')
+ need(all(sha(p,code_owners=code_owners if p==backend else None)==value for p,value in initial.items()),'producer source changed during receipt preparation')
  header=struct.pack('<8sII',b'BEFPROD1',1,len(programs))+hashlib.sha256(sfo).digest()+initial[backend]+initial[index]+initial[catalog_path]+title+version+b'\0\0'
- need(len(header)==160,'receipt header extent');return header+body,dict(title_id=identity['TITLE_ID'],app_ver=identity['APP_VER'],programs=len(programs),static_index_sha256=initial[index].hex(),catalog_sha256=initial[catalog_path].hex(),backend_sha256=initial[backend].hex(),SFO_sha256=hashlib.sha256(sfo).hexdigest(),runtime_source_root=str(source),runtime_info_sha256=sha(runtime_header).hex())
+ need(len(header)==160,'receipt header extent');return header+body,dict(title_id=identity['TITLE_ID'],app_ver=identity['APP_VER'],programs=len(programs),static_index_sha256=initial[index].hex(),catalog_sha256=initial[catalog_path].hex(),backend_sha256=initial[backend].hex(),SFO_sha256=hashlib.sha256(sfo).hexdigest(),runtime_source_root=str(source),runtime_info_sha256=sha(runtime_header,code_owners=code_owners).hex())
 def publish(root,data):
  root=Path(root);need(root.is_absolute()and root.resolve(strict=True)==root,'canonical existing QA root');s=root.lstat();need(stat.S_ISDIR(s.st_mode)and s.st_uid==os.getuid()and stat.S_IMODE(s.st_mode)==0o700,'owned 0700 QA root')
  marker=root/'fetch-register-development.marker'
@@ -65,14 +65,14 @@ def publish(root,data):
  finally:
   if os.path.exists(name):os.unlink(name)
  return target
-def configure_capture(*,root,game_root,catalog,index,backend,runtime_source_root=None):
+def configure_capture(*,root,game_root,catalog,index,backend,runtime_source_root=None,code_owners=None):
  """Original launcher/prepare stage entrypoint; no separate launch or user option.
 
  The caller supplies its already-selected game, final DSO and owned cohort root.
  Only a verified receipt is published; the returned map is passed to that same
  existing runtime process. Native configure_v1 is an equivalent direct hook.
  """
- root=Path(root);data,proof=receipt(game_root=game_root,catalog=catalog,index=index,backend=backend,runtime_source_root=runtime_source_root)
+ root=Path(root);data,proof=receipt(game_root=game_root,catalog=catalog,index=index,backend=backend,runtime_source_root=runtime_source_root,code_owners=code_owners)
  path=publish(root,data)
  return dict(schema=1,status='configured',capture_environment={'BB_FETCH_CAPTURE_ROOT':str(root),'BB_FETCH_CAPTURE_GAME_ROOT':str(Path(game_root))},receipt=dict(path=str(path),sha256=hashlib.sha256(data).hexdigest(),bytes=len(data)),proof=proof,game_started=False,formal_data_modified=False)
 def main():

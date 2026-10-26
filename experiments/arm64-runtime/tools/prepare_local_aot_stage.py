@@ -15,7 +15,7 @@ TOOLS=('launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py'
        'game_module_inputs.py','fetch_projection_inputs.py','owned_geometry_inputs.py',
        'game_pso_geometry_adapter.py','complete_geometry_psos.py','run_game_module_contracts.py',
        'prepare_fetch_capture_receipt.py','run_owned_geometry_contracts.py','launcher_source_view.py',
-       'game_companion_modules.py','prepare_module_metadata.py')
+       'game_companion_modules.py','prepare_module_metadata.py','quick_restart_preparation.py','launcher_runtime_profile.py')
 SUPPORT={'vendor/blood_echoes/loader/prepare.py':'scripts/prepare.py',
          'vendor/blood_echoes/loader/game_check.py':'scripts/game_check.py'}
 LEGACY_RENDER_LOG='        echo "Metal: direct Metal API, ARM64 host, Rosetta game, shared no-copy buffers"\n'
@@ -65,22 +65,27 @@ def bootstrap(project):
 import sys
 sys.dont_write_bytecode=True
 from pathlib import Path
-import hashlib,json,os,stat
+import hashlib,json,os,stat,plistlib
 def main():
     stage=Path(__file__).resolve(strict=True).parents[2]
     project=Path('''+repr(str(project))+''')
-    if project!=project.resolve(strict=True)or not (project/'state').is_dir():
-        raise ValueError('prepared Shared runtime/data root is unavailable')
     manifest=json.loads((stage/'ARM64-LOCAL-PREPARATION.json').read_text())
-    if manifest['runtime_project']!=str(project)or not manifest['host_local_only']:
-        raise ValueError('wrong prepared runtime root')
+    app=stage.parent.parent.parent
+    formal=False
+    if app.suffix=='.app'and (app/'Contents/Info.plist').is_file():
+        formal=plistlib.loads((app/'Contents/Info.plist').read_bytes()).get('CFBundleIdentifier')=='io.github.bbport.optimized'
+    if not formal:
+        if project!=project.resolve(strict=True)or not (project/'state').is_dir():
+            raise ValueError('prepared Shared runtime/data root is unavailable')
+        if manifest['runtime_project']!=str(project)or not manifest['host_local_only']:
+            raise ValueError('wrong prepared runtime root')
     tools=stage/'native-runtime-tools'
     if tools!=tools.resolve(strict=True):raise ValueError('linked runtime tools')
     expected={'''+','.join(repr(name) for name in TOOLS)+'''}
     if set(manifest['runtime_tools'])!=expected:raise ValueError('incomplete runtime tool closure')
     for name,digest in manifest['runtime_tools'].items():
         path=tools/name; info=path.lstat()
-        if not stat.S_ISREG(info.st_mode)or info.st_uid!=os.getuid():
+        if not stat.S_ISREG(info.st_mode)or info.st_uid not in ((0,os.getuid())if formal else(os.getuid(),)):
             raise ValueError('runtime tool is not an owned regular file')
         with path.open('rb')as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
         if actual!=digest:raise ValueError('runtime tool identity changed: '+name)
@@ -89,7 +94,7 @@ def main():
         raise ValueError('incomplete original parser closure')
     for name,digest in support.items():
         path=stage/name;info=path.lstat()
-        if path!=path.resolve(strict=True)or not stat.S_ISREG(info.st_mode)or info.st_uid!=os.getuid():
+        if path!=path.resolve(strict=True)or not stat.S_ISREG(info.st_mode)or info.st_uid not in ((0,os.getuid())if formal else(os.getuid(),)):
             raise ValueError('original parser is not canonical owned code')
         with path.open('rb')as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
         if actual!=digest:raise ValueError('original parser identity changed: '+name)
@@ -98,9 +103,17 @@ def main():
     for module in (local_metal_builder,local_aot_policy,launcher_local_aot):
         if Path(module.__file__).resolve().parent!=tools:
             raise ValueError('runtime code imported outside frozen tool closure')
+    profile=None
+    if formal:
+        import launcher_runtime_profile
+        if Path(launcher_runtime_profile.__file__).resolve().parent!=tools:
+            raise ValueError('formal profile imported outside frozen tool closure')
+        profile=launcher_runtime_profile.derive(stage,sys.argv[2:],os.environ,executable=sys.argv[1])
+        if profile is None:raise ValueError('formal outer bundle admission unavailable')
+        project=profile.work_root
     local_metal_builder.PROJECT=project
     local_aot_policy.P=project
-    launcher_local_aot.cli(project=project,execution_root=stage)
+    launcher_local_aot.cli(project=project,execution_root=stage,**({'runtime_profile':profile}if profile is not None else{}))
 if __name__=='__main__':
     try:main()
     except Exception as error:

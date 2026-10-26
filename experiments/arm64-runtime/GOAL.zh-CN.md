@@ -1,3 +1,9 @@
+## 2026-10-27 正常构建已完成，进入整包验收
+
+原生接入源码已提交 `0cbd1368`，复审保护修复 `7b9dea01`；尚未推送此批，也未更新 Release。正常构建从 tracked Git archive 加三个明确的已提交修正文件生成，未混入并行 Python 工作树。236 个 GPU TU 与 normal main/双 helper 编译 318.02 秒通过，CPU/FEX 与 cache generator 73.46 秒通过；两段压力均为 1、swap 没有增长。实际 ABI/layout、薄 ARM64、加载边、strict component 及 scalar schema2 封口已通过，重定位/签名后原输入不变。依赖仍复用现有前缀，不能称全部依赖从零构建。
+
+Python 正式路径与默认准备链正在最后收口，随后使用当前原 Swift（116项/1真实iCloud跳过/失败0）组一个统一隔离包。Formal ID 的 staged GUI 会读原正式 Defaults 并执行存档初始化，因此隔离正式角色验证只从精确 CLI/复制的 QA 进度启动，绝不开 staged formal GUI。正式应用仍未替换；实际 F3 快路径、冷暖/内存、原条件与正式角色动态验收尚未完成。
+
 ## 2026-10-27 03:40 集中验收补证与最小正式接入
 
 QA09 原始自动驱动回执保留 incomplete：旧末尾日志读取器漏掉了 F3 完成标记；独立复核实际新检查点→原 supervisor 离线重启→新 CPU→原自动继续→后续场景帧已证实路径运行。新增量读取器重放该完整实际日志通过，但尚待新包完整实测，不把重放当作新实测。实测另发现 F3 重做 source-view/static 准备数分钟；同 supervisor 会话调度复用候选保留每次 Local/组件/metadata SHA 校验，现已补不同目录同名脚本、CWD及 SOURCE-PARITY 反例。

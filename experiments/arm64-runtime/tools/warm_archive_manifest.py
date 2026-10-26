@@ -20,7 +20,7 @@ def make_manifest(*,translator_artifacts,game_artifacts,options,profile):
     return hashlib.sha256(payload).hexdigest(),manifest
 
 
-def resolve_gpu_identity(target,backend_root):
+def resolve_gpu_identity(target,backend_root,*,code_owners=None):
     # Resolve the selected executable's actual single GPU load edge, then reuse
     # the existing ownership/architecture/signature/SHA verification contract.
     import subprocess
@@ -31,7 +31,7 @@ def resolve_gpu_identity(target,backend_root):
     if len(edges)!=1:raise ValueError('selected executable must have exactly one GPU load edge')
     edge=edges[0]
     library=resolve_gpu_edge(target,edge)
-    return verify(dict(target=str(target),library=str(library),library_sha256=sha(library)),backend_root)
+    return verify(dict(target=str(target),library=str(library),library_sha256=sha(library)),backend_root,**({'code_owners':code_owners}if code_owners is not None else{}))
 
 
 def prepare_startup_archive_policy(*,enabled,engine,selected_executable,backend_root,

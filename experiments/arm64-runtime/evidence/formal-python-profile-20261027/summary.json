@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "status": "source-contracts-passed-not-runtime-validated",
+  "files": [
+    {
+      "path": "tools/launcher_runtime_profile.py",
+      "sha256": "34d3bff49a71521af7f43e559376411c8e73c2914dcda9c1c6bfc677b6bbdd4a"
+    },
+    {
+      "path": "tools/launcher_local_aot.py",
+      "sha256": "cd06ec511bde02983690763219bb5eead1bc894e23b3531718efe5b197c68e6d"
+    },
+    {
+      "path": "tools/prepare_local_aot_stage.py",
+      "sha256": "e46bb867204adc2c2dc5c87b3d026d8775773f27abdd8a0ce87d62cf9aee34a7"
+    },
+    {
+      "path": "tools/local_aot_policy.py",
+      "sha256": "70d5ba7e336c7bcacdd9f835023772f7faee29376f0a50c1b2397e035005049b"
+    },
+    {
+      "path": "tools/local_metal_builder.py",
+      "sha256": "1066e9e0139215b223bcbd9c1d0c24fbccf58f1e3bd34214703b52abb876f097"
+    },
+    {
+      "path": "tools/launcher_fixed_helpers.py",
+      "sha256": "22c7d684de7d77087b8aea9f7c4c75a851d6d5cf8ff620abbc7d3e40404e5d88"
+    },
+    {
+      "path": "tools/launcher_game_pso.py",
+      "sha256": "e7792aeeeee6cf21d5965b593963548f14096235842c790e9da64848ae6e9d7c"
+    },
+    {
+      "path": "tools/launcher_source_view.py",
+      "sha256": "a2f4769690e9887d947ff7d9b9c23a7656463d78f1eb46333c15afa34f6f14a7"
+    },
+    {
+      "path": "tools/launcher_game_catalog.py",
+      "sha256": "0299bbac7743ff75a5702a8e953ebc612ba55a6c3c90a92657a8d3a18ad69021"
+    },
+    {
+      "path": "tools/launcher_game_modules.py",
+      "sha256": "461f64d06b9f8537759ba0e00c4eff1cfcceb80d0cfae1e2f69aa6a9b7146cab"
+    },
+    {
+      "path": "tools/prepare_game_psos.py",
+      "sha256": "398197eb5ec2188cb66f05db6ca11142734df527fe213a93dc8df365fc31ca88"
+    },
+    {
+      "path": "tools/game_pso_component.py",
+      "sha256": "0c2045a16df0190b509169d4e98191cfececeb05bfeb02619c6517643314d542"
+    },
+    {
+      "path": "tools/game_pso_batch.py",
+      "sha256": "e00dc9c3edcfb6558c4ded84fed87229c829b114df89e80ea05a9640a0f6e7c3"
+    },
+    {
+      "path": "tools/prepare_module_metadata.py",
+      "sha256": "a527fa479d6e8957a62188ce767f56819bc5375bf81b0d9d08108ae70ef7d027"
+    },
+    {
+      "path": "tools/game_pso_owned_audit.py",
+      "sha256": "5362e76ced0ce5f1b865f2a141f328b96f15f4c452fc0eaa909f1583c03999d5"
+    },
+    {
+      "path": "tools/gpu_candidate_identity.py",
+      "sha256": "4f7e20db2cedd0dd5ae0d2b37d6cb39a65dab6d4884e083450b1b7c9fcabcfd5"
+    },
+    {
+      "path": "tools/warm_archive_manifest.py",
+      "sha256": "bef459d993be29e5f45fcc96ea5f6ca31952bc025142891c0e61b12a8fe737e8"
+    },
+    {
+      "path": "tools/prepare_fetch_capture_receipt.py",
+      "sha256": "369ad0c1bee83cfee7c97243a9912ecc25c0a4239040429c3051bbf7e652a91c"
+    },
+    {
+      "path": "tools/quick_restart_preparation.py",
+      "sha256": "700412e3de0559d17d31c90e5d3908c5b913a75a58845966ee7a86de07644599"
+    },
+    {
+      "path": "tests/test_formal_runtime_profile.py",
+      "sha256": "9f7eb101813347b97190a9a848c047a5dc18bfcceba4a0d6dc1aa53fe8b3984b"
+    },
+    {
+      "path": "tests/test_launcher_game_modules.py",
+      "sha256": "55eca24d91fc326955d9099692760090029cd3c3d55a9792714afee5c85641a9"
+    },
+    {
+      "path": "docs/formal-python-preparation-profile.zh-CN.md",
+      "sha256": "a9338e66e88a0daacd381fde0c2451968caf891367d38e72857bda460983389c"
+    }
+  ],
+  "tests": {
+    "combined": 231,
+    "local_policy_builder": 32,
+    "fixed_helper_controller": 14,
+    "total": 277
+  },
+  "actual_native_started": false,
+  "gpu_started": false,
+  "game_started": false,
+  "formal_data_modified": false,
+  "code_root_profile": "outer-formal-bundle",
+  "work": "BB_DATA_DIR/arm64-runtime-work",
+  "gpu": "BB_ARM_GPU_BASE_DIR/arm64-native-v1"
+}

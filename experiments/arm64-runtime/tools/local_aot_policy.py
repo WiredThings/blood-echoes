@@ -17,13 +17,14 @@ def available_toolchain():
   if not path.is_absolute()or not path.is_file():return False
  return True
 
-def prepare(*,mode='auto',gpu_root,cohort,engine,graphics,builder=None,toolchain_probe=None):
+def prepare(*,mode='auto',gpu_root,cohort,engine,graphics,builder=None,toolchain_probe=None,runtime_profile=None):
  if mode=='off':return {},dict(status='off',requested='off')
  if mode not in ('auto','record','load')or engine!='arm64'or not graphics:raise ValueError('local AOT requires ARM64 graphics mode')
  from local_metal_builder import HEX
  if not HEX.fullmatch(cohort):raise ValueError('local AOT requires verified compatibility cohort')
  gpu=Path(gpu_root).absolute()
- if gpu!=gpu.resolve(strict=True)or not gpu.is_relative_to(P/'state')or gpu==P/'state':raise ValueError('local AOT requires canonical isolated GPU state')
+ if runtime_profile is not None:runtime_profile.gpu(gpu)
+ elif gpu!=gpu.resolve(strict=True)or not gpu.is_relative_to(P/'state')or gpu==P/'state':raise ValueError('local AOT requires canonical isolated GPU state')
  root=gpu/'local-metal';root.mkdir(mode=0o700,exist_ok=True)
  if root!=root.resolve(strict=True)or root.is_symlink():raise ValueError('linked local AOT root')
  env=dict(BB_MTL_LOCAL_AOT_MODE='record',BB_MTL_LOCAL_AOT_ROOT=str(root),BB_MTL_LOCAL_AOT_COHORT=cohort)
@@ -38,7 +39,7 @@ def prepare(*,mode='auto',gpu_root,cohort,engine,graphics,builder=None,toolchain
   from local_metal_builder import build
   builder=build
  old=os.environ.get('BB_GPU_USER_DIR');os.environ['BB_GPU_USER_DIR']=str(gpu)
- try:summary=builder(root,cohort,enabled=True)
+ try:summary=builder(root,cohort,enabled=True,**({'runtime_profile':runtime_profile}if runtime_profile is not None else{}))
  finally:
   if old is None:os.environ.pop('BB_GPU_USER_DIR',None)
   else:os.environ['BB_GPU_USER_DIR']=old

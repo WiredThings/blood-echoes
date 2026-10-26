@@ -51,10 +51,15 @@ def absolute(value,stage):
     return(path if path.is_absolute()else stage/path).resolve(strict=False)
 
 
-def load_original(stage):
-    stage=directory(stage)
-    parity=json.loads((stage/'SOURCE-PARITY.json').read_text())
-    path=stage/'scripts/mods.py';value,_=file_sha(path)
+def load_original(stage,runtime_profile=None):
+    stage=runtime_profile.code(stage)if runtime_profile is not None else directory(stage)
+    if runtime_profile is not None:
+        from launcher_runtime_profile import code_bytes
+        parity=json.loads(code_bytes(stage/'SOURCE-PARITY.json')[0])
+        path=stage/'scripts/mods.py';value=code_bytes(path,limit=4*1024*1024,content=False)[1]['sha256']
+    else:
+        parity=json.loads((stage/'SOURCE-PARITY.json').read_text())
+        path=stage/'scripts/mods.py';value,_=file_sha(path)
     need(value==parity['effective_sources']['scripts/mods.py'],'original mod algorithm changed')
     spec=importlib.util.spec_from_file_location('_blood_echoes_admitted_mods_'+value,path)
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
@@ -94,8 +99,8 @@ def mapping(root,origins,check):
     return files
 
 
-def recipe(stage,environment):
-    stage=directory(stage);env=environment
+def recipe(stage,environment,runtime_profile=None):
+    stage=runtime_profile.code(stage)if runtime_profile is not None else directory(stage);env=environment
     base=directory(absolute(env.get('BB_GAME_DIR','../CUSA03173'),stage))
     data=absolute(env.get('BB_DATA_DIR','.'),stage)
     mods=absolute(env.get('BB_MODS_DIR',str(data/'mods')),stage)
@@ -123,9 +128,9 @@ def verify_snapshot(view,records,check):
              'source snapshot contents changed')
 
 
-def verify_live_selection(actual,origins,observed,records,stage,environment,selection,check):
+def verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile=None):
     need(mapping(actual,origins,check)==observed,'final app0 mapping changed while snapshotting')
-    need(recipe(stage,environment)==selection,'original mod selection changed while snapshotting')
+    need(recipe(stage,environment,runtime_profile)==selection,'original mod selection changed while snapshotting')
     # Comparing mappings alone does not catch an earlier file changing after its
     # clone has completed. Revalidate the whole source read-set before adoption.
     for row in records:
@@ -133,15 +138,16 @@ def verify_live_selection(actual,origins,observed,records,stage,environment,sele
         need(file_sha(Path(row['source']),check)==(row['sha256'],row['bytes']),
              'selected source contents changed while snapshotting')
     need(mapping(actual,origins,check)==observed,'final app0 mapping changed during source validation')
-    need(recipe(stage,environment)==selection,'original mod selection changed during source validation')
+    need(recipe(stage,environment,runtime_profile)==selection,'original mod selection changed during source validation')
 
 
-def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clone_file=clone):
+def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clone_file=clone,runtime_profile=None):
     """Startup-only callable. The caller keeps original app0 for final exec."""
-    project=directory(project);gpu=directory(gpu_root);stage=directory(stage)
-    need(gpu.is_relative_to(project/'state')and gpu!=project/'state','isolated source snapshot GPU root')
+    project=directory(project);gpu=directory(gpu_root);stage=runtime_profile.code(stage)if runtime_profile is not None else directory(stage)
+    if runtime_profile is not None:runtime_profile.work(project);runtime_profile.gpu(gpu)
+    else:need(gpu.is_relative_to(project/'state')and gpu!=project/'state','isolated source snapshot GPU root')
     actual=directory(Path(arguments[arguments.index('--app0')+1]).absolute())
-    module,algorithm=load_original(stage);selection=recipe(stage,environment)
+    module,algorithm=load_original(stage,runtime_profile);selection=recipe(stage,environment,runtime_profile)
     plain_tree(selection['base'],check)
     cache=gpu/'automatic-game-inputs';cache.mkdir(mode=0o700,exist_ok=True);directory(cache)
     views=cache/'source-views';views.mkdir(mode=0o700,exist_ok=True);directory(views)
@@ -188,7 +194,7 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
             file_sha(ready);need(ready.stat().st_size<=32*1024*1024,'source snapshot receipt budget')
             previous=json.loads(ready.read_text());need(previous['identity']==identity and previous['proof']==proof,'source snapshot identity changed')
             view=directory(generation/'view');verify_snapshot(view,records,check)
-            verify_live_selection(actual,origins,observed,records,stage,environment,selection,check)
+            verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile)
             return dict(game_root=view,report=dict(status='reused',source_identity=identity,files=len(records),logical_bytes=total,CoW=True,original_app0_preserved=True))
         if generation.exists():generation=views/(identity+'-retry-'+str(time.time_ns()))
         generation.mkdir(mode=0o700);view=generation/'view';view.mkdir(mode=0o700)
@@ -205,7 +211,7 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
         # the initial records, including the complete file set and mod mapping.
         # Metadata above is never treated as proof of unchanged file contents.
         verify_snapshot(view,records,check)
-        verify_live_selection(actual,origins,observed,records,stage,environment,selection,check)
+        verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile)
         for root,dirs,files in os.walk(view,topdown=False):Path(root).chmod(0o500)
         write_json(generation/'READY.json',dict(schema=1,identity=identity,proof=proof))
         write_json(pointer,dict(generation=generation.name))

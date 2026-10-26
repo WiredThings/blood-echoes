@@ -18,13 +18,15 @@ class ModuleControllerControls(unittest.TestCase):
    with self.assertRaisesRegex(ValueError,'identical actual DSO'):m.coherent_component(c,gpu=Path(tmp),selected_renderer='/renderer',backend_root=tmp,resolver=resolver)
  def test_capability_is_queried_not_inferred_from_manifest(self):
   def run(*args,**kwargs):return subprocess.CompletedProcess([],0,b'GAME_MODULE_CAPABILITY {"schema":1}\n',None)
-  with self.assertRaisesRegex(ValueError,'actual automatic'):m._capability(dict(module_consumer='/not-executed'),Path('/fake'),runner=run)
+  with tempfile.TemporaryDirectory()as tmp:
+   with self.assertRaisesRegex(ValueError,'actual automatic'):m._capability(dict(module_consumer='/not-executed'),Path(tmp).resolve(),runner=run)
  def test_diagnostic_or_missing_nonce_capability_refused(self):
   good=dict(schema=1,cpu_only=True,automatic_input_root=m.ROOT_POLICY,requires_nonce_and_cohort=True,diagnostic_only=False,packet_schema=1)
   for key,value in [('diagnostic_only',True),('requires_nonce_and_cohort',False),('automatic_input_root','state')]:
    cap=dict(good,**{key:value})
    def run(*args,**kwargs):return subprocess.CompletedProcess([],0,('GAME_MODULE_CAPABILITY '+json.dumps(cap)+'\n').encode(),None)
-   with self.assertRaisesRegex(ValueError,'actual automatic'):m._capability(dict(module_consumer='/not-executed'),Path('/fake'),runner=run)
+   with tempfile.TemporaryDirectory()as tmp:
+    with self.assertRaisesRegex(ValueError,'actual automatic'):m._capability(dict(module_consumer='/not-executed'),Path(tmp).resolve(),runner=run)
  def test_module_identity_is_not_runtime_hash_or_unrelated_draw_key(self):
   def ref(c):return dict(sha256=c*64,bytes=100)
   stage=dict(metadata=ref('1'),spirv=ref('2'),logical_stage='vertex',permutation_hash='3'*16)

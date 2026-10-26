@@ -167,16 +167,14 @@ def _run_bounded_capability(command,*,stdin,stdout,stderr,timeout,env):
    if interrupted:raise KeyboardInterrupt
  return subprocess.CompletedProcess(command,proc.returncode,bytes(captured),None)
 
-def fixed_helper_capability(worker,admission_root,*,runner=None):
+def fixed_helper_capability(worker,admission_root,*,runner=None,runtime_profile=None):
  """Pure scalar ABI query AFTER relocation; no Metal Device or GPU work.
  Old workers return usage64. New workers must return the exact bounded schema.
  Only a fresh owned state directory is created and removed; no old cache touched.
  """
  if runner is None:runner=_run_bounded_capability
- base=Path(admission_root).resolve(strict=True)/'state'
- need(base==base.resolve(strict=True)and base.is_dir()and base.stat().st_uid==os.getuid(),'owned helper capability data root')
- with tempfile.TemporaryDirectory(prefix='component-helper-cap-',dir=base)as tmp:
-  env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':tmp,'TMPDIR':tmp,'BB_GPU_USER_DIR':tmp}
+ from launcher_runtime_profile import capability_environment
+ with capability_environment(admission_root,runtime_profile,'component-helper-cap-')as env:
   result=runner([str(worker),'--fixed-helper-seed-schema'],stdin=subprocess.DEVNULL,
    stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10,env=env)
   need(isinstance(result.stdout,bytes)and len(result.stdout)<=4096,'worker capability output bound')
@@ -237,27 +235,33 @@ def freeze_inputs(stage,component,library,*,rewrite,admission_root):
  (stage/'GAME-PSO-COMPONENT.json').write_text(json.dumps(frozen,indent=2)+'\n')
  return frozen
 
-def load(stage):
+def load(stage,*,runtime_profile=None):
  stage=Path(stage).resolve(strict=True);path=stage/'GAME-PSO-COMPONENT.json'
  if not path.exists():return None
- raw,_=checked_bytes(path);m=json.loads(raw)
- need(m['schema']==1 and m['kind']=='blood-echoes-game-pso-component'and m['enabled']is True and m['production']is False,'invalid preparation component')
+ code_args={'code_owners':(0,os.getuid())}if runtime_profile is not None else{}
+ if runtime_profile is not None:need(runtime_profile.bundle.stage==stage,'formal component scope stage')
+ raw,_=checked_bytes(path,**code_args);m=json.loads(raw)
+ need(m['schema']==1 and m['kind']=='blood-echoes-game-pso-component'and m['enabled']is True and m['production']is (runtime_profile is not None),'invalid preparation component')
+ if runtime_profile is not None:
+  for key,value in dict(worker='bin/game-pso-preparer',module_consumer='bin/game-module-preparer',library='bin/gpu-metal-arm64/libbbgpu.dylib',layout='native-runtime-inputs/layout.json',source_root='native-runtime-inputs/layout-source').items():
+   need(m.get(key)==value,'formal component role mismatch: '+key)
+ def code_sha(p):return sha(p,owner=0 if runtime_profile is not None and p.stat().st_uid==0 else os.getuid())
  result=dict(m)
  for field in('worker','library','layout','source_root'):
   p=relative(stage,m[field]);need(p==p.resolve(strict=True)and p.is_relative_to(stage),'linked/outside component')
   result[field]=p
-  if field!='source_root':need(HEX.fullmatch(m[field+'_sha256'])and sha(p)==m[field+'_sha256'],'packaged component identity changed: '+field)
+  if field!='source_root':need(HEX.fullmatch(m[field+'_sha256'])and code_sha(p)==m[field+'_sha256'],'packaged component identity changed: '+field)
  from warm_archive_manifest import resolve_gpu_identity
- actual=resolve_gpu_identity(result['worker'],stage)
+ actual=resolve_gpu_identity(result['worker'],stage,**code_args)
  need(actual['library']==str(result['library'])and actual['library_sha256']==result['library_sha256'],
       'packaged worker actual GPU edge/library mismatch')
- result['native_layout']=load_canonical_layout(result['layout'],result['source_root'],result['layout_sha256'])
+ result['native_layout']=load_canonical_layout(result['layout'],result['source_root'],result['layout_sha256'],**code_args)
  if m.get('module_consumer')is not None:
   module=relative(stage,m['module_consumer'])
   need(module==module.resolve(strict=True)and module.is_relative_to(stage),'linked/outside module consumer')
-  need(HEX.fullmatch(m['module_consumer_sha256'])and sha(module)==m['module_consumer_sha256'],
+  need(HEX.fullmatch(m['module_consumer_sha256'])and code_sha(module)==m['module_consumer_sha256'],
        'packaged module consumer changed')
-  edge=resolve_gpu_identity(module,stage)
+  edge=resolve_gpu_identity(module,stage,**code_args)
   need(edge['library']==str(result['library'])and edge['library_sha256']==result['library_sha256'],
        'packaged module consumer actual GPU mismatch')
   need(m.get('coherent_renderer')is True and m.get('diagnostic_only')is False,'invalid module producer type')
@@ -266,5 +270,5 @@ def load(stage):
   need(m['automatic_capture_schema']==1,'unknown packaged capture schema')
   exports=subprocess.check_output(['/usr/bin/nm','-gjU',str(result['library'])],text=True,timeout=10).splitlines()
   need('_bb_fetch_companion_configure_v1'in exports,'packaged capture capability is not compiled in')
-  need(sha(result['library'])==result['library_sha256'],'capture library changed during capability check')
+  need(code_sha(result['library'])==result['library_sha256'],'capture library changed during capability check')
  return result

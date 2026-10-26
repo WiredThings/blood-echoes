@@ -183,6 +183,9 @@ def prepare(config,*,services=None):
   if not hasattr(a,name):setattr(a,name,value)
  native_services=services is None
  P=directory(a.project)  # Data root; imports remain in the loaded tools closure.
+ from launcher_runtime_profile import kw,work,cache_root,code_bytes
+ runtime_profile=getattr(a,'runtime_profile',None)
+ state=work(P,runtime_profile);cache_admission=cache_root(P,runtime_profile)
  if services is None:
   from game_pso_owned_audit import audit_owned_stage,audit_owned_key_profile,load_canonical_layout
   from qa_build_guard import require_no_games
@@ -203,15 +206,20 @@ def prepare(config,*,services=None):
  need((a.max_recipes is None or type(a.max_recipes)is int and a.max_recipes>0)and 0<a.seconds<=7200 and 0<a.page_size<=64,'explicit bounded work budget')
  run=directory(a.run_root);gpu=directory(a.gpu_root);artifact=directory(a.artifact_cache_dir)
  need(artifact.is_relative_to(gpu)and artifact!=gpu,'exact original selected PsoCache artifact/cache_dir required')
- need(run.parent==P/'state'and gpu.is_relative_to(P/'state')and run!=gpu and not any(run.iterdir()),'fresh Shared run and selected artifact roots')
- need(Path(a.manifest).resolve(strict=True).is_relative_to(P)and Path(a.layout).resolve(strict=True).is_relative_to(P),'actual runtime inputs must be Shared')
+ if runtime_profile is not None:runtime_profile.gpu(gpu)
+ need(run.parent==state and gpu.is_relative_to(cache_admission)and run!=gpu and not any(run.iterdir()),'fresh preparation run and selected artifact roots')
+ if runtime_profile is None:need(Path(a.manifest).resolve(strict=True).is_relative_to(P)and Path(a.layout).resolve(strict=True).is_relative_to(P),'actual runtime inputs must be Shared')
+ else:
+  need(Path(a.manifest).resolve(strict=True).is_relative_to(state),'formal manifest outside preparation work')
+  runtime_profile.code(a.layout);runtime_profile.code(a.source_root)
  progress=Path(a.progress_root)if a.progress_root else gpu/'game-pso-progress'
  need(progress.is_absolute()and progress.is_relative_to(gpu)and progress!=gpu,'progress must stay below selected GPU root')
  if not progress.exists():progress.mkdir(mode=0o700)
  directory(progress)
- require_no_games();identity=services['resolve_identity'](a.worker,P);need(identity['library_sha256']==a.library_sha256,'actual selected worker library SHA')
- layout=services['load_layout'](a.layout,a.source_root,a.layout_sha256)
- worker_sha=sha(owned(Path(a.worker).resolve(strict=True),32*MAX_BLOB))
+ code_args={'code_owners':(0,os.getuid())}if runtime_profile is not None else{}
+ require_no_games();identity=services['resolve_identity'](a.worker,runtime_profile.bundle.stage if runtime_profile is not None else P,**code_args);need(identity['library_sha256']==a.library_sha256,'actual selected worker library SHA')
+ layout=services['load_layout'](a.layout,a.source_root,a.layout_sha256,**code_args)
+ worker_sha=code_bytes(runtime_profile.code(a.worker),limit=32*MAX_BLOB,content=False)[1]['sha256']if runtime_profile is not None else sha(owned(Path(a.worker).resolve(strict=True),32*MAX_BLOB))
  provided=dict(os.environ if a.environment is None else a.environment)
  options=compile_environment(provided)
  effective_options=dict(options,BB_MTL_PERSIST_WARM_ARCHIVE='0',BB_MTL_RELEASE_WARM_ARCHIVE='1')
@@ -228,7 +236,7 @@ def prepare(config,*,services=None):
  policy=policy_type(before);start=clock();samples=[];sample_count=0;outcomes=[];outcome_count=0;phase_env={};stop_error=None
  samples_path=run/'samples.jsonl';outcomes_path=run/'outcomes.jsonl';events_path=run/'events.jsonl'
  builder_tmp=fresh(run,'local-builder-tmp');result={}
- session_factory=services.get('builder_session_factory');builder_session=session_factory(builder_tmp)if session_factory else None
+ session_factory=services.get('builder_session_factory');builder_session=session_factory(builder_tmp,**kw(runtime_profile))if session_factory else None
  validation_anchor=None;validation_environment=None
  batch_worker=None;batch_scope=None;batch_api=None;batch_enabled=False
  batch_stats=dict(capability_schema=0,processes=0,recipes=0,failed_recipes=0,max_recipes=16,legacy_fallback=True)
@@ -251,7 +259,7 @@ def prepare(config,*,services=None):
   if batch_api is not None:
    if native_services:
     check();require_no_games()
-    try:batch_enabled=batch_api.probe_capability(Path(a.worker).resolve(),P,check)
+    try:batch_enabled=batch_api.probe_capability(Path(a.worker).resolve(),P,check,**kw(runtime_profile))
     except (OSError,ValueError,subprocess.TimeoutExpired):batch_enabled=False
     check()
    else:batch_enabled=services.get('batch_capability',False)is True
@@ -291,7 +299,7 @@ def prepare(config,*,services=None):
    return services['local_build'](root,cohort,guard=BuilderGuard(),
      toolchain=services['toolchain'](services['runner'](builder_tmp)),**kwargs)
   updates,report=services['local_prepare'](mode='record'if phase=='record'else'auto',gpu_root=gpu,cohort=a.cohort,
-       engine='arm64',graphics=True,builder=builder)
+       engine='arm64',graphics=True,builder=builder,**kw(runtime_profile))
   if stop_error is not None:raise stop_error
   if report['status']=='stopped':raise Stopped(report.get('error','local library protection stop'))
   phase_env[phase]=updates;return report
@@ -302,11 +310,12 @@ def prepare(config,*,services=None):
    from game_pso_geometry_adapter import freeze as geometry_freeze
    packet,held=geometry_freeze(unit,layout,packetdir,a.cohort,bool(allow_compile and a.allow_compile),artifact_cache_dir=artifact,check=check)
   else:
-   packet,held=freeze(unit,layout,packetdir,a.cohort,bool(allow_compile and a.allow_compile),cache_root=P/'state',artifact_cache_dir=artifact,
+   packet,held=freeze(unit,layout,packetdir,a.cohort,bool(allow_compile and a.allow_compile),cache_root=cache_admission,artifact_cache_dir=artifact,
          audit_stage=services['audit_stage'],audit_key_profile=services['audit_key_profile'])
   env={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))and k not in VALIDATION_ENV};env.update(options);env.update(phase_env[phase])
   env.update(BB_GPU_USER_DIR=str(gpu),BB_MTL_ARCHIVE_COMPATIBILITY_ID=a.cohort,BB_MTL_PERSIST_WARM_ARCHIVE='0',
              BB_MTL_RELEASE_WARM_ARCHIVE='1',HOME=str(case),TMPDIR=str(tmp),DYLD_PRINT_LIBRARIES='1')
+  if runtime_profile is not None:env.update(runtime_profile.child_environment())
   log=case/'console.log';batch_proof=None
   if batch_enabled:
    effective_allow=bool(allow_compile and a.allow_compile)

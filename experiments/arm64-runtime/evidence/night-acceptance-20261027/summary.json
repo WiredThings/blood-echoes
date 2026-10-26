@@ -118,5 +118,30 @@
     "verified": true,
     "source_unchanged": true,
     "old_product_path_harness_failure_preserved": true
+  },
+  "night_native_integration": {
+    "source_base_revision": "0cbd1368",
+    "tracked_delta_revision": "7b9dea01",
+    "normal_GPU_translation_units": 236,
+    "normal_GPU_build_seconds": 318.02140233293176,
+    "normal_GPU_SHA256": "41023c2ac0209d659da1987bca54952d71b870d06806cb704c7178a7c0ab757d",
+    "normal_GPU_load_edge_and_signatures_verified": true,
+    "pressure_before_and_after": 1,
+    "swap_growth_mib": 0,
+    "CPU_build_status": "normal-CPU-targets-built",
+    "formal_dynamic_acceptance": false,
+    "local_app_replaced": false,
+    "CPU_build_seconds": 73.45995062508155,
+    "CPU_SHA256": "a5d121d8c9c9b09363ef01c1924cede27327c2e6481446bcde6f518ecdcf4697",
+    "CPU_cache_generator_SHA256": "27c6b46090731c6fe0e3bf5ffb11b08e91fbafcf994025e3ad3a07d6ef199933",
+    "strict_layout_sealed": true,
+    "strict_component_admission": true,
+    "scalar_fixed_helper_schema": 2,
+    "normal_source_artifacts_unchanged_by_staging": true,
+    "normal_GPU_app_wrapper_created": true,
+    "staged_CPU_manifest_private_evidence": "resource-cpu-execution-1793045168261819000",
+    "GPU_wrapper_private_evidence": "gpu-candidate-app-1793045216701938000.json",
+    "all_normal_builds_completed": true,
+    "latest_game_acceptance_started": false
   }
 }

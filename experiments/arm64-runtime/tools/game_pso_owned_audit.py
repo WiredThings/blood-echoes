@@ -10,11 +10,13 @@ from decode_shader_cache import decode_meta,decode_key,semantic_profile
 class Refused(ValueError):pass
 def need(value,message):
     if not value:raise Refused(message)
-def checked_bytes(path, *, limit=1024*1024, expected=None):
+def checked_bytes(path, *, limit=1024*1024, expected=None,code_owners=None):
+    if code_owners is not None:need(set(code_owners)<={0,os.getuid()},'bundled code owner policy')
     path=Path(path);need(path.is_absolute() and path==path.resolve(strict=True),'canonical nonlinked audit source')
     fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
     try:
-        before=os.fstat(fd);need(stat.S_ISREG(before.st_mode) and before.st_uid==os.getuid() and 0<before.st_size<=limit,'owned bounded audit source')
+        before=os.fstat(fd);need(stat.S_ISREG(before.st_mode) and before.st_uid in((os.getuid(),)if code_owners is None else code_owners) and 0<before.st_size<=limit,'owned bounded audit source')
+        if code_owners is not None:need(not(before.st_mode&0o022),'bundled code must not be group/world writable')
         data=bytearray()
         while len(data)<before.st_size:
             part=os.read(fd,before.st_size-len(data));need(bool(part),'short audit source');data.extend(part)
@@ -83,8 +85,8 @@ def audit_owned_key_profile(unit,key,profile,layout):
     return dict(key_kind=decoded['kind'],stage_references=expected,profile_semantic_sha256=p['semantic_sha256'],
                 key_native_non_srt_reader_allowed=True,native_info_srt_deserialize_allowed=False)
 
-def load_canonical_layout(path, source, expected_sha256):
-    data, ref = checked_bytes(Path(path).resolve(), limit=4 * 1024 * 1024, expected=expected_sha256)
+def load_canonical_layout(path, source, expected_sha256,*,code_owners=None):
+    data, ref = checked_bytes(Path(path).resolve(), limit=4 * 1024 * 1024, expected=expected_sha256,code_owners=code_owners)
     layout = json.loads(data)
     need(layout['schema'] == 1 and layout['pointer_bytes'] == 8 and layout['little_endian'], 'layout domain')
     receipts = []
@@ -99,7 +101,8 @@ def load_canonical_layout(path, source, expected_sha256):
     SCOPE_EXIT { clear_selection(); };
 '''
     for relative, want in layout['source_sha256'].items():
-        raw, current = checked_bytes(Path(source).resolve() / relative, limit=4 * 1024 * 1024)
+        item=Path(relative);need(not item.is_absolute()and '..'not in item.parts,'canonical layout relative source')
+        raw, current = checked_bytes(Path(source).resolve() / item, limit=4 * 1024 * 1024,code_owners=code_owners)
         normalized = False
         if current['sha256'] != want and relative == 'video_core/pipeline_cache_core_serialization.cpp':
             text = raw.decode()

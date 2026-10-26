@@ -84,12 +84,16 @@ def source_inventory(game_root, check=lambda: None):
     return sorted(sources, key=lambda row: row['path'])
 
 
-def scanner_identity(source_root):
+def scanner_identity(source_root,runtime_profile=None):
     """Bind scanner/parser code, original SELF loader and native stage enum."""
-    files = {name: file_sha(TOOLS / name)[0] for name in DEPENDENCIES}
+    def code_hash(path):
+        if runtime_profile is None:return file_sha(path)[0]
+        from launcher_runtime_profile import code_bytes
+        runtime_profile.code(path);return code_bytes(path,limit=4*1024*1024,content=False)[1]['sha256']
+    files = {name: code_hash(TOOLS / name) for name in DEPENDENCIES}
     original_loader = TOOLS.parent / 'vendor/blood_echoes/loader/prepare.py'
-    files['original-self-loader'] = file_sha(original_loader)[0]
-    files['native-runtime-info'] = file_sha(Path(source_root) / 'shader_recompiler/runtime_info.h')[0]
+    files['original-self-loader'] = code_hash(original_loader)
+    files['native-runtime-info'] = code_hash(Path(source_root) / 'shader_recompiler/runtime_info.h')
     return digest(files)
 
 
@@ -183,14 +187,18 @@ def build_static(*, game_root, source_root, output, identity, source_files):
     return receipt
 
 
-def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: None, runner=None):
+def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: None, runner=None,runtime_profile=None):
     """Default startup entry. Run expensive decoding in one reclaimable child."""
     started = time.monotonic(); project = directory(project); gpu = directory(gpu_root)
-    need(gpu.is_relative_to(project / 'state') and gpu != project / 'state', 'isolated selected GPU root required')
+    from launcher_runtime_profile import work
+    state=work(project,runtime_profile)
+    if runtime_profile is not None:runtime_profile.gpu(gpu)
+    else:need(gpu.is_relative_to(project / 'state') and gpu != project / 'state', 'isolated selected GPU root required')
     game = directory(game_root)
-    need(game.is_relative_to(project.parent) and not gpu.is_relative_to(game), 'isolated actual app0 required')
+    if runtime_profile is not None:runtime_profile.source(game)
+    else:need(game.is_relative_to(project.parent) and not gpu.is_relative_to(game), 'isolated actual app0 required')
     check(); sources = source_inventory(game, check)
-    scan_identity = scanner_identity(source_root)
+    scan_identity = scanner_identity(source_root,runtime_profile)
     identity = digest(dict(schema=SCHEMA, source_files=sources, scanner=scan_identity))
     cache = gpu / 'automatic-game-inputs'; cache.mkdir(mode=0o700, exist_ok=True); directory(cache)
     generation = cache / identity
@@ -212,13 +220,13 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
         if generation.exists():
             generation = cache / (identity + '-retry-' + str(time.time_ns()))
         generation.mkdir(mode=0o700)
-        request = project / 'state' / ('catalogue-request-' + str(time.time_ns()) + '.json')
+        request = state / ('catalogue-request-' + str(time.time_ns()) + '.json')
         write_json(request, dict(game_root=str(game), source_root=str(source_root), output=str(generation),
                                  identity=identity, source_files=sources))
         if runner is not None:
             runner(request, check)
         else:
-            log_path = project / 'state' / ('catalogue-worker-' + str(time.time_ns()) + '.log')
+            log_path = state / ('catalogue-worker-' + str(time.time_ns()) + '.log')
             with log_path.open('x') as log:
                 proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--request', str(request)],
                     stdout=log, stderr=subprocess.STDOUT, start_new_session=True,

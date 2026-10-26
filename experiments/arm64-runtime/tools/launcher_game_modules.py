@@ -79,31 +79,37 @@ def _automatic_packet(packet,path,nonce,cohort):
  packet['automatic_preparation']=dict(schema=1,nonce=nonce,cohort=cohort)
  atomic_json(path,packet)
 
-def _capability(component,gpu,*,runner=None,require_companion=False):
+def _capability(component,gpu,*,runner=None,require_companion=False,runtime_profile=None):
  from game_pso_component import _run_bounded_capability
- env={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))};env['BB_GPU_USER_DIR']=str(gpu)
- result=(runner or _run_bounded_capability)([str(component['module_consumer']),'--capability'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10,env=env)
+ from launcher_runtime_profile import capability_environment
+ with capability_environment(gpu,runtime_profile,'module-cap-',qa_root=gpu)as env:
+  result=(runner or _run_bounded_capability)([str(component['module_consumer']),'--capability'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10,env=env)
  need(result.returncode==0,'module capability query failed')
  lines=result.stdout.decode().splitlines();need(len(lines)==1 and lines[0].startswith('GAME_MODULE_CAPABILITY '),'actual module capability envelope')
  cap=json.loads(lines[0].split(' ',1)[1]);need(cap.get('schema')==1 and cap.get('cpu_only')is True and cap.get('automatic_input_root')==ROOT_POLICY and cap.get('requires_nonce_and_cohort')is True and cap.get('diagnostic_only')is False and cap.get('packet_schema')==1,'actual automatic module capability required')
  if require_companion:need(cap.get('companion_contract_schema')==1,'actual typed companion consumer capability required')
  return cap
 
-def coherent_component(component,*,gpu,selected_renderer,backend_root,resolver=None,capability_runner=None):
+def coherent_component(component,*,gpu,selected_renderer,backend_root,resolver=None,capability_runner=None,runtime_profile=None):
  """Verify actual signed ARM load edges and bytes, not an asserted ready flag."""
  need(component.get('coherent_renderer')is True and component.get('diagnostic_only')is False,'coherent non-diagnostic module component required')
  from warm_archive_manifest import resolve_gpu_identity
  resolver=resolver or resolve_gpu_identity
- consumer=Path(component['module_consumer']);raw,ref=checked_bytes(consumer,limit=64*1024*1024,expected=component['module_consumer_sha256'])
- original=resolver(Path(selected_renderer),Path(backend_root));actual=resolver(consumer,Path(backend_root))
+ code_args={'code_owners':(0,os.getuid())}if runtime_profile is not None else{}
+ consumer=Path(component['module_consumer']);raw,ref=checked_bytes(consumer,limit=64*1024*1024,expected=component['module_consumer_sha256'],**code_args)
+ if runtime_profile is not None:
+  runtime_profile.code(consumer);runtime_profile.code(selected_renderer)
+  need(Path(backend_root)==runtime_profile.bundle.stage,'formal module backend root')
+ original=resolver(Path(selected_renderer),Path(backend_root),**code_args);actual=resolver(consumer,Path(backend_root),**code_args)
  need(actual['library_sha256']==original['library_sha256']==component['library_sha256']and actual['library']==original['library'],'consumer and selected renderer require identical actual DSO')
- _capability(component,gpu,runner=capability_runner,require_companion=True)
+ _capability(component,gpu,runner=capability_runner,require_companion=True,runtime_profile=runtime_profile)
  return actual
 
 def run_module(component,packet,output,case,gpu,nonce,cohort,check,identity):
  """One CPU child; selected GPU root and PID-bound actual DSO are verified."""
  output.mkdir(mode=0o700);temp=case/'tmp';temp.mkdir(mode=0o700)
  env={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))};env.update(BB_GPU_USER_DIR=str(gpu),BB_MODULE_PREPARATION_NONCE=nonce,BB_MODULE_PREPARATION_COHORT=cohort,TMPDIR=str(temp),DYLD_PRINT_LIBRARIES='1')
+ if component.get('_runtime_profile')is not None:env.update(component['_runtime_profile'].child_environment())
  out=case/'stdout.log';err=case/'stderr.log';start=time.monotonic()
  with out.open('x')as stdout,err.open('x')as stderr:
   proc=subprocess.Popen([str(component['module_consumer']),str(packet),str(output)],stdout=stdout,stderr=stderr,env=env,start_new_session=True)
@@ -130,7 +136,7 @@ def run_module(component,packet,output,case,gpu,nonce,cohort,check,identity):
   from game_companion_modules import validate_call as validate_typed_companion
   validate_typed_companion(proc.returncode,result,output,p)
  else:validate_call(proc.returncode,result,output,p)
- checked_bytes(Path(component['module_consumer']),limit=64*1024*1024,expected=component['module_consumer_sha256'])
+ checked_bytes(Path(component['module_consumer']),limit=64*1024*1024,expected=component['module_consumer_sha256'],**({'code_owners':(0,os.getuid())}if component.get('_runtime_profile')is not None else{}))
  return result
 
 def selected_units(caches,*,gpu,state_root,title,layout,check,candidate_manifest=None):
@@ -162,7 +168,7 @@ def selected_units(caches,*,gpu,state_root,title,layout,check,candidate_manifest
 
 def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,environment=None,
             selected_renderer=None,backend_root=None,page_size=16,seconds=600,
-            native_runner=run_module,identity_resolver=None,capability_runner=None,candidate_manifest=None):
+            native_runner=run_module,identity_resolver=None,capability_runner=None,candidate_manifest=None,runtime_profile=None):
  """Original-launcher module preparation entry. No alternate frontend/CLI batch.
 
  All selected records are visited, exact states are indexed, and native misses
@@ -172,11 +178,16 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
  """
  if not component:return dict(status='unavailable',reason='coherent CPU module component unavailable',geometry_resolver=None)
  if not component.get('coherent_renderer')or component.get('diagnostic_only')is not False:return dict(status='unavailable',reason='targeted or diagnostic consumer cannot prepare runtime inputs',geometry_resolver=None)
- environment=environment or {};gpu=directory(Path(environment.get('BB_GPU_USER_DIR')or static_context['gpu_root']));project=directory(Path(project));need(gpu.is_relative_to(project/'state')and gpu!=project/'state','selected isolated GPU root')
+ environment=environment or {};gpu=directory(Path(environment.get('BB_GPU_USER_DIR')or static_context['gpu_root']));project=directory(Path(project))
+ from launcher_runtime_profile import work
+ state_root=work(project,runtime_profile)
+ if runtime_profile is not None:
+  runtime_profile.work(project);runtime_profile.gpu(gpu);component={**component,'_runtime_profile':runtime_profile}
+ else:need(gpu.is_relative_to(project/'state')and gpu!=project/'state','selected isolated GPU root')
  need(0<page_size<=128 and 0<seconds<=600,'bounded original startup preparation page')
  selected_renderer=selected_renderer or environment.get('BB_GPU_PROCESS');backend_root=backend_root or component.get('backend_root')
  if not selected_renderer or not backend_root:return dict(status='unavailable',reason='selected renderer/packaged load-edge root unavailable',geometry_resolver=None)
- identity=coherent_component(component,gpu=gpu,selected_renderer=selected_renderer,backend_root=backend_root,resolver=identity_resolver,capability_runner=capability_runner)
+ identity=coherent_component(component,gpu=gpu,selected_renderer=selected_renderer,backend_root=backend_root,resolver=identity_resolver,capability_runner=capability_runner,runtime_profile=runtime_profile)
  need(len(cohort)==64 and all(x in'0123456789abcdef'for x in cohort),'compiler cohort identity')
  layout=component['native_layout'];catalog=json.loads(checked_bytes(Path(static_context['catalog']),limit=32*1024*1024)[0]);need(Path(catalog['game_root'])==Path(static_context['game_root']),'actual final game source root')
  table=lookup_table(list(rows(Path(static_context['index']))));need(len(caches)<=128,'selected cache count budget')
@@ -194,7 +205,7 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
   profiles={};targets=collections.defaultdict(dict)
   for cache in caches:
    path=Path(cache)/'profile.bin';_,ref=checked_bytes(path);profiles[ref['sha256']]=ref
-  for unit in selected_units(caches,gpu=gpu,state_root=project/'state',title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest):
+  for unit in selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest):
    if unit['record_type']!='offline-pso-input':continue
    for stage in unit['stages']:
     if stage['logical_stage']=='vertex'and stage['hardware_stage']in('vertex','export','local'):targets[stage_key(unit,stage)][stage['serialized_spec_sha256']]=stage['metadata']
@@ -205,7 +216,7 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
   raw=json.dumps(value,sort_keys=True,separators=(',',':'))+'\n';link_bytes+=len(raw.encode());need(link_bytes<=64*1024*1024,'bounded automatic association ledger');stream.write(raw)
  stages_stream=links_path.open('x');recipes_stream=recipes_path.open('x')
  try:
-  for unit in selected_units(caches,gpu=gpu,state_root=project/'state',title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest):
+  for unit in selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest):
    check();counts['records']+=1;need(counts['records']<=MAX_RECORDS,'automatic module inventory bound')
    if unit['record_type']!='offline-pso-input':gaps[unit['reason']]+=1;continue
    stage_results={};input_ids=[]

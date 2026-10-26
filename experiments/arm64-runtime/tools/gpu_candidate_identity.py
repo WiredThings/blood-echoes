@@ -43,14 +43,15 @@ def resolve_gpu_edge(target,edge,*,rpaths=None):
   if os.path.lexists(candidate):matches.add(candidate.resolve(strict=True))
  if len(matches)!=1:raise ValueError('GPU RPATH must resolve to one unambiguous declared library')
  return matches.pop()
-def verify(meta,backend_root):
+def verify(meta,backend_root,*,code_owners=None):
  root=Path(backend_root).absolute()
  if root!=root.resolve():raise ValueError('noncanonical private backend root')
  target=Path(meta['target']).absolute();library=Path(meta['library']).absolute()
  for path in(target,library):
   if path!=path.resolve()or not path.is_relative_to(root):raise ValueError('GPU candidate outside private backend')
   st=path.stat()
-  if not stat.S_ISREG(st.st_mode)or st.st_uid!=os.getuid()or st.st_nlink!=1:raise ValueError('unowned/nonregular GPU candidate')
+  if not stat.S_ISREG(st.st_mode)or st.st_uid not in((os.getuid(),)if code_owners is None else code_owners)or st.st_nlink!=1:raise ValueError('unowned/nonregular GPU candidate')
+  if code_owners is not None and st.st_mode&0o022:raise ValueError('writable bundled GPU code')
  if sha(library)!=meta['library_sha256']:raise ValueError('GPU candidate library identity changed')
  for path in(target,library):
   if subprocess.check_output(['/usr/bin/lipo','-archs',str(path)],text=True).strip()!='arm64':raise ValueError('GPU candidate must be native ARM64')

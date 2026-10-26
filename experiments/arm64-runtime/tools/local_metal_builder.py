@@ -77,8 +77,12 @@ def child_directory(parent,name,*,create=False):
         except FileExistsError:pass
     return check_directory(path)
 
-def checked_root(root):
+def checked_root(root,runtime_profile=None):
     # Deliberately only this prepared private host; no HOME/cwd/installation fallback.
+    if runtime_profile is not None:
+        gpu=runtime_profile.gpu(runtime_profile.gpu_root);root=Path(root)
+        if root!=gpu/'local-metal':raise Refused('formal AOT root must be selected namespace/local-metal')
+        return check_directory(root)
     state=PROJECT/'state';root=Path(root)
     if not root.is_absolute()or root!=root.resolve(strict=True):raise Refused('noncanonical or symlink root')
     try:relative=root.relative_to(state)
@@ -334,14 +338,14 @@ def real_services(private_tmp):
     observer=NativeObserver()
     return observer,Safety(observer,require_no_games,MemoryPolicy),NativeToolchain(FixedRunner(private_tmp))
 
-def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None):
+def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtime_profile=None):
     # Do not move path resolution, imports, enumeration, hashes or services above this gate.
     if not enabled:return dict(status='off',build_id=None,built=0,skipped=0)
     summary=dict(status='failed',build_id=None,built=0,skipped=0,requests=0,results=[])
     observer=None;lock_fd=None;summary_path=None;index=None;results_fd=None;results_tmp=None
     try:
         if type(cohort)is not str or not HEX.fullmatch(cohort):raise Refused('cohort must be lowercase 64-hex')
-        root=checked_root(root);folder=child_directory(root,cohort);requests=child_directory(folder,'requests')
+        root=checked_root(root,**({'runtime_profile':runtime_profile}if runtime_profile is not None else{}));folder=child_directory(root,cohort);requests=child_directory(folder,'requests')
         artifact_root=child_directory(folder,'artifacts',create=True)
         private_tmp=child_directory(artifact_root,'.builder-tmp',create=True)
         lock_fd=os.open(artifact_root/'.builder.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
@@ -497,7 +501,8 @@ class PreparationSession:
     A record phase invalidates immediately. Every reuse still resolves the actual
     selected toolchain, checks authenticated binary pins and all input stat pins.
     """
-    def __init__(self,private_tmp,*,clock=time.monotonic):
+    def __init__(self,private_tmp,*,clock=time.monotonic,runtime_profile=None):
+        self.runtime_profile=runtime_profile
         self.tmp=Path(private_tmp);self.clock=clock;self.snapshot=None;self.toolchain=None;self.summary=None;self.scope=None;self.environment=None;self.audit=None;self.validation_generation=0
         self.stats=dict(calls=0,full_builds=0,reuses=0,invalidations=0,metadata_entries=0,seconds=0.0,full_build_seconds=0.0,reuse_validation_seconds=0.0,events=[])
     def invalidate(self,reason='explicit'):
@@ -515,8 +520,11 @@ class PreparationSession:
             p=Path(row['path'])
             if p!=p.resolve(strict=True)or row.get('session_stat')!=_session_stat(p.stat()):return False
         return True
-    def build(self,root,cohort,*,guard,toolchain_factory,enabled=False):
+    def build(self,root,cohort,*,guard,toolchain_factory,enabled=False,runtime_profile=None):
         if not enabled:return dict(status='off',build_id=None,built=0,skipped=0)
+        if runtime_profile is not None:
+            if self.runtime_profile is not None and self.runtime_profile is not runtime_profile:raise Refused('builder runtime profile changed')
+            self.runtime_profile=runtime_profile
         started=self.clock();self.stats['calls']+=1;root=Path(root);scope=(str(root),cohort)
         try:
             guard.check(preflight=True)
@@ -524,7 +532,7 @@ class PreparationSession:
                 lock=None
                 try:
                     # Preserve the exact cohort builder exclusion during reuse.
-                    checked_root(root)
+                    checked_root(root,**({'runtime_profile':self.runtime_profile}if self.runtime_profile is not None else{}))
                     lock=os.open(root/cohort/'artifacts/.builder.lock',os.O_RDWR|os.O_NOFOLLOW)
                     row=os.fstat(lock)
                     if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1:raise Refused('invalid session builder lock')
@@ -559,7 +567,7 @@ class PreparationSession:
                     return result
                 def compile(self,*args,**kwargs):return actual.compile(*args,**kwargs)
             try:
-                summary=build(root,cohort,enabled=True,guard=guard,toolchain=EnclosedToolchain())
+                summary=build(root,cohort,enabled=True,guard=guard,toolchain=EnclosedToolchain(),**({'runtime_profile':self.runtime_profile}if self.runtime_profile is not None else{}))
                 self.stats['full_build_seconds']+=self.clock()-started
                 if summary.get('status')=='passed'and summary.get('requests',0)>0:
                     try:
@@ -583,7 +591,7 @@ class PreparationSession:
         if self.audit is None or self.audit[0]!=(str(Path(root)),cohort):return None
         scope,toolchain,summary,environment=self.audit;lock=None;snapshot=None
         try:
-            checked_root(Path(root));guard.check(preflight=True)
+            checked_root(Path(root),**({'runtime_profile':self.runtime_profile}if self.runtime_profile is not None else{}));guard.check(preflight=True)
             lock=os.open(Path(root)/cohort/'artifacts/.builder.lock',os.O_RDWR|os.O_NOFOLLOW)
             row=os.fstat(lock)
             if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1:raise Refused('invalid validation builder lock')
@@ -612,7 +620,7 @@ class _ValidationAnchor:
         if self.snapshot is None or self.session.validation_generation!=self.generation:return False
         lock=None
         try:
-            checked_root(self.root);guard.check(preflight=True)
+            checked_root(self.root,**({'runtime_profile':self.session.runtime_profile}if self.session.runtime_profile is not None else{}));guard.check(preflight=True)
             lock=os.open(self.root/self.cohort/'artifacts/.builder.lock',os.O_RDWR|os.O_NOFOLLOW);row=os.fstat(lock)
             if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1:raise Refused('invalid validation builder lock')
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

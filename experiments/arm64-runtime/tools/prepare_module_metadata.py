@@ -1,6 +1,6 @@
 """Reuse the original loader to describe this exact private boot; never edit it."""
 from pathlib import Path
-import argparse,hashlib,struct,sys,os,tempfile,mmap,json,stat
+import argparse,hashlib,struct,sys,os,tempfile,mmap,json,stat,plistlib,importlib.util
 PRIVATE_ROOT=Path('/Users/Shared/BloodEchoesDevelopment')
 PROJECT=PRIVATE_ROOT/'arm64-runtime-prototype'
 SUPPORT=('vendor/blood_echoes/loader/prepare.py','vendor/blood_echoes/loader/game_check.py')
@@ -8,42 +8,64 @@ SIZE=424;PAGE=16384
 
 def require(ok,why):
  if not ok:raise ValueError(why)
-def owned_file(path,limit):
+def owned_file(path,limit,*,code_owners=None):
  path=Path(path).absolute();info=path.lstat()
- require(path==path.resolve(strict=True)and stat.S_ISREG(info.st_mode)and info.st_uid==os.getuid()and info.st_nlink==1 and 0<info.st_size<=limit,'module helper code must be canonical owned regular file')
+ require(path==path.resolve(strict=True)and stat.S_ISREG(info.st_mode)and info.st_uid in((os.getuid(),)if code_owners is None else code_owners)and info.st_nlink==1 and 0<info.st_size<=limit,'module helper code must be canonical owned regular file')
  return path
 def digest(path):
  with path.open('rb')as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+def formal_code_root(root):
+ info=root.parent.parent.parent/'Contents/Info.plist'
+ if not info.is_file():return False
+ return plistlib.loads(owned_file(info,1024**2,code_owners=(0,os.getuid())).read_bytes()).get('CFBundleIdentifier')=='io.github.bbport.optimized'
 def declared_code_root(executable):
  """Only the two original launcher roles, within a private packaged QA app."""
- executable=owned_file(executable,256*1024**2)
+ executable=Path(executable).absolute()
  layouts=('bin/bb-probe-metal','bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal')
  for relative in layouts:
   parts=Path(relative).parts
   if executable.parts[-len(parts):]!=parts:continue
   root=executable.parents[len(parts)-1]
   app=root.parent.parent.parent
-  require(root.name=='bbport'and root.parent.name=='Resources'and root.parent.parent.name=='Contents'and app.suffix=='.app'and app.parent==PROJECT/'apps','module helper bundle is not a declared private QA application')
+  require(root.name=='bbport'and root.parent.name=='Resources'and root.parent.parent.name=='Contents'and app.suffix=='.app','module helper bundle layout is not declared')
+  if formal_code_root(root):
+   owned_file(executable,256*1024**2,code_owners=(0,os.getuid()))
+  else:
+   require(app.parent==PROJECT/'apps','module helper bundle is not a declared private QA application')
+   owned_file(executable,256*1024**2)
   require(root==root.resolve(strict=True),'linked module helper code root')
   return root,relative
  raise ValueError('module helper executable role is not declared')
 def packaged_loader(code_root,executable,*,script=None):
  """Bind code to frozen bundle manifests; never fall back after any refusal."""
  root,role=declared_code_root(executable)
+ formal=formal_code_root(root)
+ code_args={'code_owners':(0,os.getuid())}if formal else{}
  require(Path(code_root).absolute()==root,'module helper code root differs from actual executable')
- helper=owned_file(root/'native-runtime-tools/prepare_module_metadata.py',2*1024**2)
+ helper=owned_file(root/'native-runtime-tools/prepare_module_metadata.py',2*1024**2,**code_args)
  require(Path(script if script is not None else __file__).absolute()==helper,'module helper is not running from its frozen bundle role')
- manifest=json.loads(owned_file(root/'ARM64-LOCAL-PREPARATION.json',1024**2).read_bytes())
- require(manifest['schema']==1 and manifest['host_local_only']is True and manifest['runtime_project']==str(PROJECT),'module helper requires private prepared component')
+ manifest=json.loads(owned_file(root/'ARM64-LOCAL-PREPARATION.json',1024**2,**code_args).read_bytes())
+ require(manifest['schema']==1 and ((manifest.get('production')is True)if formal else(manifest['host_local_only']is True and manifest['runtime_project']==str(PROJECT))),'module helper requires declared prepared component')
  require(manifest['runtime_tools']['prepare_module_metadata.py']==digest(helper),'module helper identity changed')
  support=manifest['runtime_support'];require(set(support)==set(SUPPORT),'module helper original parser closure differs')
  for relative in SUPPORT:
-  path=owned_file(root/relative,2*1024**2)
+  path=owned_file(root/relative,2*1024**2,**code_args)
   require(support[relative]==digest(path),'module helper original parser identity changed: '+relative)
- native=json.loads(owned_file(root/'NATIVE-METAL.json',1024**2).read_bytes())
- require(native['schema']==1 and native['game_runtime']=='fex-arm64'and native['production']is False,'module helper requires declared private FEX runtime')
+ native=json.loads(owned_file(root/'NATIVE-METAL.json',1024**2,**code_args).read_bytes())
+ require(native['schema']==1 and native['game_runtime']=='fex-arm64'and native['production']is formal,'module helper requires declared FEX runtime profile')
  require(native['frozen_runtime'][role]==digest(Path(executable)),'module helper actual executable identity changed')
  return root/'vendor/blood_echoes/loader'
+def formal_inputs(code_root,executable,boot,game,out,environment):
+ root,role=declared_code_root(executable)
+ require(Path(code_root).absolute()==root,'formal metadata code root mismatch')
+ if not formal_code_root(root):return None
+ # Verify the sibling before executing it under isolated Python (-I).
+ manifest=json.loads(owned_file(root/'ARM64-LOCAL-PREPARATION.json',1024**2,code_owners=(0,os.getuid())).read_bytes())
+ path=owned_file(root/'native-runtime-tools/launcher_runtime_profile.py',2*1024**2,code_owners=(0,os.getuid()))
+ require(digest(path)==manifest['runtime_tools']['launcher_runtime_profile.py'],'formal metadata profile tool identity')
+ name='_blood_echoes_metadata_profile_'+digest(path);spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);sys.modules[name]=module;spec.loader.exec_module(module)
+ admitted=module.bundle(root);require(admitted is not None,'formal metadata outer bundle admission')
+ return module.metadata_inputs(admitted,boot,game,out,environment)
 def select_loader(*,code_root=None,executable=None,loader=None,script=None):
  script=Path(script if script is not None else __file__).absolute()
  if code_root is not None or executable is not None:
@@ -90,9 +112,11 @@ def record(m,name,base,ident,tls_index,main=False):
   struct.pack_into('<QIi',b,352+i*16,base+p['vaddr'],size,p['flags'])
  struct.pack_into('<I',b,416,len(loads));return bytes(b),[(base+p['vaddr'],p['memsz'],p['flags'])for p in loads]
 
-def prepare(boot,game,out,loader):
+def prepare(boot,game,out,loader,*,formal_inputs=None):
  boot=boot.resolve(strict=True);game=game.resolve(strict=True);out=out.absolute();loader=loader.resolve(strict=True)
- for path in [boot,game,out.parent.resolve(strict=True),loader]:require(path.is_relative_to(PRIVATE_ROOT),'inputs/output must stay in private Shared tree')
+ if formal_inputs is None:
+  for path in [boot,game,out.parent.resolve(strict=True),loader]:require(path.is_relative_to(PRIVATE_ROOT),'inputs/output must stay in private Shared tree')
+ else:require((boot,game,out,loader)==(formal_inputs.boot,formal_inputs.game,formal_inputs.out,formal_inputs.loader),'formal module inputs differ from admitted roles')
  require(not out.is_symlink(),'linked metadata destination')
  sys.path.insert(0,str(loader));from prepare import parse_self,unpack
  require(Path(sys.modules['prepare'].__file__).resolve(strict=True)==loader/'prepare.py','module parser imported outside selected original loader')
@@ -142,4 +166,5 @@ if __name__=='__main__':
  sys.dont_write_bytecode=True
  ap=argparse.ArgumentParser();ap.add_argument('--boot',type=Path,required=True);ap.add_argument('--app0',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--loader-scripts',type=Path);ap.add_argument('--code-root',type=Path);ap.add_argument('--runtime-executable',type=Path);a=ap.parse_args()
  loader=select_loader(code_root=a.code_root,executable=a.runtime_executable,loader=a.loader_scripts)
- prepare(a.boot,a.app0,a.out,loader)
+ formal=formal_inputs(a.code_root,a.runtime_executable,a.boot,a.app0,a.out,os.environ)if a.code_root is not None else None
+ prepare(a.boot,a.app0,a.out,loader,formal_inputs=formal)

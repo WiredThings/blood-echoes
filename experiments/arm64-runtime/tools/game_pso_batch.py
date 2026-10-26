@@ -17,18 +17,16 @@ def capability(stdout):
  values=[json.loads(line.split(' ',1)[1])for line in stdout.splitlines()if line.startswith('GAME_PSO_BATCH_CAPABILITY ')]
  return len(values)==1 and canonical(values[0])==canonical(CAPABILITY)
 
-def probe_capability(worker,project,check,*,runner=None):
+def probe_capability(worker,project,check,*,runner=None,runtime_profile=None):
  # The selected DSO constructs UserPaths before main, including scalar CLIs.
  # Match the existing component capability contract, never inherit account or
  # launch environment secrets and never use an evidence directory as GPU data.
  if runner is None:
   from game_pso_component import _run_bounded_capability
   runner=_run_bounded_capability
- base=Path(project).resolve(strict=True)/'state';row=base.lstat()
- need(base==base.resolve(strict=True)and stat.S_ISDIR(row.st_mode)and row.st_uid==os.getuid(),'owned canonical capability state root')
+ from launcher_runtime_profile import capability_environment
  check()
- with tempfile.TemporaryDirectory(prefix='game-pso-batch-cap-',dir=base)as tmp:
-  env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':tmp,'TMPDIR':tmp,'BB_GPU_USER_DIR':tmp}
+ with capability_environment(project,runtime_profile,'game-pso-batch-cap-')as env:
   result=runner([str(worker),'--game-pso-batch-capability'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=3,env=env)
   check()
   need(type(result.returncode)is int and isinstance(result.stdout,bytes)and len(result.stdout)<=4096,'bounded scalar capability result')

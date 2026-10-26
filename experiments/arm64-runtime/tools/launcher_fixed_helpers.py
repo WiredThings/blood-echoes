@@ -54,7 +54,12 @@ def validate_result(row,phase):
 
 def prepare(*,project,execution_root,arguments,environment,cohort,options,observe,
             mode='auto',local_prepare=None,component_loader=None,toolchain_probe=None,
-            protection_baseline=None,runner=None):
+            protection_baseline=None,runner=None,runtime_profile=None):
+ if runtime_profile is None:
+  def kw(_):return{}
+  def work(value,_):return value/'state'
+ else:
+  from launcher_runtime_profile import kw,work
  project=Path(project).resolve(strict=True)
  if mode in ('off','record'):return {},dict(status='inactive',reason='explicit-local-mode')
  if mode not in ('auto','load')or not HEX.fullmatch(cohort):raise ValueError('fixed helper mode/cohort')
@@ -62,25 +67,26 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  stage=Path(execution_root).resolve(strict=True)
  if component_loader is None:
   from game_pso_component import load as component_loader
- component=component_loader(stage)
+ component=component_loader(stage,**kw(runtime_profile))
  if component is None or component.get('fixed_helper_seed_schema')!=2:
   return {},dict(status='unavailable',reason='fixed helper worker ABI unavailable')
  if toolchain_probe is None:
   from local_aot_policy import available_toolchain as toolchain_probe
  if not toolchain_probe():return {},dict(status='source-fallback',reason='toolchain-unavailable')
  from warm_archive_manifest import resolve_gpu_identity
- selected=resolve_gpu_identity(Path(environment['BB_GPU_PROCESS']),stage)
+ selected=resolve_gpu_identity(Path(environment['BB_GPU_PROCESS']),stage,**({'code_owners':(0,os.getuid())}if runtime_profile is not None else{}))
  if selected['library_sha256']!=component['library_sha256']:raise ValueError('fixed helper worker/renderer DSO mismatch')
  from launcher_game_pso import title_id
- title=title_id(arguments,stage,project);gpu=Path(environment['BB_GPU_USER_DIR']).resolve(strict=True)
- if gpu==project/'state'or not gpu.is_relative_to(project/'state'):raise ValueError('fixed helper isolated GPU root required')
+ title=title_id(arguments,stage,project,**kw(runtime_profile));gpu=Path(environment['BB_GPU_USER_DIR']).resolve(strict=True)
+ if runtime_profile is not None:runtime_profile.gpu(gpu)
+ elif gpu==project/'state'or not gpu.is_relative_to(project/'state'):raise ValueError('fixed helper isolated GPU root required')
  artifact=gpu/'cache'/title/'metal';artifact.mkdir(parents=True,exist_ok=True)
  if artifact!=artifact.resolve(strict=True):raise ValueError('linked renderer artifact root')
  from qa_memory_policy import MemoryPolicy
  from qa_build_guard import require_no_games
  baseline=observe();policy=MemoryPolicy(baseline)
  if protection_baseline is not None:policy.baseline=min(policy.baseline,protection_baseline['swap_mib'])
- start=time.monotonic();job=project/'state'/('fixed-helper-seeds-'+str(time.time_ns()));job.mkdir(mode=0o700)
+ start=time.monotonic();job=work(project,runtime_profile)/('fixed-helper-seeds-'+str(time.time_ns()));job.mkdir(mode=0o700)
  calls=[];report=dict(schema=1,status='deferred',known=8,calls=calls,artifact_cache_dir=str(artifact),cohort=cohort,
   original_arguments_preserved=True,storage_opened=False,renderer_owners_constructed=False,formal_data_modified=False)
  def check():
@@ -96,6 +102,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   child.update({k:v for k,v in env.items()if k=='BB_GS_DEBUG'or k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))or k in ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES','MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')})
   child.update(BB_GPU_USER_DIR=str(gpu),BB_MTL_ARCHIVE_COMPATIBILITY_ID=cohort,BB_MTL_PERSIST_WARM_ARCHIVE='0',
    BB_MTL_RELEASE_WARM_ARCHIVE='1',BB_MTL_REPLAY_THREAD='0',HOME=str(case),TMPDIR=str(tmp),DYLD_PRINT_LIBRARIES='1')
+  if runtime_profile is not None:child.update(runtime_profile.child_environment())
   log=case/'console.log';command=[str(component['worker']),phase,str(packet),str(scratch)]
   if runner is not None:row=runner(command,child,case,check)
   else:
@@ -137,7 +144,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
    from local_aot_policy import prepare as local_prepare
   # Probe emitted original LocalLibrary requests. Reuse the SAME local policy,
   # root and cohort; never publish or fabricate a library/function origin here.
-  updates,local=local_prepare(mode=mode,gpu_root=gpu,cohort=cohort,engine='arm64',graphics=True)
+  updates,local=local_prepare(mode=mode,gpu_root=gpu,cohort=cohort,engine='arm64',graphics=True,**kw(runtime_profile))
   report['local']=local;nextenv={**environment,**updates}
   if local.get('status')in('stopped','failed-protection'):raise ProtectionStopped('fixed helper local preparation safety stop')
   if nextenv.get('BB_MTL_LOCAL_AOT_MODE')!='load':report.update(status='source-fallback',reason='local-library-build-unavailable');return updates,report
@@ -155,7 +162,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
     # A ten-second collection budget may discover requests after the first
     # build. Consume only the new requests with the same verified policy; the
     # existing success files and warm-map admission remain unchanged.
-    more,local=local_prepare(mode=mode,gpu_root=gpu,cohort=cohort,engine='arm64',graphics=True)
+    more,local=local_prepare(mode=mode,gpu_root=gpu,cohort=cohort,engine='arm64',graphics=True,**kw(runtime_profile))
     report['local']=local;updates.update(more);nextenv.update(more)
     if local.get('status')in('stopped','failed-protection'):raise ProtectionStopped('fixed helper incremental local preparation safety stop')
     if nextenv.get('BB_MTL_LOCAL_AOT_MODE')!='load':report.update(status='source-fallback',reason='incremental-local-library-build-unavailable');return updates,report
