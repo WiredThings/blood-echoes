@@ -29,6 +29,8 @@ class Fixture(unittest.TestCase):
         script = self.repo / 'tools/macos/build_launcher.sh'
         script.parent.mkdir(parents=True)
         script.write_text('work=${BB_LAUNCHER_WORK:-out/launcher-build}\n')
+        identity_source = Path(__file__).resolve().parents[3] / 'tools/macos/build_identity.py'
+        (script.parent / 'build_identity.py').write_bytes(identity_source.read_bytes())
         for root, names in ((self.prefix, ('cmake', 'ninja', 'pkg-config', 'protoc')),
                             (self.provider, ('python3.11',))):
             (root / 'bin').mkdir(parents=True)
@@ -63,6 +65,8 @@ class Fixture(unittest.TestCase):
         self.assertIn('--prepare-only', commands['cpu-generate']['argv'])
         self.assertTrue(commands['launcher-build']['argv'][1].endswith('tools/macos/build_launcher.sh'))
         self.assertIn('-DBBNET_PROTOC_EXECUTABLE=' + str(self.prefix / 'bin/protoc'), commands['net-configure']['argv'])
+        self.assertIn('-DBB_LTO=OFF', commands['renderer-configure']['argv'])
+        self.assertIn('-DBB_PGO=off', commands['renderer-configure']['argv'])
         for command in commands.values():
             if command['name'].endswith('-build') and command['name'] != 'launcher-build':
                 self.assertEqual(command['argv'][command['argv'].index('--parallel') + 1], '1')
@@ -147,6 +151,82 @@ class Fixture(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'inputs changed'):
                 build.execute(value)
         self.assertFalse(self.args['build_root'].exists())
+
+    def identify_export(self, *, top=None, revision=None):
+        def reject_parent_git(*args):
+            raise AssertionError('parent HEAD/status must not be consumed')
+        return build.identify_source(self.repo, revision or self.args['revision'], git_top=lambda: top, git=reject_parent_git)
+
+    def export_manifest(self, value=None):
+        (self.repo / 'SOURCE-MANIFEST.json').write_text(json.dumps(value or {'source_commit': self.args['revision']}))
+
+    def test_gitless_export_reuses_original_manifest_parser_without_writes(self):
+        self.export_manifest([{'component': 'blood-echoes', 'revision': 'A' * 40}])
+        before = sorted(str(p.relative_to(self.base)) for p in self.base.rglob('*'))
+        with patch('subprocess.Popen', side_effect=AssertionError('native call')):
+            result = self.identify_export()
+        self.assertEqual(result['mode'], 'source-export')
+        self.assertEqual(result['revision'], 'a' * 40)
+        self.assertNotIn('tree', result)
+        self.assertIn('tools/macos/build_launcher.sh', result['source_files'])
+        self.assertEqual(before, sorted(str(p.relative_to(self.base)) for p in self.base.rglob('*')))
+
+    def test_gitless_missing_manifest_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'requires SOURCE-MANIFEST'):
+            self.identify_export()
+
+    def test_gitless_wrong_manifest_revision_rejected(self):
+        self.export_manifest({'source_commit': 'b' * 40})
+        with self.assertRaisesRegex(ValueError, 'export revision differs'):
+            self.identify_export()
+
+    def test_parent_repository_is_not_export_identity(self):
+        with self.assertRaisesRegex(ValueError, 'requires SOURCE-MANIFEST'):
+            self.identify_export(top=self.base)
+        self.export_manifest()
+        result = self.identify_export(top=self.base)
+        self.assertEqual(result['mode'], 'source-export')
+        self.assertNotIn('tree', result)
+
+    def test_repository_marker_with_wrong_top_rejected(self):
+        self.export_manifest()
+        (self.repo / '.git').mkdir()
+        with self.assertRaisesRegex(ValueError, 'marker disagrees'):
+            self.identify_export(top=self.base)
+
+    def test_source_export_snapshot_covers_source_gui_resource_and_scripts(self):
+        self.export_manifest()
+        paths = [self.source / 'src/runtime.cpp', self.repo / 'scripts/prepare.py',
+                 self.repo / 'launcher-macos/Sources/BBLauncher/Resources/AppIcon.icns']
+        for path in paths:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('original')
+        before = self.identify_export()
+        for path in paths:
+            path.write_text('changed')
+            after = self.identify_export()
+            self.assertNotEqual(before['snapshot_sha256'], after['snapshot_sha256'])
+            with self.assertRaisesRegex(ValueError, 'source changed during build'):
+                build.need(after == before, 'source changed during build')
+            path.write_text('original')
+        self.assertEqual(before, self.identify_export())
+
+    def test_source_export_snapshot_does_not_read_development_evidence(self):
+        self.export_manifest()
+        evidence = self.source / 'evidence/private/game.bin'
+        evidence.parent.mkdir(parents=True)
+        evidence.write_text('never source')
+        result = self.identify_export()
+        self.assertFalse(any('evidence' in p for p in result['source_files']))
+
+    def test_exact_git_top_keeps_head_clean_and_tree_contract(self):
+        calls = []
+        def git(*args):
+            calls.append(args)
+            return {'HEAD': 'a' * 40, 'HEAD^{tree}': 'b' * 40}.get(args[-1], '')
+        result = build.identify_source(self.repo, 'a' * 40, git_top=lambda: self.repo, git=git)
+        self.assertEqual(result, dict(mode='git', revision='a' * 40, tree='b' * 40))
+        self.assertTrue(any(args[0] == 'status' for args in calls))
 
     def test_artifact_comes_from_actual_file_api(self):
         normal = self.base / 'normal'

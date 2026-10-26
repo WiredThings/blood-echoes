@@ -250,9 +250,17 @@ def python_provider(provider):
          'Python 3.11 Framework required')
     interpreter = _file(root / 'Resources/Python.app/Contents/MacOS/Python')
     supplied = _file(root / 'bin/python3.11')
-    need(supplied == interpreter, 'Framework interpreter identity mismatch')
+    library = _file(root / 'Python')
+    if supplied != interpreter:
+        # Homebrew may install a distinct command-line wrapper.  Its basename
+        # or version string does not prove that it uses this Framework.
+        for executable in (supplied, interpreter):
+            refs = [ref for ref in loads(executable) if Path(ref).name == 'Python']
+            need(len(refs) == 1 and refs[0].startswith('/'),
+                 'single exact Framework Python load edge required')
+            need(_file(refs[0]) == library, 'Framework interpreter library mismatch')
     return dict(framework_root=root, provider=supplied, interpreter=interpreter,
-                library=_file(root / 'Python'), stdlib=_root(root / 'lib/python3.11'),
+                library=library, stdlib=_root(root / 'lib/python3.11'),
                 license=_file(root.parents[3] / 'LICENSE'))
 
 

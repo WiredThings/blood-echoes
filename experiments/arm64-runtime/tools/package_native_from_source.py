@@ -135,6 +135,7 @@ def copy_notices(repo,engine,relocators):
     for root in packages.values(): collect(root,engine/'licenses/build-packages'/root.parent.name/root.name)
     attribution=repo/'launcher-macos/Sources/BBLauncher/Resources/Artwork/ATTRIBUTION.txt'
     copy(attribution,engine/'licenses/icons/HuntersMark-ATTRIBUTION.txt')
+    copy(repo/'tools/macos/resources/ATTRIBUTION.txt',engine/'licenses/icons/GameCover-ATTRIBUTION.txt')
     public=dict(source_commit=None,source='https://github.com/WiredThings/blood-echoes',
                 components=['bbport','shadPS4','AetherPS4/FEXCore Darwin','SDL3','Vulkan loader','FFmpeg','fmt','xxHash','miniz','Zydis','SPIRV-Cross','Protobuf','Abseil','miniupnpc','OpenSSL','CPython'],
                 license_files=copied,game_or_compiled_game_assets_included=False)

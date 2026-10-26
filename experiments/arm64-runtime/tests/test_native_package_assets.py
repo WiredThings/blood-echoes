@@ -173,6 +173,37 @@ class Assets(unittest.TestCase):
             self.assertEqual(m.python_provider(provider)['framework_root'], root)
         with self.assertRaises(ValueError): m.python_provider(root / 'Python')
 
+    def wrapper(self):
+        root = self.framework()
+        wrapper = root / 'bin/python3.11'; wrapper.unlink(); wrapper.write_bytes(b'distinct CLI')
+        interpreter = root / 'Resources/Python.app/Contents/MacOS/Python'
+        library = root / 'Python'
+        self.edges[wrapper] = [str(library), '/usr/lib/libSystem.B.dylib']
+        self.edges[interpreter] = [str(library)]
+        return root, wrapper, interpreter, library
+
+    def test_different_wrapper_same_exact_framework(self):
+        root, wrapper, interpreter, library = self.wrapper()
+        for provider in (root, wrapper, interpreter):
+            result = m.python_provider(provider)
+            self.assertEqual(result['provider'], wrapper)
+            self.assertEqual(result['interpreter'], interpreter)
+            self.assertEqual(result['library'], library)
+
+    def test_different_wrapper_wrong_framework_rejected(self):
+        root, wrapper, interpreter, library = self.wrapper()
+        wrong = self.src / 'other-framework/Python'; wrong.parent.mkdir(); wrong.write_bytes(library.read_bytes())
+        for executable in (wrapper, interpreter):
+            self.edges[executable] = [str(wrong)]
+            with self.assertRaisesRegex(ValueError, 'library mismatch'): m.python_provider(root)
+            self.edges[executable] = [str(library)]
+
+    def test_different_wrapper_ambiguous_or_unproven_edge_rejected(self):
+        root, wrapper, interpreter, library = self.wrapper()
+        for edges in ([], ['@rpath/Python'], [str(library), str(library)]):
+            self.edges[wrapper] = edges
+            with self.assertRaisesRegex(ValueError, 'single exact'): m.python_provider(root)
+
     def test_stdlib_allowlist_no_links(self):
         root = self.framework() / 'lib/python3.11'
         for name in ('json/__init__.py', 'site-packages/no.py', 'test/no.py', '__pycache__/no.pyc', 'a.py', 'lib-dynload/a.so', 'data.txt'):

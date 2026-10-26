@@ -8,6 +8,7 @@ separate from this source build.  No prepared command table is replayed.
 from pathlib import Path
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -79,7 +80,8 @@ def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider
     openssl = str(directory(openssl_root)) if openssl_root is not None else None
     required = ['tools/macos/build_launcher.sh', 'experiments/arm64-runtime/tools/configure_native_build.py',
                 'experiments/arm64-runtime/tools/build_metadata_layout.py', 'experiments/arm64-runtime/vendor/metal_api/CMakeLists.txt',
-                'experiments/arm64-runtime/vendor/bbnet/CMakeLists.txt', 'experiments/arm64-runtime/targets.cmake']
+                'experiments/arm64-runtime/vendor/bbnet/CMakeLists.txt', 'experiments/arm64-runtime/targets.cmake',
+                'tools/macos/build_identity.py']
     sources = {name: digest(repo / name) for name in required}
     launcher = (repo / required[0]).read_text()
     need('work=${BB_LAUNCHER_WORK:-out/launcher-build}' in launcher,
@@ -107,7 +109,7 @@ def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider
         net_config += ['-DOPENSSL_ROOT_DIR=' + openssl]
     commands = [dict(name='renderer-configure', argv=[cmake, '-S', str(source / 'vendor/metal_api'), '-B', str(renderer), *common,
                     '-DPKG_CONFIG_EXECUTABLE=' + tools['pkg-config']['path'], '-DBB_BUILD_GAME_PREPARATION=ON',
-                    '-DBB_GAME_PREPARATION_SOURCE_ROOT=' + str(source), '-DBB_DEV_FETCH_CAPTURE=ON', '-DBB_LTO=ON', '-DBB_PGO=off']),
+                    '-DBB_GAME_PREPARATION_SOURCE_ROOT=' + str(source), '-DBB_DEV_FETCH_CAPTURE=ON', '-DBB_LTO=OFF', '-DBB_PGO=off']),
                 dict(name='renderer-build', argv=[cmake, '--build', str(renderer), '--parallel', '1', '--target',
                     'bbgpu', 'game-pso-preparer', 'game-module-preparer', 'bb-gpu', 'metadata-layout']),
                 dict(name='cpu-generate', argv=prepare),
@@ -148,6 +150,74 @@ def target_artifact(build, name):
     path = (build / artifacts[0]['path']).absolute()
     need(path == path.resolve(strict=True) and path.is_relative_to(build), 'target artifact escaped build')
     return path
+
+
+def source_snapshot(repository):
+    """Hash actual build source, original scripts and GUI resources, not QA trees.
+
+    The fixed source roles exclude development evidence/output/game/cache trees.
+    Internal source links record their spelling and their actual target content;
+    external dependencies must instead use the explicit dependency providers.
+    """
+    repo = directory(repository)
+    runtime = repo / 'experiments/arm64-runtime'
+    roots = [repo / p for p in ('src', 'gpu', 'include', 'scripts', 'launcher', 'launcher-macos', 'tools')]
+    roots += [runtime / p for p in ('src', 'vendor', 'tools', 'config', 'tests')]
+    for parent in (repo, runtime):
+        roots += [p for p in parent.iterdir() if p.name in ('CMakeLists.txt', 'SOURCE-MANIFEST.json', 'Package.swift', 'Package.resolved')
+                  or p.suffix in ('.py', '.cmake', '.sh')]
+    result, visited, queue = {}, set(), [p for p in roots if os.path.lexists(p)]
+    while queue:
+        path = queue.pop()
+        relative = str(path.relative_to(repo))
+        if relative in visited:
+            continue
+        visited.add(relative)
+        need(len(visited) <= 500000, 'source snapshot node bound exceeded')
+        row = path.lstat()
+        need(row.st_uid in (0, os.getuid()), 'source snapshot owner mismatch')
+        if stat.S_ISLNK(row.st_mode):
+            target = path.resolve(strict=True)
+            need(target.is_relative_to(repo), 'source export link escaped source tree')
+            result[relative] = dict(kind='link', target=os.readlink(path))
+            queue.append(target)
+        elif stat.S_ISDIR(row.st_mode):
+            result[relative] = dict(kind='directory', mode=stat.S_IMODE(row.st_mode))
+            queue += [p for p in path.iterdir() if p.name not in ('.git', '__pycache__', '.build', '.DS_Store')]
+        else:
+            result[relative] = dict(kind='file', mode=stat.S_IMODE(row.st_mode), bytes=row.st_size, sha256=digest(path))
+    return dict(sorted(result.items()))
+
+
+def identify_source(repository, revision, *, git_top, git):
+    """Callbacks are FixedRunner-controlled queries; author tests inject no tools."""
+    repo = directory(repository)
+    top = git_top()
+    if top is not None and Path(top).resolve(strict=True) == repo:
+        need(git('rev-parse', 'HEAD') == revision, 'repository revision differs from requested revision')
+        need(not git('status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none'),
+             'source/submodule modifications or untracked inputs present')
+        return dict(mode='git', revision=revision, tree=git('rev-parse', 'HEAD^{tree}'))
+    # The original source_revision contract permits an export inside another
+    # checkout. Never attribute that parent's HEAD/tree to this export.
+    need(not os.path.lexists(repo / '.git'), 'repository marker disagrees with actual Git top level')
+    manifest = repo / 'SOURCE-MANIFEST.json'
+    need(manifest.is_file(), 'Git-less source export requires SOURCE-MANIFEST.json')
+    need(manifest.stat().st_size <= 1024 * 1024, 'source manifest size bound exceeded')
+    manifest_sha = digest(manifest)
+    helper = repo / 'tools/macos/build_identity.py'
+    helper_sha = digest(helper)
+    spec = importlib.util.spec_from_file_location('_blood_echoes_source_identity', helper)
+    module = importlib.util.module_from_spec(spec)
+    # Avoid importlib's bytecode writer in an immutable source export.
+    exec(compile(helper.read_bytes(), str(helper), 'exec'), module.__dict__)
+    actual = module.manifest_revision(json.loads(manifest.read_text()))
+    need(actual == revision, 'source export revision differs from requested revision')
+    snapshot = source_snapshot(repo)
+    need(digest(manifest) == manifest_sha and digest(helper) == helper_sha, 'source identity changed during snapshot')
+    canonical = json.dumps(snapshot, sort_keys=True, separators=(',', ':')).encode()
+    return dict(mode='source-export', revision=revision, manifest_sha256=manifest_sha,
+                snapshot_sha256=hashlib.sha256(canonical).hexdigest(), source_files=snapshot)
 
 
 class BuildGuard:
@@ -204,9 +274,22 @@ def execute(value):
             return raw
         def git(*args):
             return run(['/usr/bin/git', '-C', value['repository'], *args], name='git-' + args[0], timeout=20).decode().strip()
-        need(git('rev-parse', 'HEAD') == value['revision'], 'repository revision differs from requested revision')
-        need(not git('status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none'), 'source/submodule modifications or untracked inputs present')
-        source_identity = dict(revision=value['revision'], tree=git('rev-parse', 'HEAD^{tree}'), source_files=value['source_files'])
+        def git_top():
+            # Preserve non-repository status without relaxing FixedRunner's
+            # fail-closed command semantics. The wrapper/child share its group.
+            code = ('import json,subprocess,sys; p=subprocess.run(sys.argv[1:],capture_output=True,text=True); '
+                    'print(json.dumps(dict(returncode=p.returncode,stdout=p.stdout)))')
+            raw = run([value['tools']['python']['path'], '-I', '-B', '-c', code, '/usr/bin/git', '-C',
+                       value['repository'], 'rev-parse', '--show-toplevel'], name='git-top-level', timeout=20)
+            query = json.loads(raw)
+            need(query['returncode'] in (0, 128), 'Git top-level query failed')
+            if query['returncode'] == 128:
+                need(not query['stdout'].strip(), 'ambiguous non-repository Git output')
+                return None
+            top = query['stdout'].strip()
+            need(top.startswith('/') and '\n' not in top, 'invalid Git top-level response')
+            return top
+        source_identity = identify_source(value['repository'], value['revision'], git_top=git_top, git=git)
         sdk = value['sdk_root'] or run(value['sdk_query'], name='sdk-query', timeout=20).decode().strip()
         sdk = str(directory(sdk))
         env = {k: v.replace('<SDKROOT>', sdk) for k, v in value['environment'].items()}
@@ -224,8 +307,7 @@ def execute(value):
                 argv = native['configure']
             argv = [a.replace('<SDKROOT>', sdk) for a in argv]
             run(argv, name=command['name'], env=env)
-        need(git('rev-parse', 'HEAD') == value['revision'] and not git('status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none'),
-             'source changed during build')
+        need(identify_source(value['repository'], value['revision'], git_top=git_top, git=git) == source_identity, 'source changed during build')
         need(all(digest(Path(value['repository']) / p) == h for p, h in value['source_files'].items()), 'build source identity changed')
         artifacts = {}
         roles = [('renderer', 'library', 'bbgpu'), ('renderer', 'gpu', 'bb-gpu'), ('renderer', 'worker', 'game-pso-preparer'),
