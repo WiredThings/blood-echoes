@@ -27,6 +27,11 @@ def write(path,value):path.write_text(json.dumps(value,indent=2)+'\n')
 def owned(path):
  path=Path(path).absolute();need(path==path.resolve(strict=True)and path.stat().st_uid==os.getuid(),'canonical owned staging input');return path
 
+def disjoint_output(output,inputs):
+ for source in inputs:
+  need(not output.is_relative_to(source)and not source.is_relative_to(output),
+       'staging output overlaps a source application or product directory')
+
 def check_relative_payload(root):
  """Keep internal executable aliases; never package external QA dependencies."""
  root=owned(root)
@@ -38,7 +43,9 @@ def check_relative_payload(root):
  # accepts safe relative links in source mode; we checked them independently.
  rows=inspect_payload(root,source=True)
  from package_optimized import development_tool
- need(not any(development_tool(Path(row['path']))for row in rows),'development automation in staged application')
+ need(not any(development_tool(Path(*Path(row['path']).parts[i:]))
+              for row in rows for i in range(len(Path(row['path']).parts))),
+      'development automation in staged application')
  need(not any(Path(row['path']).name in('ARM64-QA-MANIFEST.json','DEVELOPMENT-WORLD-WARPER.json')for row in rows),'QA/development manifest in application')
  return rows
 
@@ -57,6 +64,7 @@ def stage(*,qa_app,baseline,output,launcher_products,revision):
  output=Path(output).absolute();parent=owned(output.parent)
  need(output.parent==parent and not os.path.lexists(output)and output.suffix=='.app','fresh canonical staging app required')
  need(not output.is_relative_to(Path('/Applications'))and not base.is_relative_to(output),'this tool never writes an installed app')
+ disjoint_output(output,(qa,base,products))
  launcher=products/'BBLauncher';resource=products/'BBLauncher_BBLauncher.bundle'
  need(launcher.is_file()and not launcher.is_symlink()and resource.is_dir()and not resource.is_symlink(),'current original GUI product required')
  need(subprocess.check_output(['/usr/bin/lipo','-archs',str(launcher)],text=True).strip()=='arm64','native GUI required')

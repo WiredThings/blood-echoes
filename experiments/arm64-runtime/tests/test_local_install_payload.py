@@ -2,7 +2,7 @@
 from pathlib import Path
 import os,sys,tempfile,unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from prepare_local_install import check_relative_payload
+from prepare_local_install import check_relative_payload,disjoint_output
 
 class PayloadTests(unittest.TestCase):
  def setUp(self):
@@ -13,6 +13,13 @@ class PayloadTests(unittest.TestCase):
   (self.app/'alias').symlink_to('code')
   rows=check_relative_payload(self.app)
   self.assertEqual(len(rows),2);self.assertEqual(os.readlink(self.app/'alias'),'code')
+ def test_staging_never_writes_inside_or_above_sources(self):
+  sources=[self.root/'QA.app',self.root/'Baseline.app',self.root/'Products']
+  for source in sources:
+   with self.assertRaises(ValueError):disjoint_output(source/'nested/New.app',sources)
+   with self.assertRaises(ValueError):disjoint_output(source,sources)
+  with self.assertRaises(ValueError):disjoint_output(self.root,sources)
+  self.assertIsNone(disjoint_output(self.root/'independent/New.app',sources))
  def test_external_or_absolute_alias_rejected(self):
   (self.root/'outside').write_text('outside')
   for target in('../outside',str(self.root/'outside')):
@@ -26,7 +33,7 @@ class PayloadTests(unittest.TestCase):
    self.assertEqual(path.read_bytes(),b'author payload');path.unlink()
    if path.parent!=self.app:path.parent.rmdir()
  def test_private_manifests_and_automation_rejected(self):
-  for relative in('ARM64-QA-MANIFEST.json','DEVELOPMENT-WORLD-WARPER.json','tools/macos/benchmark.py'):
+  for relative in('ARM64-QA-MANIFEST.json','DEVELOPMENT-WORLD-WARPER.json','tools/macos/benchmark.py','Contents/Resources/bbport/tools/macos/benchmark.py'):
    path=self.app/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('{}')
    with self.assertRaises(ValueError):check_relative_payload(self.app)
    path.unlink()
