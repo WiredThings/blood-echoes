@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "counts": {
+    "static_programs_with_input_semantics": 1938,
+    "distinct_asset_vertex_layouts": 42,
+    "metadata_records": 8036,
+    "fetch_metadata_records": 3201,
+    "fetch_hardware_stage.vertex": 3105,
+    "fetch_attributes": 13962,
+    "exact_key_vertex_links": 5251,
+    "fetch_hardware_stage.local": 96,
+    "unique_static_programs_with_observed_fetch": 155
+  },
+  "statuses": {
+    "walker.constant-origin-map": 2013,
+    "fetch-Vsharp-not-captured": 10598,
+    "walker.empty-walker": 1188,
+    "empty-walker": 3364
+  },
+  "walker_root_occurrences": {
+    "6": 2013
+  },
+  "fetch_attribute_pointer_roots": {
+    "2": 13962
+  },
+  "outputs": {
+    "static-vertex-program-inputs.jsonl": "db96fbb32d61e9edf67158b77d95e782e6210cdc9cab97df03dc0595781d38af",
+    "observed-vertex-fetch-inputs.jsonl": "1b7a588544fa41b639c5184468f0d897bb30e8e65b945df6356ff26b2baf5f1b",
+    "asset-vertex-layouts.jsonl": "fb763f14b591454de5a5d8058e8cf3a530de0f64efe9515939bec44e25f14b27"
+  },
+  "seconds": 2.264518083073199,
+  "output_bytes": 22928235,
+  "game_started": false,
+  "GPU_started": false,
+  "guest_pointers_followed": false,
+  "walker_executed": false,
+  "formal_data_modified": false,
+  "qualification": "Metadata and exact constant-address walker origin audit only; no FLVER-to-fetch semantic inference, no raw descriptor synthesis from Vulkan format, no pipeline/module admission changes.",
+  "tests": {
+    "command": "python3 -m unittest discover -s experiments/arm64-runtime/tests -p 'test_vertex_fetch_inputs.py' -v",
+    "passed": 13
+  },
+  "input_static_index_sha256": "6c1af1015d03791392f24ae9179bc0415a6e1e629fae06919d8c0781d54bb0c9"
+}

@@ -10,6 +10,7 @@
 #include "shader_recompiler/ir/post_order.h"
 #include "shader_recompiler/ir/program.h"
 #include "shader_recompiler/profile.h"
+#include "shader_recompiler/uncaptured_program_base.h"
 #include "shader_recompiler/recompiler.h"
 
 namespace Shader {
@@ -60,8 +61,8 @@ void EmitControlFlowGraph(IR::Program& program, Pools& pools, Gcn::CFG& cfg,
     program.post_order_blocks = Shader::IR::PostOrder(program.blocks.front());
 }
 
-IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Info& info,
-                             RuntimeInfo& runtime_info, const Profile& profile) {
+static IR::Program TranslateProgramImpl(const std::span<const u32>& code, Pools& pools, Info& info,
+                             RuntimeInfo& runtime_info, const Profile& profile, bool unknown_program_base) {
     // Ensure first instruction is expected.
     constexpr u32 token_mov_vcchi = 0xBEEB03FF;
     if (code[0] != token_mov_vcchi) {
@@ -107,6 +108,10 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     Shader::Optimization::ReadLaneEliminationPass(program);
     Shader::IR::DumpProgram(program, info, "pre-res-discover.");
     auto resources = Shader::Optimization::ResourceDiscoverPass(program, profile);
+    // Offline metadata has no guest program address. Refuse the dependency before
+    // ResourcePatchingPass can consume ProgramBase through BufferResource::GetSharp.
+    // This is an extra preparation-only entry; normal runtime translation is unchanged.
+    if (unknown_program_base) RejectUncapturedProgramBase(resources);
     Shader::Optimization::FlattenExtendedUserdataPass(program);
     Shader::IR::DumpProgram(program, info, "pre-res-patch.");
     Shader::Optimization::ResourcePatchingPass(program.info, resources, profile);
@@ -147,6 +152,16 @@ IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Inf
     Shader::IR::DumpProgram(program, info);
 
     return program;
+}
+
+IR::Program TranslateProgram(const std::span<const u32>& code, Pools& pools, Info& info,
+                             RuntimeInfo& runtime_info, const Profile& profile) {
+    return TranslateProgramImpl(code, pools, info, runtime_info, profile, false);
+}
+
+IR::Program TranslateProgramWithoutProgramBase(const std::span<const u32>& code, Pools& pools,
+                             Info& info, RuntimeInfo& runtime_info, const Profile& profile) {
+    return TranslateProgramImpl(code, pools, info, runtime_info, profile, true);
 }
 
 } // namespace Shader

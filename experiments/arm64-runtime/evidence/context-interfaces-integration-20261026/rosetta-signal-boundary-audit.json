@@ -1,0 +1,566 @@
+{
+  "schema": 1,
+  "read_only": true,
+  "game_started": false,
+  "formal_runtime_has_sigreturn_implementation": false,
+  "formal_runtime_has_ps4_syscall417_dispatch": false,
+  "scoped_forks_have_reusable_ps4_signal_frame_producer": false,
+  "conclusion_scope": "specified source files at pinned commits and current installed binary symbols, not all upstream history",
+  "local_refs": [
+    {
+      "ref": "HEAD",
+      "commit": "7b09b7da3ab02d8c25c8a1e619f97e140b797710",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "37ded580415159c27f298a64a25c365d4d4be9ba7f1acf0d2df53435846be098",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "fac2dbbb99af1bc339b0ea1a7c0d056bb82aa754fbc1acd4a1c7a7d5e9e0ea7a",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "origin/optimized",
+      "commit": "3e2419b5f1b1f291521d0b61ffcd99d3fcaf881a",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "37ded580415159c27f298a64a25c365d4d4be9ba7f1acf0d2df53435846be098",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "fac2dbbb99af1bc339b0ea1a7c0d056bb82aa754fbc1acd4a1c7a7d5e9e0ea7a",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "optimized",
+      "commit": "8289f836e79e2ddd46228f58b69d0898555abb69",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "49279e50c8050a015a88b99cbba99a2d536437a1a65a148846b61482f62c1581",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "e8e27fb3ea6566e550993e95d9d548f242671d73163a33021954823446f898ec",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "3e2419b5f1b1f291521d0b61ffcd99d3fcaf881a",
+      "commit": "3e2419b5f1b1f291521d0b61ffcd99d3fcaf881a",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "37ded580415159c27f298a64a25c365d4d4be9ba7f1acf0d2df53435846be098",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "fac2dbbb99af1bc339b0ea1a7c0d056bb82aa754fbc1acd4a1c7a7d5e9e0ea7a",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream",
+      "commit": "8289f836e79e2ddd46228f58b69d0898555abb69",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "49279e50c8050a015a88b99cbba99a2d536437a1a65a148846b61482f62c1581",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "e8e27fb3ea6566e550993e95d9d548f242671d73163a33021954823446f898ec",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-0.3",
+      "commit": "872d0eb3e8d3ec42542da20e6e49261a6f581102",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "a3d2bd82ad02ea6fd21a9d4dd940ffe585606de14856dc8b6b6067e07b502b6b",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "4912cdcc7177ab291fbc6be56153623470a4e7550a786471632c4e245971db90",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-0.4",
+      "commit": "0333d6004fd1499d6b4d029a3e6e5dd3c511f8ea",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "a3d2bd82ad02ea6fd21a9d4dd940ffe585606de14856dc8b6b6067e07b502b6b",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "648e9a6eb8dba7fa82951592db59fd22ae9a62a49f1b51ccf37997e331482c1f",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-0.5",
+      "commit": "8fc568a9a62f414565a91b751db6e10d22164bcc",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "49279e50c8050a015a88b99cbba99a2d536437a1a65a148846b61482f62c1581",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "648e9a6eb8dba7fa82951592db59fd22ae9a62a49f1b51ccf37997e331482c1f",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-0.51",
+      "commit": "3646e16a3b65cb26872ae7340419149bd6e4f2fa",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "49279e50c8050a015a88b99cbba99a2d536437a1a65a148846b61482f62c1581",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "524f1e8a4b2a8029752563583132eccd65bcb8431465399f66b79a450bb083b1",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-0.51-kk-a82cadb",
+      "commit": "339578b7b8346c447207f7b5b74078813cb4d148",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "49279e50c8050a015a88b99cbba99a2d536437a1a65a148846b61482f62c1581",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "524f1e8a4b2a8029752563583132eccd65bcb8431465399f66b79a450bb083b1",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-kk-gs",
+      "commit": "56107ba6f3f93bd8676d069c8b0ab7f2dcdd4910",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "27d16ab4d3baf355407ca02cd943841b2491fb4c4f3e7c5cb7392ce7c37c3747",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "ba1c08d372b5b669d4535ba019a6e71b15f1e04dcf23fa8f6e005f55661d1802",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "2838f9d9e28cd057593b869efb34eb5674c859580e4e74536fc9cb16a442ff93",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-native",
+      "commit": "c88a06b69b87287e7ad3da550b0a1da551c8c0f1",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "a3d2bd82ad02ea6fd21a9d4dd940ffe585606de14856dc8b6b6067e07b502b6b",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "9b6acd9e50098b67c9ee0ce98ee51e6293039a523e9602773635a5df4a9bb408",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-native-0.5",
+      "commit": "fdfab2f80c03f860ef3f7b06176ac993554e415e",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "49279e50c8050a015a88b99cbba99a2d536437a1a65a148846b61482f62c1581",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "9b6acd9e50098b67c9ee0ce98ee51e6293039a523e9602773635a5df4a9bb408",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-native-0.51",
+      "commit": "c1e28eadbcbdd374520e2aa37485646ee617a958",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "49279e50c8050a015a88b99cbba99a2d536437a1a65a148846b61482f62c1581",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "b5ce4b3496d263c7f3f7684c87d44ba713aefd242a41b5bae3414e9385fb59b1",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/macos-passes",
+      "commit": "0d53b5bb7ba488063c7bc03b571311fd9dd7beb2",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "27d16ab4d3baf355407ca02cd943841b2491fb4c4f3e7c5cb7392ce7c37c3747",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "ba1c08d372b5b669d4535ba019a6e71b15f1e04dcf23fa8f6e005f55661d1802",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "2838f9d9e28cd057593b869efb34eb5674c859580e4e74536fc9cb16a442ff93",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    },
+    {
+      "ref": "upstream/optimized",
+      "commit": "8289f836e79e2ddd46228f58b69d0898555abb69",
+      "files": [
+        {
+          "path": "src/runtime.c",
+          "sha256": "49279e50c8050a015a88b99cbba99a2d536437a1a65a148846b61482f62c1581",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/runtime_kernel.c",
+          "sha256": "9120c7d4aaeb46042335db18e71d797e60b8604eb2ee771e9c081f22439f19ed",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": true,
+          "lazy_unsupported_exit20": false,
+          "syscall417_spelling": false
+        },
+        {
+          "path": "src/probe.c",
+          "sha256": "e8e27fb3ea6566e550993e95d9d548f242671d73163a33021954823446f898ec",
+          "context_implementation_name_hits": [],
+          "guest_signal_record_only": false,
+          "lazy_unsupported_exit20": true,
+          "syscall417_spelling": false
+        }
+      ]
+    }
+  ],
+  "remote_pins": [
+    {
+      "repo": "deadinside28/bloodborne_pc",
+      "commit": "8185b88d80573fa300595d5c54450183b4109935",
+      "files": [
+        "src/runtime.c",
+        "src/runtime_kernel.c",
+        "src/probe.c"
+      ]
+    },
+    {
+      "repo": "bmy/bbport-mac",
+      "commit": "4de5fd1340c8184dd88687fc07631ee2425cb587",
+      "files": [
+        "src/runtime_kernel.c",
+        "src/probe.c"
+      ]
+    },
+    {
+      "repo": "Huax-1839/bloodborne-macos",
+      "commit": "11992198df6306dacf6ec37de57ee920db1acc11",
+      "files": [
+        "src/runtime_kernel.c",
+        "src/probe.c"
+      ]
+    }
+  ],
+  "boot": {
+    "sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+    "format": "BBPROBE5",
+    "imports": [
+      {
+        "index": 728,
+        "name": "crb5j7mkk1c#p#J",
+        "linked_binding": null
+      },
+      {
+        "index": 729,
+        "name": "mo0bFmWppIw#p#J",
+        "linked_binding": null
+      },
+      {
+        "index": 730,
+        "name": "OjWstbIRPUo#p#J",
+        "linked_binding": null
+      }
+    ],
+    "modules": 2,
+    "import_count": 762,
+    "binding_count": 238
+  },
+  "libc": {
+    "sha256": "4378b47f46f1d856824a6f971db1a0c3f41833b77f49d2fba9538f667a139166",
+    "decoded_syscall_count": 0,
+    "decoder": "Capstone linear with skipdata; not indirect-call exhaustive",
+    "guest_bytes_exported": false
+  },
+  "darwin_sdk": {
+    "SYS_sigreturn": 184,
+    "SYS_poll_nocancel": 417,
+    "qualification": "do not forward PS4 syscall number into Darwin; no unknown syscall executed"
+  },
+  "native_binary": {
+    "path": "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/bb-probe-metal",
+    "architecture": "x86_64",
+    "symbol_matches": [
+      "guest_signal",
+      "guest_sigprocmask",
+      "unresolved",
+      "fault"
+    ],
+    "context_impl_symbol_matches": []
+  },
+  "formal_data_modified": false,
+  "current_runtime_sha256": "0cb0de7fc043b54c2244dfde2ae17dc635f5ea7b50dd9fe3d602e44698422c0e"
+}

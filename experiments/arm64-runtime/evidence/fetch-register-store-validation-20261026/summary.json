@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "status": "authored-native-cpu-tests-passed",
+  "python_tests": 2,
+  "native_assertions": 43,
+  "game_started": false,
+  "GPU_started": false,
+  "guest_reads": false,
+  "renderer_library_linked": false,
+  "formal_data_modified": false,
+  "runtime_queue_integrated": false,
+  "atomic_failure_keeps_old": true,
+  "budget_eviction": false,
+  "source_sha256": {
+    "src/fetch_register_store.h": "8e5c1ee0b59125c43796c9676ccc974f8b9970d4004daecd4b34812858c9888b",
+    "src/fetch_register_store.cpp": "1b959f7a2a3c94eaf47ca730540bf0aa90223fc31e420cfd37282cd5e45e2097",
+    "src/fetch_register_snapshot.h": "dd225c756fb226f8081a95ccb186281384709e7247983da068e4e6bc9ecede56",
+    "tests/test_fetch_register_store.cpp": "72e8f43d2672bec10f28c2bb7d4166baf6f14ba8825d1d84851ab230632b62a3",
+    "tests/test_fetch_register_store.py": "a03472b07a37a2b3e90af67435b83e3ad48145f76d18d713ea693b54a69af276",
+    "docs/fetch-register-store.zh-CN.md": "c3490c1fefe9027b64ae0de937e925db0a80025eba1fc9085acbe4e4be57bc40"
+  },
+  "command": "python3 -m unittest discover -s experiments/arm64-runtime/tests -p 'test_fetch_register_store.py' -v",
+  "qualification": "Callable owned snapshot fetch-register writer/reader; integration and real-game regression not claimed."
+}

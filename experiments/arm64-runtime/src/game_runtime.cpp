@@ -29,6 +29,8 @@
 #include "bbport_resource_lifetime.h"
 #include "bbport_payload_gate.h"
 #include "static_range_index.h"
+#include "guest_ordinary_unwind.h"
+#include "guest_signal_return_classifier.h"
 #include "session_state.h"
 #include "thread_bootstrap_ranges.h"
 #include "core/fex/darwin_fault.h"
@@ -92,6 +94,7 @@ struct CodeMapOutput final:FEXCore::CodeMapOpener {
 };
 struct State {
  HleCallRegistry registry;HleVeneerAllocator veneers;BbGuestModules::Registry module_info;
+ std::unique_ptr<BbOrdinaryUnwind::Entry> ordinary_unwind;
  // Published once, before guest entry; fault handling only reads this immutable list.
  std::vector<std::pair<uintptr_t,size_t>> missing_data_ranges;std::atomic<bool> missing_data_ready{false};
  std::map<uintptr_t,std::shared_ptr<HleCallAdapter>> native;
@@ -170,6 +173,16 @@ public:HleCallResult Invoke(HleCallFrame& f)const override{
 };
 bool valid(void* c,uintptr_t a,size_t n,bool write){return static_cast<State*>(c)->valid(a,n,write);}
 std::optional<Core::GuestExecutionRange> executable(void* c,uintptr_t address){auto& s=*static_cast<State*>(c);if(auto r=s.veneers.QueryExecutableRange(address))return r;std::shared_lock lock(s.mutex);for(auto r:s.ranges)if(r.Executable&&address>=r.Begin&&address-r.Begin<r.Size)return r;return std::nullopt;}
+// Context continuations cannot retain a transient guest VMA or a writable
+// overlap after this HLE returns. Only the published, lifetime-long list is used.
+bool immutable_executable(void* context,uintptr_t p,size_t n){
+ auto& state=*static_cast<State*>(context);if(!p||!n||p>UINTPTR_MAX-n||!state.permanent.Ready())return false;
+ std::shared_lock lock(state.mutex);bool found=false;
+ for(size_t j=0;j<state.permanent_count;++j){const auto r=state.ranges[j];
+  if(r.Writable&&p<r.Begin+r.Size&&r.Begin<p+n)return false;
+  if(r.Executable&&!r.Writable&&p>=r.Begin&&n<=r.Size&&p-r.Begin<=r.Size-n)found=true;
+ }return found;
+}
 std::optional<FEXCore::ExecutableFileSectionInfo> code_file(void* c,uintptr_t address){auto& s=*static_cast<State*>(c);return s.code_files?s.code_files->Query(address):std::nullopt;}
 void failure(void*,const HleCallFailure& f){std::fprintf(stderr,"ARM HLE STOP name=%.*s error=%d\n",int(f.name.size()),f.name.data(),f.error);std::fflush(nullptr);_Exit(BB_ARM_EXIT_HLE_FAULT);}
 void module_start(unsigned index){active->module=index;std::printf("ARM MODULE begin=%u\n",index);}
@@ -457,6 +470,12 @@ int game_main(int argc,char** argv){
   if((runtime_net_enabled()||getenv("BB_DEV_WORLD_WARPER_DIR"))&&getenv("BB_ARM_AUTO_CONTINUE"))runtime_quicksave_begin_auto_continue();
   bbgpu_register_kernel();
   Mapping image(b.size),halt(Page),driver(Page),params(Page);s.image=image.at();s.image_size=b.size;s.libc=image.at()+b.modules.at(0).base;for(auto segment:b.segments)if(segment.flags&1)s.text_end=std::max<uintptr_t>(s.text_end,image.at()+segment.address+segment.size);s.halt=halt.at();b.load(image.ptr);*static_cast<uint8_t*>(halt.ptr)=0xf4;
+  // Candidate only. Unknown ABI retains the existing explicit missing-import path.
+  constexpr uint64_t context_offset=0x53cd0,context_bytes=166;
+  const bool context_candidate=getenv("BB_ARM_CONTEXT_IMPORTS")&&std::string_view(getenv("BB_ARM_CONTEXT_IMPORTS"))=="1";
+  const bool context_abi=context_candidate&&!b.modules.empty()&&context_offset<=b.modules[0].size&&context_bytes<=b.modules[0].size-context_offset&&
+   b.covered(b.modules[0].base+context_offset,context_bytes,true)&&
+   BbOrdinaryUnwind::AdmitObservedAbi({reinterpret_cast<const std::byte*>(s.libc+context_offset),context_bytes});
   const auto progname=BbGuestProcess::Initialize(std::span(static_cast<std::byte*>(params.ptr),params.size),params.at());
   if(!module_metadata.empty()){s.module_info.Load(module_metadata,BbStaticCode::SourceHash(boot),b,image.at());std::printf("ARM MODULE registry=%zu bytes=%zu\n",s.module_info.Size(),s.module_info.Size()*sizeof(BbGuestModules::Info));}
 
@@ -486,6 +505,17 @@ int game_main(int argc,char** argv){
    else if(net_adapter){auto net=std::shared_ptr<HleCallAdapter>(std::move(net_adapter));imported[i]=veneer(s,s.registry.Register(framed(net),std::string("net.")+runtime_import_name(b.names[i].c_str())));++native;route="native-net";}
    else if(av_adapter){
     imported[i]=veneer(s,s.registry.Register(framed(av_adapter),std::string("avplayer.")+runtime_import_name(b.names[i].c_str())));++native;route="native-avplayer";}
+   else if(!host&&!b.bindings.contains(i)&&kinds[i]==1&&context_abi&&b.names[i]=="OjWstbIRPUo#p#J"){
+    if(!s.ordinary_unwind){
+     auto executable_target=[](void* context,uintptr_t address){return immutable_executable(context,address,1);};
+     auto a=s.registry.Register(framed(std::make_shared<BbOrdinaryUnwind::Adapter>(true,executable_target,&s)),"loader.__Ux86_64_setcontext.ordinary");
+     s.ordinary_unwind=std::make_unique<BbOrdinaryUnwind::Entry>(a->Operation());s.ranges.push_back(s.ordinary_unwind->Range());
+    }
+    imported[i]=s.ordinary_unwind->Address();++native;route="guest-ordinary-unwind";
+   }
+   else if(!host&&!b.bindings.contains(i)&&kinds[i]==1&&context_abi&&b.names[i]=="crb5j7mkk1c#p#J"){
+    imported[i]=veneer(s,s.registry.Register(framed(std::make_shared<BbSignalReturn::Classifier>(true,immutable_executable,&s)),"loader._is_signal_return"));++native;route="native-signal-pc-classifier";
+   }
    else if(!host&&!b.bindings.contains(i)&&kinds[i]==1&&s.module_info.Ready()&&b.names[i]=="kbw4UHHSYy0#p#J"){
     imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(module_finalize)),"loader.__pthread_cxa_finalize"));++native;route="native-module-finalize";
    }

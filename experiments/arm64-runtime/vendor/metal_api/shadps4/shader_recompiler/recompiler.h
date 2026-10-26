@@ -36,4 +36,11 @@ struct CompileContext {
                                            Info& info, RuntimeInfo& runtime_info,
                                            const Profile& profile);
 
+/// Offline, owned inputs without a captured guest program address. Rejects inline
+/// program-relative buffer sharps before their address can affect resource patching.
+/// No guest access or relaxed checks; the ordinary TranslateProgram ABI is retained.
+[[nodiscard]] IR::Program TranslateProgramWithoutProgramBase(
+    const std::span<const u32>& code, Pools& pools, Info& info,
+    RuntimeInfo& runtime_info, const Profile& profile);
+
 } // namespace Shader

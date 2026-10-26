@@ -1,0 +1,42 @@
+{
+  "GPU_started": false,
+  "final_build": "game-module-native-1793000307708837000",
+  "final_build_delta": {
+    "geometry_positive": 1,
+    "kind_stage_negative": 1,
+    "ordinary_positive": 1
+  },
+  "formal_data_modified": false,
+  "game_started": false,
+  "geometry_input_states": {
+    "bitwise_spirv_equal": 14,
+    "physical_metadata_records": 51,
+    "retired_span_exported": false,
+    "total": 14
+  },
+  "native_negative_cases": {
+    "geometry": 28,
+    "ordinary": 35
+  },
+  "ordinary_inputs": {
+    "bitwise_spirv_equal": 30,
+    "conservatively_rejected": 1,
+    "total": 31
+  },
+  "program_base_guard_authored_test": true,
+  "qualification": "Independent owned GCN retranslation, not final Metal PSOs, pixels, FPS or whole-renderer memory acceptance.",
+  "runtime_cache_import_allowed": false,
+  "schema": 1,
+  "source_sha256": {
+    "src/game_module_preparer.mm": "4fd002e6b4b7344b25410df1e52829d8fc97a470341f56f2af2be781d5e53c4a",
+    "src/module_profile_bool_fields.inc": "5364232d54bc3b3fd2aeb15b5780d5a12faeb911112f66b904dcd1608d5fb643",
+    "tests/test_uncaptured_program_base.cpp": "5dc2e615be78b6cec81da86867b522ee7f20493febe0b8b5a72366f0c39faf1b",
+    "tests/test_uncaptured_program_base.py": "29cead5d978c1a9b702a395d70683e1fecdebf3d71fbd523628cd05bf7dd6a2b",
+    "tools/build_game_module_consumer.py": "37d5befd3a5647e8e20d0163d0de7a217699bc003c4aa7978239cb200c61e62f",
+    "vendor/metal_api/shadps4/shader_recompiler/recompiler.cpp": "49d1ad35cc6be9ee7e060e5a93e449a87e855169483b87cfc7f7eebdf098972c",
+    "vendor/metal_api/shadps4/shader_recompiler/recompiler.h": "d15690b3e748c4b2fabec86babafd5fd1c55c40c1cd57cc810d92f0370d39bfe",
+    "vendor/metal_api/shadps4/shader_recompiler/uncaptured_program_base.h": "c512c489a8a447782c178a44a416e5e68ee41a420efa386f6d10f3a69c98c88e"
+  },
+  "status": "targeted-native-cpu-validation",
+  "whole_renderer_rebuilt": false
+}

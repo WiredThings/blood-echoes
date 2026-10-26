@@ -761,6 +761,8 @@ public:
     std::optional<EngineFailure> Failure;
     uint64_t Result {};
     bool WasInvoked {};
+    unsigned Depth {};
+    bool AtHleBoundary {};
     BridgeSyscallHandler* Owner {};
     FEXCore::Core::InternalThreadState* Thread {};
 
@@ -768,6 +770,8 @@ public:
       Failure.reset();
       Result = 0;
       WasInvoked = false;
+      Depth = 0;
+      AtHleBoundary = false;
       Owner = nullptr;
       Thread = nullptr;
     }
@@ -781,6 +785,7 @@ public:
       state.Reset();
       state.Owner = &owner;
       state.Thread = thread;
+      state.Depth = Previous ? std::min(Previous->Depth, 1023u) + 1 : 1;
       ActiveInvocation = &state;
     }
 
@@ -1012,7 +1017,15 @@ public:
     for (size_t index = 0; index < hleFrame.xmm.size(); ++index) {
       hleFrame.xmm[index] = {frame->State.xmm.sse.data[index][0], frame->State.xmm.sse.data[index][1]};
     }
-    auto result = Bridge.Invoke(hleFrame);
+    auto result = [&] {
+      struct BoundaryScope final {
+        InvocationState& State; bool Previous;
+        explicit BoundaryScope(InvocationState& state)
+          : State {state}, Previous {state.AtHleBoundary} {State.AtHleBoundary=true;}
+        ~BoundaryScope() {State.AtHleBoundary=Previous;}
+      } boundary {*invocation};
+      return Bridge.Invoke(hleFrame);
+    }();
     if (const auto* error = std::get_if<EngineFailure>(&result)) {
       invocation->Failure = *error;
       frame->State.gregs[FEXCore::X86State::REG_RAX] = static_cast<uint64_t>(-error->Error);
@@ -1067,6 +1080,14 @@ public:
       return {dynamicRange->Begin, dynamicRange->Size, dynamicRange->Writable};
     }
     return {};
+  }
+
+  bool UnwindBoundary(uintptr_t* owner,unsigned* depth,uintptr_t* rsp) const noexcept {
+    auto* invocation=ActiveInvocation;
+    if(!owner||!depth||!rsp||!invocation||invocation->Owner!=this||!invocation->Thread||
+       !invocation->Thread->CurrentFrame||!invocation->Depth||!invocation->AtHleBoundary)return false;
+    *owner=reinterpret_cast<uintptr_t>(invocation->Thread);*depth=invocation->Depth;
+    *rsp=invocation->Thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_RSP];return true;
   }
 
   FEXCore::Core::InternalThreadState* ActiveThread() const {
@@ -1241,6 +1262,11 @@ bool BachataQueryGuestRipSyscall(uint64_t* out_rip, uint64_t* out_syscall) noexc
     *out_syscall = state.gregs[FEXCore::X86State::REG_RAX];
   }
   return true;
+}
+
+bool PrototypeQueryUnwindBoundary(uintptr_t* owner,unsigned* depth,uintptr_t* rsp) noexcept {
+ const auto& e=ActiveFexExecution;
+ return e.Thread&&e.Syscalls&&e.Syscalls->UnwindBoundary(owner,depth,rsp);
 }
 
 bool PrototypeQueryLiveGuestRip(uint64_t host_pc,uint64_t* out_rip) noexcept {

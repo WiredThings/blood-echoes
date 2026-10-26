@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "sigreturn_implemented": false,
+  "scope": "bounded-root-continuation-design-only",
+  "observed_call": {
+    "libc_offset": 346047,
+    "argument": "*(cursor+0x138)+0x40",
+    "producer_identity_proven": false,
+    "indirect_calls_exhaustive": false
+  },
+  "hle_current_fields": [
+    "gpr[16]",
+    "xmm[16]",
+    "rsp"
+  ],
+  "hle_missing_commit_fields": [
+    "rflags",
+    "fs/gs bases",
+    "x87/xstate",
+    "continuation disposition"
+  ],
+  "existing_signal_callback": {
+    "invocation_depth": "nested",
+    "full_snapshot": false,
+    "restores_outer_saved_gpr_rip_rsp_unconditionally": true
+  },
+  "bounded_candidate": {
+    "root_only": true,
+    "current_owned_stack_only": true,
+    "legacy_FP_only_after_actual_schema_proof": true,
+    "unknown_extensions": "explicit failure before mutation",
+    "nested_callbacks": "explicit rejection",
+    "method": "frozen immutable snapshot then normal HLE return and guest restore veneer",
+    "implemented": false
+  },
+  "minimum_blocker": "real version-bound producer/frame identity and complete saved-state provenance",
+  "native_public_FEX_fields_changed": false,
+  "formal_data_modified": false
+}

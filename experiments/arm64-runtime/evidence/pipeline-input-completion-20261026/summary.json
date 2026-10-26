@@ -1,0 +1,180 @@
+{
+  "GPU_started": false,
+  "cache_errors": [],
+  "complete_scan": true,
+  "counts": {
+    "cache_directories": 35,
+    "exact_raw_input_duplicates": 5032,
+    "existing_native_exclusions": 77,
+    "owned_packet_audits": 1728,
+    "packet_ready_compute-direct": 349,
+    "packet_ready_graphics-existing-plain-or-rectlist-chain": 1309,
+    "packet_ready_inputs": 1728,
+    "packet_ready_tessellation-existing-three-variant-chain": 70,
+    "records": 6837,
+    "unique_raw_input_sets": 1728
+  },
+  "formal_data_modified": false,
+  "game_started": false,
+  "gap_reasons": {
+    "geometry-session-chain-not-admitted": 77
+  },
+  "historical_module_provenance_audit": {
+    "conflicting_recorded_input_groups": 1,
+    "groups": [
+      {
+        "profile_semantic_sha256": "a52941b1dd1f0eab660ea053e22e0cf39f1a37544bb2ec2b4c45ee9bc5d0383c",
+        "raw_profile_variants": 5,
+        "records": 5,
+        "same_recorded_profile_spec_multiple_spv": true,
+        "serialized_spec_sha256": "5a94123f61bcce1e48f258c4000a82954fd3a29f972552d255264660b0c8a08c",
+        "spv_variants": [
+          {
+            "bytes": 266576,
+            "records": 1,
+            "sha256": "39d4f21632c8e1f9f87c1698cf0358a5052a853a8067d9ae1ed11154729d8ae3"
+          },
+          {
+            "bytes": 265308,
+            "records": 4,
+            "sha256": "8a5b492be7830e47ea5854dac706a4341cd0e75618f0786aa3bc4d4a03eb3d7e"
+          }
+        ]
+      },
+      {
+        "profile_semantic_sha256": "b2d4dd9d42142e17cdc3506167c2a06f5302936b93a2d6b1aa2aaaa8ad793e21",
+        "raw_profile_variants": 1,
+        "records": 1,
+        "same_recorded_profile_spec_multiple_spv": false,
+        "serialized_spec_sha256": "5a94123f61bcce1e48f258c4000a82954fd3a29f972552d255264660b0c8a08c",
+        "spv_variants": [
+          {
+            "bytes": 304692,
+            "records": 1,
+            "sha256": "ca87a3578388e3f9684752880391347f0ac51ec5877fba78de43a597766b33f0"
+          }
+        ]
+      }
+    ],
+    "hardware_stage": "compute",
+    "manifest_sha256": "f2282358d7eae11e04e5380c87c27255e27e1233fe6d378041372526c02a090d",
+    "observed_gcn_sha_recorded": false,
+    "patch_identity_recorded": false,
+    "producer_compatibility_proven": false,
+    "producer_compiler_identity_recorded": false,
+    "program_hash": "0000000042f2a521",
+    "records": 6,
+    "root_cause_proven": false,
+    "runtime_cache_import_allowed": false,
+    "static_code_sha256": [
+      "516024f633fd57946b11da0a285d588f41c237dd4162b36697a2647b1ee93d86"
+    ]
+  },
+  "input_manifest_sha256": "4780b30e0997a47aafcf4bb81ffb97b32c04e023699ba09d66fa869bc691f05f",
+  "layout_abi_sha256": "1df5bb5230b3615ca8f388dd689287c08f0914f7e41603fc7310f98c989c9ff9",
+  "module_batch": {
+    "GPU_started": false,
+    "counts": {
+      "compute": 19,
+      "export": 2,
+      "fragment": 8,
+      "vertex": 2
+    },
+    "final_PSO_prepared": false,
+    "identities": {
+      "source_catalog_sha256": "aaa52cc0b5f652417f540625f7bc6879dc43adb811c613aa506ad6c4350e90b4",
+      "static_index_sha256": "6c1af1015d03791392f24ae9179bc0415a6e1e629fae06919d8c0781d54bb0c9",
+      "templates_sha256": "f2282358d7eae11e04e5380c87c27255e27e1233fe6d378041372526c02a090d"
+    },
+    "native_compilation_verified": false,
+    "rejected": [],
+    "runtime_cache_import_allowed": false
+  },
+  "module_counts": {
+    "needs_additional_dependencies": 892,
+    "observed_unique_modules": 2200,
+    "owned_gcn_consumer_templates": 1308
+  },
+  "native_deserializer_called": false,
+  "native_module_validation": {
+    "CPU_only": true,
+    "build_layers": [
+      {
+        "build_sha256": "1c0918004e1a673b7e4eb5c8268b5a2f093eb4720feb3269cca95be7b2596663",
+        "fresh_coherent_renderer": false,
+        "manifest_directory": "game-module-native-1792997968715095000",
+        "role": "ordinary-31-positive-and-33-negative"
+      },
+      {
+        "build_sha256": "34c87b84fe33e35bcaeadb4d3b50cf306bc7841b8f153507fba056b6aeaefa65",
+        "fresh_coherent_renderer": false,
+        "manifest_directory": "game-module-native-1792998384406981000",
+        "role": "ordinary-ES-and-2-extra-negative-increment"
+      }
+    ],
+    "byte_equal_modules": 30,
+    "diagnostic_artifact_runtime_eligible": false,
+    "final_PSO_prepared": false,
+    "initial_failed_runs_counted_as_pass": false,
+    "negative_after": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 6768.625
+    },
+    "negative_all_rejected": true,
+    "negative_before": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 6768.625
+    },
+    "negative_cases": 35,
+    "owned_inputs": 31,
+    "positive_after": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 6776.625
+    },
+    "positive_before": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 6776.625
+    },
+    "runtime_cache_import_allowed": false,
+    "stages": {
+      "compute": 18,
+      "export": 2,
+      "fragment": 8,
+      "vertex": 2
+    },
+    "unresolved": [
+      {
+        "program_hash": "0000000042f2a521",
+        "reason": "retranslated SPIR-V differs from observed module"
+      }
+    ]
+  },
+  "output_bytes": 22795609,
+  "qualification": "Complete canonical existing worker packets audited on CPU, not native GPU readiness. Static defaults alone do not invent full PSOs. Raw snapshots and exact native-worker consumed payloads have separate identities. No program-hash or guessed semantic merges; Info/flat/walker provenance never becomes native input.",
+  "runtime_cache_import_allowed": false,
+  "schema": 1,
+  "scope": "Explicit private QA cache corpus; static facts do not invent missing draw state. Counts are audited inputs, not native GPU compilation successes.",
+  "seconds": 15.996112166089006,
+  "source_cache_modified": false,
+  "static_identities_by_hardware_stage": {
+    "compute": 68,
+    "export": 177,
+    "fragment": 6573,
+    "geometry": 62,
+    "hull": 39,
+    "local": 131,
+    "vertex": 1865
+  },
+  "static_index_sha256": "6c1af1015d03791392f24ae9179bc0415a6e1e629fae06919d8c0781d54bb0c9",
+  "status": "passed-input-audit",
+  "targeted_tests": {
+    "GPU_tests": 0,
+    "input_completion": 16,
+    "native_result_contract_and_variant_audit": 15,
+    "owned_module_sources": 11
+  }
+}

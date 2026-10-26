@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "status": "current_header_layout_only_not_game_ABI_admitted",
+  "source": "vendor/aether/src/core/libraries/kernel/threads/exception.h",
+  "ucontext_bytes": 1280,
+  "mcontext_bytes": 1152,
+  "fields": [
+    {
+      "name": "uc_sigmask",
+      "ucontext_offset": 0,
+      "size": 16
+    },
+    {
+      "name": "uc_mcontext",
+      "ucontext_offset": 64,
+      "size": 1152
+    },
+    {
+      "name": "mc_rdi",
+      "ucontext_offset": 72,
+      "size": 8
+    },
+    {
+      "name": "mc_r10",
+      "ucontext_offset": 144,
+      "size": 8
+    },
+    {
+      "name": "mc_r11",
+      "ucontext_offset": 152,
+      "size": 8
+    },
+    {
+      "name": "mc_flags",
+      "ucontext_offset": 208,
+      "size": 4
+    },
+    {
+      "name": "mc_rip",
+      "ucontext_offset": 224,
+      "size": 8
+    },
+    {
+      "name": "mc_cs",
+      "ucontext_offset": 232,
+      "size": 8
+    },
+    {
+      "name": "mc_rflags",
+      "ucontext_offset": 240,
+      "size": 8
+    },
+    {
+      "name": "mc_rsp",
+      "ucontext_offset": 248,
+      "size": 8
+    },
+    {
+      "name": "mc_ss",
+      "ucontext_offset": 256,
+      "size": 8
+    },
+    {
+      "name": "mc_len",
+      "ucontext_offset": 264,
+      "size": 8
+    },
+    {
+      "name": "mc_fpformat",
+      "ucontext_offset": 272,
+      "size": 8
+    },
+    {
+      "name": "mc_ownedfp",
+      "ucontext_offset": 280,
+      "size": 8
+    },
+    {
+      "name": "mc_lbrfrom",
+      "ucontext_offset": 288,
+      "size": 8
+    },
+    {
+      "name": "mc_lbrto",
+      "ucontext_offset": 296,
+      "size": 8
+    },
+    {
+      "name": "mc_aux1",
+      "ucontext_offset": 304,
+      "size": 8
+    },
+    {
+      "name": "mc_aux2",
+      "ucontext_offset": 312,
+      "size": 8
+    },
+    {
+      "name": "mc_fpstate",
+      "ucontext_offset": 320,
+      "size": 832
+    },
+    {
+      "name": "mc_fsbase",
+      "ucontext_offset": 1152,
+      "size": 8
+    },
+    {
+      "name": "mc_gsbase",
+      "ucontext_offset": 1160,
+      "size": 8
+    },
+    {
+      "name": "uc_link",
+      "ucontext_offset": 1216,
+      "size": 8
+    },
+    {
+      "name": "uc_stack",
+      "ucontext_offset": 1224,
+      "size": 24
+    },
+    {
+      "name": "uc_flags",
+      "ucontext_offset": 1248,
+      "size": 4
+    }
+  ],
+  "ordinary_producer_fp_offset": 288,
+  "signal_header_fp_offset": 320,
+  "sigreturn_import_registered": false,
+  "restore_mutates_state": false,
+  "missing_prerequisites": [
+    "actual supported signal producer and exact layout version",
+    "authoritative full spilled GPR/RFLAGS/FP/xstate/TLS state at signal boundary",
+    "valid same-thread active frame and owned stack/token lifetime",
+    "supported guest mask and alt-stack restoration",
+    "structured root/nested continuation commit without escaping host C++ scopes"
+  ]
+}

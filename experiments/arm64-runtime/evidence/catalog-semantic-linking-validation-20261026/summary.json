@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "status": "metadata-associations-and-authored-controls-passed",
+  "stage_mapping": {
+    "file_header": "GNM Shdr file_stage; independent BinaryInfo/code identity check",
+    "native_enum": "runtime_info.h HwStage order; automatically compared to decode_shader_cache.HW",
+    "raw_BinaryInfo_is_not_native_enum": true,
+    "native_hardware_stage_values": {
+      "fragment": 0,
+      "vertex": 1,
+      "geometry": 2,
+      "export": 3,
+      "hull": 4,
+      "local": 5,
+      "compute": 6
+    }
+  },
+  "static_programs": {
+    "header_references": 22519,
+    "program_identities": 8915,
+    "header_variants": 8915,
+    "hashes_with_multiple_codes": 62,
+    "program_stage_pairs": 8915,
+    "stage_pairs_with_multiple_codes": 0,
+    "source_entries": 15325,
+    "metadata_estimated_bytes": 70991104,
+    "metadata_estimate_budget_bytes": 268435456,
+    "index_sha256": "6c1af1015d03791392f24ae9179bc0415a6e1e629fae06919d8c0781d54bb0c9",
+    "entry_index_sha256": "21c2d606c23180eaca9a88610e82fb69f686254554a28f72e3cc1d959fb93ff4"
+  },
+  "asset_associations": {
+    "parsed_models": 15371,
+    "model_mesh_material_references": 80451,
+    "references_with_exact_mtd_record": 80296,
+    "references_missing_mtd": 155,
+    "material_binding_status_counts": {
+      "exact-material-name": 80296,
+      "missing-material": 139,
+      "empty-reference": 16
+    },
+    "missing_material_references_by_asset_kind": {
+      "chr": 49,
+      "map": 46,
+      "obj": 60
+    },
+    "ambiguous_normalized_material_names": [],
+    "references_with_uninterpreted_gx_offset": 80099,
+    "distinct_asset_draw_schemas": 350,
+    "shader_stage_family_candidates": 3442,
+    "verified_static_entry_program_identities": 17024,
+    "full_pso_recipes_from_static_scan": 0
+  },
+  "observed_cache_associations": {
+    "counts": {
+      "metadata_records": 8036,
+      "unique_static_code": 8036,
+      "serialized_geometry_copy_records": 48,
+      "geometry_copy.owned-static-copy-source-identified": 48,
+      "cross_stage_code_negative_checks": 48
+    },
+    "known_geometry_collision_observations": {
+      "000000001635154c.geometry": 15,
+      "000000008e3f8dc4.geometry": 33
+    },
+    "qualification": "Actual decoded metadata hardware-stage associations and exact static GS-copy source provenance. No SPIR-V provenance proof, pointer rewrite, native span reconstruction or PSO execution claimed"
+  },
+  "measurements": {
+    "program_index": {
+      "seconds": 1.44,
+      "peak_rss_mib": 223.1875
+    },
+    "asset_bindings": {
+      "seconds": 1.98,
+      "peak_rss_mib": 223.765625
+    },
+    "observed_audit": {
+      "seconds": 0.41,
+      "peak_rss_mib": 139.0
+    }
+  },
+  "tests": {
+    "static_program_and_copy_provenance": 15,
+    "material_association": 4,
+    "existing_full_catalog_authored": 23
+  },
+  "source_files": {
+    "tools/static_program_links.py": "440d039a3c09ed667162186d41600e5d012b6c6dd3f0d86d692b572a7422a616",
+    "tools/audit_static_program_links.py": "018d265bd350aac95f985b67d78f01ba5e095c2779808e13b7c4a081e41e8587",
+    "tools/derive_bindings.py": "9b2277f837be1022bc860e550bc847a883f81187667dfe95e228d2b84066b136",
+    "tests/test_static_program_links.py": "f66ca255c4d6dfef8ee3b4e0ef44a36ed48695bb941057d3a93fc57fbd5e643f",
+    "tests/test_derive_bindings.py": "422b22e04cb0d8a62fb047fef2c7b978b992edd2147e58076ebe5d5e8dbf9765",
+    "tests/test_full_game_catalog.py": "da5e2aa3e841929b82dac9a1b75c6c990eeaeee1f4729c34cbacdf3a8420197c"
+  },
+  "game_started": false,
+  "GPU_started": false,
+  "native_cache_walker_executed": false,
+  "session_pointer_dereferenced": false,
+  "existing_inputs_rechecked_unchanged": true,
+  "formal_data_modified": false,
+  "full_game_rescanned": false,
+  "full_pso_recipes_from_static_scan": 0,
+  "qualification": [
+    "Static per-entry stages and code spans do not prove a material pass chooses a multi-stage family",
+    "155 material gaps are preserved: 139 missing definitions and16 empty references; not declared unused",
+    "48 GS copy sources can be represented as owned static code only after a separate byte-verifying consumer; old worker rejection remains",
+    "No native PSO/GPU execution, FPS, hitch, whole-game completeness or runtime memory benefit claimed"
+  ]
+}

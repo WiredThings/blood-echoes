@@ -1,0 +1,150 @@
+{
+  "GPU_started": false,
+  "actual_native_module_compilation_verified": true,
+  "after": {
+    "locked": false,
+    "pressure": 1,
+    "swap_mib": 6768.625
+  },
+  "author_tests": 12,
+  "before": {
+    "locked": false,
+    "pressure": 1,
+    "swap_mib": 6768.625
+  },
+  "complete_PSO": false,
+  "counts": {
+    "all_metadata": 8544,
+    "exact_duplicate_GS_inputs": 37,
+    "physical_GS_000000001635154c": 16,
+    "physical_GS_000000008e3f8dc4": 35,
+    "physical_GS_metadata": 51
+  },
+  "existing_worker_GS_gate_changed": false,
+  "final_policy_delta": {
+    "GS_positive": {
+      "passed": 1
+    },
+    "build_sha256": "b87d8d88f10bf640fab65f00657c8fa9b99a872c55da8f1bfa9a45f9c4385ce6",
+    "explicit_owned_copy_rebound_verified": true,
+    "full_14_rerun": false,
+    "ordinary_positive": {
+      "passed": 1
+    }
+  },
+  "formal_data_modified": false,
+  "game_started": false,
+  "geometry_ranges": {
+    "in_primitive": [
+      1
+    ],
+    "in_vertex_data_size": [
+      28,
+      60
+    ],
+    "mode": [
+      3
+    ],
+    "num_invocations": [
+      1
+    ],
+    "num_outputs": [
+      0
+    ],
+    "out_primitive": [
+      [
+        2,
+        2,
+        2,
+        2
+      ]
+    ],
+    "out_vertex_data_size": [
+      12,
+      28
+    ],
+    "output_vertices": [
+      8,
+      40
+    ],
+    "outputs": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "last_depth_gate_delta": {
+    "GS_positive": {
+      "passed": 1
+    },
+    "build_sha256": "5fbea28af4ca2737e5188aa77622ab89cfcef964efb5c2bb8f7dfbfdfdf65b94",
+    "full_batch_rerun": false,
+    "mixed_kind_case_count": 1,
+    "ordinary_positive": {
+      "passed": 1
+    },
+    "preexisting_raw_gate_rejection": "geometry schema and stage must match",
+    "preexisting_wrong_union_reachability_claimed": false
+  },
+  "native_negative_cases_passed": 28,
+  "native_negatives": {
+    "after": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 6736.625
+    },
+    "before": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 6736.625
+    },
+    "build_sha256": "b87d8d88f10bf640fab65f00657c8fa9b99a872c55da8f1bfa9a45f9c4385ce6",
+    "count": 27,
+    "old_GS_worker_gate_changed": false,
+    "runtime_cache_import_allowed": false,
+    "status": "passed"
+  },
+  "native_validation": {
+    "after": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 6768.625
+    },
+    "batch_sha256": "f0a2e3ada2cc29e15315988682bfe199087b4b5b20aeffad82b663ead3218729",
+    "before": {
+      "locked": false,
+      "pressure": 1,
+      "swap_mib": 6768.625
+    },
+    "build_sha256": "d8fd9cbdcd03a24c5f693fd80dcb42053b9ae0356defbce4aa6aa42dc14d9db8",
+    "counts": {
+      "passed": 14
+    },
+    "full_final_PSO_ready": false,
+    "owned_GS_packets": 14,
+    "physical_GS_metadata": 51,
+    "runtime_cache_import_allowed": false,
+    "seconds": 1.4854575420031324,
+    "status": "passed"
+  },
+  "original_pointer_followed": false,
+  "owned_GS_packets": 14,
+  "retired_span_forwarded": false,
+  "schema": 1,
+  "scope": "Fourteen observed GS input states for two programs; no final Metal PSO, ordinary worker GS gate unchanged.",
+  "seconds": 3.160389958997257,
+  "source_cache_modified": false,
+  "static_index_sha256": "6c1af1015d03791392f24ae9179bc0415a6e1e629fae06919d8c0781d54bb0c9",
+  "status": "frozen-owned-GS-inputs"
+}

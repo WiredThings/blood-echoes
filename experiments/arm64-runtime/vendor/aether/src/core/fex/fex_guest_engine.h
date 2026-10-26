@@ -87,6 +87,8 @@ bool DeliverGuestOrbisSignal(int orbis_sig, siginfo_t* info, void* rawContext,
 // signal handler — touches only thread-local pointer state and frame registers.
 bool BachataQueryGuestRipSyscall(uint64_t* out_rip, uint64_t* out_syscall) noexcept;
 bool PrototypeQueryLiveGuestRip(uint64_t host_pc,uint64_t* out_rip) noexcept;
+// Read-only identity at an active, spilled HLE boundary; depth 1 is root.
+bool PrototypeQueryUnwindBoundary(uintptr_t* owner,unsigned* depth,uintptr_t* rsp) noexcept;
 
 // Crash-diagnostic only: classifies a host fault address (the SIGSEGV/SIGBUS si_addr) against
 // FEXCore's iOS dual-mapped JIT allocation tables. Writes a short human-readable description

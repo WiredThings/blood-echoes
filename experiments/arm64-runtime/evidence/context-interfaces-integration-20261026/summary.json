@@ -1,0 +1,61 @@
+{
+  "status": "passed",
+  "execution_root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/ordinary-unwind-current-1792997378879745000",
+  "ordinary": {
+    "cases": 16,
+    "classifier_cases": 11,
+    "assertions": 282,
+    "real_fex": true,
+    "actual_hle_adapter": true,
+    "signal_imports_registered": false,
+    "game_started": false
+  },
+  "nested": {
+    "case": "nested_callback",
+    "depth": 2,
+    "error": 45,
+    "restoration_rejected": true,
+    "explicit_failure_stop": true,
+    "launcher_restart_emitted": false
+  },
+  "seconds": 3.3648963749874383,
+  "before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9094.6875
+  },
+  "after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9094.6875
+  },
+  "game_started": false,
+  "GUI_started": false,
+  "formal_data_modified": false,
+  "old_cache_modified": false,
+  "prepared_archive_unchanged": true,
+  "source_unchanged": true,
+  "source_sha256": {
+    "experiments/arm64-runtime/vendor/aether/src/core/fex/fex_guest_engine.cpp": "9895940376fb9fa306d7d69c1c8e3437196ae0c345636e115b0beb3be0314cce",
+    "experiments/arm64-runtime/vendor/aether/src/core/fex/fex_guest_engine.h": "85a8c279ebd3b37ffde713f24177c96a01be33c9d3006d31c9336fa0bf38672c",
+    "experiments/arm64-runtime/src/guest_ordinary_unwind.h": "2dd6e6eada3b456657e35eaeb29754698e84d4ef91bd590285891f22b4e5ec97",
+    "experiments/arm64-runtime/src/guest_signal_return_classifier.h": "7756f6fc3bc35101603c25d38a8f258ed9833e1f4c3c1bfc2bb72e57f4b9793a",
+    "experiments/arm64-runtime/src/ordinary_unwind.asm": "25f6dbf464123e84b0a3f4a232d4933228cd373f48e30fa5b394278dd36c8d93",
+    "experiments/arm64-runtime/src/ordinary_unwind_bytes.h": "f6911a23f1b8ce40ab08b779a77b557b231f28b49be58bd88bf37e9bf6592f34",
+    "experiments/arm64-runtime/src/ordinary_unwind_LICENSE.txt": "fbbcae4ee71d5bca09b5d5809d136d441ea34201de038966e6b2f0613fd1ad5c",
+    "experiments/arm64-runtime/tests/test_ordinary_unwind.cpp": "ff607b81b5d934e23a7353ac3afc1b0967cb09d64b11f9d2fbc9795747ac0f4f",
+    "experiments/arm64-runtime/tests/test_ordinary_unwind_fex.py": "1fab3c46df5379e99dfdaf277d11f90de86903dc09b68596ca10222b26acf71e",
+    "experiments/arm64-runtime/src/game_runtime.cpp": "0cb0de7fc043b54c2244dfde2ae17dc635f5ea7b50dd9fe3d602e44698422c0e"
+  },
+  "routing_proposal_base_sha256": "6ba433999e13e96f314e1cf8952cc031ed95cb803c21fa901c9b2d5ea2436c22",
+  "runtime_routing_applied": true,
+  "all_three_complete": false,
+  "sigreturn_registered": false,
+  "completed_scope": [
+    "ordinary private-libunwind recovery candidate",
+    "pinned signal PC classifier candidate"
+  ],
+  "inherited_signal_layout_static_assertions": true,
+  "routing_gate": "BB_ARM_CONTEXT_IMPORTS=1",
+  "syntax_result": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/context-routing-syntax-1792997298540220000/result.json"
+}

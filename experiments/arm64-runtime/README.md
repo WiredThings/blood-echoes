@@ -10,6 +10,17 @@ non-secret build inputs. It intentionally contains **no game assets, dumped modu
 saves, quick saves, credentials, runtime caches, QA preferences or captured game frames**.
 Vendored code retains its original licenses. SOURCE.json records upstream provenance.
 
+## Current priorities
+
+2026-10-26: finish the full-game compilable input catalogue and three remaining
+signal/context imports first; batch performance/memory, launcher acceptance and
+portable delivery last. Hardware TSO and new FEX/CPU-GPU specialization stay in the
+long-term backlog. The user removed the 15% usage stop; memory, lock and production
+data protection still apply. The six completed imports will join the remaining
+three as one validated production-integration batch, not as piecemeal releases.
+See [current goal](GOAL.zh-CN.md). Historical checkpoints below retain their dates;
+current missing-import count is three, not nine or five.
+
 ## Current status
 
 The 2026-10-26 native PSO preparation checkpoint is described in
@@ -389,3 +400,5 @@ to validate the actual full-build library. Prepared local dependencies are requi
 
 
 2026-10-26追加：十四类平铺Metal源码库现已接到隔离ARM64版默认首启准备，和原八类固定最终PSO分别验收。56项逐类失败反例及冷/暖/稳定暖三轮通过；稳定暖424项首遍strict、约141秒进入场景。正式应用与Release未变，未声称旧新FPS或内存收益。见[十四类库默认准备与冷暖验证](docs/tiling-default-startup.zh-CN.md)。
+
+最新输入收口：见 [真实 GCN 重新翻译](docs/game-module-retranslation.zh-CN.md)、[完整候选输入](docs/pipeline-input-completion.zh-CN.md)、[fetch 缺口](docs/vertex-fetch-inputs.zh-CN.md) 与 [上下文接口](docs/context-interfaces-integration.zh-CN.md)。源码和短测试先完成；整包性能、内存和功能统一收尾，正式版未更新。
