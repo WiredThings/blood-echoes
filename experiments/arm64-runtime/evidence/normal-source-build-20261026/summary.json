@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "status": "normal-committed-source-renderer-helpers-CPU-built-layout-sealed",
+  "source_commit": "8ec54a3032ceb107bf813a128d6b8bda076f72ac",
+  "source_archive_sha256": "e76b4f1e1efa351dd0da4f8396cf1acfa8cb8701e3476c39e774ce0b9077dd05",
+  "source_files": 10971,
+  "untracked_worktree_inputs": false,
+  "renderer": {
+    "status": "normal-targets-built",
+    "translation_units": 235,
+    "seconds": 311.8265097079566,
+    "library_sha256": "ec7e930967edc24423f3e4fcf8a5635f784cb86ef729802d2bef6af63109af2d",
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9305.875
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9281.875
+    }
+  },
+  "CPU": {
+    "status": "normal-CPU-targets-built",
+    "seconds": 69.80799387500156,
+    "game_sha256": "16787ae4b7f6eb276be0f987bd4fc80a45d08dac75a21d6136b6e735221f9700",
+    "cache_generator_sha256": "a27324b589ee3c2e84cccf00326f05975194707f57b3ca67d26e4901ce0ef9e2",
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9249.875
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9249.875
+    }
+  },
+  "layout": {
+    "strict_canonical_layout_passed": true,
+    "layout_sha256": "9998823ad648d7ca310646db57c76716cff7cbd2887f7a1d00978858a9515fe7",
+    "loaded_edges": [
+      "/usr/lib/libc++.1.dylib",
+      "/usr/lib/libSystem.B.dylib"
+    ],
+    "source_stamps": 12,
+    "profile_fields": 49,
+    "writer_fixtures": 7
+  },
+  "helpers": {
+    "status": "normal-helpers-native-load-and-capability-passed",
+    "same_actual_DSO": true
+  },
+  "dependency_construction_proven": false,
+  "configured_existing_dependency_prefixes": true,
+  "latest_batch_main_in_this_full_build": false,
+  "normal_package_integrated": false,
+  "game_started": false,
+  "formal_data_modified": false
+}

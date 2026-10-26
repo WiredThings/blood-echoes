@@ -1,0 +1,134 @@
+{
+  "after": {
+    "locked": false,
+    "pressure": 1,
+    "swap_mib": 9193.875
+  },
+  "before": {
+    "locked": false,
+    "pressure": 1,
+    "swap_mib": 9193.875
+  },
+  "cases": {
+    "cold-batch": {
+      "artifact_hits": 0,
+      "completed": 17,
+      "native_batch": {
+        "capability_schema": 1,
+        "failed_recipes": 0,
+        "legacy_fallback": false,
+        "max_recipes": 16,
+        "processes": 4,
+        "recipes": 34
+      },
+      "seconds": 16.80680750007741,
+      "status": "completed"
+    },
+    "warm-batch": {
+      "artifact_hits": 17,
+      "completed": 17,
+      "native_batch": {
+        "capability_schema": 1,
+        "failed_recipes": 0,
+        "legacy_fallback": false,
+        "max_recipes": 16,
+        "processes": 2,
+        "recipes": 17
+      },
+      "seconds": 4.1927208750275895,
+      "status": "completed"
+    },
+    "warm-single": {
+      "artifact_hits": 17,
+      "completed": 17,
+      "native_batch": {
+        "capability_schema": 0,
+        "failed_recipes": 0,
+        "legacy_fallback": true,
+        "max_recipes": 16,
+        "processes": 0,
+        "recipes": 0
+      },
+      "seconds": 4.419972375035286,
+      "status": "completed"
+    }
+  },
+  "equivalence": {
+    "compared": "per recipe full native family/function/descriptor/primary/fragment/route/key/archive SHA; state built/hit kept separately",
+    "events": 29,
+    "families": {
+      "compute": 4,
+      "ordinary-graphics": 7,
+      "rectlist": 3,
+      "tessellation": 3
+    },
+    "passed": true,
+    "recipes": 17
+  },
+  "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/native-pso-batch-control-20261026-01",
+  "evidence_result_sha256": "783da0e9c240145b5e7199727b66037269905d939c8a88b65d85ed46b87c74e8",
+  "formal_data_modified": false,
+  "game_started": false,
+  "layout_sha256": "9998823ad648d7ca310646db57c76716cff7cbd2887f7a1d00978858a9515fe7",
+  "library_sha256": "ec7e930967edc24423f3e4fcf8a5635f784cb86ef729802d2bef6af63109af2d",
+  "native_rejections": {
+    "batch_exit": 65,
+    "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/native-pso-batch-protocol-20261026-01",
+    "failed": 3,
+    "no_artifact_events": true,
+    "no_device_log": true,
+    "partial_not_success": true,
+    "processed": 3,
+    "sha256": "7ca310f873e20f89401acc9abcf6983a8e117787b13096c28efdd187e2e26533",
+    "status": "passed-no-device-native-rejections"
+  },
+  "qualification": "one bounded headless native input-equivalence pair; not matched game FPS or full-game coverage",
+  "raw_copy": {
+    "bytes": 13410376,
+    "files": 1439,
+    "ignored_nonraw": 11,
+    "limit": 536870912,
+    "source_views_copied": false
+  },
+  "rss_errors": [],
+  "rss_sampled_peaks": {
+    "cold-batch": {
+      "max_footprint_mib": 53.235107421875,
+      "max_lifetime_footprint_mib": 53.250732421875,
+      "max_rss_mib": 69.6875,
+      "samples": 63
+    },
+    "warm-batch": {
+      "max_footprint_mib": 38.43818664550781,
+      "max_lifetime_footprint_mib": 38.43818664550781,
+      "max_rss_mib": 54.140625,
+      "samples": 28
+    },
+    "warm-single": {
+      "max_footprint_mib": 34.438140869140625,
+      "max_lifetime_footprint_mib": 34.438140869140625,
+      "max_rss_mib": 46.8125,
+      "samples": 17
+    }
+  },
+  "schema": 1,
+  "seconds": 111.4632436670363,
+  "selection": {
+    "excluded": {
+      "geometry-session-chain-not-admitted": 5
+    },
+    "family_hints": {
+      "compute": 4,
+      "graphics-existing-plain-or-rectlist-chain": 4,
+      "ordinary-graphics": 3,
+      "rectlist": 3,
+      "tessellation": 3
+    },
+    "owned_GS_admitted": false,
+    "recipes": 17,
+    "source": "exact cache-local recipe/key join to prior native family labels; selection only"
+  },
+  "source_cache_unchanged": true,
+  "status": "passed-native-batch-single-controls",
+  "worker_sha256": "6c24946fb2678a43e5e6271593dd50deece9dbc6efd85038205b60411ec53661"
+}

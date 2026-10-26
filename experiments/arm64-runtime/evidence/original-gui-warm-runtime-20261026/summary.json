@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "status": "bounded-same-app-warm-runtime-observation-completed",
+  "guard_reason": "QA finished",
+  "guard_seconds": 520.9284583330154,
+  "first_native_game_guard_seconds": 304.8807152910158,
+  "first_gpu_guard_seconds": 305.39021720795427,
+  "before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 8853.8125
+  },
+  "after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9369.875
+  },
+  "pressure_max": 2,
+  "swap_peak_mib": 9377.875,
+  "swap_delta_mib": 516.0625,
+  "runtime_startup_local_hits": 538,
+  "runtime_helper_local_hits": 28,
+  "local_misses": 0,
+  "metal_footprint_bytes": {
+    "first": 970065648,
+    "last": 1157711864,
+    "samples": 42
+  },
+  "guest_heap_live_bytes": {
+    "first": 648232572,
+    "last": 980984120,
+    "samples": 42
+  },
+  "fatal_log_lines": 0,
+  "actual_playable_scene_verified": false,
+  "FPS_measured": false,
+  "no_continuous_memory_pressure_claim": false,
+  "formal_data_modified": false,
+  "cache_cleared": false,
+  "Cua_during_runtime": false
+}

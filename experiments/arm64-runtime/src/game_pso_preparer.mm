@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <memory>
+#include <optional>
 #include <signal.h>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -168,21 +170,19 @@ int FixedHelpers(const std::string&mode,const Json&p,const fs::path&scratch,Json
 }
 
 #ifndef BB_GEOMETRY_PSO_CONTRACT_ONLY
-int main(int argc,char**argv){@autoreleasepool {
- if(argc==2&&std::string_view(argv[1])=="--fixed-helper-seed-schema"){
-  std::printf("FIXED_HELPER_CAPABILITY %u\n",Metal::HostPso::FixedSeedSchema);return 0;
- }
- // This executable has its own worker contract; never emits launcher restart 75/76.
- if(argc!=4){std::fprintf(stderr,"usage: game-pso-preparer record|prepare|helpers-probe|helpers-prepare packet.json fresh-scratch\n");return 64;}
+int RunRecipe(const std::string&mode,const fs::path&packet,const fs::path&scratch,
+              std::unique_ptr<Metal::Device>*shared_device=nullptr,
+              const std::string&packet_sha={},std::optional<bool>expected_allow={}){@autoreleasepool {
  signal(SIGINT,Signal);signal(SIGTERM,Signal);
  Json result{{"candidate_only",true},{"runtime_cache_import_allowed",false},{"actual_final_read_admission",{{"allowed",false}}},
   {"native_info_srt_deserialize",false},{"walker_registered_or_executed",false},{"artifact_publication_observed",false}};
  try {
-  const std::string mode=argv[1];Need(mode=="record"||mode=="prepare"||mode=="helpers-probe"||mode=="helpers-prepare","worker mode");
-  const fs::path packet=argv[2],scratch=argv[3];Directory(scratch);
+  Need(mode=="record"||mode=="prepare"||mode=="helpers-probe"||mode=="helpers-prepare","worker mode");
+  Directory(scratch);
   Need(Child(scratch,fs::path(Shared)/"state")&&fs::is_empty(scratch),"fresh empty Shared source scratch required");
   Directory(packet.parent_path());Need(Child(packet.parent_path(),fs::path(Shared)/"state"),"Shared packet root required");
-  auto raw=Read(packet,MaxPacket);Json p=Json::parse(raw);
+  auto raw=Read(packet,MaxPacket,packet_sha);Json p=Json::parse(raw);
+  if(expected_allow)Need(p.at("allow_compile").get<bool>()==*expected_allow,"batch packet policy differs from frame");
   if(mode=="helpers-probe"||mode=="helpers-prepare")return FixedHelpers(mode,p,scratch,result);
   const bool geometry_packet=GeometryPacket(p);
   Need(p.at("manifest_schema")==2&&p.at("candidate_only")==true&&p.at("runtime_cache_import_allowed")==false,"candidate packet schema/policy");
@@ -247,7 +247,13 @@ int main(int argc,char**argv){@autoreleasepool {
   for(size_t i=0;i<present.size();++i)Need(present[i]==(compute?i==u32(Shader::SwStage::Compute):bool(key.stage_hashes[i])),"complete local stage set");
   Need(compute||present[u32(Shader::SwStage::Vertex)],"graphics VS required");
   Need(present[u32(Shader::SwStage::TessellationControl)]==present[u32(Shader::SwStage::TessellationEval)],"paired tess stages");
-  Stop();Metal::Device device;Metal::ShaderCompiler compiler{device,scratch,Metal::ReadFloatRules()};
+  Stop();std::unique_ptr<Metal::Device>own_device;
+  // Only the device survives one recipe. Compiler/functions/modules/PSO maps
+  // below are local and die before this recipe's autorelease pool drains.
+  if(shared_device){if(!*shared_device)*shared_device=std::make_unique<Metal::Device>();}
+  else own_device=std::make_unique<Metal::Device>();
+  auto& device=shared_device?**shared_device:*own_device;
+  Metal::ShaderCompiler compiler{device,scratch,Metal::ReadFloatRules()};
   Need(compiler.CacheDir()==scratch,"actual fresh source cache_dir");
   std::array<Metal::ShaderModule*,VideoCore::MaxShaderStages> modules{};
   for(auto& s:stages){Stop();auto name=VideoCore::PipelineCacheCore::GetShaderName(static_cast<Shader::HwStage>(Hardware(s.hardware)),s.pgm,s.permutation);
@@ -316,5 +322,58 @@ int main(int argc,char**argv){@autoreleasepool {
   std::printf("GAME_PSO_RESULT %s\n",result.dump().c_str());return 0;
  }catch(const std::exception& e){result["status"]=interrupted?"stopped":"rejected";result["error"]=e.what();
   std::fprintf(stderr,"GAME_PSO_RESULT %s\n",result.dump().c_str());return interrupted?70:65;}
+}}
+
+constexpr unsigned BatchMaxRecipes=16;
+int RunBatch(const std::string&phase){
+ Need(phase=="record"||phase=="prepare","one explicit batch phase required");
+ signal(SIGINT,Signal);signal(SIGTERM,Signal);
+ std::unique_ptr<Metal::Device>device;
+ unsigned processed=0,failed=0;std::optional<bool>batch_allow;
+ std::array<char,32770>line{};
+ try {
+  while(processed<BatchMaxRecipes&&std::fgets(line.data(),line.size(),stdin)){
+   Stop();const auto length=std::strlen(line.data());
+   Need(length>0&&length<=32768&&line[length-1]=='\n',"bounded complete batch frame");
+   auto frame=Json::parse(std::vector<u8>(reinterpret_cast<const u8*>(line.data()),reinterpret_cast<const u8*>(line.data())+length));
+   Need(frame.at("schema")==1&&frame.at("phase")==phase,"batch schema/phase");
+   const auto sequence=frame.at("sequence").get<unsigned>();
+   const auto request=frame.at("request_id").get<std::string>();
+   const auto packet_sha=frame.at("packet_sha256").get<std::string>();
+   const bool allow=frame.at("allow_compile").get<bool>();
+   Need(sequence==processed+1&&Metal::FunctionIdentity::Hex(request)&&Metal::FunctionIdentity::Hex(packet_sha),"batch exact request identity/sequence");
+   Need(phase!="record"||!allow,"record batch cannot compile native PSOs");
+   if(batch_allow)Need(*batch_allow==allow,"batch compilation policy cannot change");else batch_allow=allow;
+   Json mark{{"schema",1},{"sequence",sequence},{"request_id",request},{"packet_sha256",packet_sha}};
+   std::printf("GAME_PSO_BATCH_BEGIN %s\n",mark.dump().c_str());std::fflush(stdout);
+   const auto code=RunRecipe(phase,frame.at("packet").get<std::string>(),frame.at("scratch").get<std::string>(),&device,packet_sha,allow);
+   mark["exit"]=code;std::printf("GAME_PSO_BATCH_END %s\n",mark.dump().c_str());std::fflush(stdout);
+   ++processed;if(code)++failed;
+   if(code==70||code==79)return code;
+  }
+  Need(!std::ferror(stdin),"batch input error");
+  Json result{{"schema",1},{"processed",processed},{"failed",failed},{"phase",phase},
+    {"status",failed?"partial":"completed"}};
+  std::printf("GAME_PSO_BATCH_DONE %s\n",result.dump().c_str());std::fflush(stdout);
+  return failed?65:0;
+ }catch(const std::exception&e){
+  std::fprintf(stderr,"GAME_PSO_BATCH_ERROR %s\n",e.what());return interrupted?70:65;
+ }
+}
+int main(int argc,char**argv){@autoreleasepool {
+ // Capability is queried before any Device construction, never inferred from a
+ // manifest boolean. The old CLI retains the same recipe validation path.
+ if(argc==2&&std::string_view(argv[1])=="--game-pso-batch-capability"){
+  std::puts("GAME_PSO_BATCH_CAPABILITY {\"schema\":1,\"max_recipes\":16,\"shared\":\"device-only\",\"per_recipe_native_validation\":true}");return 0;
+ }
+ if(argc==2&&std::string_view(argv[1])=="--fixed-helper-seed-schema"){
+  std::printf("FIXED_HELPER_CAPABILITY %u\n",Metal::HostPso::FixedSeedSchema);return 0;
+ }
+ // No launcher return-to-menu/restart 75/76 values are used by this contract.
+ if(argc==3&&std::string_view(argv[1])=="--batch"){
+  try{return RunBatch(argv[2]);}catch(const std::exception&e){std::fprintf(stderr,"GAME_PSO_BATCH_ERROR %s\n",e.what());return 65;}
+ }
+ if(argc!=4){std::fprintf(stderr,"usage: game-pso-preparer record|prepare|helpers-probe|helpers-prepare packet.json fresh-scratch\n");return 64;}
+ return RunRecipe(argv[1],argv[2],argv[3]);
 }}
 #endif

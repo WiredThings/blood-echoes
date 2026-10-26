@@ -1,9 +1,48 @@
 """Validate a private GPU child against its actual Mach-O load edge before launch."""
 from pathlib import Path
-import hashlib,os,stat,struct,subprocess
+import hashlib,os,re,stat,struct,subprocess
 
 def sha(path):
  with Path(path).open('rb')as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def load_rpaths(target):
+ """Only this main executable's declared paths; no environment/default search."""
+ text=subprocess.check_output(['/usr/bin/otool','-l',str(target)],text=True)
+ paths=[];pending=False
+ for raw in text.splitlines():
+  line=raw.strip()
+  if line.startswith('cmd '):
+   if pending:raise ValueError('incomplete native RPATH command')
+   pending=line=='cmd LC_RPATH'
+  elif pending and line.startswith('path '):
+   m=re.fullmatch(r'path (.+) \(offset [0-9]+\)',line)
+   if not m or len(m[1])>4096:raise ValueError('invalid native RPATH')
+   paths.append(m[1]);pending=False
+ if pending or len(paths)>64:raise ValueError('invalid native RPATH count/extent')
+ return paths
+
+def resolve_gpu_edge(target,edge,*,rpaths=None):
+ """Resolve one declared edge, refusing ambiguous or implicit RPATH lookup.
+
+ The caller still verifies the resolved library's private root, owner, ARM64,
+ signature and SHA. RPATH support does not grant a new filesystem read root.
+ """
+ target=Path(target)
+ if edge.startswith(('@loader_path/','@executable_path/')):
+  return(target.parent/edge.split('/',1)[1]).resolve(strict=True)
+ if edge.startswith('/'):return Path(edge).resolve(strict=True)
+ if not edge.startswith('@rpath/'):raise ValueError('unresolved GPU child load edge: '+edge)
+ suffix=Path(edge[len('@rpath/'):])
+ if suffix.is_absolute()or '..'in suffix.parts or not suffix.parts:raise ValueError('invalid GPU RPATH suffix')
+ matches=set()
+ for raw in load_rpaths(target)if rpaths is None else rpaths:
+  if raw.startswith(('@loader_path/','@executable_path/')):base=target.parent/raw.split('/',1)[1]
+  elif raw in('@loader_path','@executable_path'):base=target.parent
+  elif raw.startswith('/'):base=Path(raw)
+  else:raise ValueError('unresolved native RPATH: '+raw)
+  candidate=base/suffix
+  if os.path.lexists(candidate):matches.add(candidate.resolve(strict=True))
+ if len(matches)!=1:raise ValueError('GPU RPATH must resolve to one unambiguous declared library')
+ return matches.pop()
 def verify(meta,backend_root):
  root=Path(backend_root).absolute()
  if root!=root.resolve():raise ValueError('noncanonical private backend root')
@@ -22,13 +61,7 @@ def verify(meta,backend_root):
  gpu=[x for x in deps if Path(x).name.startswith('libbbgpu')]
  resolved=[]
  for edge in gpu:
-  if edge.startswith('@loader_path/'):
-   resolved.append(str((target.parent/edge[len('@loader_path/'):]).resolve()))
-  elif edge.startswith('@executable_path/'):
-   resolved.append(str((target.parent/edge[len('@executable_path/'):]).resolve()))
-  elif edge.startswith('/'):
-   resolved.append(str(Path(edge).resolve()))
-  else:raise ValueError('unresolved GPU child load edge: '+edge)
+  resolved.append(str(resolve_gpu_edge(target,edge)))
  if resolved!=[str(library)]:raise ValueError('GPU child load edge does not match candidate library: '+repr(gpu))
  for path in(target,library):
   signature=subprocess.run(['/usr/bin/codesign','--verify','--strict',str(path)],capture_output=True,text=True)

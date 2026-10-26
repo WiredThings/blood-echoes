@@ -181,6 +181,7 @@ def prepare(config,*,services=None):
  for name,value in dict(phase='all',allow_compile=True,max_recipes=None,seconds=600,page_size=16,
                         progress_root=None,environment=None,retain_worker_scratch=False).items():
   if not hasattr(a,name):setattr(a,name,value)
+ native_services=services is None
  P=directory(a.project)  # Data root; imports remain in the loaded tools closure.
  if services is None:
   from game_pso_owned_audit import audit_owned_stage,audit_owned_key_profile,load_canonical_layout
@@ -229,6 +230,8 @@ def prepare(config,*,services=None):
  builder_tmp=fresh(run,'local-builder-tmp');result={}
  session_factory=services.get('builder_session_factory');builder_session=session_factory(builder_tmp)if session_factory else None
  validation_anchor=None;validation_environment=None
+ batch_worker=None;batch_scope=None;batch_api=None;batch_enabled=False
+ batch_stats=dict(capability_schema=0,processes=0,recipes=0,failed_recipes=0,max_recipes=16,legacy_fallback=True)
  def check():
   nonlocal sample_count
   elapsed=clock()-start
@@ -239,8 +242,27 @@ def prepare(config,*,services=None):
   with samples_path.open('a')as stream:stream.write(json.dumps(sample,separators=(',',':'))+'\n')
   reason=policy.observe(elapsed,s)
   if reason:raise Stopped(reason)
+ def discover_batch():
+  nonlocal batch_api,batch_enabled
+  # Query the actual selected executable before Device construction. A missing
+  # exact capability, including an old component, preserves the original CLI.
+  try:import game_pso_batch as batch_api
+  except ImportError:pass
+  if batch_api is not None:
+   if native_services:
+    check();require_no_games()
+    try:batch_enabled=batch_api.probe_capability(Path(a.worker).resolve(),P,check)
+    except (OSError,ValueError,subprocess.TimeoutExpired):batch_enabled=False
+    check()
+   else:batch_enabled=services.get('batch_capability',False)is True
+  batch_stats.update(capability_schema=1 if batch_enabled else 0,legacy_fallback=not batch_enabled)
+ def close_batch(*,abort=False):
+  nonlocal batch_worker,batch_scope
+  old=batch_worker;batch_worker=None;batch_scope=None
+  if old is not None:old.close(abort=abort)
  def prep_phase(phase,guard):
   nonlocal stop_error,validation_anchor,validation_environment
+  close_batch()  # Never inherit record/load/build/snapshot environments.
   if phase=='record'and builder_session is not None:builder_session.invalidate('record-phase')
   class BuilderGuard:
    def check(self,**kwargs):
@@ -274,7 +296,7 @@ def prepare(config,*,services=None):
   if report['status']=='stopped':raise Stopped(report.get('error','local library protection stop'))
   phase_env[phase]=updates;return report
  def execute(unit,phase,allow_compile,ordinal):
-  nonlocal outcome_count
+  nonlocal outcome_count,batch_worker,batch_scope
   check();require_no_games();case=fresh(run,f'{phase}-{ordinal:06d}');packetdir=fresh(case,'packet');scratch=fresh(case,'source-cache');tmp=fresh(case,'tmp')
   if 'owned_geometry_pso'in unit:
    from game_pso_geometry_adapter import freeze as geometry_freeze
@@ -285,24 +307,41 @@ def prepare(config,*,services=None):
   env={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))and k not in VALIDATION_ENV};env.update(options);env.update(phase_env[phase])
   env.update(BB_GPU_USER_DIR=str(gpu),BB_MTL_ARCHIVE_COMPATIBILITY_ID=a.cohort,BB_MTL_PERSIST_WARM_ARCHIVE='0',
              BB_MTL_RELEASE_WARM_ARCHIVE='1',HOME=str(case),TMPDIR=str(tmp),DYLD_PRINT_LIBRARIES='1')
-  log=case/'console.log';command=[str(Path(a.worker).resolve()),phase,str(packetdir/'packet.json'),str(scratch)]
-  with log.open('w')as stream:
-   proc=subprocess.Popen(command,env=env,cwd=case,stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
-   wait_owned_worker(proc,log,check,clock,start,a.seconds)
+  log=case/'console.log';batch_proof=None
+  if batch_enabled:
+   effective_allow=bool(allow_compile and a.allow_compile)
+   scope=batch_api.scope_identity(phase,effective_allow,env)
+   if batch_worker is not None and(batch_scope!=scope or batch_worker.count>=batch_api.MAX_RECIPES):close_batch()
+   if batch_worker is None:
+    root=fresh(run,f'batch-{batch_stats["processes"]+1:06d}');batch_tmp=fresh(root,'tmp');batch_env=dict(env,HOME=str(root),TMPDIR=str(batch_tmp))
+    batch_worker=batch_api.Worker(executable=Path(a.worker).resolve(),phase=phase,allow_compile=effective_allow,environment=batch_env,root=root,check=check,clock=clock,start=start,seconds=a.seconds,wait=wait_owned_worker)
+    batch_scope=scope;batch_stats['processes']+=1
+   try:response=batch_worker.request(packet=packetdir/'packet.json',packet_sha256=sha(owned(packetdir/'packet.json',MAX_LINE)),scratch=scratch,ordinal=ordinal)
+   except BaseException:
+    try:close_batch(abort=True)
+    except OSError:pass
+    raise
+   pid=batch_worker.proc.pid;code=response['exit'];lines=response['lines'];loaded=batch_worker.loaded
+   batch_proof=dict(schema=1,sequence=response['sequence'],request_id=response['request_id'],worker_log=str(batch_worker.log),per_recipe_native_validation=True)
+   log.write_text(''.join(lines));batch_stats['recipes']+=1;batch_stats['failed_recipes']+=code!=0
+  else:
+   command=[str(Path(a.worker).resolve()),phase,str(packetdir/'packet.json'),str(scratch)]
+   with log.open('w')as stream:
+    proc=subprocess.Popen(command,env=env,cwd=case,stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
+    wait_owned_worker(proc,log,check,clock,start,a.seconds)
+   pid=proc.pid;code=proc.returncode;lines=log.read_text().splitlines(keepends=True);loaded=set()
   need(sum(map(len,held.values()))<=MAX_TOTAL,'retained original read-set budget');del held
-  events=[];workers=[];loaded=set()
-  with log.open()as stream:
-   while True:
-    line=stream.readline(MAX_LINE+1)
-    if not line:break
-    need(len(line)<=MAX_LINE,'bounded worker result line')
-    if line.startswith('GAME_PSO_RESULT '):workers.append(json.loads(line.split(' ',1)[1]));need(len(workers)<=1,'one actual worker result')
-    if line.startswith('Metal game PSO artifact event: '):events.append(json.loads(line.split(': ',1)[1]));need(len(events)<=64,'bounded actual artifact events')
-    image=dyld_gpu_image(line,proc.pid)
-    if image is not None:loaded.add(image);need(len(loaded)<=1,'multiple actual GPU libraries')
+  events=[];workers=[]
+  for line in lines:
+   need(len(line)<=MAX_LINE,'bounded worker result line')
+   if line.startswith('GAME_PSO_RESULT '):workers.append(json.loads(line.split(' ',1)[1]));need(len(workers)<=1,'one actual worker result')
+   if line.startswith('Metal game PSO artifact event: '):events.append(json.loads(line.split(': ',1)[1]));need(len(events)<=64,'bounded actual artifact events')
+   image=dyld_gpu_image(line,pid)
+   if image is not None:loaded.add(image);need(len(loaded)<=1,'multiple actual GPU libraries')
   loaded_identity=verify_loaded_gpu(loaded,identity)
-  row=dict(phase=phase,ordinal=ordinal,pid=proc.pid,exit=proc.returncode,recipe=unit['recipe_blob_identity'],worker=workers[0]if len(workers)==1 else None,
+  row=dict(phase=phase,ordinal=ordinal,pid=pid,exit=code,recipe=unit['recipe_blob_identity'],worker=workers[0]if len(workers)==1 else None,
            artifact_events=events,log=str(log),loaded_gpu_identity=loaded_identity,runtime_cache_import_allowed=False,actual_final_read_admission=False)
+  if batch_proof is not None:row['native_batch']=batch_proof
   (case/'result.json').write_text(json.dumps(row,indent=2)+'\n');outcome_count+=1
   if len(outcomes)<64:outcomes.append(row)
   with outcomes_path.open('a')as stream:stream.write(json.dumps(row,separators=(',',':'))+'\n')
@@ -313,9 +352,16 @@ def prepare(config,*,services=None):
  def event(value):
   with events_path.open('a')as stream:stream.write(json.dumps(value,separators=(',',':'))+'\n')
  try:
+  discover_batch()
   result=run_manifest(a.manifest,progress_root=progress,context=context,execute=execute,prepare_phase=prep_phase,check=check,
        ready=preparation_ready,phase=a.phase,page_size=a.page_size,max_recipes=a.max_recipes,seconds=a.seconds,clock=clock,event_sink=event)
+ except (Stopped,KeyboardInterrupt)as error:
+  result=dict(status='stopped',error=str(error)or'interrupted',completed=0,protection_stops=1,full_manifest_preparation_verified=False)
  finally:
+  try:close_batch(abort=result.get('status')in('failed','stopped'))
+  except (ValueError,OSError,Stopped,Deferred)as error:
+   result.update(status='stopped'if isinstance(error,(Stopped,Deferred))else'failed',error='batch terminal verification: '+str(error),full_manifest_preparation_verified=False)
+  result['native_batch']=dict(batch_stats)
   if validation_anchor is not None:validation_anchor.close()
   if builder_session is not None:
    builder_session.close();result['builder_session']=dict(builder_session.stats)

@@ -18,6 +18,18 @@ def sha(p,*,owner=None):
 def relative(root,rel):
  p=Path(rel);need(not p.is_absolute()and '..'not in p.parts and str(p)==rel,'component relative path');return root/p
 
+def runtime_layout_bytes(layout):
+ """Retain ABI/proof fields, excluding developer-only Writer fixture paths.
+
+ The source component verified those fixtures; they are not runtime inputs.
+ The frozen manifest binds the serialized runtime layout's separate SHA.
+ """
+ row=json.loads(json.dumps(layout));fixtures=row.get('authored_writer_fixtures',{})
+ need(isinstance(fixtures,dict),'layout fixture receipt domain')
+ for item in fixtures.values():
+  need(isinstance(item,dict),'layout fixture receipt shape');item.pop('path',None)
+ return(json.dumps(row,sort_keys=True,separators=(',',':'))+'\n').encode()
+
 def repair_input_sha(path):
  """Artifacts stay user-owned; only the selected SDK settings may be root-owned."""
  path=Path(path)
@@ -190,11 +202,12 @@ def freeze_inputs(stage,component,library,*,rewrite,admission_root):
  layout=Path(m['layout']);source_root=Path(m['source_root'])
  l=load_canonical_layout(layout,source_root,m['layout_sha256'])
  root=stage/'native-runtime-inputs';root.mkdir(mode=0o700)
- dst=root/'layout.json';shutil.copy2(layout,dst);need(sha(dst)==m['layout_sha256'],'copied native layout changed')
+ dst=root/'layout.json';dst.write_bytes(runtime_layout_bytes(l));runtime_layout_sha=sha(dst)
  headers=root/'layout-source';headers.mkdir()
  for name,want in l['source_sha256'].items():
   src=relative(source_root,name);data,_=checked_bytes(src,limit=4*1024*1024,expected=want)
   out=relative(headers,name);out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(data)
+ load_canonical_layout(dst,headers,runtime_layout_sha)
  worker=stage/'bin/game-pso-preparer';shutil.copy2(source,worker)
  need(sha(worker)==m['worker_sha256'],'copied worker changed before relocation')
  rewrite(worker,Path(m['library']),library)
@@ -202,7 +215,7 @@ def freeze_inputs(stage,component,library,*,rewrite,admission_root):
  frozen=dict(schema=1,enabled=True,kind=m['kind'],production=False,
   worker=str(worker.relative_to(stage)),worker_sha256=sha(worker),
   library=str(library.relative_to(stage)),library_sha256=sha(library),
-  layout=str(dst.relative_to(stage)),layout_sha256=sha(dst),
+  layout=str(dst.relative_to(stage)),layout_sha256=runtime_layout_sha,source_layout_sha256=m['layout_sha256'],
   source_root=str(headers.relative_to(stage)),
   fixed_helper_seed_schema=fixed_helper_capability(worker,admission_root))
  if m.get('module_consumer')is not None:

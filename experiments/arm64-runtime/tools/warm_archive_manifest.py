@@ -24,16 +24,13 @@ def resolve_gpu_identity(target,backend_root):
     # Resolve the selected executable's actual single GPU load edge, then reuse
     # the existing ownership/architecture/signature/SHA verification contract.
     import subprocess
-    from gpu_candidate_identity import verify,sha
+    from gpu_candidate_identity import verify,sha,resolve_gpu_edge
     target=Path(target).resolve(strict=True)
     deps=[line.strip().split(' (compatibility')[0]for line in subprocess.check_output(['/usr/bin/otool','-L',str(target)],text=True).splitlines()[1:]]
     edges=[edge for edge in deps if Path(edge).name.startswith('libbbgpu')]
     if len(edges)!=1:raise ValueError('selected executable must have exactly one GPU load edge')
     edge=edges[0]
-    if edge.startswith(('@loader_path/','@executable_path/')):
-        library=(target.parent/edge.split('/',1)[1]).resolve(strict=True)
-    elif edge.startswith('/'):library=Path(edge).resolve(strict=True)
-    else:raise ValueError('unresolved GPU load edge: '+edge)
+    library=resolve_gpu_edge(target,edge)
     return verify(dict(target=str(target),library=str(library),library_sha256=sha(library)),backend_root)
 
 

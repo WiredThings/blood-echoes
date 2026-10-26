@@ -8,7 +8,7 @@ TOOLS=('launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py'
        'warm_archive_manifest.py','gpu_candidate_identity.py','native_observer.py',
        'qa_memory_policy.py','qa_build_guard.py','paged_metal_requests.py',
        'launcher_game_pso.py','game_pso_component.py','game_pso_candidates.py',
-       'prepare_game_psos.py','game_pso_queue.py','game_pso_progress_identity.py','game_pso_owned_audit.py',
+       'prepare_game_psos.py','game_pso_batch.py','game_pso_queue.py','game_pso_progress_identity.py','game_pso_owned_audit.py',
        'inventory_shader_cache.py','decode_shader_cache.py','game_shader_catalog.py',
        'launcher_game_catalog.py','launcher_game_modules.py','full_game_catalog.py',
        'gnm_shader_metadata.py','static_program_links.py','complete_pipeline_inputs.py',

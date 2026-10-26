@@ -2,6 +2,10 @@
 
 已读取当前系统目标、源码和最新进度。2026-10-26本轮发现系统卡残留blocked；已按用户继续指令点击原卡“恢复目标”，API回读active，正文未改。源码已有进展不应被旧状态阻断。用户最新要求取消“三项全完成后九项才可整批接入”的门槛；未重建/清空目标，也未标记完成。下方历史中的该门槛不再执行。
 
+最新收口（本轮）：Git提交`8ec54a30`的干净归档已实际完成正常renderer235TU+双helper构建（311.83s）、全新FEX/CPU/cache-generator构建（69.81s）及同源码完整layout封口；两个helper实际加载同一DSO且能力通过。正常构建仍使用既有依赖前缀，尚未证明全新依赖构建，也未接最终正常产物App清单。详docs/normal-source-build-checkpoint.zh-CN.md。
+
+同App暖启动有界运行520.93s，约304.88s进入原生主进程；538次Local/28次helper hit、0miss、0fatal。压力最高2，swap总增加516.06MiB；可操作场景与FPS未验证，不能叫内存验收通过。测试已正常结束，仅保留一个QA启动器。暖PSO分项409个recipe均为严格archive hit且0编译，不能把305s全部归GPU worker。新最多16项共享Device候选已实际编译并测17条真实recipe/29个artifact：函数/descriptor/key/archiveSHA完全一致，暖batch4.19s vs single4.42s仅单对，RSS峰+7.33MiB/foot+4MiB为临时进程开销；原压力/swap不变，三个无Device失败反例通过。GS不在本轮样本，完整409/501仍待集中验证。37工具闭包已接候选模块，旧组件仍单项fallback；未替换当前正式应用或QA引擎。
+
 验收前新增：完成全启动器UI→配置→脚本→当前ARM/Metal消费对账，修复原生必需宿主误作可选、Rosetta误门控、未支持renderer入口、菜单零副作用不匹配差异和旧GUI组包；详docs/launcher-feature-audit.zh-CN.md。先收口这些源码，再组当前隔离包集中验收。
 
 1. 三项归上游与正式 Rosetta 既有缺口：保留两个默认关闭的门控候选及测试；完整sigreturn停止扩展。27/282不是游戏命中证据；未知导入仍明确诊断，不能隐藏统计或零返回。接口代理已停止 owned producer/417 专项，收口其未启用成果，不回退六项。系统目标正文现已由用户原地更新并回读active。
