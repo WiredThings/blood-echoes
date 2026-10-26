@@ -174,6 +174,54 @@ class Assets(unittest.TestCase):
         r = self.relocator(bindings={a: self.engine / 'a'})
         r.copy(a, self.engine / 'a'); self.assertEqual(len(r.machos), 2)
 
+    def test_ready_cycle_revisit_finishes_and_rechecks(self):
+        a = self.binary('a'); b = self.binary('b')
+        self.edges[a] = [str(b)]; self.edges[b] = [str(a)]
+        r = self.relocator(bindings={a: self.engine / 'a'})
+        r.copy(a, self.engine / 'a')
+        with patch.object(r, '_copy', wraps=r._copy) as visits:
+            r.copy(a, self.engine / 'a')
+        self.assertEqual(visits.call_count, 3)
+        (self.engine / 'deps-metal-arm64/lib/b').write_bytes(b'external')
+        with self.assertRaisesRegex(ValueError, 'changed'): r.copy(a, self.engine / 'a')
+
+    def test_diamond_traversal_and_metadata_are_linear(self):
+        app = self.binary('app', True)
+        levels = [[self.binary(f'level{level}-{side}') for side in range(2)] for level in range(8)]
+        self.edges[app] = [str(p) for p in levels[0]]
+        for previous, following in zip(levels, levels[1:]):
+            for node in previous: self.edges[node] = [str(p) for p in following]
+        count = 1 + sum(map(len, levels))
+        r = self.relocator()
+        with patch.object(r, '_copy', wraps=r._copy) as visits:
+            r.copy(app, self.engine / 'app')
+        self.assertLessEqual(visits.call_count, 2 * count)
+        self.assertEqual(m.loads.call_count, count)
+        self.assertEqual(m.commands.call_count, count)
+        self.assertEqual(m._original.run.call_count, count)
+        with patch.object(r, '_copy', wraps=r._copy) as visits:
+            r.copy(app, self.engine / 'app')
+        self.assertLessEqual(visits.call_count, 2 * count)
+        self.assertEqual(m._original.run.call_count, count)
+
+    def test_different_ancestor_context_not_hidden_by_memo(self):
+        app = self.binary('app', True); a = self.binary('a'); b = self.binary('b')
+        common = self.binary('common'); middle = self.binary('middle')
+        self.binary('left/lib'); self.binary('right/lib')
+        self.edges[app] = [str(a), str(b)]
+        self.edges[a] = self.edges[b] = [str(common)]
+        self.edges[common] = [str(middle)]; self.edges[middle] = ['@rpath/lib']
+        self.cmds[a] = [('LC_RPATH', '@loader_path/left')]
+        self.cmds[b] = [('LC_RPATH', '@loader_path/right')]
+        with self.assertRaisesRegex(ValueError, 'collision'):
+            self.relocator().copy(app, self.engine / 'app')
+
+    def test_source_edit_after_metadata_cache_still_rejected(self):
+        source = self.binary('app', True); r = self.relocator(); dest = self.engine / 'app'
+        r.copy(source, dest)
+        with source.open('ab') as stream: stream.write(b'external')
+        with self.assertRaisesRegex(ValueError, 'collision'): r.copy(source, dest)
+
     def framework(self):
         root = self.root / 'prefix/Frameworks/Python.framework/Versions/3.11'
         (root / 'Resources/Python.app/Contents/MacOS').mkdir(parents=True)

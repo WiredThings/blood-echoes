@@ -77,6 +77,7 @@ class Relocator:
         self._records = _ENGINES.setdefault(self.engine, {})
         self._active = set()
         self._executable = None
+        self._metadata_cache = {}
 
     def _destination(self, path):
         path = Path(path).absolute()
@@ -118,19 +119,12 @@ class Relocator:
         need(self._allowed(path, loader), 'dependency escapes declared source roots')
         return path
 
-    def _resolve(self, ref, loader, executable, ancestors=()):
+    def _resolve(self, ref, loader, executable, runpaths):
         if ref.startswith('@rpath/'):
             tail = Path(ref[len('@rpath/'):])
             need(tail.parts and not tail.is_absolute() and '..' not in tail.parts, 'invalid rpath tail')
-            roots = list(self.search_dirs)
-            # Dyld also searches the run-path stack of the loading chain.
-            owners = list(dict.fromkeys([loader, *reversed(ancestors),
-                                         *([executable] if executable is not None else [])]))
-            for owner in owners:
-                roots.extend(self._expand(value, owner, executable)
-                             for command, value in commands(owner) if command == 'LC_RPATH')
             candidates = set()
-            for root in roots:
+            for root in runpaths:
                 candidate = (root / tail).resolve(strict=False)
                 # The lexical tail cannot traverse upwards. A package-manager
                 # file symlink may resolve into another explicitly admitted
@@ -156,18 +150,43 @@ class Relocator:
         executable = source if self._is_executable(source) else self._executable
         if executable == source:
             self._executable = source
-        return self._copy(source, self._destination(destination), executable)
+        # This memo belongs to ONE public copy.  New calls always recheck the
+        # source/destination digests, including previously ready closures.
+        traversal = {'seen': set(), 'visits': 0}
+        runpaths = self.search_dirs
+        if executable is not None:
+            metadata = self._metadata(executable, sha(executable))
+            runpaths = self._runpaths(executable, executable, runpaths, metadata['commands'])
+        return self._copy(source, self._destination(destination), executable, runpaths, traversal)
 
-    def _copy(self, source, destination, executable, ancestors=()):
+    def _metadata(self, source, digest):
+        key = (source, digest)
+        if key not in self._metadata_cache:
+            need(len(self._metadata_cache) < 8192, 'dependency source budget exceeded')
+            need(_original.run('/usr/bin/lipo', '-archs', source).strip() == 'arm64', 'thin ARM64 required')
+            need(minimum(source) <= self.minimum_os, 'minimum macOS exceeds package target')
+            self._metadata_cache[key] = {'loads': tuple(loads(source)), 'commands': tuple(commands(source))}
+            need(sha(source) == digest, 'source changed during metadata inspection')
+        return self._metadata_cache[key]
+
+    def _runpaths(self, source, executable, inherited, source_commands):
+        # Resolution already rejects multiple different candidates rather than
+        # relying on dyld search order, so the canonical root SET is sufficient.
+        roots = set(inherited)
+        roots.update(self._expand(value, source, executable)
+                     for command, value in source_commands if command == 'LC_RPATH')
+        return tuple(sorted(roots))
+
+    def _copy(self, source, destination, executable, inherited, traversal):
         source = _file(source)
         digest = sha(source)
-        need(_original.run('/usr/bin/lipo', '-archs', source).strip() == 'arm64', 'thin ARM64 required')
-        need(minimum(source) <= self.minimum_os, 'minimum macOS exceeds package target')
+        metadata = self._metadata(source, digest)
+        runpaths = self._runpaths(source, executable, inherited, metadata['commands'])
         edges = []
-        for ref in loads(source):
+        for ref in metadata['loads']:
             if _system(ref):
                 continue
-            dep = self._resolve(ref, source, executable, ancestors)
+            dep = self._resolve(ref, source, executable, runpaths)
             target = self._destination(self.bindings.get(dep, self.libdir / dep.name))
             edges.append((ref, dep, target))
         plan = tuple(edges)
@@ -176,42 +195,54 @@ class Relocator:
             need(record['source'] == source and record['source_sha256'] == digest and record['plan'] == plan,
                  'destination source or dependency-plan collision')
             self._remember(record)
-            if destination in self._active:
-                return destination
-            need(record['ready'] and sha(destination) == record['after'], 'staged bytes changed')
-            for _, dep, target in edges:
-                self._copy(dep, target, executable, (*ancestors, source))
-            need(sha(source) == digest, 'source changed during reuse')
-            return destination
-        if destination.exists():
-            need(sha(destination) == digest, 'unknown destination differs from source')
+            need((record['ready'] or destination in self._active) and sha(destination) == record['after'],
+                 'staged bytes changed')
         else:
-            copy_file(source, destination)
-        need(sha(destination) == digest and sha(source) == digest, 'source changed while copying')
-        record = dict(source=source, destination=destination, source_sha256=digest, plan=plan,
-                      ready=False, after=None,
-                      input={'path': str(destination.relative_to(self.engine)), 'source': str(source),
-                             'sha256_before_relocation': digest})
-        self._records[destination] = record
-        self._remember(record)
-        self._active.add(destination)
+            if destination.exists():
+                need(sha(destination) == digest, 'unknown destination differs from source')
+            else:
+                copy_file(source, destination)
+            need(sha(destination) == digest and sha(source) == digest, 'source changed while copying')
+            record = dict(source=source, destination=destination, source_sha256=digest, plan=plan,
+                          ready=False, after=digest,
+                          input={'path': str(destination.relative_to(self.engine)), 'source': str(source),
+                                 'sha256_before_relocation': digest})
+            self._records[destination] = record
+            self._remember(record)
+        context = (destination, source, executable, runpaths)
+        # Even a memo hit reached the complete plan/SHA checks above.  Only its
+        # recursive children are elided; a different effective context is visited.
+        if context in traversal['seen']:
+            return destination
+        need(traversal['visits'] < 32768, 'dependency context budget exceeded')
+        traversal['visits'] += 1
+        traversal['seen'].add(context)
+        relocate_here = not record['ready'] and destination not in self._active
+        if relocate_here:
+            self._active.add(destination)
         try:
             for ref, dep, target in edges:
-                self._copy(dep, target, executable, (*ancestors, source))
-                _execute(['/usr/bin/install_name_tool', '-change', ref,
-                          '@loader_path/' + os.path.relpath(target, destination.parent), destination])
-            for command, value in commands(source):
-                if command == 'LC_RPATH':
-                    _execute(['/usr/bin/install_name_tool', '-delete_rpath', value, destination])
-                elif command == 'LC_ID_DYLIB':
-                    _execute(['/usr/bin/install_name_tool', '-id', '@rpath/' + destination.name, destination])
+                self._copy(dep, target, executable, runpaths, traversal)
+                if relocate_here:
+                    _execute(['/usr/bin/install_name_tool', '-change', ref,
+                              '@loader_path/' + os.path.relpath(target, destination.parent), destination])
+                    record['after'] = sha(destination)
+            if relocate_here:
+                for command, value in metadata['commands']:
+                    if command == 'LC_RPATH':
+                        _execute(['/usr/bin/install_name_tool', '-delete_rpath', value, destination])
+                    elif command == 'LC_ID_DYLIB':
+                        _execute(['/usr/bin/install_name_tool', '-id', '@rpath/' + destination.name, destination])
+                    record['after'] = sha(destination)
             need(sha(source) == digest, 'source changed during relocation')
-            record['after'] = sha(destination)
-            record['input']['sha256_after_relocation'] = record['after']
-            record['ready'] = True
+            need(sha(destination) == record['after'], 'staged bytes changed during relocation')
+            if relocate_here:
+                record['input']['sha256_after_relocation'] = record['after']
+                record['ready'] = True
             return destination
         finally:
-            self._active.remove(destination)
+            if relocate_here:
+                self._active.remove(destination)
 
     def sign_copied(self, paths=None):
         """Sign only tracked owned copies, updating shared byte provenance."""

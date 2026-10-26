@@ -25,7 +25,6 @@ def directory(value):
     path = Path(value).absolute()
     need(path == path.resolve(strict=True) and path.is_dir(), 'canonical directory required: ' + str(path))
     need(path.stat().st_uid in (0, os.getuid()), 'directory owner mismatch')
-    need(not any(part.endswith('.app') for part in path.parts), 'application directories are not build inputs/outputs')
     return path
 
 
@@ -76,7 +75,7 @@ def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider
     provider = directory(python_provider)
     tools['python'] = executable(provider / 'bin/python3.11')
     need(Path(tools['python']['path']).is_relative_to(provider), 'python executable escaped explicit provider')
-    sdk = str(directory(sdk_root)) if sdk_root is not None else '<SDKROOT>'
+    sdk = str(directory(Path(sdk_root).resolve(strict=True))) if sdk_root is not None else '<SDKROOT>'
     openssl = str(directory(openssl_root)) if openssl_root is not None else None
     required = ['tools/macos/build_launcher.sh', 'experiments/arm64-runtime/tools/configure_native_build.py',
                 'experiments/arm64-runtime/tools/build_metadata_layout.py', 'experiments/arm64-runtime/vendor/metal_api/CMakeLists.txt',
@@ -291,7 +290,7 @@ def execute(value):
             return top
         source_identity = identify_source(value['repository'], value['revision'], git_top=git_top, git=git)
         sdk = value['sdk_root'] or run(value['sdk_query'], name='sdk-query', timeout=20).decode().strip()
-        sdk = str(directory(sdk))
+        sdk = str(directory(Path(sdk).resolve(strict=True)))
         env = {k: v.replace('<SDKROOT>', sdk) for k, v in value['environment'].items()}
         for section in ('renderer', 'net'):
             query = root / section / '.cmake/api/v1/query'

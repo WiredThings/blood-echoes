@@ -83,6 +83,26 @@ class Fixture(unittest.TestCase):
         self.assertNotIn('<SDKROOT>', json.dumps(value))
         self.assertIn('-DOPENSSL_ROOT_DIR=' + str(self.prefix), value['commands'][5]['argv'])
 
+    def test_xcode_sdk_alias_is_normalized_without_output_access(self):
+        sdk = self.base / 'Xcode.app/Contents/Developer/SDKs/MacOSX.sdk'
+        sdk.mkdir(parents=True)
+        alias = sdk.with_name('MacOSX27.0.sdk')
+        alias.symlink_to(sdk.name, target_is_directory=True)
+        value = self.plan(sdk_root=alias)
+        self.assertEqual(value['sdk_root'], str(sdk))
+        self.assertFalse(Path(value['build_root']).exists())
+
+    def test_owned_built_gui_directory_is_valid_input(self):
+        app = self.base / 'build/gui/Blood Echoes.app'
+        app.mkdir(parents=True)
+        self.assertEqual(build.directory(app), app)
+
+    def test_output_inside_application_still_rejected(self):
+        app = self.base / 'Existing.app'
+        app.mkdir()
+        with self.assertRaisesRegex(ValueError, 'application'):
+            self.plan(build_root=app / 'fresh')
+
     def test_existing_output_rejected_without_overwrite(self):
         self.args['build_root'].mkdir()
         sentinel = self.args['build_root'] / 'old'
