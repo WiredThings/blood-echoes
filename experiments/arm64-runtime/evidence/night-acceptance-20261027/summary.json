@@ -55,7 +55,7 @@
   "release_updated": false,
   "published_documentation_updated": false,
   "formal_saves_settings_cache_modified": false,
-  "qualification": "QA08 original-condition static scene and QA09 ordered F2/F3 path evidenced separately. Raw QA09 driver failure retained; no revised-driver live success, matched Rosetta performance, sustained-memory, full visual/network or formal promotion claim.",
+  "qualification": "Latest staged formal layout passed original F2/new-checkpoint/F3/offline supervisor/automatic continue with actual nested ARM64 CPU and pre/post whole-app seals. Scripted QA API, not physical keys or full visual/network acceptance. Original QA source save unchanged; formal app/data untouched. Matched Rosetta cold/warm run in progress.",
   "targeted_python_controls": null,
   "normal_rebuild": {
     "source_base_revision": "f8d35f4f",
@@ -93,8 +93,8 @@
     "revised_reader_fresh_live_run_pending": true
   },
   "remaining_code_blockers": [
-    "Native module helper must add interpreter-level -B beside -I to prevent signed-app bytecode writes; small CPU rebuild and new staged code required",
-    "Actual staged formal-layout CLI/F3 and matched scene-memory acceptance pending; source QA is clone-only and formal GUI remains unlaunched"
+    "Matched cold/warm scene performance and memory comparison pending; conditional local install not yet performed",
+    "First empty-cache F3 repeated full preparation (343.24s); seeded same-supervisor fast path already passed (41.11s)"
   ],
   "targeted_results": {
     "initial_receipt_clone_metadata_scope_cache_controls": 143,
@@ -129,7 +129,7 @@
     "pressure_before_and_after": 1,
     "swap_growth_mib": 0,
     "CPU_build_status": "normal-CPU-targets-built",
-    "formal_dynamic_acceptance": false,
+    "formal_dynamic_acceptance": "F2-F3-and-pre-post-whole-app-seal-passed; matched-performance-pending",
     "local_app_replaced": false,
     "CPU_build_seconds": 73.45995062508155,
     "CPU_SHA256": "a5d121d8c9c9b09363ef01c1924cede27327c2e6481446bcde6f518ecdcf4697",
@@ -177,5 +177,31 @@
     "post_run_bundle_signature": "failed-new-stdlib-pyc-files-original-sealed-bytes-unchanged",
     "post_run_bundle_code_restored_from_original_zip": true,
     "new_bytecode_preserved_in_private_evidence": true
+  },
+  "module_helper_bytecode_fix": {
+    "source_revision": "fa4f1922",
+    "interpreter_flags": [
+      "-I",
+      "-B"
+    ],
+    "real_bundled_Python_author_controls": 3,
+    "metadata_controls": 14,
+    "CPU_incremental_build_seconds": 7.660856916918419,
+    "CPU_sha256": "20d8441a9ac66635460ccceef98f9e81086334f616f0ee9bbb374f607b6d737a",
+    "GPU_library_unchanged": true,
+    "normal_component_resealed": true,
+    "QA11_archive_sha256": "35216d20b4eed39b1ac0fb17366231d55f7c8353f53b5467b14d9f17687cd232",
+    "QA11_archive_bytes": 47498904,
+    "staged_formal_bundle_pre_seal_verified": true,
+    "staged_formal_GUI_launched": false,
+    "actual_formal_profile_test": "functional-checked",
+    "actual_formal_profile_result": "original-launch-benchmark-1793048805779073000/run-1/result.json",
+    "pre_and_post_whole_app_seal_required": true,
+    "whole_app_pre_and_post_seal": "verified",
+    "source_QA_save_unchanged": true,
+    "first_scene_seconds": 419.18329133302905,
+    "F3_to_scene_seconds": 343.24084962497,
+    "swap_growth_mib": 599.0,
+    "peak_pressure": 2
   }
 }

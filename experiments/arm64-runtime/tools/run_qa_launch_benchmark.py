@@ -4,7 +4,7 @@ Only Continue is automated before a scene camera is observed. No exploration,
 combat, screenshots, profiling or changes to original data are performed.
 """
 from pathlib import Path
-import argparse,collections,csv,hashlib,json,math,os,signal,statistics,subprocess,sys,time
+import argparse,collections,csv,hashlib,json,math,os,signal,statistics,struct,subprocess,sys,time
 from native_observer import NativeObserver
 from qa_memory_policy import MemoryPolicy
 from diagnostic_frame_tail import read_tail
@@ -97,7 +97,7 @@ def finish_app_seal(report,formal,*,runner=None):
  post=app_seal(formal['app'],runner=runner)
  result['whole_app_seal']=dict(pre=formal['seal'],post=post,post_after_owned_process_cleanup=True)
  if formal['seal'].get('status')!='verified'or post['status']!='verified':
-  result.update(status='incomplete',seal_error='whole staged application resource seal failed')
+  result.update(status='incomplete',seal_error='whole staged execution application resource seal failed')
  return result
 
 def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,identity_resolver=None,seal_runner=None):
@@ -139,9 +139,97 @@ def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,ide
    native_manifest_sha256=sha(stage/'NATIVE-METAL.json'),runtime_sha256=hashes,
    effective_scripts=parity,cpu=cpus,gpu=gpu,whole_app_pre_seal=seal,formal_GUI_started=False,formal_data_read=False))
 
+def reference_image(path):
+ """Read actual x86/ARM Mach-O metadata with the existing package parser."""
+ from launcher_runtime_profile import code_bytes
+ root=Path(__file__).resolve().parents[3];sys.path.insert(0,str(root/'tools/macos'))
+ from package_optimized import loads
+ path=Path(path);before=code_bytes(path,limit=512*1024*1024,content=False)[1]
+ with path.open('rb')as stream:header=stream.read(16)
+ if len(header)!=16:raise ValueError('reference Mach-O header missing')
+ magic,cpu,_,kind=struct.unpack('<4I',header)
+ if magic!=0xfeedfacf or cpu not in(0x01000007,0x0100000c)or kind not in(2,6):raise ValueError('reference must be a thin x86_64/ARM64 Mach-O executable or dylib')
+ arch='x86_64'if cpu==0x01000007 else'arm64'
+ if subprocess.check_output(['/usr/bin/lipo','-archs',str(path)],text=True,timeout=10).strip()!=arch:raise ValueError('reference actual Mach-O architecture differs')
+ dependencies=loads(path)
+ signed=subprocess.run(['/usr/bin/codesign','--verify','--strict',str(path)],capture_output=True,text=True,timeout=30)
+ if signed.returncode:raise ValueError('reference image signature rejected: '+str(path))
+ if code_bytes(path,limit=512*1024*1024,content=False)[1]!=before:raise ValueError('reference code changed during native inspection')
+ return dict(path=str(path),architecture=arch,filetype=kind,sha256=before['sha256'],dependencies=dependencies,strict_signature=True)
+
+def reference_closure(stage,*,image_inspector=None):
+ """Two real x86 CPUs/host and ARM backend, with bounded relative closure."""
+ from gpu_candidate_identity import resolve_gpu_edge
+ inspect=image_inspector or reference_image;cache={};pending=[]
+ def image(path,architecture,kind):
+  path=Path(path);key=str(path)
+  if key not in cache:
+   value=inspect(path)
+   if value.get('path')!=key or value.get('strict_signature')is not True:raise ValueError('reference inspector did not verify actual image')
+   cache[key]=value;pending.append((path,architecture))
+  value=cache[key]
+  if value.get('architecture')!=architecture or value.get('filetype')!=kind:raise ValueError('reference actual architecture/filetype mismatch')
+  return value
+ host=stage/'bin/gpu-metal/libbbgpu.dylib';gpu=stage/'bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu';gpu_library=stage/'bin/gpu-metal-arm64/libbbgpu.dylib'
+ cpus={}
+ for role in CPU_ROLES:
+  target=stage/role;value=image(target,'x86_64',2)
+  edges=[e for e in value['dependencies']if Path(e).name.startswith('libbbgpu')]
+  if len(edges)!=1 or not edges[0].startswith(('@loader_path/','@executable_path/'))or resolve_gpu_edge(target,edges[0])!=host:raise ValueError('reference CPU needs one exact relative host edge')
+  cpus[role]=dict(target=str(target),target_sha256=value['sha256'],architecture='x86_64',library=str(host),load_edge_verified=True,strict_signatures=True)
+ image(host,'x86_64',6);image(gpu,'arm64',2);image(gpu_library,'arm64',6)
+ while pending:
+  path,arch=pending.pop()
+  if len(cache)>256:raise ValueError('reference native dependency closure bound')
+  for edge in cache[str(path)]['dependencies']:
+   if edge.startswith(('/usr/lib/','/System/')):continue
+   if not edge.startswith(('@loader_path/','@executable_path/')):raise ValueError('reference dependency is not relative to its packaged image')
+   target=resolve_gpu_edge(path,edge)
+   if not target.is_relative_to(stage):raise ValueError('reference relative native dependency escapes code package')
+   image(target,arch,6)
+ for value in cpus.values():value['library_sha256']=cache[str(host)]['sha256']
+ return cpus,dict(sorted(cache.items()))
+
+def admit_reference(app,source,*,project=P,seal_runner=None,image_inspector=None,gpu_verifier=None):
+ """Original 0.2.51 code-only reference; never its GUI or formal data."""
+ from qa_launch_conditions import canonical,SCRIPTS
+ from launcher_runtime_profile import code_bytes
+ from gpu_candidate_identity import verify
+ import plistlib
+ project=canonical(project,directory=True)
+ if project!=P:raise ValueError('reference benchmark uses only the fixed Shared development project')
+ app=canonical(app,directory=True,within=project/'evidence')
+ if app.suffix!='.app':raise ValueError('reference-stage must be a staged original application')
+ seal=app_seal(app,runner=seal_runner)
+ if seal['status']!='verified':raise ValueError('whole reference application seal failed before run')
+ stage=canonical(app/'Contents/Resources/bbport',directory=True,within=app)
+ info=plistlib.loads(code_bytes(app/'Contents/Info.plist')[0])
+ if info.get('CFBundleIdentifier')!='io.github.bbport.optimized'or info.get('CFBundleShortVersionString')!='0.2.51':raise ValueError('reference requires original formal 0.2.51 identity')
+ native=json.loads(code_bytes(stage/'NATIVE-METAL.json')[0])
+ if native.get('game_runtime')=='fex-arm64'or native.get('default_enabled')is not True or native.get('minimum_os_major')!=27:raise ValueError('reference must retain its original enabled ARM64 Metal backend')
+ if source['environment'].get('BB_METAL_ARM64')not in(None,'1'):raise ValueError('original source must already select the ARM64 Metal backend')
+ scripts={name:code_bytes(stage/name,limit=4*1024*1024,content=False)[1]['sha256']for name in SCRIPTS}
+ if set(source['original_scripts'])!=set(SCRIPTS)or dict(source['original_scripts'])!=scripts:raise ValueError('reference differs from receipt original sixteen scripts')
+ runtime={role:canonical(stage/role,within=stage)for role in (*CPU_ROLES,'bin/gpu-metal/libbbgpu.dylib','bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu','bin/gpu-metal-arm64/libbbgpu.dylib')}
+ cpus,closure=reference_closure(stage,image_inspector=image_inspector)
+ gpu_role='bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'
+ gpu=(gpu_verifier or verify)(dict(target=str(runtime[gpu_role]),library=str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib']),library_sha256=closure[str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib'])]['sha256']),stage,code_owners=(0,os.getuid()))
+ if gpu.get('target')!=str(runtime[gpu_role])or gpu.get('target_sha256')!=closure[str(runtime[gpu_role])]['sha256']or gpu.get('library')!=str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib'])or gpu.get('library_sha256')!=closure[str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib'])]['sha256']or gpu.get('architecture')!='arm64'or gpu.get('strict_signatures')is not True or gpu.get('load_edge_verified')is not True:raise ValueError('reference actual GPU/DSO differs')
+ hashes={role:closure[str(path)]['sha256']for role,path in runtime.items()}
+ return dict(app=app,stage=stage,runtime=runtime,runtime_sha256=hashes,seal=seal,
+  identity=dict(profile='original-0.2.51-Rosetta-isolated-CLI',app=str(app),stage=str(stage),
+   cpu_architecture='x86_64',GPU_architecture='arm64',cpu=cpus,gpu=gpu,native_closure=closure,
+   original_scripts=scripts,whole_app_pre_seal=seal,reference_GUI_started=False,formal_data_read=False))
+
+
+def execution_request(formal_stage,reference_stage,*,functional_f3=False):
+ if formal_stage is not None and reference_stage is not None:raise ValueError('formal-stage and reference-stage are mutually exclusive')
+ if reference_stage is not None and functional_f3:raise ValueError('reference-stage supports performance sampling only; F3 is not part of this comparison')
+ return reference_stage if reference_stage is not None else formal_stage
+
 def execution_conditions(source,formal):
  if formal is None:return source
- return dict(source,stage=formal['stage'],app=formal['app'],runtime=formal['runtime'],runtime_sha256=formal['runtime_sha256'],formal_code_admission=formal)
+ return dict(source,stage=formal['stage'],app=formal['app'],runtime=formal['runtime'],runtime_sha256=formal['runtime_sha256'],execution_code_admission=formal)
 
 def execution_environment(source,case,formal=None,*,functional_f3=False):
  """The already cloned original conditions, with code path changes only."""
@@ -164,7 +252,7 @@ def benchmark_changes(source,case,env,*,formal=None,functional_f3=False):
  return changes,sorted(allowed)
 
 def selected_cache_mode(requested,formal_stage):
- if formal_stage is not None and requested not in(None,'empty'):raise ValueError('formal-stage requires empty cache mode; QA shader cache import is forbidden')
+ if formal_stage is not None and requested not in(None,'empty'):raise ValueError('staged code comparison requires empty cache mode; QA shader cache import is forbidden')
  return 'empty'if formal_stage is not None else requested or'seeded'
 
 def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False):
@@ -244,33 +332,37 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
    try:report['scene_sample']=scene_summary(frames,samples,ready,scene_seconds)
    except ValueError as error:report.update(status='incomplete',error=str(error))
   report['qualification']=('Original normal Play and original offline F3 supervisor; isolated scripted quicksave/quickload API, not a physical keyboard test. No FPS/performance or full visual/network conclusion.'if f3 is not None else'Original Swift frozen conditions; Continue only. Scene camera is not full gameplay/visual/network/F3 acceptance. Telemetry has overhead; combined footprints may double-count shared memory. No matched old/new performance or sustained-memory conclusion.')
-  if c.get('formal_code_admission')is not None:
-   sealed=finish_app_seal(report,c['formal_code_admission']);report.clear();report.update(sealed)
+  if c.get('execution_code_admission')is not None:
+   sealed=finish_app_seal(report,c['execution_code_admission']);report.clear();report.update(sealed)
   if frames.exists():os.replace(frames,root/'frames.csv')
   write(root/'result.json',report);print(json.dumps({k:v for k,v in report.items()if k not in('native_identity','qualification')},indent=2),flush=True)
  return report
 
 def main():
- ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));ap.add_argument('--formal-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2),default=1);ap.add_argument('--functional-f3',action='store_true');a=ap.parse_args()
+ ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));code=ap.add_mutually_exclusive_group();code.add_argument('--formal-stage',type=Path);code.add_argument('--reference-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2),default=1);ap.add_argument('--functional-f3',action='store_true');a=ap.parse_args()
  assert 60<=a.startup_seconds<=1800 and 45<=a.scene_seconds<=180
  assert not a.functional_f3 or a.runs==1,'functional F3 is one supervised session'
  from qa_launch_conditions import load
  from qa_launch_clone import create
  c=load(a.receipt,stage=a.stage,project=P);require_no_games()
- a.cache_mode=selected_cache_mode(a.cache_mode,a.formal_stage)
+ selected_code=execution_request(a.formal_stage,a.reference_stage,functional_f3=a.functional_f3)
+ a.cache_mode=selected_cache_mode(a.cache_mode,selected_code)
  status=subprocess.run(['/Users/k.d./.local/bin/cua-driver','status'],capture_output=True,text=True,timeout=10)
  assert 'daemon is not running'in(status.stdout+status.stderr).lower(),'Cua must be stopped'
  native,cache_admission=admit(c)
  formal=admit_formal(a.formal_stage,c)if a.formal_stage is not None else None
- execution=execution_conditions(c,formal)
+ reference=admit_reference(a.reference_stage,c)if a.reference_stage is not None else None
+ code_admission=formal or reference
+ execution=execution_conditions(c,code_admission)
  observer=NativeObserver();before=observer.system();assert not before['locked']and before['pressure']!=4
  tag=str(time.time_ns());root=P/'evidence'/('original-launch-benchmark-'+tag);root.mkdir(mode=0o700)
  case=create(c,cache_admission,project=P,tag=tag,cache_mode=a.cache_mode)
- env=execution_environment(c,case,formal,functional_f3=a.functional_f3)
- actual_changes,allowed_changes=benchmark_changes(c,case,env,formal=formal,functional_f3=a.functional_f3)
+ env=execution_environment(c,case,code_admission,functional_f3=a.functional_f3)
+ actual_changes,allowed_changes=benchmark_changes(c,case,env,formal=code_admission,functional_f3=a.functional_f3)
  command=[c['executable'],str(execution['stage']/c['arguments'][0])]+([]if a.functional_f3 else['--benchmark'])
  report=dict(schema=1,status='running',receipt_sha256=sha(a.receipt),launch_id=c['launch_id'],native_identity=native,original_shell_entry_preserved=True,original_benchmark_flag_added=True,benchmark_control_overrides=dict(BB_QUICKSAVE='0',BB_PAD_FILE_ONLY='1'),cache_mode=a.cache_mode,silent=True,screen_capture=False,Cua=False,profiler=False,scripted_actions=['Continue until real scene camera'],formal_data_modified=False,source_save_unchanged=False,settings_sha256=case['config_sha256'],startup_budget_seconds=a.startup_seconds,scene_seconds=a.scene_seconds,quality_or_effects_changed=False)
  if formal is not None:report.update(formal_native_identity=formal['identity'],execution_profile='staged-formal-bundle-isolated-CLI',source_QA_only_for_clone=True,cache_namespace_policy='empty-base-to-new-namespace-by-original-bootstrap')
+ if reference is not None:report.update(reference_native_identity=reference['identity'],execution_profile='original-0.2.51-Rosetta-isolated-CLI',source_QA_only_for_clone=True,cache_namespace_policy='empty-isolated-root-original-reference-policy')
  if a.functional_f3:report.update(original_benchmark_flag_added=False,benchmark_control_overrides={'BB_FRAME_STATS':'1','BB_ARM_QA_PAD_FILE':'isolated existing native QA API'},performance_sample=False,functional_f3_requested=True,incremental_log_events=True,scripted_actions=['Continue before first scene','quicksave API','quickload API','automatic continue observed; no scripted Continue after F3'])
  write(root/'conditions.json',dict(command=command,cwd=str(execution['stage']),environment=env,source_receipt=str(a.receipt),data=str(case['data_root']),user=str(case['user_root']),cache=str(case['cache_root']),pad=str(case['pad']),allowed_changes=allowed_changes,actual_changes=actual_changes,cache_clone=case['cache_clone']))
  write(root/'result.json',report);print('Evidence:',root,flush=True)

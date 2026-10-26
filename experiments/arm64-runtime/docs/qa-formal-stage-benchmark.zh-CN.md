@@ -23,3 +23,15 @@ python3 experiments/arm64-runtime/tools/run_qa_launch_benchmark.py \
 ```
 
 本轮验证：新增 `tests/test_qa_benchmark_formal_stage.py` 的 18 项作者控制通过；使用真实 Python bundle byte reader，注入 native identity verifier，并明确禁止 Popen。覆盖整包pre失败不启动、post失败保留raw功能结果并降级、前后通过与超时，以及完整闭包、outer ID、production、文件更改、缺 nested、脚本不等、错误 CPU/GPU edge/签名/架构、路径链接/越界、强制 empty、原环境与 source clone 身份保留、画质更改拒绝及 F3 前置。没有启动 native/GPU/game，也没有修改正在运行的旧 driver 或正式数据；真正 staged-role 运行由主任务统一安排。
+
+## 原 Rosetta 0.2.51 匹配参考
+
+同一 development driver 新增 `--reference-stage <P/evidence/.../Blood Echoes.app>`，与 `--formal-stage` 互斥；不支持 `--functional-f3`，该参考只用于性能采样。其余仍是同一原 QA receipt、`qa_launch_clone.create`、scene sampler 与连续 MemoryPolicy。默认强制 empty，拒绝 seeded；不读正式 Defaults 或正式进度，不运行参考 GUI。
+
+参考入口核真实外层正式 ID 与 `CFBundleShortVersionString=0.2.51`、whole app pre seal、已启用原 ARM64 Metal 后端。参考 16 脚本实际 SHA 对照 source receipt 的 **original_scripts**；FEX正式候选仍对照 **effective_scripts**，不混淆两种来源。脚本本身负责原生后端选择；源条件若显式关闭 ARM64 Metal 会拒绝，driver不修改该设置。
+
+实际 top/nested CPU 与其 host dylib 必须为 thin x86_64；独立 GPU 与 DSO 为 arm64。`reference_image` 读取 Mach-O header、lipo、codesign，复用原 package `loads` 读取依赖；CPU必须只有一个精确 host edge，使用既有 `gpu_candidate_identity.resolve_gpu_edge` 解析。所有非 system 依赖必须为包内相对边，递归闭包最多256映像，并逐个核对应架构、类型、摘要和签名。未实现任意 RPATH/外部驱动/其他版本兼容，遇到这些明确拒绝，不猜目录。
+
+所有执行选择共用 `execution_code_admission` 和原 sampler 的 pre/post 整包封口；参考身份单独写入 `reference_native_identity`，明确 CPU `x86_64`、GPU `arm64`，不能称纯ARM。只替换代码 cwd/shell/Python wrapper 路径和 `BB_GPU_PROCESS`；原 INI、语言、模组和质量条件仍来自源 QA 的独立副本。原参考脚本没有 FEX 准备 hook，所以不会调用新版准备链；driver 不把 QA 的默认准备行为强加给参考。两边从各自新空缓存执行相同 cold/warm 采样后，才由主任务对照场景、帧时间与内存，不把单次均值直接解释成稳定收益。
+
+新增 `tests/test_qa_benchmark_reference_stage.py` 的11项作者控制通过；保留正式入口18项与scene/summary12项控制。测试只用作者文件和注入的 native metadata/seal verifier，禁止进程启动。此修改尚未执行任何参考游戏/原生/helper过程，真正基线复制与匹配运行由主任务安排。
