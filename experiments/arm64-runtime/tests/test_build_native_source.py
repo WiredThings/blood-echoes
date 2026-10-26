@@ -159,6 +159,12 @@ class Fixture(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'single-link'):
             self.plan()
 
+    def test_unpackageable_release_identity_is_rejected_before_build(self):
+        for kwargs in (dict(version='0.2.52-beta'), dict(revision='a' * 64)):
+            with self.assertRaisesRegex(ValueError, 'version|revision'):
+                self.plan(**kwargs)
+            self.assertFalse(self.args['build_root'].exists())
+
     def test_revision_and_version_not_shell_fragments(self):
         for kw in (dict(revision='HEAD'), dict(version='0.2.52;rm'), dict(revision='A' * 40)):
             with self.assertRaises(ValueError):

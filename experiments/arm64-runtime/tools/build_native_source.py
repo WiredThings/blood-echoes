@@ -63,8 +63,8 @@ def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider
     need(prefixes and len(prefixes) == len(set(prefixes)), 'distinct explicit dependency prefixes required')
     for path in [repo, root, *prefixes]:
         need(not any(c in str(path) for c in (';', '\n', '\r')), 'ambiguous command/CMake path')
-    need(re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.]+)?', version), 'explicit release version required')
-    need(re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', revision), 'full lowercase source revision required')
+    need(re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version), 'explicit release version required')
+    need(re.fullmatch(r'[0-9a-f]{40}', revision), 'full lowercase source revision required')
     tools = {}
     for name in ('cmake', 'ninja', 'pkg-config'):
         found = next((p / 'bin' / name for p in prefixes if (p / 'bin' / name).exists()), None)
