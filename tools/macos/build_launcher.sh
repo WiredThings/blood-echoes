@@ -13,7 +13,7 @@ cd -- "$(dirname -- "$0")/../.."
 repo=$PWD
 pkg=launcher-macos
 app=${BB_APP:-out/Blood Echoes.app}
-work=out/launcher-build
+work=${BB_LAUNCHER_WORK:-out/launcher-build}
 release=${BB_RELEASE:-}
 
 [[ $(uname -s) == Darwin ]] || { echo "STOP: run this on the Mac" >&2; exit 1; }

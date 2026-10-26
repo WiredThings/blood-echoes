@@ -86,6 +86,44 @@ def bundle(stage):
     return Bundle(root,app,native,local)
 
 @dataclass(frozen=True)
+class PackagingCapabilityProfile:
+    """Code-only packaging query scope. Deliberately NOT a game RuntimeProfile."""
+    bundle:Bundle
+    data_root:Path
+    _data_identity:tuple
+
+    def revalidate(self):
+        current=bundle(self.bundle.stage)
+        need(current is not None and current.app==self.bundle.app and current.native==self.bundle.native and current.local==self.bundle.local,'packaging bundle code identity changed')
+        need(set(current.native['frozen_runtime'])==set(ROLES)|{'bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal','bin/gpu-net/libbbnet.dylib'},'packaging requires eight actual frozen runtime roles')
+        root=owned_dir(self.data_root);info=root.stat()
+        need((info.st_dev,info.st_ino,info.st_uid,stat.S_IMODE(info.st_mode))==self._data_identity and stat.S_IMODE(info.st_mode)==0o700,'packaging capability data root replaced or changed')
+        return current
+
+    def capability_root(self):
+        self.revalidate()
+        work=owned_dir(self.data_root/WORK);capabilities=owned_dir(work/'capabilities')
+        need(stat.S_IMODE(work.stat().st_mode)==stat.S_IMODE(capabilities.stat().st_mode)==0o700,'packaging scalar scratch must stay private')
+        return capabilities
+
+
+def packaging_capabilities(stage,*,scratch_parent):
+    """Context manager owning fresh disposable packaging data, never P/state."""
+    from contextlib import contextmanager
+    @contextmanager
+    def enter():
+        admitted=bundle(stage);need(admitted is not None,'actual formal bundle code closure required before packaging capability')
+        parent=owned_dir(scratch_parent)
+        need(not parent.is_relative_to(admitted.app),'packaging scratch must stay outside signed application')
+        with tempfile.TemporaryDirectory(prefix='packaging-capability-',dir=parent)as temporary:
+            data=owned_dir(temporary);work=owned_dir(data/WORK,create=True);owned_dir(work/'capabilities',create=True)
+            info=data.stat();profile=PackagingCapabilityProfile(admitted,data,(info.st_dev,info.st_ino,info.st_uid,stat.S_IMODE(info.st_mode)))
+            profile.revalidate()
+            yield profile
+    return enter()
+
+
+@dataclass(frozen=True)
 class RuntimeProfile:
     bundle:Bundle
     data_root:Path
@@ -152,9 +190,16 @@ def derive(stage,arguments,environment,*,executable=None):
     owned_dir(work,create=True);owned_dir(expected,create=True)
     return result
 
-def kw(profile):return {'runtime_profile':profile}if profile is not None else{}
-def work(project,profile=None):return profile.work(project)if profile is not None else owned_dir(Path(project)/'state')
-def cache_root(project,profile=None):return profile.gpu_root if profile is not None else owned_dir(Path(project)/'state')
+def _game_profile(profile):
+    need(not isinstance(profile,PackagingCapabilityProfile),'packaging capability profile is not a game runtime profile')
+    return profile
+
+def kw(profile):
+    _game_profile(profile);return {'runtime_profile':profile}if profile is not None else{}
+def work(project,profile=None):
+    _game_profile(profile);return profile.work(project)if profile is not None else owned_dir(Path(project)/'state')
+def cache_root(project,profile=None):
+    _game_profile(profile);return profile.gpu_root if profile is not None else owned_dir(Path(project)/'state')
 
 @dataclass(frozen=True)
 class MetadataInputs:

@@ -185,9 +185,10 @@ def fixed_helper_capability(worker,admission_root,*,runner=None,runtime_profile=
   need(result.returncode==0 and len(result.stdout)<=4096 and result.stdout==b'FIXED_HELPER_CAPABILITY 2\n','worker fixed helper ABI query failed')
   return 2
 
-def freeze_inputs(stage,component,library,*,rewrite,admission_root):
- """Call AFTER dependency relocation/signing; bind final copied GPU and worker."""
+def prepare_inputs(stage,component,library,*,rewrite,admission_root):
+ """Copy/relocate verified inputs only; never query or publish an enabled component."""
  stage=Path(stage).resolve(strict=True);library=Path(library).resolve(strict=True)
+ need(not os.path.lexists(stage/'GAME-PSO-COMPONENT.json'),'component must not be published before input preparation')
  raw,_=checked_bytes(Path(component),limit=1024*1024);m=json.loads(raw)
  need(m['schema']==1 and m['kind']=='blood-echoes-game-pso-component'and m['production']is False,'admitted private component required')
  source=Path(m['worker']);need(sha(source)==m['worker_sha256'],'worker source identity')
@@ -210,12 +211,11 @@ def freeze_inputs(stage,component,library,*,rewrite,admission_root):
  need(sha(worker)==m['worker_sha256'],'copied worker changed before relocation')
  rewrite(worker,Path(m['library']),library)
  # No development-source paths survive in the installed runtime manifest.
- frozen=dict(schema=1,enabled=True,kind=m['kind'],production=False,
+ frozen=dict(schema=1,enabled=False,kind=m['kind'],production=False,
   worker=str(worker.relative_to(stage)),worker_sha256=sha(worker),
   library=str(library.relative_to(stage)),library_sha256=sha(library),
   layout=str(dst.relative_to(stage)),layout_sha256=runtime_layout_sha,source_layout_sha256=m['layout_sha256'],
-  source_root=str(headers.relative_to(stage)),
-  fixed_helper_seed_schema=fixed_helper_capability(worker,admission_root))
+  source_root=str(headers.relative_to(stage)))
  if m.get('module_consumer')is not None:
   # Coherent module input conversion is optional only for historical component
   # admission. New automatic builds provide it and the actual scalar capability.
@@ -232,8 +232,62 @@ def freeze_inputs(stage,component,library,*,rewrite,admission_root):
  if m.get('automatic_capture_schema')is not None:
   need(m['automatic_capture_schema']==1,'unknown automatic capture schema')
   frozen['automatic_capture_schema']=1
- (stage/'GAME-PSO-COMPONENT.json').write_text(json.dumps(frozen,indent=2)+'\n')
+ identities={str(path.relative_to(stage)):sha(path)for path in [worker,library,dst,*([stage/frozen['module_consumer']]if'module_consumer'in frozen else[]),*(path for path in headers.rglob('*')if path.is_file())]}
+ return dict(candidate_schema=1,kind='blood-echoes-prepared-component-inputs',stage=str(stage),component=frozen,
+             copied_sha256=identities,capability_queried=False,component_published=False)
+
+
+def _prepared_candidate(stage,candidate):
+ need(candidate.get('candidate_schema')==1 and candidate.get('kind')=='blood-echoes-prepared-component-inputs'and candidate.get('stage')==str(stage)and candidate.get('capability_queried')is False and candidate.get('component_published')is False,'unpublished prepared component input contract')
+ frozen=dict(candidate['component'])
+ need(frozen.get('schema')==1 and frozen.get('kind')=='blood-echoes-game-pso-component'and frozen.get('enabled')is False and frozen.get('production')is False and'fixed_helper_seed_schema'not in frozen,'component candidate cannot claim capability or enablement')
+ expected={frozen[name]for name in('worker','library','layout')}
+ if'module_consumer'in frozen:expected.add(frozen['module_consumer'])
+ headers=relative(stage,frozen['source_root']);expected.update(str(path.relative_to(stage))for path in headers.rglob('*')if path.is_file())
+ need(set(candidate['copied_sha256'])==expected,'prepared component copied file closure changed')
+ for name,want in candidate['copied_sha256'].items():
+  need(HEX.fullmatch(want)and sha(relative(stage,name))==want,'prepared component bytes changed: '+name)
+ for name in('worker','library','layout','module_consumer'):
+  if name in frozen:need(candidate['copied_sha256'][frozen[name]]==frozen[name+'_sha256'],'candidate field/file identity mismatch')
+ load_canonical_layout(relative(stage,frozen['layout']),headers,frozen['layout_sha256'])
  return frozen
+
+
+def finalize_inputs(stage,candidate,*,admission_root,runtime_profile=None,production=False,capability_runner=None):
+ """Publish only after a real scalar query on final copied, stable code."""
+ stage=Path(stage).resolve(strict=True);need(type(production)is bool,'explicit component profile')
+ need(not os.path.lexists(stage/'GAME-PSO-COMPONENT.json'),'refuse overwriting a published component')
+ frozen=_prepared_candidate(stage,candidate)
+ if production:
+  from launcher_runtime_profile import PackagingCapabilityProfile
+  need(isinstance(runtime_profile,PackagingCapabilityProfile),'formal finalization requires a packaging-only capability profile')
+  admitted=runtime_profile.revalidate();need(admitted.stage==stage,'packaging capability belongs to another bundle')
+  for name,want in dict(worker='bin/game-pso-preparer',module_consumer='bin/game-module-preparer',library='bin/gpu-metal-arm64/libbbgpu.dylib',layout='native-runtime-inputs/layout.json',source_root='native-runtime-inputs/layout-source').items():
+   need(frozen.get(name)==want,'formal final component role mismatch: '+name)
+  for name in('worker','library','module_consumer'):
+   need(admitted.native['frozen_runtime'][frozen[name]]==frozen[name+'_sha256'],'final component differs from actual frozen bundle')
+ else:need(runtime_profile is None,'old QA finalization retains its original Shared scalar path')
+ from warm_archive_manifest import resolve_gpu_identity
+ code_args={'code_owners':(0,os.getuid())}if production else{}
+ for name in('worker','module_consumer'):
+  if name not in frozen:continue
+  actual=resolve_gpu_identity(relative(stage,frozen[name]),stage,**code_args)
+  need(actual['library']==str(relative(stage,frozen['library']))and actual['library_sha256']==frozen['library_sha256'],'final copied consumer actual DSO edge differs')
+ capability=fixed_helper_capability(relative(stage,frozen['worker']),admission_root,runner=capability_runner,runtime_profile=runtime_profile)
+ need(not production or capability==2,'formal component requires the actual fixed helper schema2 query')
+ _prepared_candidate(stage,candidate)
+ if production:runtime_profile.revalidate()
+ frozen.update(enabled=True,production=production,fixed_helper_seed_schema=capability)
+ # The candidate was never usable. Only this completed scalar query publishes
+ # the final manifest, without replacing an earlier successful component.
+ with(stage/'GAME-PSO-COMPONENT.json').open('x')as stream:json.dump(frozen,stream,indent=2);stream.write('\n')
+ return frozen
+
+
+def freeze_inputs(stage,component,library,*,rewrite,admission_root):
+ """Historical QA API: the same verified copy stage then original scalar path."""
+ candidate=prepare_inputs(stage,component,library,rewrite=rewrite,admission_root=admission_root)
+ return finalize_inputs(stage,candidate,admission_root=admission_root)
 
 def load(stage,*,runtime_profile=None):
  stage=Path(stage).resolve(strict=True);path=stage/'GAME-PSO-COMPONENT.json'
