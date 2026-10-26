@@ -118,6 +118,17 @@ class Configuration(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'escaped'):self.make_plan()
     def test_runtime_isolation_not_relocated(self):
         with self.assertRaisesRegex(ValueError,'must not be relocated'):self.make_plan(runtime_root=self.root)
+    def test_build_never_reads_private_runtime_tree(self):
+        import configure_native_build as config
+        original=config.directory
+        def build_directory(path):
+            self.assertNotEqual(Path(path),PRIVATE_RUNTIME,'private QA state is not a build input')
+            return original(path)
+        with patch.object(config,'directory',side_effect=build_directory):
+            value=self.make_plan()
+        self.assertFalse(value['runtime_tree_read_for_build'])
+        self.assertIn('-DBB_ARM64_RUNTIME_ROOT='+str(PRIVATE_RUNTIME),value['configure'])
+        self.assertFalse(value['clean_checkout_build_proven'])
     def test_generated_source_tree_rejected(self):
         with self.assertRaisesRegex(ValueError,'independent'):self.make_plan(generated_dir=D/'generated-new')
     def test_gpu_generator_uses_independent_output(self):

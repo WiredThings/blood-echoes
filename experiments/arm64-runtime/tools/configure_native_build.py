@@ -73,7 +73,13 @@ def renderer_inputs(source,build):
                 avplayer_configured_inputs=avplayer,build_tools=tools,generator='Ninja',
                 cache_sha256=sha(build/'CMakeCache.txt'),compile_commands_sha256=sha(build/'compile_commands.json'),target_description_sha256=sha(reply/record['jsonFile']))
 def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_build,runtime_root=PRIVATE_RUNTIME):
-    source=directory(source_root);runtime=directory(runtime_root);need(runtime==PRIVATE_RUNTIME,'existing Shared runtime root must not be relocated')
+    source=directory(source_root)
+    # This literal only selects the unbundled development fallback compiled
+    # into the binary. No source, generated file or dependency is read there.
+    # A fresh build host need not have a private QA runtime tree. Keep the
+    # literal fixed: runtime admission remains enforced by the runtime itself.
+    runtime=Path(runtime_root)
+    need(runtime==PRIVATE_RUNTIME,'existing Shared runtime root must not be relocated')
     build=Path(build_dir).absolute();generated=Path(generated_dir).absolute()
     for path in(build,generated):need(path==path.resolve()and not path.is_relative_to(source),'independent nonlinked build/generated outputs required')
     need(generated!=build,'generated output must be distinct from build')
@@ -93,6 +99,7 @@ def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_buil
     if renderer['sysroot']:command+=['-DCMAKE_OSX_SYSROOT='+renderer['sysroot']]
     return dict(schema=1,source_root=str(source),build_dir=str(build),generated_dir=str(generated),runtime_root=str(runtime),renderer=renderer,generators=[native,gpu],configure=command,
                 configure_ready=True,cpu_host=dict(status='same-normal-renderer-candidate',actual_load_and_native_ABI_validated=False,duplicate_host_objects_required=False),
+                runtime_tree_read_for_build=False,
                 clean_checkout_build_proven=False,ABI_validated=False,targets_built=False)
 def prepare(value):
     need(renderer_inputs(Path(value['source_root']),Path(value['renderer']['build']))==value['renderer'],'renderer configuration changed after planning')
