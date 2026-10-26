@@ -79,7 +79,28 @@ def cpu_paths(conditions):
  # do not pretend the top executable was the observed nested process.
  return {str(conditions['runtime'][role])for role in CPU_ROLES if role in conditions['runtime']}
 
-def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,identity_resolver=None):
+def app_seal(app,*,runner=None):
+ """Whole resource envelope, not just executable signatures. No launch."""
+ command=['/usr/bin/codesign','--verify','--deep','--strict',str(app)]
+ try:
+  result=(runner or subprocess.run)(command,capture_output=True,text=True,timeout=30)
+  output=(result.stdout or'')+(result.stderr or'')
+  if type(result.returncode)is not int or result.returncode or len(output)>65536:
+   return dict(status='failed',command=command,exit=result.returncode,error=output[:2048]or'whole app resource seal rejected')
+  return dict(status='verified',command=command,exit=0)
+ except (OSError,subprocess.SubprocessError)as error:
+  return dict(status='failed',command=command,error=str(error)[:2048])
+
+def finish_app_seal(report,formal,*,runner=None):
+ """Call only AFTER owned child teardown. Preserve the independent raw result."""
+ result=dict(report,raw_run_status=report['status'])
+ post=app_seal(formal['app'],runner=runner)
+ result['whole_app_seal']=dict(pre=formal['seal'],post=post,post_after_owned_process_cleanup=True)
+ if formal['seal'].get('status')!='verified'or post['status']!='verified':
+  result.update(status='incomplete',seal_error='whole staged application resource seal failed')
+ return result
+
+def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,identity_resolver=None,seal_runner=None):
  """Extra code-only admission. Original QA selection/save reader is unchanged.
 
  Default loaders perform real bundle byte, Mach-O ARM64, signature and declared
@@ -93,6 +114,8 @@ def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,ide
  if project!=P:raise ValueError('formal benchmark uses only the fixed Shared development project')
  app=canonical(app,directory=True,within=project/'evidence')
  if app.suffix!='.app':raise ValueError('formal-stage must be a new staged .app under development evidence')
+ seal=app_seal(app,runner=seal_runner)
+ if seal['status']!='verified':raise ValueError('whole application seal failed before run: '+seal.get('error','rejected'))
  stage=canonical(app/'Contents/Resources/bbport',directory=True,within=app)
  admitted=(bundle_loader or bundle)(stage)
  if admitted is None or admitted.stage!=stage or admitted.app!=app:raise ValueError('actual outer formal bundle admission missing')
@@ -111,14 +134,14 @@ def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,ide
  gpu=(gpu_verifier or verify)(dict(target=str(runtime[gpu_role]),library=str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib']),library_sha256=hashes['bin/gpu-metal-arm64/libbbgpu.dylib']),stage,**owners)
  if gpu.get('target')!=str(runtime[gpu_role])or gpu.get('target_sha256')!=hashes[gpu_role]or gpu.get('library')!=str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib'])or gpu.get('library_sha256')!=hashes['bin/gpu-metal-arm64/libbbgpu.dylib']or gpu.get('load_edge_verified')is not True or gpu.get('strict_signatures')is not True or gpu.get('architecture')!='arm64':
   raise ValueError('formal actual GPU/DSO role identity differs')
- return dict(app=app,stage=stage,runtime=runtime,runtime_sha256=hashes,
+ return dict(app=app,stage=stage,runtime=runtime,runtime_sha256=hashes,seal=seal,
   identity=dict(profile='staged-formal-bundle-isolated-CLI',app=str(app),stage=str(stage),
    native_manifest_sha256=sha(stage/'NATIVE-METAL.json'),runtime_sha256=hashes,
-   effective_scripts=parity,cpu=cpus,gpu=gpu,formal_GUI_started=False,formal_data_read=False))
+   effective_scripts=parity,cpu=cpus,gpu=gpu,whole_app_pre_seal=seal,formal_GUI_started=False,formal_data_read=False))
 
 def execution_conditions(source,formal):
  if formal is None:return source
- return dict(source,stage=formal['stage'],app=formal['app'],runtime=formal['runtime'],runtime_sha256=formal['runtime_sha256'])
+ return dict(source,stage=formal['stage'],app=formal['app'],runtime=formal['runtime'],runtime_sha256=formal['runtime_sha256'],formal_code_admission=formal)
 
 def execution_environment(source,case,formal=None,*,functional_f3=False):
  """The already cloned original conditions, with code path changes only."""
@@ -221,6 +244,8 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
    try:report['scene_sample']=scene_summary(frames,samples,ready,scene_seconds)
    except ValueError as error:report.update(status='incomplete',error=str(error))
   report['qualification']=('Original normal Play and original offline F3 supervisor; isolated scripted quicksave/quickload API, not a physical keyboard test. No FPS/performance or full visual/network conclusion.'if f3 is not None else'Original Swift frozen conditions; Continue only. Scene camera is not full gameplay/visual/network/F3 acceptance. Telemetry has overhead; combined footprints may double-count shared memory. No matched old/new performance or sustained-memory conclusion.')
+  if c.get('formal_code_admission')is not None:
+   sealed=finish_app_seal(report,c['formal_code_admission']);report.clear();report.update(sealed)
   if frames.exists():os.replace(frames,root/'frames.csv')
   write(root/'result.json',report);print(json.dumps({k:v for k,v in report.items()if k not in('native_identity','qualification')},indent=2),flush=True)
  return report

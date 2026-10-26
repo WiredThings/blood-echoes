@@ -1,7 +1,7 @@
 """Real author bundle byte closure + injected native identities; zero processes."""
 from pathlib import Path
 from types import MappingProxyType
-import copy,hashlib,json,os,plistlib,sys,tempfile,unittest
+import copy,hashlib,json,os,plistlib,sys,tempfile,unittest,subprocess
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import run_qa_launch_benchmark as driver
@@ -43,7 +43,10 @@ class FormalStage(unittest.TestCase):
   return dict(target=str(target),target_sha256=driver.sha(target),library=str(lib),library_sha256=driver.sha(lib),load_edge_verified=True,strict_signatures=True,architecture='arm64')
  def gpu(self,meta,stage,**kw):
   self.calls.append((meta,stage,kw));return dict(meta,target_sha256=driver.sha(meta['target']),load_edge_verified=True,strict_signatures=True,architecture='arm64')
- def admit(self,**kw):return driver.admit_formal(self.app,self.source,project=self.project,identity_resolver=kw.pop('identity_resolver',self.actual),gpu_verifier=kw.pop('gpu_verifier',self.gpu),**kw)
+ def seal_runner(self,command,**kw):
+  self.assertEqual(command,['/usr/bin/codesign','--verify','--deep','--strict',str(self.app)])
+  return subprocess.CompletedProcess(command,0,'','')
+ def admit(self,**kw):return driver.admit_formal(self.app,self.source,project=self.project,identity_resolver=kw.pop('identity_resolver',self.actual),gpu_verifier=kw.pop('gpu_verifier',self.gpu),seal_runner=kw.pop('seal_runner',self.seal_runner),**kw)
  def test_real_fullclosure_and_both_exact_cpu_roles(self):
   r=self.admit();self.assertEqual(set(r['runtime']),driver.FORMAL_ROLES);self.assertEqual(len(self.calls),3)
   self.assertEqual(set(r['identity']['cpu']),set(driver.CPU_ROLES));self.assertTrue(all(x[2]['code_owners']==(0,os.getuid())for x in self.calls))
@@ -111,5 +114,24 @@ class FormalStage(unittest.TestCase):
   driver.benchmark_changes(self.source,case,env,formal=formal,functional_f3=True)
   self.source['environment']=dict(self.source['environment'],BB_QUICKSAVE='0')
   with self.assertRaisesRegex(ValueError,'quicksave'):driver.execution_environment(self.source,case,formal,functional_f3=True)
+
+ def test_whole_app_pre_seal_failure_prevents_native_admission(self):
+  def bad(command,**kw):return subprocess.CompletedProcess(command,1,'','unsealed contents present')
+  with self.assertRaisesRegex(ValueError,'seal failed before run'):self.admit(seal_runner=bad)
+  self.assertFalse(self.calls)
+ def test_post_seal_failure_preserves_functional_result_but_is_incomplete(self):
+  formal=self.admit();raw=dict(status='functional-checked',functional_f3={'phase':'completed'},stop='functional F3 completed')
+  def bad(command,**kw):return subprocess.CompletedProcess(command,1,'','modified stdlib pycache')
+  result=driver.finish_app_seal(raw,formal,runner=bad)
+  self.assertEqual(result['status'],'incomplete');self.assertEqual(result['raw_run_status'],'functional-checked')
+  self.assertEqual(result['functional_f3'],raw['functional_f3']);self.assertEqual(raw['status'],'functional-checked')
+  self.assertEqual(result['whole_app_seal']['post']['status'],'failed');self.assertIn('seal',result['seal_error'])
+ def test_pre_and_post_seals_both_pass_without_erasing_sample(self):
+  formal=self.admit();result=driver.finish_app_seal(dict(status='sampled',scene_sample={'fps':50}),formal,runner=self.seal_runner)
+  self.assertEqual(result['status'],'sampled');self.assertEqual(result['raw_run_status'],'sampled')
+  self.assertEqual(result['scene_sample'],{'fps':50});self.assertTrue(result['whole_app_seal']['post_after_owned_process_cleanup'])
+ def test_seal_timeout_is_failure_and_not_a_functional_success(self):
+  def timeout(command,**kw):raise subprocess.TimeoutExpired(command,30)
+  self.assertEqual(driver.app_seal(self.app,runner=timeout)['status'],'failed')
 
 if __name__=='__main__':unittest.main()
