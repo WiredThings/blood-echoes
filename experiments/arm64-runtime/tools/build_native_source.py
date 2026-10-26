@@ -123,7 +123,7 @@ def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider
                        PKG_CONFIG_LIBDIR=':'.join(str(p / sub) for p in prefixes for sub in ('lib/pkgconfig', 'share/pkgconfig')),
                        BB_APP=str(root / 'gui/Blood Echoes.app'), BB_LAUNCHER_WORK=str(root / 'gui/work'),
                        BB_SWIFT_SCRATCH_PATH=str(root / 'gui/swift'), BB_RELEASE=version,
-                       BB_SWIFT_JOBS='1', BB_SWIFT_BUILD_SYSTEM='xcode', SDKROOT=sdk,
+                       BB_SWIFT_JOBS='1', SDKROOT=sdk,
                        CMAKE_BUILD_PARALLEL_LEVEL='1', PYTHONDONTWRITEBYTECODE='1')
     return dict(schema=1, status='plan-only', repository=str(repo), source_root=str(source), build_root=str(root),
                 dependency_prefixes=list(map(str, prefixes)), python_provider=str(provider), openssl_root=openssl, sdk_root=None if sdk_root is None else sdk,

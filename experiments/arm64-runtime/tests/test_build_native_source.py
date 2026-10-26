@@ -74,6 +74,7 @@ class Fixture(unittest.TestCase):
             self.assertTrue(Path(value['environment'][key]).is_relative_to(self.args['build_root']))
         self.assertNotIn('launcher-component-stage', json.dumps(value))
         self.assertNotIn('/Users/Shared', json.dumps(value))
+        self.assertNotIn('BB_SWIFT_BUILD_SYSTEM', value['environment'])
 
     def test_explicit_sdk_and_openssl(self):
         sdk = self.base / 'SDK'
