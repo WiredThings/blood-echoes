@@ -129,7 +129,17 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   with manifest.open('rb')as stream:summary['manifest_sha256']=hashlib.file_digest(stream,'sha256').hexdigest()
   family='geometry-owned-source-existing-native-chain';summary.setdefault('eligible_by_family',{})[family]=geometry['admitted']
  else:summary['geometry_source_adapter']=dict(status='not-provided',admitted=0)
- if summary['eligible']==0:return dict(status='empty',scan=summary,capture_environment=capture_environment)
+ if summary['eligible']==0:
+  result=dict(status='empty',scan=summary,capture_environment=capture_environment)
+  # An exhaustively scanned empty anticipatory queue has no PSO to prewarm.
+  # This hint carries no native-ready claim; the original publisher still
+  # checks Local/final guards and the strict context before atomic publication.
+  if restart_binding is not None and summary['complete']is True and capture_report.get('status')=='configured'and capture_environment=={
+      'BB_FETCH_CAPTURE_ROOT':str(capture_root),'BB_FETCH_CAPTURE_GAME_ROOT':str(prepared_inputs['game_root'])}:
+   from quick_restart_preparation import pending
+   try:result['_restart_context']=pending(prepared_inputs)
+   except(ValueError,OSError,KeyError,TypeError):pass
+  return result
  # This exact directory is ShaderCompiler::DefaultCacheDir / PsoCache cache_dir,
  # NOT a developer-created test artifact directory.
  artifact=gpu/'cache'/title/'metal';artifact.mkdir(parents=True,exist_ok=True)

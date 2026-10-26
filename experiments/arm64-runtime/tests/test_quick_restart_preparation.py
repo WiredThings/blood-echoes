@@ -165,5 +165,19 @@ class Restart(unittest.TestCase):
   with patch.object(quick,'binding',return_value=dict(author='binding')),patch.object(quick,'publish')as publish:
    with self.assertRaises(RuntimeError):local.prepare_launch(str(f.inputs/'runtime'),f.args,f.env,observe=lambda:next(observations),**values)
    publish.assert_not_called()
+ def test_empty_context_is_published_through_original_final_local_guard(self):
+  import test_launcher_local_aot as fixture
+  import launcher_local_aot as local
+  f=fixture.Startup();f.setUp();self.addCleanup(f.tearDown);context=dict(author='empty-queue-context')
+  kwargs=dict(project=f.root,archive_prepare=f.identity,local_prepare=lambda **kw:({},dict(status='prepared')),
+      fixed_helper_prepare=lambda **kw:({},dict(status='completed')),game_prepare=lambda **kw:dict(status='empty',_restart_context=context))
+  with patch.object(quick,'binding',return_value=dict(author='binding')),patch.object(quick,'publish',return_value=True)as publish:
+   _,report=local.prepare_launch(str(f.inputs/'runtime'),f.args,f.env,observe=lambda:dict(locked=False,pressure=1,swap_mib=0),**kwargs)
+   self.assertEqual(publish.call_count,1);self.assertIs(publish.call_args.kwargs['context'],context)
+   self.assertEqual(report['game_pso']['status'],'empty');self.assertNotIn('_restart_context',report['game_pso'])
+  samples=iter([dict(locked=False,pressure=1,swap_mib=0),dict(locked=False,pressure=4,swap_mib=0)])
+  with patch.object(quick,'binding',return_value=dict(author='binding')),patch.object(quick,'publish')as publish:
+   with self.assertRaises(RuntimeError):local.prepare_launch(str(f.inputs/'runtime'),f.args,f.env,observe=lambda:next(samples),**kwargs)
+   publish.assert_not_called()
 
 if __name__=='__main__':unittest.main(verbosity=2)

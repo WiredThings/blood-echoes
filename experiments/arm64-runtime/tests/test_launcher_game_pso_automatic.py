@@ -106,5 +106,51 @@ class Entry(unittest.TestCase):
         self.assertEqual(result['capture_environment'],capture)
         self.assertNotIn('modules',[name for name,_ in self.calls])
 
+    def completed_static_context(self):
+        from launcher_game_catalog import output_receipt,write_json
+        cache=self.gpu/'automatic-game-inputs';generation=cache/('c'*64);generation.mkdir(parents=True)
+        game=cache/'source-views'/('d'*64)/'view';game.mkdir(parents=True);game.chmod(0o500)
+        write_json(game.parent/'READY.json',dict(schema=1,identity='d'*64,proof=dict(authored=True)))
+        (generation/'catalog.json').write_text('{}');(generation/'static-program-index.jsonl').write_text('authored static index\n')
+        write_json(generation/'READY.json',dict(schema=1,identity='c'*64,files=output_receipt(generation)))
+        return dict(generation=generation,identity='c'*64,game_root=game,catalog=generation/'catalog.json',
+                    index=generation/'static-program-index.jsonl',cache_root=cache,report=dict(status='indexed'))
+
+    def configured_capture(self,**kw):
+        return dict(status='configured',capture_environment={'BB_FETCH_CAPTURE_ROOT':str(kw['root']),
+                    'BB_FETCH_CAPTURE_GAME_ROOT':str(kw['game_root'])})
+
+    def test_complete_empty_queue_supplies_strict_context_without_native_ready_claim(self):
+        import quick_restart_preparation as quick
+        self.component['automatic_capture_schema']=1;context=self.completed_static_context()
+        result=self.prepare(prepared_inputs=context,restart_binding=dict(authored=True),capture_configure=self.configured_capture)
+        self.assertEqual(result['status'],'empty');self.assertIs(result['scan']['complete'],True)
+        self.assertEqual(result['scan']['eligible'],0);self.assertNotIn('preparation',result)
+        self.assertNotIn('full_manifest_preparation_verified',result)
+        verified=quick._context(result['_restart_context'],self.gpu,lambda:None)
+        self.assertEqual(verified['game_root'],context['game_root'])
+        self.assertEqual(verified['catalog'],context['catalog'])
+        self.assertEqual([name for name,_ in self.calls],['candidates','modules'])
+
+    def test_incomplete_empty_scan_cannot_supply_restart_context(self):
+        import quick_restart_preparation as quick
+        self.component['automatic_capture_schema']=1;context=self.completed_static_context()
+        def incomplete(**kw):
+            summary=self.candidates(**kw);summary['complete']=False;return summary
+        with patch.object(quick,'pending',side_effect=AssertionError('incomplete scan cannot publish')):
+            result=self.prepare(prepared_inputs=context,restart_binding=dict(authored=True),capture_configure=self.configured_capture,candidate_builder=incomplete)
+        self.assertEqual(result['status'],'deferred');self.assertNotIn('_restart_context',result)
+        self.assertEqual([name for name,_ in self.calls],['candidates'])
+
+    def test_empty_without_capture_or_with_missing_static_ready_keeps_full_restart_path(self):
+        import quick_restart_preparation as quick
+        context=self.completed_static_context()
+        with patch.object(quick,'pending',side_effect=AssertionError('capture is missing')):
+            result=self.prepare(prepared_inputs=context,restart_binding=dict(authored=True))
+        self.assertEqual(result['status'],'empty');self.assertNotIn('_restart_context',result)
+        self.component['automatic_capture_schema']=1;(context['generation']/'READY.json').unlink()
+        result=self.prepare(prepared_inputs=context,restart_binding=dict(authored=True),capture_configure=self.configured_capture)
+        self.assertEqual(result['status'],'empty');self.assertNotIn('_restart_context',result)
+
 
 if __name__ == '__main__': unittest.main()
