@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "status": "normal-source-paired-and-staged-not-game-tested",
+  "renderer": {
+    "seconds": 317.489482917008,
+    "translation_units": 235,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9411.4375
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9395.4375
+    },
+    "artifacts": {
+      "libbbgpu.dylib": {
+        "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/build/libbbgpu.dylib",
+        "sha256": "ec7e930967edc24423f3e4fcf8a5635f784cb86ef729802d2bef6af63109af2d"
+      },
+      "game-pso-preparer": {
+        "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/build/game-pso-preparer",
+        "sha256": "c152935851c2433f50e98ff07f302ce1518382cbdcffe640de5efd02c37aa746"
+      },
+      "game-module-preparer": {
+        "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/build/game-module-preparer",
+        "sha256": "64999b5417216b240cd6e5afc75619dfed12f359debe6ba6cc5edc072e7e4995"
+      },
+      "bb-gpu": {
+        "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/build/bb-gpu",
+        "sha256": "2bf644698ebf209ea1675529ff46a0aa89d06c4203142f7f76a862462a6a3679"
+      }
+    },
+    "actual_gpu_executable": {
+      "target": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/build/bb-gpu",
+      "target_sha256": "2bf644698ebf209ea1675529ff46a0aa89d06c4203142f7f76a862462a6a3679",
+      "library": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/build/libbbgpu.dylib",
+      "library_sha256": "ec7e930967edc24423f3e4fcf8a5635f784cb86ef729802d2bef6af63109af2d",
+      "load_edge_verified": true,
+      "strict_signatures": true,
+      "architecture": "arm64",
+      "declared_gpu_load_edges": [
+        "@rpath/libbbgpu.dylib"
+      ]
+    }
+  },
+  "cpu": {
+    "status": "normal-CPU-targets-built",
+    "source_root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-clean-source-1793023825033571000/source/experiments/arm64-runtime",
+    "cpu_build": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/cpu",
+    "normal_renderer": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/build/libbbgpu.dylib",
+    "game_started": false,
+    "GPU_started": false,
+    "formal_data_modified": false,
+    "bb-game-arm64": {
+      "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/cpu/Bin/bb-game-arm64",
+      "sha256": "a9c2d1fcff04f580de5d3b62faa19828113e3f77dbfd13ffbe5747f07a3cf8d1"
+    },
+    "bb-cpu-cache-generator": {
+      "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/normal-gpu-clean-20261027-01/cpu/Bin/bb-cpu-cache-generator",
+      "sha256": "e1f587588f7f0a8d3c7161ca9156ac9dc0a559c465cf3c4a560443010049d0f1"
+    },
+    "seconds": 70.04049208399374,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9395.4375
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9395.4375
+    }
+  },
+  "layout": {
+    "sha256": "c16eb040bcd22633aa758b3a5150e53299bdb74c16621016a26a1b05c5652462",
+    "binary_sha256": "d93e5a5b43133c89a9466516e6025a55f99cd0adbd2cc2c648be57c4d07f41cc",
+    "strict_canonical_layout_passed": true,
+    "renderer_loaded": false
+  },
+  "staging": {
+    "cpu_manifest": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/resource-cpu-execution-1793032533817978000/cpu-runtime-manifest.json",
+    "component": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/resource-cpu-execution-1793032533817978000/GAME-PSO-COMPONENT.source.json",
+    "cpu_admission": true,
+    "component_admission": true
+  },
+  "normal_gpu_app": {
+    "manifest": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/gpu-candidate-app-1793032681464965000.json",
+    "historical_template_used": false,
+    "actual_load": {
+      "target": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/bin/Bloodborne Metal Candidate QA 1793032681464965000.app/Contents/MacOS/bb-gpu",
+      "target_sha256": "023b24329d768ee7d0e3da345d7bf9b51466a2f46ad05d8c3e59f28bd4568732",
+      "library": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/bin/gpu-preparation-1793032681464965000/libbbgpu.dylib",
+      "library_sha256": "ec7e930967edc24423f3e4fcf8a5635f784cb86ef729802d2bef6af63109af2d",
+      "load_edge_verified": true,
+      "strict_signatures": true,
+      "architecture": "arm64",
+      "declared_gpu_load_edges": [
+        "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/backend/bbport/bin/gpu-preparation-1793032681464965000/libbbgpu.dylib"
+      ]
+    }
+  },
+  "fresh_header_only_VMA": {
+    "revision": "3aa921224c154a0d2c43912bc88e1c42ce1f7607",
+    "header_sha256": "8487b7995ad3b263eb73bc5b9a77d71aa69b6bef5d58a715c02d2663afd81f1a",
+    "original_header_unchanged": true,
+    "config_sha256": "824341cb7b1c444ea6e219c0f932591313068390d9905c995a19615f49722a9a",
+    "header_only": true,
+    "game_started": false,
+    "GPU_started": false
+  },
+  "all_dependencies_fresh": false,
+  "host_local_only": true,
+  "game_started": false,
+  "formal_data_modified": false,
+  "release_updated": false
+}

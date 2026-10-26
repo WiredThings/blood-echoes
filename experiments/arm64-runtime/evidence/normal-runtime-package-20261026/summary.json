@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "packaged-original-gui-preparation-running",
+  "status": "original-gui-startup-and-runtime-local-reuse-sampled",
   "production": false,
   "archive_sha256": "4bd168b4a406b4414f7668a2fe8430490a660f97ace7473e2118efdada525878",
   "archive_bytes": 47497427,
@@ -49,5 +49,103 @@
   "formal_data_modified": false,
   "release_updated": false,
   "case_shell_cpu_sha256_is_historical": true,
-  "case_runtime_identity_authority": "ARM64-QA-MANIFEST frozen_runtime and upstream_inputs; shell receipt correction is next-source-only"
+  "case_runtime_identity_authority": "ARM64-QA-MANIFEST frozen_runtime and upstream_inputs; shell receipt correction is next-source-only",
+  "observation": {
+    "guard_reason": "QA finished",
+    "duration_seconds": 1128.1739839590155,
+    "first_native": {
+      "bb-probe-metal": {
+        "pid": 49806,
+        "seconds": 914.8822839590721
+      },
+      "bb-gpu": {
+        "pid": 64630,
+        "seconds": 915.6619803750655
+      }
+    },
+    "no_cua_or_screen_recording": true,
+    "silent": true,
+    "automatic_input": false,
+    "guard_result_sha256": "79dc6d83502e343a93ef438086c0ec5b0435d06cd8820a2f775e0b516aedada2",
+    "game_log_sha256": "8facafcf806b9921e710b6b1a478d92b2cf305e5db9fd2fc4409eab7120beecf",
+    "preparation_result_sha256": "2918321044131f513c79c8c11f4e27c32ebb4d71ff3f6075855b58896aed4fbf",
+    "preparation": {
+      "status": "completed",
+      "completed": 409,
+      "deferred": 0,
+      "rejected": 0,
+      "seconds": 297.4912051249994,
+      "batch": {
+        "capability_schema": 1,
+        "processes": 844,
+        "recipes": 1227,
+        "failed_recipes": 0,
+        "max_recipes": 16,
+        "legacy_fallback": false
+      },
+      "phase_request_counts": {
+        "prepare": 818,
+        "record": 409
+      },
+      "artifact_counts": {
+        "attempts": 501,
+        "built": 390,
+        "compile_attempts": 390,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 111,
+        "unavailable": 0
+      },
+      "recipe_all_hit_count": 52,
+      "initial_local": {
+        "built": 0,
+        "skipped": 22,
+        "requests": 22
+      },
+      "final_local": {
+        "built": 431,
+        "skipped": 22,
+        "requests": 453
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9156.5625
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9116.3125
+      }
+    },
+    "runtime_counts": {
+      "Metal local AOT: hit": 538,
+      "Metal local AOT: miss": 0,
+      "Metal helper local AOT: hit": 11,
+      "BACHATA_FEX_FATAL": 0,
+      "Fatal": 0
+    },
+    "memory": {
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9161.875
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9411.4375
+      },
+      "swap_growth_mib": 249.5625,
+      "max_pressure": 4,
+      "longest_sampled_severe_seconds": 0.5124916660133749,
+      "peak_swap_mib": 9419.4375
+    },
+    "limitations": [
+      "no playable scene or matched FPS verified",
+      "transient critical pressure occurred; not memory acceptance",
+      "existing isolated shader recipe seed; not empty-shader first installation"
+    ]
+  }
 }

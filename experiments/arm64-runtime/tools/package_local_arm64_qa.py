@@ -118,6 +118,12 @@ def main():
     admitted_stage=Path(prepared['stage'])
     raw=subprocess.check_output([sys.executable,str(P/'tools/prepare_launcher_gui_qa.py')],text=True)
     case=json.loads(raw);app=Path(case['app']);resources=app/'Contents/Resources'
+    # Observe the original Swift environment; never reconstruct its settings
+    # in the benchmark harness. This opt-in is absent from production bundles.
+    launch_receipt=Path(case['data'])/'out/launch-conditions.json'
+    info_path=app/'Contents/Info.plist';info=plistlib.loads(info_path.read_bytes())
+    assert info['CFBundleIdentifier']==case['bundle_id']
+    info['BBQALaunchReceipt']=str(launch_receipt);info_path.write_bytes(plistlib.dumps(info))
     # The QA shell generator supplies isolated paths, not authority to reuse an
     # old GUI binary. Require the explicitly selected current native build.
     products=a.launcher_products.resolve(strict=True)
@@ -248,6 +254,7 @@ def main():
         private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,gpu_cache_seed=cache_seed,
         frozen_runtime=native['frozen_runtime'],cpu_runtime_manifest=dict(path=str(a.cpu_runtime_manifest.resolve()),sha256=sha(a.cpu_runtime_manifest),protocol_version=cpu_runtime['protocol_version'],live_payload_version=cpu_runtime['live_payload_version'],author_instrumentation=cpu_runtime.get('author_instrumentation',False)),
         launcher_build=dict(path=str(products),source_executable_sha256=sha(launcher),code_identity_sha256=launcher_identity),qa_preferences_seed=preferences_seed,
+        qa_launch_conditions_receipt=dict(path=str(launch_receipt),producer='original-swift-LauncherModel.start-final-environment',game_started_verified=False),
         upstream_inputs=dict(cpu=sha(cpu_game_source),cpu_library=sha(cpu_source),gpu_library=sha(gpu_source),net_library=sha(original/'bin/gpu-net/libbbnet.dylib')),
         original_scripts=baseline,effective_scripts=source,controlled_changes=['run.sh final-exec hook','local Metal preparation runtime tools'],manual_physical_input=True,silent=True,
         diagnostic_capture=False,performance_logging=False,

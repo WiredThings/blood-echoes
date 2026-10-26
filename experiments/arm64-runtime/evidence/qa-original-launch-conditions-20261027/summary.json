@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "status": "original-Swift-condition-receipt-captured-not-game-acceptance",
+  "archive": {
+    "sha256": "6ee1bd8f03f0fee882b86d1d0e664ed903a057e760ab12925b2e4e3c0da098be",
+    "bytes": 47510788,
+    "entries": 877,
+    "forbidden_game_save_cache_artifacts": []
+  },
+  "app": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/apps/Blood Echoes ARM64 GUI QA 1793033361727444000.app",
+  "frozen_runtime": {
+    "bin/bb-probe-metal": "4bd22f9f845fa662446e24d73f528f7797754a7a4706b95d327bd087cd1a91f4",
+    "bin/gpu-metal/libbbgpu.dylib": "cb7f93b977b6e4b27503038928ef052b7679b98816f75d09c3dccbfaca741b99",
+    "bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu": "e63f0c14e28f42ccae6efb01a701ee67200c7c90213433cee6c1dd08e6824b9f",
+    "bin/gpu-metal-arm64/libbbgpu.dylib": "cb7f93b977b6e4b27503038928ef052b7679b98816f75d09c3dccbfaca741b99",
+    "bin/gpu-net/libbbnet.dylib": "445d5d813f34bf3a88fe10f250726ddbbfcdcb96b099daadcf618a7101173141",
+    "bin/game-pso-preparer": "f0b73b8cace5d203a6d5e3a6dac9ff38e13f582d0cbada04c577ce92924be72a",
+    "bin/game-module-preparer": "71ffe5bbc30e5c88938cf6d843c4e0acae2e0f6d29c34d72aa14711149f6a9b6"
+  },
+  "normal_cpu_manifest": {
+    "path": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/resource-cpu-execution-1793032533817978000/cpu-runtime-manifest.json",
+    "sha256": "6fb4674762637bdad861a1b800fcf0fdadf385301785f3cf3f6e0d3b4cff571f",
+    "protocol_version": 1297350663,
+    "live_payload_version": 6,
+    "author_instrumentation": false
+  },
+  "normal_gpu_template_replaced": true,
+  "cache_seed": {
+    "source_manifest_sha256": "88b97b47ac6fd1c10ae6b4a86b83c1a128c3c4d914ef68733ae0db356da9ec23",
+    "upstream_gpu_library_sha256": "ec7e930967edc24423f3e4fcf8a5635f784cb86ef729802d2bef6af63109af2d",
+    "cache_only": true,
+    "save_config_seed_changed": false,
+    "formal_data_modified": false,
+    "copied_files": 4575,
+    "copied_bytes": 54477794,
+    "source_cache_modified": false
+  },
+  "swift_tests": {
+    "total": 114,
+    "skipped": 1,
+    "failures": 0,
+    "QA_condition_tests": 14,
+    "toolchain": "Xcode native ARM64 Release",
+    "test_log_sha256": "f828b56d384d5c99e9ade43686f459cb423721c7af27604713a56162575208b8"
+  },
+  "receipt": {
+    "sha256": "fdd1443db3b8f0f9e8cdc853125cc0bd91b4b7095784c564f1805e3f45d8acbc",
+    "producer": "original-swift-LauncherModel.start-final-environment",
+    "launch_id": "5E9746DB-429A-4975-8EA1-5E3678539F8D",
+    "source_pid": 81826,
+    "environment_keys": 92,
+    "original_environment_unchanged": true,
+    "protected": {
+      "BB_ARM_PAYLOAD_GATE": "1",
+      "BB_ARM_RAW_PREWRITE": "1",
+      "BB_LAYER_READ_TRAPS": "1",
+      "BB_GPU_LIFETIME": "1"
+    },
+    "offline": true,
+    "launch_boundary": "before-Process.run",
+    "game_started_verified": false
+  },
+  "capture_guard": {
+    "reason": "QA finished",
+    "seconds": 84.11706829199102,
+    "before": {
+      "pressure": 2,
+      "locked": false,
+      "swap_mib": 9237.875
+    },
+    "after": {
+      "pressure": 2,
+      "locked": false,
+      "swap_mib": 9237.875
+    },
+    "game_or_performance_acceptance": false
+  },
+  "formal_data_modified": false,
+  "release_updated": false,
+  "host_local_only": true
+}

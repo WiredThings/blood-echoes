@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 import plistlib
 import shutil
+import stat
+import struct
 import subprocess
 
 from package_optimized import commands, loads, minimum, sha, SYSTEM
@@ -12,6 +14,81 @@ from game_app import GAME_ICON
 
 def native_available(info, major):
     return info.get('schema') == 1 and info.get('default_enabled') is True and major >= info.get('minimum_os_major', 27)
+
+
+def create_native_gpu_bundle(engine, source_executable, *, bundle=None, version,
+                             minimum_os_major=27,
+                             bundle_id='io.github.bbport.optimized.metal-game'):
+    """Wrap an admitted native target in a fresh owned staging bundle.
+
+    Source/dependency bytes are never modified. The original package workflow
+    owns dependency admission and outer frontend policy; this helper only relocates
+    its copied main executable and applies the existing GPU application identity.
+    """
+    engine = Path(engine).absolute()
+    if engine != engine.resolve(strict=True):
+        raise ValueError('Canonical owned engine required')
+    engine_stat = engine.stat()
+    if not stat.S_ISDIR(engine_stat.st_mode) or engine_stat.st_uid != os.getuid():
+        raise ValueError('Canonical owned engine required')
+    source = Path(source_executable).absolute()
+    if source != source.resolve(strict=True) or not source.is_relative_to(engine):
+        raise ValueError('Native GPU executable must remain inside the engine')
+    source_stat = source.lstat()
+    if not stat.S_ISREG(source_stat.st_mode) or source_stat.st_uid != os.getuid() or not os.access(source, os.X_OK):
+        raise ValueError('Owned regular native GPU executable required')
+    with source.open('rb') as stream:
+        header = stream.read(16)
+    if len(header) != 16 or struct.unpack('<4I', header)[:2] != (0xfeedfacf, 0x100000c) or struct.unpack('<4I', header)[3] != 2:
+        raise ValueError('Thin ARM64 native main executable required')
+    if subprocess.check_output(['lipo', '-archs', str(source)], text=True).strip() != 'arm64':
+        raise ValueError('Thin ARM64 native main executable required')
+    bundle = Path(bundle) if bundle is not None else engine/'bin/Bloodborne Metal.app'
+    if not bundle.is_absolute():
+        bundle = engine/bundle
+    if not bundle.is_relative_to(engine) or '..' in bundle.parts or os.path.lexists(bundle):
+        raise ValueError('Fresh native GPU bundle inside the engine required')
+    if bundle.parent != bundle.parent.resolve(strict=True):
+        raise ValueError('Native GPU bundle parent must be canonical')
+    parent_stat = bundle.parent.stat()
+    if not stat.S_ISDIR(parent_stat.st_mode) or parent_stat.st_uid != os.getuid():
+        raise ValueError('Owned native GPU bundle parent required')
+    if type(minimum_os_major) is not int or minimum_os_major < 26 or minimum_os_major > 99:
+        raise ValueError('Invalid native GPU minimum OS')
+    if not isinstance(version, str) or not version or len(version) > 128 or '\0' in version:
+        raise ValueError('Invalid native GPU version')
+    if not isinstance(bundle_id, str) or not bundle_id or len(bundle_id) > 255 or '\0' in bundle_id:
+        raise ValueError('Invalid native GPU bundle identity')
+    relocations = []
+    for ref in loads(source):
+        if ref.startswith(SYSTEM):
+            continue
+        if not ref.startswith('@loader_path/'):
+            raise ValueError('Native game bundle dependency is not relocated: '+ref)
+        target = (source.parent/ref.removeprefix('@loader_path/')).resolve(strict=True)
+        if not target.is_file() or not target.is_relative_to(engine):
+            raise ValueError('Native game dependency leaves the package: '+ref)
+        relocations.append((ref, target))
+    # All admission checks precede creating the fresh bundle. No old bundle is removed.
+    executable = bundle/'Contents/MacOS/bb-gpu'
+    executable.parent.mkdir(parents=True, exist_ok=False)
+    shutil.copy2(source, executable)
+    for ref, target in relocations:
+        subprocess.run(['install_name_tool', '-change', ref,
+                        '@loader_path/'+os.path.relpath(target, executable.parent), str(executable)], check=True)
+    resources = bundle/'Contents/Resources'
+    resources.mkdir()
+    shutil.copy2(GAME_ICON, resources/'AppIcon.icns')
+    (bundle/'Contents/Info.plist').write_bytes(plistlib.dumps(dict(
+        CFBundleIdentifier=bundle_id, CFBundleName='Bloodborne',
+        CFBundleDisplayName='Bloodborne', CFBundleExecutable='bb-gpu', CFBundlePackageType='APPL',
+        CFBundleInfoDictionaryVersion='6.0', CFBundleShortVersionString=version,
+        CFBundleVersion=version.replace('.', ''), CFBundleIconFile='AppIcon',
+        LSMinimumSystemVersion=f'{minimum_os_major}.0', NSHighResolutionCapable=True,
+        NSPrincipalClass='NSApplication')))
+    subprocess.run(['codesign', '--force', '--sign', '-', str(executable)], check=True)
+    subprocess.run(['codesign', '--force', '--sign', '-', str(bundle)], check=True)
+    return executable
 
 
 def stage_arm64_metal(engine, build, prefix, version):
@@ -88,37 +165,11 @@ def stage_arm64_metal(engine, build, prefix, version):
             subprocess.run(['install_name_tool', '-id', '@rpath/'+binary.name, str(binary)], check=True)
         subprocess.run(['codesign', '--force', '--sign', '-', str(binary)], check=True)
 
-    # A stable game bundle supplies the cover before SDL's runtime icon override,
-    # and while an F3 restart tears down the window. The x86 frontend stays hidden.
-    bundle = engine / 'bin/Bloodborne Metal.app'
-    executable = bundle / 'Contents/MacOS/bb-gpu'
-    executable.parent.mkdir(parents=True)
-    shutil.copy2(host / 'bb-gpu', executable)
-    for ref in loads(executable):
-        if ref.startswith(SYSTEM):
-            continue
-        if not ref.startswith('@loader_path/'):
-            raise ValueError('Native game bundle dependency is not relocated: '+ref)
-        target = (host/ref.removeprefix('@loader_path/')).resolve()
-        if not target.is_file() or not target.is_relative_to(engine.resolve()):
-            raise ValueError('Native game dependency leaves the package: '+ref)
-        subprocess.run(['install_name_tool', '-change', ref,
-                        '@loader_path/'+os.path.relpath(target, executable.parent), str(executable)], check=True)
-    min_major = max([26] + [minimum(p)[0] for p in done])
-    # The shell and launcher availability checks intentionally share this floor.
-    min_major = max(27, min_major)
-    resources = bundle/'Contents/Resources'
-    resources.mkdir()
-    shutil.copy2(GAME_ICON, resources/'AppIcon.icns')
-    (bundle/'Contents/Info.plist').write_bytes(plistlib.dumps(dict(
-        CFBundleIdentifier='io.github.bbport.optimized.metal-game', CFBundleName='Bloodborne',
-        CFBundleDisplayName='Bloodborne', CFBundleExecutable='bb-gpu', CFBundlePackageType='APPL',
-        CFBundleInfoDictionaryVersion='6.0', CFBundleShortVersionString=version,
-        CFBundleVersion=version.replace('.', ''), CFBundleIconFile='AppIcon',
-        LSMinimumSystemVersion=f'{min_major}.0', NSHighResolutionCapable=True,
-        NSPrincipalClass='NSApplication')))
-    subprocess.run(['codesign', '--force', '--sign', '-', str(executable)], check=True)
-    subprocess.run(['codesign', '--force', '--sign', '-', str(bundle)], check=True)
+    # Use the original GPU bundle algorithm for a newly built native target.
+    # The frontend policy and NATIVE-METAL manifest remain owned by this stage.
+    min_major = max(27, max([26] + [minimum(p)[0] for p in done]))
+    create_native_gpu_bundle(engine, host/'bb-gpu', version=version,
+                             minimum_os_major=min_major)
     frontend = engine/'bin/Bloodborne Game.app'
     info_path = frontend/'Contents/Info.plist'
     if info_path.is_file():

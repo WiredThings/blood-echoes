@@ -32,7 +32,9 @@ python3 tools/stage_normal_runtime.py \
 ## 已验证范围与剩余边界
 
 1. 实际 staging 与原 CPU manifest loader 已通过：`P/evidence/resource-cpu-execution-1793029304846779000/result.json`。该次 raw GPU SHA 为 `ec7e930967edc24423f3e4fcf8a5635f784cb86ef729802d2bef6af63109af2d`，已核验 main-only repair。CPU 副本签名/重定位后摘要改变，原 normal 产物未改。
-2. 随后为工具加入原 `freeze_inputs` 与 runtime `load` 封口；为避免与已运行 QA07 争抢资源，尚未单独重跑新整段 stager。主任务 QA07 已使用上述实际 source component 完成原打包器的真实 worker/module freeze，不能把该事实写成新 stager 整段再次执行。
+2. 终版 stager 已在 2026-10-27 对新的正常 renderer／配对 CPU／layout／main-only worker 整段实际运行，原 CPU loader、`freeze_inputs` 和 runtime `load` 均通过：`P/evidence/resource-cpu-execution-1793032533817978000/result.json`。能力查询仅为有界标量，不建 Device。旧 build 的 CMake cache 曾被缺失依赖的失败重配置改变，原封口随后正确拒绝它；未放宽 SHA，改为新空 build 并重新封口。
 3. `tests/test_stage_normal_runtime.py` 的 12 项纯作者控制全过：`P/evidence/normal-stage-controls-1793029820916391000/result.json`。覆盖输出名/已有输出/链接/越界、错误和变化 SHA、编译与链接归一化边界、唯一实际 DSO、精确重定位 argv。此组 mock 控制未运行原生进程，不能替代真实 Mach-O 加载检查或游戏功能测试。
 
 依赖仍复用本次正常构建明确声明的 prepared prefixes。manifest 明确记录 `prepared_dependencies_reused=true`、`clean_checkout_build_proven=false`；本工具不证明第三方依赖重新从零构建、不证明可移植分发，也不把正常 source 构建与 prepared 依赖混称为完整 clean-checkout 验证。
+
+新正常 `bb-gpu` 与 GPU/CPU 来源见 `docs/native-gpu-wrapper-source-closure.zh-CN.md`。新 DSO 与旧正常 DSO raw SHA 完全一致；新路径、签名和加载边分别验证，不把字节相同当作已完成场景／性能验收。

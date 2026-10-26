@@ -7,7 +7,7 @@ from pathlib import Path
 import argparse, json, os, subprocess, time
 from configure_native_build import PRIVATE_RUNTIME, directory, renderer_inputs, need, sha
 
-def inspect(source,build):
+def inspect(source,build,*,include_gpu_executable=False):
  source=directory(source);build=directory(build)
  selected=renderer_inputs(source,build)
  cache={}
@@ -25,17 +25,23 @@ def inspect(source,build):
   need(str(path)not in sources,'duplicate renderer translation unit')
   sources[str(path)]=sha(path)
  need(sources,'normal renderer has no translation units')
+ targets=['bbgpu','game-pso-preparer','game-module-preparer'];main=None
+ if include_gpu_executable:
+  main_path=Path(selected['source'])/'bb_gpu/bb_gpu_main.cpp'
+  rows=[u for u in units if 'CMakeFiles/bb-gpu.dir/'in u.get('command','')]
+  need(len(rows)==1 and Path(rows[0]['file'])==main_path and main_path==main_path.resolve(strict=True),'one canonical normal GPU executable source required')
+  main=dict(path=str(main_path),sha256=sha(main_path));targets.append('bb-gpu')
  return dict(selected=selected,cmake=str(cmake),cmake_sha256=sha(cmake),source_sha256=sources,
-             command=[str(cmake),'--build',str(build),'--parallel','1','--target','bbgpu','game-pso-preparer','game-module-preparer'])
+             gpu_executable_source=main,command=[str(cmake),'--build',str(build),'--parallel','1','--target',*targets])
 
-def build(*,source_root,renderer_build,output):
+def build(*,source_root,renderer_build,output,include_gpu_executable=False):
  from qa_build_guard import require_no_games
  from native_observer import NativeObserver
  from qa_memory_policy import MemoryPolicy
  from local_metal_builder import FixedRunner
  project=directory(PRIVATE_RUNTIME);out=Path(output).absolute()
  need(out.parent==project/'evidence'and out==out.resolve(strict=False)and not out.exists(),'fresh isolated build evidence required')
- directory(out.parent);plan=inspect(source_root,renderer_build);require_no_games()
+ directory(out.parent);plan=inspect(source_root,renderer_build,include_gpu_executable=include_gpu_executable);require_no_games()
  out.mkdir(mode=0o700);(out/'plan.json').write_text(json.dumps(plan,indent=2)+'\n')
  observer=NativeObserver();before=observer.system();policy=MemoryPolicy(before);start=time.monotonic();samples=[]
  class Guard:
@@ -51,13 +57,19 @@ def build(*,source_root,renderer_build,output):
  try:
   raw=FixedRunner(out).run(plan['command'],880,Guard(),cwd=source_root)
   (out/'build.log').write_bytes(raw)
-  need(inspect(source_root,renderer_build)==plan,'normal build inputs changed')
+  need(inspect(source_root,renderer_build,include_gpu_executable=include_gpu_executable)==plan,'normal build inputs changed')
   artifacts={name:Path(renderer_build)/name for name in('libbbgpu.dylib','game-pso-preparer','game-module-preparer')}
+  if include_gpu_executable:artifacts['bb-gpu']=Path(renderer_build)/'bb-gpu'
   result={}
   for name,path in artifacts.items():
    need(path==path.resolve(strict=True)and path.is_file()and path.stat().st_uid==os.getuid(),'owned normal artifact required')
    need(subprocess.check_output(['/usr/bin/lipo','-archs',str(path)],text=True).strip()=='arm64','normal artifact is not thin ARM64')
    result[name]=dict(path=str(path),sha256=sha(path))
+  if include_gpu_executable:
+   from warm_archive_manifest import resolve_gpu_identity
+   actual=resolve_gpu_identity(artifacts['bb-gpu'],project/'evidence')
+   need(actual['library']==str(artifacts['libbbgpu.dylib'])and actual['library_sha256']==result['libbbgpu.dylib']['sha256'],'normal GPU executable loads another DSO')
+   report['gpu_executable_identity']=actual
   report.update(status='normal-targets-built',artifacts=result,renderer_translation_units=len(plan['source_sha256']))
   return report
  except BaseException as error:
@@ -69,6 +81,7 @@ def build(*,source_root,renderer_build,output):
 def main():
  p=argparse.ArgumentParser(description=__doc__)
  for name in('source-root','renderer-build','output'):p.add_argument('--'+name,type=Path,required=True)
- a=p.parse_args();result=build(source_root=a.source_root,renderer_build=a.renderer_build,output=a.output)
+ p.add_argument('--include-gpu-executable',action='store_true')
+ a=p.parse_args();result=build(source_root=a.source_root,renderer_build=a.renderer_build,output=a.output,include_gpu_executable=a.include_gpu_executable)
  print(json.dumps({k:v for k,v in result.items()if k!='samples'},indent=2))
 if __name__=='__main__':main()

@@ -703,6 +703,9 @@ final class LauncherModel: ObservableObject {
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = pipe
         process.standardError = pipe
+        if job == .game, let diagnostic = QALaunchConditions.record(arguments: arguments, repository: repo, environment: env) {
+            appendLines([diagnostic])
+        }
         // The reader owns a duplicate of the read end (closed by the reader at end of file).
         let readFD = dup(pipe.fileHandleForReading.fileDescriptor)
         do {

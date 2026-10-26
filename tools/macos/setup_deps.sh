@@ -172,7 +172,8 @@ fi
 step "VulkanMemoryAllocator (header-only)"
 VMA_TAG=v3.4.0 VMA_REV=3aa921224c154a0d2c43912bc88e1c42ce1f7607
 echo "tag: $VMA_TAG"
-if ! have include/vk_mem_alloc.h; then
+# The CMake package is required too; a surviving header is not a complete install.
+if ! have include/vk_mem_alloc.h || ! have share/cmake/VulkanMemoryAllocator/VulkanMemoryAllocatorConfig.cmake; then
     fetch VulkanMemoryAllocator https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git "$VMA_TAG" "$VMA_REV"
     cmake_build VulkanMemoryAllocator -DVMA_BUILD_DOCUMENTATION=OFF -DVMA_BUILD_SAMPLES=OFF
 fi

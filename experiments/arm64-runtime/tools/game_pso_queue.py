@@ -235,6 +235,9 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
  """
  need(phase in('all','record','prepare')and 0<page_size<=PAGE_MAX and seconds>0,'bounded page/phase/time budget')
  need(max_recipes is None or type(max_recipes)is int and max_recipes>0,'optional recipe work budget')
+ # Preserve the accepted CLI range while limiting the live metadata window to
+ # the native page contract. This is never a cap on full-manifest coverage.
+ page_size=min(page_size,16)
  start=clock();run=uuid.uuid4().hex;queue=None;cycle=None;active=None;ordinal=0;fresh=False
  report=dict(schema=1,progress_schema=2,orchestration_schema=1,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,
    verified_artifact_hits=0,collection_strict_hits=0,strict_lookup_attempts=0,visited=0,work_units=0,collected=0,provisional_native=0,provisional_artifact_hits=0,source_late_deferred=0,
@@ -285,10 +288,21 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
    if phase!='record':
     report['initial_local_calls']+=1;initial=local('prepare');report['initial_local']=initial
     if initial.get('status')=='prepared':initial_anchor=local('snapshot')
+   def collected(item,state,row=None):
+    queue.collect(item,cycle,state,row);report['collected']+=1
+    if state=='provisional':report['collection_strict_hits']+=1
+    event(item,'collected-'+state)
+    if state=='rejected':finish(item,'rejected')
+    elif phase=='record':finish(item,'deferred',recorded=True)
    while True:
-    guard();page=queue.phase_page(cycle,run,page_size,'collect')
+    guard()
+    # Admit only work-budgeted items. A pending record is the second half of
+    # the same admitted item, not a new work unit or a second payload window.
+    remaining=page_size if max_recipes is None else max(1,min(page_size,max_recipes-report['work_units']))
+    page=queue.phase_page(cycle,run,remaining,'collect')
     if not page:break
     report['max_page_items']=max(report['max_page_items'],len(page))
+    pending_record=[]  # References to this <=16-item page only, never owned bytes.
     for item in page:
      work_guard();report['work_units']+=1;active=item;state=None;row=None
      if phase!='record'and initial.get('status')=='prepared':
@@ -297,22 +311,22 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
        if strict_lookup_ready(row,ready):state='provisional'
        elif local_inputs_ready(row):state='local-inputs'
       except (Rejected,ValueError,OSError)as error:event(item,'collection-lookup-not-admitted',error=str(error)[:512])
-     if state is None:
-      if phase in('all','record'):
-       if not record_open:local('record');record_open=True
-       try:
-        # Only the explicit record CLI keeps its old recorded scheduling hint;
-        # default collection never accepts an old hint instead of current work.
-        if phase!='record'or not item['recorded_hint']:
-         row=call(item,'record',False);report['recorded']+=1
-        state='recorded'
-       except (Rejected,ValueError,OSError)as error:state='rejected';event(item,'record-rejection',error=str(error)[:512])
-      else:state='unavailable'
-     queue.collect(item,cycle,state,row);report['collected']+=1
-     if state=='provisional':report['collection_strict_hits']+=1
-     event(item,'collected-'+state)
-     if state=='rejected':finish(item,'rejected')
-     elif phase=='record':finish(item,'deferred',recorded=True)
+     if state is None and phase in('all','record'):
+      pending_record.append(item)
+     else:collected(item,state or'unavailable',row)
+    # Finish this bounded page's actual strict lookups before switching the
+    # phase-local worker. Each record still independently freezes/audits its
+    # complete original read-set; no lookup miss or ready hint is authority.
+    for item in pending_record:
+     guard();active=item;row=None
+     if not record_open:local('record');record_open=True
+     try:
+      # Only explicit record CLI retains its original scheduling-only hint.
+      if phase!='record'or not item['recorded_hint']:
+       row=call(item,'record',False);report['recorded']+=1
+      state='recorded'
+     except (Rejected,ValueError,OSError)as error:state='rejected';event(item,'record-rejection',error=str(error)[:512])
+     collected(item,state,row)
    if phase=='record':queue.set_stage(cycle,'done')
    else:
     all_strict=queue.phase_count(cycle,'provisional')==queue.total()and queue.total()>0

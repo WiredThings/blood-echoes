@@ -6,7 +6,11 @@
 
 同App暖启动有界运行520.93s，约304.88s进入原生主进程；538次Local/28次helper hit、0miss、0fatal。压力最高2，swap总增加516.06MiB；可操作场景与FPS未验证，不能叫内存验收通过。测试已正常结束，仅保留一个QA启动器。暖PSO分项409个recipe均为严格archive hit且0编译，不能把305s全部归GPU worker。新最多16项共享Device候选已实际编译并测17条真实recipe/29个artifact：函数/descriptor/key/archiveSHA完全一致，暖batch4.19s vs single4.42s仅单对，RSS峰+7.33MiB/foot+4MiB为临时进程开销；原压力/swap不变，三个无Device失败反例通过。GS不在本轮样本，完整409/501仍待集中验证。37工具闭包已接候选模块，旧组件仍单项fallback；新QA07已接入经过实际原生对照的batch main，正式应用未改。
 
-最新唯一QA为 `Blood Echoes ARM64 GUI QA 1793029386377677000.app`（包07，SHA `4bd168b4a406b4414f7668a2fe8430490a660f97ace7473e2118efdada525878`）。旧06已正常退出。新包保留原UI与脚本，使用正常构建CPU/renderer/module及单列的batch-main delta；原加载边、签名、layout和组件loader均通过。当前正由1200秒有界guard验证原入口，不以组包成功代替游戏/性能/内存通过。下方package05/06段落均为历史实测，不是当前运行状态。
+最新唯一QA为 `Blood Echoes ARM64 GUI QA 1793029386377677000.app`（包07，SHA `4bd168b4a406b4414f7668a2fe8430490a660f97ace7473e2118efdada525878`）。旧06已正常退出。新包保留原UI与脚本，使用正常构建CPU/renderer/module及单列的batch-main delta；原加载边、签名、layout和组件loader均通过。本轮原GUI启动验证已结束：914.88秒见原生主进程、915.66秒见GPU；409项准备完成（297.49秒），538 Local/11 helper hit、0 Local miss、无Fatal日志。全程1128.17秒由root结束；swap净增249.56MiB，曾严重压力约0.51秒，未触发持续保护。没有可操作场景/FPS验证，不能称性能或内存验收通过。下方package05/06段落均为历史实测，不是当前运行状态。
+
+下一收口：真实cold调度发现844个worker进程，已以最多16项元数据页改为先strict再record，保留1227次实际recipe验证；8项新增及69项既有纯CPU控制通过，实际native收益待集中验证。正常GPU wrapper去历史模板接线中：复用原native_metal的GPU专用封面/metadata/签名helper，不另造前端；新正常bb-gpu target已从全新build实际构建（317.49秒），配对CPU/FEX（70.04秒）、layout和终版stager整段亦通过，正常wrapper已实际生成；尚未组成含当前Swift条件出口的新QA整包。临时依赖VMA config缺失造成一次重配置失败已保留证据，已从固定3.4.0源码在新开发前缀重建header-only package，原头SHA一致；依赖仍未全量从零构建。
+
+2026-10-27 最新QA08已组包（SHA `6ee1bd8f…098be`，47,510,788字节），旧07已退出，唯一08为 `1793033361727444000.app`。Swift ARM64 Release全套114项/跳过1真实iCloud/失败0，新增14项QA出口全过。原UI已真实写出92个BB/MTL条件及4个保护开关全1，producer/sourcePID/launchID与本次case对应；84.12秒条件采集由root明确结束，未声称游戏/性能通过。原UI条件的CPU消费器与自动bench接线仍未完成，不能继续用旧固定fixture取代它；之后统一场景、冷暖、性能/内存和功能回归。Shared可移植准入及全部依赖fresh构建仍是实际源码/交付残余。当前无游戏，仅08启动器idle；目标active。
 
 验收前新增：完成全启动器UI→配置→脚本→当前ARM/Metal消费对账，修复原生必需宿主误作可选、Rosetta误门控、未支持renderer入口、菜单零副作用不匹配差异和旧GUI组包；详docs/launcher-feature-audit.zh-CN.md。先收口这些源码，再组当前隔离包集中验收。
 
