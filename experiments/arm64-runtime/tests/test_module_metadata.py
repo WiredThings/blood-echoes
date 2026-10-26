@@ -1,8 +1,10 @@
 """Bounded metadata creation and atomic refusal using authored ELF-like data."""
 from pathlib import Path
 import unittest,sys,struct,copy,tempfile
+from unittest.mock import patch
 P=Path(__file__).resolve().parents[1];sys.path.insert(0,str(P/'tools'));sys.path.insert(0,str(P/'vendor/blood_echoes/loader'))
 from prepare_module_metadata import record,boot_header,prepare
+import prepare_module_metadata as metadata
 
 def model():
  elf=bytearray(8192);elf[0x800:0x814]=bytes([1,0x1b,3,0x3b])+struct.pack('<iI',-0x104,1)+bytes(8)
@@ -40,7 +42,9 @@ class Controls(unittest.TestCase):
     if change=='segments':m['ph']+=m['ph'][:2]*2
     with self.assertRaises((ValueError,UnicodeError)):record(m,name,0,0,1)
  def test_original_boot_header_and_atomic_refusal(self):
-  with tempfile.TemporaryDirectory(dir=P/'state',prefix='module-metadata-unit-')as directory:
+  # Authored files stay in this test's fresh tree, without a pre-existing QA
+  # state directory. Only the CPU fixture's policy root changes, not runtime.
+  with tempfile.TemporaryDirectory(dir=P,prefix='module-metadata-unit-')as directory,patch.object(metadata,'PRIVATE_ROOT',P):
    root=Path(directory);boot=root/'boot';out=root/'out';out.write_bytes(b'keep-existing-metadata')
    raw=b'BBPROBE5'+struct.pack('<6Q',16384,0,1,0,0,1)+struct.pack('<6Q',64,0,0,0,0,2)+bytes(112)+struct.pack('<Q',0)+struct.pack('<3Q',0,16384,5)+bytes(16384);boot.write_bytes(raw);self.assertEqual(boot_header(boot)['size'],16384)
    for mutation in [b'',raw[:55],b'X'+raw[1:],raw+b'X',raw[:-1]]:

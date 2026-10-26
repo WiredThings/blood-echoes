@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "status": "in-progress-not-promoted",
+  "original_swift_conditions": {
+    "BB_MTL_keys": 92,
+    "four_resource_protections": true
+  },
+  "first_benchmark": {
+    "runtime_started": true,
+    "scene_ready": false,
+    "seconds": 706.95130233292,
+    "stop": "unexpected >1GiB swap growth within5s",
+    "swap_growth_mib": 1737.0625,
+    "source_save_unchanged": true,
+    "FPS_accepted": false
+  },
+  "preparation": {
+    "complete": true,
+    "eligible_recipes": 422,
+    "strict_artifact_hits": 409,
+    "seconds": 102.36295249999966,
+    "matched_speedup_claim": false
+  },
+  "system_recovery": {
+    "process": "chronod",
+    "footprint_mib": 1463.9265441894531,
+    "prior_user_authorization": true,
+    "signal": "SIGTERM"
+  },
+  "resume": {
+    "same_private_user_and_cache": true,
+    "protection_relaxed": false,
+    "status": "sampled",
+    "seconds": 418.79267420899123,
+    "scene_ready_seconds": 325.2962496250402,
+    "scene_sample_seconds": 90,
+    "fps_last30s": 48.87484574605603,
+    "p95_ms": 21.21,
+    "p99_ms": 21.57,
+    "gpu_ms": 19.221990456714384,
+    "combined_footprint_mib": 5809.46598815918,
+    "scene_peak_combined_footprint_mib": 5947.841011047363,
+    "swap_growth_mib": 1550.125,
+    "peak_pressure": 4,
+    "severe_observations": 1,
+    "source_save_unchanged": true,
+    "frames": 5931,
+    "compiles": 0,
+    "metal_source_calls": 0,
+    "metal_local_calls": 11,
+    "strict_pso_hits": 8,
+    "strict_pso_attempts": 8
+  },
+  "local_app_replaced": false,
+  "release_updated": false,
+  "published_documentation_updated": false,
+  "formal_saves_settings_cache_modified": false,
+  "qualification": "Only original-condition static QA scene sampled; shared footprints may double-count. Not matched old/new, sustained memory, full visual/F3/network acceptance or portable/formal readiness.",
+  "targeted_python_controls": 143
+}

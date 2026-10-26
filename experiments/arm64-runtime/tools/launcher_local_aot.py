@@ -5,7 +5,8 @@ This wrapper takes their final executable/arguments, prepares only shader caches
 then execs the same executable with the same arguments and exit-code semantics.
 """
 from pathlib import Path
-import json, os, signal, stat, sys
+import json, os, signal, stat, sys, time
+from contextlib import contextmanager
 
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -14,6 +15,36 @@ OPTION_PREFIXES = ('BB_MTL_', 'BB_LAYER_', 'BB_PC_', 'BB_GUEST_')
 VALIDATION_OPTIONS = ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES',
                       'MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')
 _pending_signal = 0
+PREPARATION_PHASES = frozenset(('archive-policy', 'local-libraries', 'fixed-helpers',
+    'game-preparation', 'source-view', 'static-catalog', 'capture-receipt',
+    'candidate-scan', 'module-inputs', 'geometry-inputs', 'complete-pso', 'local-finalize'))
+
+
+def _phase_message(phase, event, started=None, outcome=None):
+    # Only internal enums and a duration are emitted. Logging failures must not
+    # replace the original preparation result or exception (including signals).
+    try:
+        message = dict(phase=phase, event=event)
+        if started is not None:
+            message['seconds'] = round(max(0.0, time.monotonic()-started), 6)
+            message['outcome'] = outcome
+        print('Metal preparation phase: '+json.dumps(message, sort_keys=True), flush=True)
+    except Exception:
+        pass
+
+
+@contextmanager
+def preparation_phase(phase):
+    if phase not in PREPARATION_PHASES:
+        raise ValueError('unknown internal preparation phase')
+    started = time.monotonic()
+    _phase_message(phase, 'start')
+    outcome = 'raised'
+    try:
+        yield
+        outcome = 'returned'
+    finally:
+        _phase_message(phase, 'end', started, outcome)
 
 
 def regular(path, *, parent=None):
@@ -115,21 +146,24 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     before = observe()
     if before['locked'] or before['pressure'] == 4:
         raise RuntimeError('locked or severe pressure before local Metal preparation')
-    updates, identity = archive_prepare(enabled=True, engine='arm64',
-        selected_executable=Path(env['BB_GPU_PROCESS']), backend_root=backend_root,
-        game_artifacts=inputs, options=options,
-        profile={'engine':'arm64', 'namespace':'arm64-srt1',
-                 'profile_abi':'SPV10-meta7-key5-msl3'})
+    with preparation_phase('archive-policy'):
+        updates, identity = archive_prepare(enabled=True, engine='arm64',
+            selected_executable=Path(env['BB_GPU_PROCESS']), backend_root=backend_root,
+            game_artifacts=inputs, options=options,
+            profile={'engine':'arm64', 'namespace':'arm64-srt1',
+                     'profile_abi':'SPV10-meta7-key5-msl3'})
     env.update(updates)
     cohort = identity['token']
-    updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
-                                   cohort=cohort, engine='arm64', graphics=True)
+    with preparation_phase('local-libraries'):
+        updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
+                                       cohort=cohort, engine='arm64', graphics=True)
     env.update(updates)
     if fixed_helper_prepare is None:
         from launcher_fixed_helpers import prepare as fixed_helper_prepare
-    helper_updates, helper_report = fixed_helper_prepare(project=project, execution_root=code_root,
-        arguments=arguments, environment=env, cohort=cohort, options=options, observe=observe,
-        mode=mode or 'auto', local_prepare=local_prepare, protection_baseline=before)
+    with preparation_phase('fixed-helpers'):
+        helper_updates, helper_report = fixed_helper_prepare(project=project, execution_root=code_root,
+            arguments=arguments, environment=env, cohort=cohort, options=options, observe=observe,
+            mode=mode or 'auto', local_prepare=local_prepare, protection_baseline=before)
     env.update(helper_updates)
     if 'local' in helper_report:
         report = helper_report['local']
@@ -137,8 +171,9 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     if report['status'] in ('prepared', 'record', 'source-fallback') and mode != 'record':
         if game_prepare is None:
             from launcher_game_pso import prepare as game_prepare
-        game_report = game_prepare(project=project, execution_root=code_root,
-            arguments=arguments, environment=env, cohort=cohort, options=options, observe=observe)
+        with preparation_phase('game-preparation'):
+            game_report = game_prepare(project=project, execution_root=code_root,
+                arguments=arguments, environment=env, cohort=cohort, options=options, observe=observe)
         capture = game_report.get('capture_environment', {})
         if set(capture)-{'BB_FETCH_CAPTURE_ROOT','BB_FETCH_CAPTURE_GAME_ROOT'}:
             raise ValueError('unexpected runtime capture environment')
@@ -146,8 +181,9 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
         # Candidate record requests may have extended this cohort. Reuse the
         # same policy to get the latest validated final exec build identity.
         if 'preparation' in game_report:
-            updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
-                                           cohort=cohort, engine='arm64', graphics=True)
+            with preparation_phase('local-finalize'):
+                updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
+                                               cohort=cohort, engine='arm64', graphics=True)
             env.update(updates)
     after = observe()
     # Preserve the entire preparation interval's cumulative budget. The builder

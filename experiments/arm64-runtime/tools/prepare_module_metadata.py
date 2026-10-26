@@ -1,11 +1,59 @@
 """Reuse the original loader to describe this exact private boot; never edit it."""
 from pathlib import Path
-import argparse,hashlib,struct,sys,os,tempfile,mmap
-P=Path(__file__).resolve().parents[1]
+import argparse,hashlib,struct,sys,os,tempfile,mmap,json,stat
+PRIVATE_ROOT=Path('/Users/Shared/BloodEchoesDevelopment')
+PROJECT=PRIVATE_ROOT/'arm64-runtime-prototype'
+SUPPORT=('vendor/blood_echoes/loader/prepare.py','vendor/blood_echoes/loader/game_check.py')
 SIZE=424;PAGE=16384
 
 def require(ok,why):
  if not ok:raise ValueError(why)
+def owned_file(path,limit):
+ path=Path(path).absolute();info=path.lstat()
+ require(path==path.resolve(strict=True)and stat.S_ISREG(info.st_mode)and info.st_uid==os.getuid()and info.st_nlink==1 and 0<info.st_size<=limit,'module helper code must be canonical owned regular file')
+ return path
+def digest(path):
+ with path.open('rb')as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+def declared_code_root(executable):
+ """Only the two original launcher roles, within a private packaged QA app."""
+ executable=owned_file(executable,256*1024**2)
+ layouts=('bin/bb-probe-metal','bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal')
+ for relative in layouts:
+  parts=Path(relative).parts
+  if executable.parts[-len(parts):]!=parts:continue
+  root=executable.parents[len(parts)-1]
+  app=root.parent.parent.parent
+  require(root.name=='bbport'and root.parent.name=='Resources'and root.parent.parent.name=='Contents'and app.suffix=='.app'and app.parent==PROJECT/'apps','module helper bundle is not a declared private QA application')
+  require(root==root.resolve(strict=True),'linked module helper code root')
+  return root,relative
+ raise ValueError('module helper executable role is not declared')
+def packaged_loader(code_root,executable,*,script=None):
+ """Bind code to frozen bundle manifests; never fall back after any refusal."""
+ root,role=declared_code_root(executable)
+ require(Path(code_root).absolute()==root,'module helper code root differs from actual executable')
+ helper=owned_file(root/'native-runtime-tools/prepare_module_metadata.py',2*1024**2)
+ require(Path(script if script is not None else __file__).absolute()==helper,'module helper is not running from its frozen bundle role')
+ manifest=json.loads(owned_file(root/'ARM64-LOCAL-PREPARATION.json',1024**2).read_bytes())
+ require(manifest['schema']==1 and manifest['host_local_only']is True and manifest['runtime_project']==str(PROJECT),'module helper requires private prepared component')
+ require(manifest['runtime_tools']['prepare_module_metadata.py']==digest(helper),'module helper identity changed')
+ support=manifest['runtime_support'];require(set(support)==set(SUPPORT),'module helper original parser closure differs')
+ for relative in SUPPORT:
+  path=owned_file(root/relative,2*1024**2)
+  require(support[relative]==digest(path),'module helper original parser identity changed: '+relative)
+ native=json.loads(owned_file(root/'NATIVE-METAL.json',1024**2).read_bytes())
+ require(native['schema']==1 and native['game_runtime']=='fex-arm64'and native['production']is False,'module helper requires declared private FEX runtime')
+ require(native['frozen_runtime'][role]==digest(Path(executable)),'module helper actual executable identity changed')
+ return root/'vendor/blood_echoes/loader'
+def select_loader(*,code_root=None,executable=None,loader=None,script=None):
+ script=Path(script if script is not None else __file__).absolute()
+ if code_root is not None or executable is not None:
+  require(code_root is not None and executable is not None and loader is None,'bundle module helper requires exact root/runtime and no loader override')
+  return packaged_loader(code_root,executable,script=script)
+ # A bundle invocation missing its role arguments is an error, not permission
+ # to silently use old tools from P. Only the old unbundled developer role remains.
+ require(not any(part.endswith('.app')for part in script.parts),'bundle module helper role arguments missing')
+ require(script==owned_file(PROJECT/'tools/prepare_module_metadata.py',2*1024**2),'unbundled module helper must be the fixed development tool')
+ return Path(loader)if loader is not None else PROJECT/'vendor/blood_echoes/loader'
 def boot_header(path):
  with path.open('rb')as f:
   def read(n):
@@ -44,9 +92,10 @@ def record(m,name,base,ident,tls_index,main=False):
 
 def prepare(boot,game,out,loader):
  boot=boot.resolve(strict=True);game=game.resolve(strict=True);out=out.absolute();loader=loader.resolve(strict=True)
- for path in [boot,game,out.parent.resolve(strict=True),loader]:require(path.is_relative_to(Path('/Users/Shared/BloodEchoesDevelopment')),'inputs/output must stay in private Shared tree')
+ for path in [boot,game,out.parent.resolve(strict=True),loader]:require(path.is_relative_to(PRIVATE_ROOT),'inputs/output must stay in private Shared tree')
  require(not out.is_symlink(),'linked metadata destination')
  sys.path.insert(0,str(loader));from prepare import parse_self,unpack
+ require(Path(sys.modules['prepare'].__file__).resolve(strict=True)==loader/'prepare.py','module parser imported outside selected original loader')
  def module(path):
   require(path.is_file() and 0<path.stat().st_size<=512*1024**2,'source module size')
   # Reuse the original SELF decoder, not its symbol/relocation inventory. mmap
@@ -90,4 +139,7 @@ def prepare(boot,game,out,loader):
  print('ARM MODULE metadata records=%d bytes=%d boot=%s'%(len(records),len(data),digest.hex()),flush=True)
  return dict(records=len(records),bytes=len(data),boot_sha256=digest.hex(),source_sha256=source_hashes)
 if __name__=='__main__':
- ap=argparse.ArgumentParser();ap.add_argument('--boot',type=Path,required=True);ap.add_argument('--app0',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--loader-scripts',type=Path,default=P/'vendor/blood_echoes/loader');a=ap.parse_args();prepare(a.boot,a.app0,a.out,a.loader_scripts)
+ sys.dont_write_bytecode=True
+ ap=argparse.ArgumentParser();ap.add_argument('--boot',type=Path,required=True);ap.add_argument('--app0',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--loader-scripts',type=Path);ap.add_argument('--code-root',type=Path);ap.add_argument('--runtime-executable',type=Path);a=ap.parse_args()
+ loader=select_loader(code_root=a.code_root,executable=a.runtime_executable,loader=a.loader_scripts)
+ prepare(a.boot,a.app0,a.out,loader)

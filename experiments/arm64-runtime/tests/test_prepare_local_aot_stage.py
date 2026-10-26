@@ -115,4 +115,13 @@ def cli(*,project=None,execution_root=None):
    self.assertEqual(stage_prepare.sha(stage/relative),result['manifest']['runtime_support'][relative])
   (stage/'vendor/blood_echoes/loader/prepare.py').write_text('modified parser')
   r,output=self.invoke(stage);self.assertEqual(r.returncode,74);self.assertFalse(output.exists());self.assertIn('parser identity changed',r.stderr)
+ def test_module_helper_is_frozen_once_with_existing_original_parser_pair(self):
+  result=self.build();stage=Path(result['stage']);helper=stage/'native-runtime-tools/prepare_module_metadata.py'
+  self.assertEqual(stage_prepare.TOOLS.count('prepare_module_metadata.py'),1)
+  self.assertEqual(helper.read_bytes(),(self.runtime/helper.name).read_bytes())
+  self.assertEqual(stage_prepare.sha(helper),result['manifest']['runtime_tools'][helper.name])
+  self.assertEqual(set(result['manifest']['runtime_support']),set(stage_prepare.SUPPORT))
+  self.assertEqual(len(result['manifest']['runtime_support']),2)
+  helper.write_text('# changed module helper\n')
+  r,output=self.invoke(stage);self.assertEqual(r.returncode,74);self.assertFalse(output.exists());self.assertIn('runtime tool identity changed: prepare_module_metadata.py',r.stderr)
 if __name__=='__main__':unittest.main(verbosity=2)

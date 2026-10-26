@@ -15,7 +15,7 @@ TOOLS=('launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py'
        'game_module_inputs.py','fetch_projection_inputs.py','owned_geometry_inputs.py',
        'game_pso_geometry_adapter.py','complete_geometry_psos.py','run_game_module_contracts.py',
        'prepare_fetch_capture_receipt.py','run_owned_geometry_contracts.py','launcher_source_view.py',
-       'game_companion_modules.py')
+       'game_companion_modules.py','prepare_module_metadata.py')
 SUPPORT={'vendor/blood_echoes/loader/prepare.py':'scripts/prepare.py',
          'vendor/blood_echoes/loader/game_check.py':'scripts/game_check.py'}
 LEGACY_RENDER_LOG='        echo "Metal: direct Metal API, ARM64 host, Rosetta game, shared no-copy buffers"\n'

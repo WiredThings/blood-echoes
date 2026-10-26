@@ -4,6 +4,7 @@ import ast,hashlib,json,os,re,struct,time
 from game_pso_owned_audit import checked_bytes
 from game_pso_component import load
 from game_pso_candidates import build,digest
+from launcher_local_aot import preparation_phase
 
 def title_id(arguments,stage,project):
  """Use the original admitted SFO reader on the ACTUAL original --app0 path."""
@@ -52,15 +53,17 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
    from launcher_source_view import prepare as source_view_prepare
   from launcher_source_view import SnapshotUnavailable
   try:
-   source_view=source_view_prepare(project=project,gpu_root=gpu,stage=stage,
-       arguments=arguments,environment=environment,check=check)
+   with preparation_phase('source-view'):
+    source_view=source_view_prepare(project=project,gpu_root=gpu,stage=stage,
+        arguments=arguments,environment=environment,check=check)
   except SnapshotUnavailable as error:
    return dict(status='source-fallback',reason='APFS source snapshot unavailable',
                source_view=dict(status='unavailable',errno=error.errno),original_arguments_preserved=True)
   if catalogue_prepare is None:
    from launcher_game_catalog import prepare as catalogue_prepare
-  prepared_inputs=catalogue_prepare(project=project,gpu_root=gpu,game_root=source_view['game_root'],
-      source_root=component['source_root'],cohort=cohort,check=check)
+  with preparation_phase('static-catalog'):
+   prepared_inputs=catalogue_prepare(project=project,gpu_root=gpu,game_root=source_view['game_root'],
+       source_root=component['source_root'],cohort=cohort,check=check)
   prepared_inputs['report']['source_view']=source_view['report']
  # Use the admitted original SFO reader on the byte-equal canonical snapshot.
  # The actual final exec still receives the untouched original mod view.
@@ -75,24 +78,27 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
    from prepare_fetch_capture_receipt import configure_capture as capture_configure
   capture_root=gpu/'automatic-game-inputs'/('runtime-'+cohort)
   capture_root.mkdir(mode=0o700,parents=True,exist_ok=True)
-  capture_report=capture_configure(root=capture_root,game_root=prepared_inputs['game_root'],
-      catalog=prepared_inputs['catalog'],index=prepared_inputs['index'],
-      backend=Path(selected['library']),runtime_source_root=component['source_root'])
+  with preparation_phase('capture-receipt'):
+   capture_report=capture_configure(root=capture_root,game_root=prepared_inputs['game_root'],
+       catalog=prepared_inputs['catalog'],index=prepared_inputs['index'],
+       backend=Path(selected['library']),runtime_source_root=component['source_root'])
   capture_environment=capture_report['capture_environment']
   prepared_inputs['capture_root']=capture_root
  manifest=run/'candidates.jsonl'
- summary=candidate_builder(gpu_root=gpu,title_id=title,layout=component['native_layout'],output=manifest,check=check)
+ with preparation_phase('candidate-scan'):
+  summary=candidate_builder(gpu_root=gpu,title_id=title,layout=component['native_layout'],output=manifest,check=check)
  summary['automatic_static_inputs']=catalogue_report
  summary['automatic_runtime_capture']={k:v for k,v in capture_report.items()if k!='capture_environment'}
  if not summary['complete']:return dict(status='deferred',reason='incomplete automatic candidate scan',scan=summary,
                                        capture_environment=capture_environment)
  if module_prepare is None:
   from launcher_game_modules import prepare as module_prepare
- module_inputs=module_prepare(prepared_inputs,project=project,
-     caches=[Path(r['cache'])for r in summary.get('cache_inventory_audits',[])],
-     component=component,cohort=cohort,check=check,environment=environment,
-     selected_renderer=Path(environment['BB_GPU_PROCESS']),backend_root=stage,
-     candidate_manifest={'path':str(manifest),'sha256':summary['manifest_sha256']})
+ with preparation_phase('module-inputs'):
+  module_inputs=module_prepare(prepared_inputs,project=project,
+      caches=[Path(r['cache'])for r in summary.get('cache_inventory_audits',[])],
+      component=component,cohort=cohort,check=check,environment=environment,
+      selected_renderer=Path(environment['BB_GPU_PROCESS']),backend_root=stage,
+      candidate_manifest={'path':str(manifest),'sha256':summary['manifest_sha256']})
  summary['automatic_modules']={k:v for k,v in module_inputs.items()if k not in('geometry_resolver','cache_root')}
  # A stable owned recipe is admitted only after this same-build controller's
  # native capability, load edge and complete input/result checks have succeeded.
@@ -105,7 +111,8 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  if resolver is not None:
   from game_pso_geometry_adapter import augment_manifest
   combined=run/'candidates-owned.jsonl'
-  geometry=augment_manifest(manifest,combined,layout=component['native_layout'],resolver=resolver,cache_root=prepared_inputs['cache_root'],check=check)
+  with preparation_phase('geometry-inputs'):
+   geometry=augment_manifest(manifest,combined,layout=component['native_layout'],resolver=resolver,cache_root=prepared_inputs['cache_root'],check=check)
   manifest=combined;summary['geometry_source_adapter']=geometry;summary['eligible']+=geometry['admitted'];summary['excluded']-=geometry['admitted']
   with manifest.open('rb')as stream:summary['manifest_sha256']=hashlib.file_digest(stream,'sha256').hexdigest()
   family='geometry-owned-source-existing-native-chain';summary.setdefault('eligible_by_family',{})[family]=geometry['admitted']
@@ -122,7 +129,9 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   manifest=manifest,layout=component['layout'],layout_sha256=component['layout_sha256'],source_root=component['source_root'],
   cohort=cohort,gpu_root=gpu,run_root=work,artifact_cache_dir=artifact,phase='all',allow_compile=True,
   page_size=16,max_recipes=None,seconds=600,progress_root=gpu/'game-pso-progress',environment={k:v for k,v in environment.items()if k=='BB_GS_DEBUG' or k in ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES','MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')or k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))},options_identity=digest(options))
- report=runner(config);check()
+ with preparation_phase('complete-pso'):
+  report=runner(config)
+ check()
  if report.get('status')in('stopped','failed-protection'):raise RuntimeError('game PSO preparation stopped by safety guard')
  return dict(status=report.get('status','failed'),scan=summary,preparation=report,artifact_cache_dir=str(artifact),title_id=title,
              runtime_cache_import_allowed=False,original_arguments_preserved=True,capture_environment=capture_environment)
