@@ -9,6 +9,10 @@
 #include "common/path_util.h"
 #include "common/scope_exit.h"
 #include "common/types.h"
+#if defined(BB_BUNDLED_RUNTIME_ADMISSION)
+#include "../../../../src/bundled_runtime_admission.h"
+#include "../../../../src/gpu_runtime_state.h"
+#endif
 
 #ifdef __APPLE__
 #include <CoreFoundation/CFBundle.h>
@@ -91,8 +95,23 @@ static auto UserPaths = [] {
     const char* port_dir = std::getenv("BB_GPU_USER_DIR");
     // This library is a private prototype artifact. Reject default HOME/cwd fallback
     // before any constructor can create or read a production cache directory.
-    const auto refuse=[](){std::fputs("ARM PRIVATE STATE REQUIRED: use the Shared isolated runner\n",stderr);std::fflush(stderr);std::_Exit(78);};
+    const auto refuse=[](){std::fputs("ARM STATE ADMISSION FAILED: native bundle and isolated data roles are required\n",stderr);std::fflush(stderr);std::_Exit(78);};
     if(!port_dir||!*port_dir)refuse();
+    auto user_dir=std::filesystem::path(port_dir);
+    bool admitted_formal=false;
+#if defined(BB_BUNDLED_RUNTIME_ADMISSION)
+    try {
+        if(const auto& bundle=BbBundledRuntime::Actual();bundle) {
+            const auto env=[](const char* key){const auto* value=std::getenv(key);return std::string(value?value:"");};
+            user_dir=BbGpuState::Formal(env,bundle->IsWorker());
+            admitted_formal=true;
+        }
+    }catch(const std::exception& error) {
+        std::fprintf(stderr,"ARM STATE ADMISSION FAILED: %.256s\n",error.what());
+        std::fflush(stderr);std::_Exit(78);
+    }
+#endif
+    if(!admitted_formal) {
     std::error_code ec;
     const auto private_root=std::filesystem::canonical("/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/state",ec);
     if(ec)refuse();
@@ -100,8 +119,7 @@ static auto UserPaths = [] {
     if(ec||!std::filesystem::is_directory(private_dir))refuse();
     const auto relative=private_dir.lexically_relative(private_root);
     if(relative.empty()||relative=="."||*relative.begin()=="..")refuse();
-
-    auto user_dir = port_dir ? std::filesystem::path(port_dir) : std::filesystem::current_path() / PORTABLE_DIR;
+    }
     if (!std::filesystem::exists(user_dir)) {
         // If it doesn't exist, use the standard path for the platform instead.
         // NOTE: On Windows we currently just create the portable directory instead.

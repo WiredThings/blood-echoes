@@ -55,7 +55,7 @@
   "release_updated": false,
   "published_documentation_updated": false,
   "formal_saves_settings_cache_modified": false,
-  "qualification": "Only original-condition static QA scene sampled; shared footprints may double-count. Not matched old/new, sustained memory, full visual/F3/network acceptance or portable/formal readiness.",
+  "qualification": "QA08 original-condition static scene and QA09 ordered F2/F3 path evidenced separately. Raw QA09 driver failure retained; no revised-driver live success, matched Rosetta performance, sustained-memory, full visual/network or formal promotion claim.",
   "targeted_python_controls": null,
   "normal_rebuild": {
     "source_base_revision": "f8d35f4f",
@@ -83,12 +83,18 @@
     "native_module_metadata_from_bundle_reached": true,
     "F2_new_checkpoint_confirmed": true,
     "F3_original_offline_supervisor_reached": true,
-    "F3_scene_return": "pending",
-    "local_app_replaced": false
+    "F3_scene_return": "independently-evidenced-from-ordered-log-new-CPU-and-scene-rows",
+    "local_app_replaced": false,
+    "automated_F3_result": "incomplete-old-tail-reader-missed-marker",
+    "raw_failure_receipt_preserved": true,
+    "F3_first_scene_seconds": 838.3612,
+    "F3_repeat_preparation_regression": true,
+    "revised_reader_actual_log_replay_passed": true,
+    "revised_reader_fresh_live_run_pending": true
   },
   "remaining_code_blockers": [
-    "Authenticated formal role consumer/native lifecycle integration still incomplete; Shared-only runtime cannot replace original formal user roots",
-    "F3 repeats source snapshot/static preparation for minutes; safe same-supervisor reuse under investigation"
+    "Actual formal bundle/role consumers and original non-Shared root integration; no new ticket protocol or full scope-prototype requirement",
+    "F3 same-supervisor preparation scheduling candidate needs new package/live proof; default full integrity checks retained"
   ],
   "targeted_results": {
     "initial_receipt_clone_metadata_scope_cache_controls": 143,
@@ -96,6 +102,21 @@
     "late_F3_scene_observer_python_controls": 41,
     "source_view_and_current_driver_controls": 73,
     "native_configuration_controls": 17,
-    "qualification": "overlapping suites, do not sum as unique assertions"
+    "qualification": "overlapping suites, do not sum as unique assertions",
+    "native_session_work_author_filesystem": "compiled/executed PASS; not game regression",
+    "native_GPU_namespace_author_filesystem": "compiled/executed PASS; no renderer/formal data loaded",
+    "Swift_launch_session_tests": 6,
+    "Swift_original_launcher_suite": {
+      "tests": 116,
+      "skipped_real_iCloud": 1,
+      "failed": 0
+    }
+  },
+  "launcher_release_product": {
+    "architecture": "arm64",
+    "sha256": "ede09b166c56c2e044f75752385d3da7c4ca621f0d0fb7d00b576264504255e5",
+    "verified": true,
+    "source_unchanged": true,
+    "old_product_path_harness_failure_preserved": true
   }
 }

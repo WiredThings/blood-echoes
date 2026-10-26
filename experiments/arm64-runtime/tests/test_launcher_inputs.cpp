@@ -22,7 +22,7 @@ int main(int argc,char**argv){
  setenv("BB_ARM_HLE_FAST","invalid",1);assert(!BbLauncherCpu::ConfigurePublishedLookup());
  if(had)setenv("BB_ARM_HLE_FAST",previous.c_str(),1);else unsetenv("BB_ARM_HLE_FAST");
  // Original BB_ONLINE and BB_GPU_LIFETIME selections must not need FEX-only frontend flags.
- const char* policy_keys[]={"BB_ONLINE","BB_ARM_ALLOW_NETWORK","BB_GPU_LIFETIME","BB_ARM_PACKED_VENEERS","BB_ARM_RESOURCE_HOOKS","BB_ARM_RESOURCE_FAST","BB_ARM_RESOURCE_LEAF","BB_ARM_EXTRA_HEAPS"};
+ const char* policy_keys[]={"BB_ONLINE","BB_ARM_ALLOW_NETWORK","BB_GPU_LIFETIME","BB_ARM_PACKED_VENEERS","BB_ARM_RESOURCE_HOOKS","BB_ARM_RESOURCE_FAST","BB_ARM_RESOURCE_LEAF","BB_ARM_EXTRA_HEAPS","BB_ARM_PAYLOAD_GATE","BB_LAYER_READ_TRAPS","BB_ARM_RAW_PREWRITE"};
  std::vector<std::pair<std::string,std::string>> kept;
  for(auto key:policy_keys){if(const char* v=getenv(key))kept.emplace_back(key,v);unsetenv(key);}
  assert(!BbLauncherCpu::ConfigureNetworkAdmission()&&!getenv("BB_ARM_ALLOW_NETWORK"));
@@ -31,10 +31,15 @@ int main(int argc,char**argv){
  setenv("BB_ARM_ALLOW_NETWORK","1",1);setenv("BB_ONLINE","0",1);assert(!BbLauncherCpu::ConfigureNetworkAdmission());
  BbLauncherCpu::ConfigureExecutionDefaults(true);assert(BbLauncherCpu::Enabled("BB_ARM_PACKED_VENEERS")&&!getenv("BB_ARM_RESOURCE_HOOKS"));
  setenv("BB_GPU_LIFETIME","1",1);BbLauncherCpu::ConfigureExecutionDefaults(true);
- for(auto key:{"BB_ARM_RESOURCE_HOOKS","BB_ARM_RESOURCE_FAST","BB_ARM_RESOURCE_LEAF","BB_ARM_EXTRA_HEAPS"})assert(BbLauncherCpu::Enabled(key));
+ for(auto key:{"BB_ARM_RESOURCE_HOOKS","BB_ARM_RESOURCE_FAST","BB_ARM_RESOURCE_LEAF","BB_ARM_EXTRA_HEAPS","BB_ARM_PAYLOAD_GATE","BB_LAYER_READ_TRAPS","BB_ARM_RAW_PREWRITE"})assert(BbLauncherCpu::Enabled(key));
  for(auto key:policy_keys)unsetenv(key);
  setenv("BB_GPU_LIFETIME","1",1);BbLauncherCpu::ConfigureExecutionDefaults(false);assert(!getenv("BB_ARM_RESOURCE_HOOKS"));
  setenv("BB_ARM_RESOURCE_HOOKS","0",1);BbLauncherCpu::ConfigureExecutionDefaults(true);assert(!BbLauncherCpu::Enabled("BB_ARM_RESOURCE_HOOKS")&&!getenv("BB_ARM_EXTRA_HEAPS"));
+ for(auto key:policy_keys)unsetenv(key);
+ setenv("BB_GPU_LIFETIME","0",1);BbLauncherCpu::ConfigureExecutionDefaults(true);
+ for(auto key:{"BB_ARM_PAYLOAD_GATE","BB_LAYER_READ_TRAPS","BB_ARM_RAW_PREWRITE"})assert(!getenv(key));
+ setenv("BB_GPU_LIFETIME","1",1);for(auto key:{"BB_ARM_PAYLOAD_GATE","BB_LAYER_READ_TRAPS","BB_ARM_RAW_PREWRITE"})setenv(key,"0",1);
+ BbLauncherCpu::ConfigureExecutionDefaults(true);for(auto key:{"BB_ARM_PAYLOAD_GATE","BB_LAYER_READ_TRAPS","BB_ARM_RAW_PREWRITE"})assert(std::string(getenv(key))=="0");
  for(auto key:policy_keys)unsetenv(key);for(auto& [key,value]:kept)setenv(key.c_str(),value.c_str(),1);
  std::vector<std::string_view> args{"boot.bin","--user","user","--app0","app0","--content-profile","content.bin","--patches","patches.bin","--timeout","0"};
  auto cli=BbLauncherCli::Parse(args);assert(cli.boot=="boot.bin"&&cli.user=="user"&&cli.graphics&&cli.timeout==0);

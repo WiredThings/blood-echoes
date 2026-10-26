@@ -102,14 +102,11 @@ class PrototypeScope:
             inside = any(candidate == PurePosixPath(row['path']) for row in self.components.values())
         if role == 'data':
             inside = str(candidate) in self.config_files.values()
-        if self.profile == 'qa-shared' and actor == 'metadata_helper' and role == 'user':
-            supported = operation == 'write'
-            inside = candidate == base / '.arm-module-info.bin'
         if operation == 'write':
             inside = inside and str(candidate) not in self.protected_inputs
             if self.roles['mod'] != self.roles['game']:
                 inside = inside and not candidate.is_relative_to(PurePosixPath(self.roles['mod']))
-            if self.profile == 'formal-prototype' and candidate.parent == PurePosixPath(self.roles['user']):
+            if candidate.parent == PurePosixPath(self.roles['user']):
                 inside = inside and candidate.name not in ('.arm-runtime-session', '.arm-module-info.bin', '.arm-restart-request')
         # Existing mod trees can contain source links. A structural match here
         # does not prove a safe resolution; the eventual fd/overlay gate must.
@@ -203,7 +200,7 @@ def validate(document, *, selection, observed, final_argv, session, uid):
              app.parent == project / 'apps' and roles['user'].parent == project / 'state' and
              roles['data'].is_relative_to(project / 'state') and roles['gpu'].parent == project / 'state' and
              roles['game'].is_relative_to(project.parent / 'assets') and roles['gpu_namespace'] == roles['gpu'], 'unchanged Shared QA boundary required')
-        metadata_role = 'user'
+        metadata_role = 'work'
     else:
         need(bundle['id'] == 'io.github.bbport.optimized' and all(not roles[k].is_relative_to(project)
              for k in ('code', 'data', 'out', 'user', 'gpu', 'work')), 'formal prototype cannot reuse QA identity/data')

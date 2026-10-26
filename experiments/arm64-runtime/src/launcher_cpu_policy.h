@@ -28,6 +28,12 @@ inline void ConfigureExecutionDefaults(bool graphics) {
             Default("BB_ARM_RESOURCE_FAST");
             if (Enabled("BB_ARM_RESOURCE_FAST")) Default("BB_ARM_RESOURCE_LEAF");
             Default("BB_ARM_EXTRA_HEAPS");
+            // Coherence/lifetime safety implementations used by the admitted
+            // ARM backend. Keep explicit overrides and the original lifetime
+            // selection; these do not select effects, resolution or cache size.
+            Default("BB_ARM_PAYLOAD_GATE");
+            Default("BB_LAYER_READ_TRAPS");
+            Default("BB_ARM_RAW_PREWRITE");
         }
     }
 }

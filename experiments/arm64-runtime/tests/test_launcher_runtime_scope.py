@@ -77,7 +77,7 @@ class Controls(unittest.TestCase):
         self.document['roles'] = dict(code=str(app / 'Contents/Resources/bbport'), data=str(data), out=str(data / 'out'),
             user=str(p / 'state/gui-user-7'), gpu=str(gpu), gpu_namespace=str(gpu), game=str(p.parent / 'assets/game'),
             mod=str(data / 'out/mod-game-author'), work=str(data / 'out/runtime-sessions' / self.session['nonce']))
-        self.document['state_policy'] = dict(progress_role='user', session_marker_role='user', module_metadata_role='user', restart_request_role='user')
+        self.document['state_policy'] = dict(progress_role='user', session_marker_role='work', module_metadata_role='work', restart_request_role='work')
         self.refresh()
 
     def test_pure_formal_candidate_never_inspects_formal_paths_or_authorizes(self):
@@ -100,7 +100,9 @@ class Controls(unittest.TestCase):
 
     def test_qa_shared_gate_remains_and_formal_namespace_is_separate(self):
         self.qa(); result = self.validate(); self.assertEqual(result.profile, 'qa-shared')
-        self.assertTrue(result.classify('metadata_helper', 'user', self.roles['user'] + '/.arm-module-info.bin', 'write')['structural_candidate'])
+        self.assertFalse(result.classify('metadata_helper', 'user', self.roles['user'] + '/.arm-module-info.bin', 'write')['structural_candidate'])
+        self.assertTrue(result.classify('metadata_helper', 'work', self.roles['work'] + '/.arm-module-info.bin', 'write')['structural_candidate'])
+        self.assertFalse(result.classify('cpu', 'user', self.roles['user'] + '/.arm-runtime-session', 'write')['structural_candidate'])
         self.document['roles']['user'] = '/Users/author/formal-user'; self.refresh(); self.refuses('Shared QA boundary')
 
     def test_formal_cannot_reuse_qa_bundle_or_data(self):

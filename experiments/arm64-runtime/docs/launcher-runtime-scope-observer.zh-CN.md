@@ -12,6 +12,8 @@ candidate = launcher_runtime_scope.validate(document, selection=original_selecti
 
 返回的observed可直接交给现有纯数据validator；scope仍 `authorization=False/native_integration=False`。它不是正式目录放行器，也不做open/exec授权。
 
+状态策略现已与original-launcher-final-exec源码同步：Shared QA也将运行时module metadata/工作marker指向work，user中旧QA来源marker仅只读验证；非launcher authored/legacy的旧state语义不在此profile内。观察器仍不创建work或写user，不因为这项源码接线就升级为native授权。
+
 ## 限界与实际读取
 
 在任何resolve/stat/open之前，先只按词法检查 `qa-shared/prototype_only/production=false`、原selection相同、P/apps内实际code角色、P/state的data/out/user/gpu/work、P兄弟assets内game及精确最终overlay。formal profile、形式正确但指向正式目录的role/组件均先拒绝。原final argv解析复用 `launcher_runtime_scope._final_inputs`，没有另写近似前端策略。

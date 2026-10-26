@@ -14,6 +14,28 @@ struct LauncherRuntime: Equatable, Sendable {
         isFexArm64 ? renderer == "metal" : Catalog.renderers.contains { $0.value == renderer }
     }
 
+    /// A launch session belongs to the original supervisor and all of its F3
+    /// children. Generate it once per Play, never in saved preferences or per
+    /// game process. This is protocol state, not authority to load native code.
+    func launchEnvironment(_ original: [String: String], isolatedQA: Bool = false,
+                           nonce: () -> String = { UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased() }) -> [String: String] {
+        guard isFexArm64 else { return original }
+        var env = original
+        env["BB_ARM_LAUNCHER_COMPAT"] = "1"
+        let keys = ["BB_ARM_SESSION_NONCE", "BB_ARM_RESTART_NONCE"]
+        let valid: (String?) -> Bool = { value in
+            guard let value, value.utf8.count == 32 else { return false }
+            return value.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
+        }
+        if !isolatedQA || !keys.allSatisfy({ valid(env[$0]) }) {
+            for key in keys { env[key] = nonce() }
+        }
+        // A previous child's derived cache path cannot select this launch's
+        // namespace. The startup component derives it from the original base.
+        env.removeValue(forKey: "BB_ARM_GPU_BASE_DIR")
+        return env
+    }
+
     static func decode(_ data: Data) -> LauncherRuntime {
         guard data.count <= 65_536,
               let value = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],

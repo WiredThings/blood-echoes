@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include <filesystem>
+#include "bundled_runtime_admission.h"
 #include <vector>
 #include <string>
 #include <cstdlib>
@@ -40,12 +41,19 @@ inline HelperSelection SelectHelper(const std::filesystem::path&actual){
  return {executable,{},project/"tools/prepare_module_metadata.py",false};
 }
 inline HelperSelection ActualHelper(){
+ const auto& admission=BbBundledRuntime::Actual();
+ if(admission){
+  if(!admission->IsCpu())throw std::runtime_error("module preparation requires admitted CPU role");
+  return {admission->executable,admission->code_root,admission->tools.at("prepare_module_metadata.py"),true};
+ }
  char path[4096];uint32_t size=sizeof(path);
  if(_NSGetExecutablePath(path,&size))throw std::runtime_error("module runtime executable path exceeds bound");
  return SelectHelper(path);
 }
-inline std::filesystem::path Prepare(const std::filesystem::path&boot,const std::filesystem::path&app0,const std::filesystem::path&state){
- const auto output=state/".arm-module-info.bin";
+inline std::filesystem::path Prepare(const std::filesystem::path&boot,const std::filesystem::path&app0,const std::filesystem::path&runtime_work){
+ // The launcher passes its verified session work directory, never substitutes
+ // that directory for --user. Unbundled/legacy callers retain their old state.
+ const auto output=runtime_work/".arm-module-info.bin";
  if(std::filesystem::is_symlink(output))throw std::runtime_error("linked module metadata output");
  const char*python=getenv("BB_QUICKSAVE_PYTHON");if(!python||!*python)python="/usr/bin/python3";
  const auto selected=ActualHelper();

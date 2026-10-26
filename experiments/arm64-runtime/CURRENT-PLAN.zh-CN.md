@@ -1,3 +1,11 @@
+## 2026-10-27 03:40 集中验收补证与最小正式接入
+
+QA09 原始自动驱动回执保留 incomplete：旧末尾日志读取器漏掉了 F3 完成标记；独立复核实际新检查点→原 supervisor 离线重启→新 CPU→原自动继续→后续场景帧已证实路径运行。新增量读取器重放该完整实际日志通过，但尚待新包完整实测，不把重放当作新实测。实测另发现 F3 重做 source-view/static 准备数分钟；同 supervisor 会话调度复用候选保留每次 Local/组件/metadata SHA 校验，现已补不同目录同名脚本、CWD及 SOURCE-PARITY 反例。
+
+正式接入只需真实外层 bundle/已知 native role + 已有冻结摘要/实际加载边，以及原 CLI/数据根映射；不要把巨大 runtime-scope 原型所有字段或新票据系统增加为交付门槛。QA 原保护分支保留。工作元数据移至 data 独立目录，原进度和旧缓存不迁移；正式 GPU 使用原根下新增 arm64-native-v1 命名空间。当前正在集中接源码，尚未替换 /Applications，Release 和对外发布文档未更新。
+
+原生 session-work 与 GPU namespace 的作者文件系统控制实际编译运行通过；Swift 两 nonce 每次 Play 建立并原 supervisor 内继承的 6 项定向测试通过。均不替代整包验收。
+
 ## 2026-10-27 夜间授权与当前验收
 
 夜间实测补证：使用原Swift最终配置和新隔离副本的第一次启动706.95s时因5秒swap新增>1GiB停止，未到场景。按既有授权重启约1464MiB chronod后，同一QA副本续测325.30s见场景并采90s，末30s48.87FPS、GPU19.22ms、p95 21.21ms；合计footprint中位5809MiB（共享页可能重复），swap净增1550MiB，严重压力仅1次观测，未持续。5931帧中现场compiles/source_calls=0、strict8/8、11Local调用；源QA存档摘要保持不变。仅该静态场景采样通过，不是匹配Rosetta/旧新版、长稳态内存或全功能验收。正式应用尚未替换，Release/发布文档未更新。包内metadata闭包源码与作用域纯数据候选已完成143项Python控制，native/正式作用域接线仍未完成。

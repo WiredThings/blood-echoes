@@ -13,6 +13,8 @@
 #include "launcher_cli.h"
 #include "launcher_thread.h"
 #include "launcher_cpu_policy.h"
+#include "bundled_runtime_admission.h"
+#include "launcher_bundled_paths.h"
 #include "guest_resource_detours.h"
 #include "game_menu_detours.h"
 #include "resource_leaf_profile.h"
@@ -381,35 +383,75 @@ extern "C" uint64_t bb_arm_net_call(uintptr_t entry,const uint64_t*args,size_t c
  if(attach)runtime_thread_detach_host();
  return result;
 }
+namespace {
+struct BundledLauncherSession { fs::path data,config,boot,content,user,work;std::string session_nonce,restart_nonce,identity; };
+std::optional<BundledLauncherSession> bundled_launcher_session;
+}
+// Tri-state keeps the original standalone QA restart gate unchanged. A real
+// formal CPU may only restart the exact session admitted by game_main.
+extern "C" int bb_arm_bundled_restart_admitted(const char*user,const char*nonce){
+ try{
+  const auto& admission=BbBundledRuntime::Actual();if(!admission)return -1;
+  check(admission->IsCpu()&&bundled_launcher_session&&user&&nonce,"bundled restart lacks admitted CPU session");
+  const auto& session=*bundled_launcher_session;
+  check(BbLauncherPaths::RestartMatches(session.user,session.restart_nonce,user,nonce),"bundled restart progress/restart nonce changed");
+  const char* session_nonce=getenv("BB_ARM_SESSION_NONCE");
+  check(session_nonce&&session.session_nonce==session_nonce,"bundled restart session nonce changed");
+  BbLauncherPaths::Role(session.user,true,true);
+  BbSession::OwnedFd work(open(session.work.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC));
+  BbSession::WorkDirectory(work.get(),true);BbSession::VerifyWorkIdentity(work.get(),session.identity);
+  check(fs::canonical(session.work)==session.work,"bundled restart work path changed");return 1;
+ }catch(const std::exception&e){std::fprintf(stderr,"ARM bundled restart refused: %s\n",e.what());return 0;}
+}
 int game_main(int argc,char** argv){
  try{
   setvbuf(stdout,nullptr,_IOLBF,0);setvbuf(stderr,nullptr,_IOLBF,0);
   install_faults();
+  const auto& bundled=BbBundledRuntime::Actual();
+  check(!bundled||bundled->IsCpu(),"runtime executable is not an admitted CPU role");
   fs::path boot,state,app0,content,seed_user,startup,settings_template;bool modules_only=false,graphics=false,heap_fixture=false,resume=false;
   fs::path launcher_patches,launcher_config;const bool launcher_compat=argc>1&&!std::string_view(argv[1]).starts_with("--");unsigned launcher_timeout=0;bool launcher_strict_imports=false;
   if(launcher_compat){
-   check(getenv("BB_ARM_LAUNCHER_COMPAT")&&std::string_view(getenv("BB_ARM_LAUNCHER_COMPAT"))=="1","launcher compatibility requires explicit isolated selection");
+   check(bundled||(getenv("BB_ARM_LAUNCHER_COMPAT")&&std::string_view(getenv("BB_ARM_LAUNCHER_COMPAT"))=="1"),"launcher compatibility requires explicit isolated selection");
    check(getenv("BB_RESTART_SUPERVISED")&&std::string_view(getenv("BB_RESTART_SUPERVISED"))=="1","launcher requires original restart supervisor");
    std::vector<std::string_view> arguments;for(int i=1;i<argc;++i)arguments.emplace_back(argv[i]);auto options=BbLauncherCli::Parse(arguments);
    boot=options.boot;state=options.user;app0=options.app0;content=options.content;launcher_patches=options.patches;graphics=options.graphics;launcher_timeout=options.timeout;launcher_strict_imports=options.strict_imports;resume=true;
   }else
   for(int i=1;i<argc;++i){std::string_view a=argv[i];if((a=="--heap-fixture"||a=="--authored-fixture")){heap_fixture=true;continue;}if(a=="--resume-state"){resume=true;continue;}if(a=="--graphics"){graphics=true;continue;}if(a=="--modules-only"){modules_only=true;continue;}check(i+1<argc,"missing argument");if(a=="--boot")boot=argv[++i];else if(a=="--state")state=argv[++i];else if(a=="--settings-template")settings_template=argv[++i];else if(a=="--startup-patches")startup=argv[++i];else if(a=="--seed-user")seed_user=argv[++i];else if(a=="--app0")app0=argv[++i];else if(a=="--content-profile")content=argv[++i];else throw std::runtime_error("unsupported argument");}
+  check(!bundled||launcher_compat,"bundled CPU requires original launcher argv");
   check(!boot.empty()&&!state.empty()&&state.is_absolute(),"require --boot --state");
   if(launcher_compat){check(getenv("BB_CONFIG"),"original launcher configuration missing");launcher_config=getenv("BB_CONFIG");check(getenv("BB_GAME_DIR")&&fs::is_directory(getenv("BB_GAME_DIR")),"original launcher game root missing");}
   const auto private_path=[](const fs::path& path){auto relative=fs::canonical(path).lexically_relative("/Users/Shared/BloodEchoesDevelopment");return !relative.empty()&&relative!="."&&*relative.begin()!="..";};
-  if(launcher_compat)check(private_path(launcher_config)&&fs::is_regular_file(launcher_config)&&!fs::is_symlink(launcher_config),"original launcher config must be a Shared regular file");
+  if(launcher_compat&&!bundled)check(private_path(launcher_config)&&fs::is_regular_file(launcher_config)&&!fs::is_symlink(launcher_config),"original launcher config must be a Shared regular file");
   if(heap_fixture)check(fs::canonical(boot.parent_path())==fs::canonical(fs::path(BB_PROTOTYPE_ROOT)/"fixtures"),"heap test hooks only for authored fixtures");
-  check((startup.empty()||private_path(startup))&&(launcher_patches.empty()||private_path(launcher_patches))&&private_path(boot)&& (content.empty()||private_path(content)) && (app0.empty()||private_path(app0)),"runtime inputs must stay in Shared private development tree");
+  if(!bundled)check((startup.empty()||private_path(startup))&&(launcher_patches.empty()||private_path(launcher_patches))&&private_path(boot)&& (content.empty()||private_path(content)) && (app0.empty()||private_path(app0)),"runtime inputs must stay in Shared private development tree");
   if(launcher_compat){
    if(const char*pad=getenv("BB_ARM_QA_PAD_FILE")){check(private_path(pad)&&!fs::is_symlink(pad)&&fs::is_regular_file(pad),"launcher QA pad must be a private regular file");setenv("BB_PAD_FILE",pad,1);setenv("BB_PAD_FILE_ONLY","1",1);}
 
   }
   const char* session_nonce=getenv("BB_ARM_SESSION_NONCE");
+  const char* restart_nonce=getenv("BB_ARM_RESTART_NONCE");
+  check(!bundled||(restart_nonce&&BbLauncherPaths::Nonce(restart_nonce)),"bundled launcher restart nonce missing or malformed");
   check(!resume||(session_nonce&&strlen(session_nonce)==32),"resume requires its private supervisor session");
   const auto session_app0=launcher_compat?fs::path(getenv("BB_GAME_DIR")):app0;
-  check(!launcher_compat||private_path(session_app0),"launcher base game outside Shared");
-  const std::string identity="ARMQA1\n"+fs::canonical(boot).string()+"\n"+session_app0.string()+"\n"+content.string()+"\n"+(session_nonce?session_nonce:"")+"\n";
-  BbSession::Prepare(state,fs::path(BB_PROTOTYPE_ROOT)/"state",identity,resume);
+  check(bundled||!launcher_compat||private_path(session_app0),"launcher base game outside Shared");
+  const std::string identity=std::string(bundled?"ARMLAUNCH1\n":"ARMQA1\n")+fs::canonical(boot).string()+"\n"+session_app0.string()+"\n"+content.string()+"\n"+(session_nonce?session_nonce:"")+"\n";
+  if(!bundled)BbSession::Prepare(state,fs::path(BB_PROTOTYPE_ROOT)/"state",identity,resume);
+  else {
+   check(getenv("BB_DATA_DIR"),"bundled launcher data role missing");
+   BbLauncherPaths::Inputs(getenv("BB_DATA_DIR"),launcher_config,boot,content,launcher_patches,state,session_app0,app0);
+   if(const char* user=getenv("BB_USER_DIR"))check(fs::path(user)==state,"bundled user argv/environment disagreement");
+  }
+  fs::path runtime_work=state;
+  if(launcher_compat){
+   check(getenv("BB_DATA_DIR"),"original launcher data role missing");
+   runtime_work=bundled?BbSession::PrepareBundledLauncherWork(fs::path(getenv("BB_DATA_DIR")),launcher_config,boot,content,session_nonce,identity):
+    BbSession::PrepareLauncherWork(fs::path(getenv("BB_DATA_DIR")),fs::path(BB_PROTOTYPE_ROOT)/"state",launcher_config,boot,content,session_nonce,identity);
+   if(bundled){
+    bundled_launcher_session=BundledLauncherSession{getenv("BB_DATA_DIR"),launcher_config,boot,content,state,runtime_work,session_nonce,restart_nonce,identity};
+   }
+   std::printf("ARM LAUNCHER runtime work=%s; progress=%s; admission=%s\n",runtime_work.c_str(),state.c_str(),bundled?"actual-bundle/no-user-marker":"QA-source-marker-retained");
+  }
   if(const char* qos=getenv("BB_ARM_QA_CPU_QOS")){
    check(launcher_compat&&getenv("BB_ARM_QA_CPU_QOS_EXPERIMENT")&&std::string_view(getenv("BB_ARM_QA_CPU_QOS_EXPERIMENT"))=="1","CPU QoS experiment requires explicit private test admission");
    int mode=0;check(!bb_qa_cpu_qos_parse(qos,&mode)&&!bb_qa_cpu_qos_apply(mode),"CPU QoS experiment admission failed");
@@ -419,7 +461,7 @@ int game_main(int argc,char** argv){
    BbLauncherCpu::ConfigureExecutionDefaults(graphics);
    std::printf("ARM LAUNCHER original online admission=%d; original selection retained\n",BbLauncherCpu::ConfigureNetworkAdmission());
   }
-  if(resume)std::puts("ARM QA reusing verified private session; seed will not overwrite working progress");
+  if(resume)std::puts(bundled?"ARM LAUNCHER reusing original progress; no QA save marker required":"ARM QA reusing verified private session; seed will not overwrite working progress");
   if(!seed_user.empty()&&!resume){
    check(fs::canonical(seed_user)==fs::canonical("/Users/Shared/BloodEchoesDevelopment/qa-seed-user"),"only fixed QA seed is allowed");
    auto source=seed_user/"savedata";check(fs::is_directory(source)&&!fs::is_symlink(source),"QA seed missing or linked");
@@ -454,7 +496,7 @@ int game_main(int argc,char** argv){
   Boot b(boot);check(b.format=="BBPROBE5"&&b.caps==1,"require linked BBPROBE5");
   fs::path module_metadata;
   if(heap_fixture){if(const char* path=getenv("BB_ARM_AUTHORED_MODULE_INFO")){module_metadata=path;check(private_path(module_metadata)&&!fs::is_symlink(module_metadata),"authored module metadata outside Shared");}}
-  else if(!app0.empty())module_metadata=BbGuestModules::Prepare(boot,app0,state);
+  else if(!app0.empty())module_metadata=BbGuestModules::Prepare(boot,app0,runtime_work);
 
   std::vector<std::unique_ptr<Mapping>> missing_data_storage; // outlives the FEX State
   State s;active=&s;
@@ -482,9 +524,9 @@ int game_main(int argc,char** argv){
   uint64_t net_sdk{};memcpy(&net_sdk,static_cast<uint8_t*>(image.ptr)+b.procparam+16,8);runtime_net_configure(app0.c_str(),game_metadata.serial.c_str(),game_metadata.title.c_str(),game_metadata.version.c_str(),static_cast<unsigned char*>(image.ptr),b.size,uint32_t(net_sdk));
   std::vector<uintptr_t> imported(b.names.size());std::vector<uint64_t> kinds(b.names.size());for(auto x:b.relocs)if(x.kind){check(!kinds[x.value]||kinds[x.value]==x.kind,"mixed import kind");kinds[x.value]=x.kind;}
   if(graphics){
-   const char* child=getenv("BB_GPU_PROCESS");check(child&&private_path(child),"GPU child must come from the Shared development tree");
+   const char* child=getenv("BB_GPU_PROCESS");check(child&&(bundled?fs::path(child)==bundled->Runtime("bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu"):private_path(child)),"GPU child does not match admitted executable role");
    uint64_t sdk{};memcpy(&sdk,static_cast<uint8_t*>(image.ptr)+b.procparam+16,8);BbGpuConfig config{game_metadata.title.c_str(),game_metadata.serial.c_str(),getenv("BB_GPU_USER_DIR"),uint32_t(sdk),game_metadata.attributes,1920,1080};graphics_enabled=true;check(bbgpu_init(&config)==0,"native GPU init failed");std::printf("ARM GPU frontend ready symbols=%u\n",bbgpu_symbol_count());}
-  unsigned native=0,linked=0,missing=0;std::ofstream imports(state/"imports.tsv");
+  unsigned native=0,linked=0,missing=0;std::ofstream imports(runtime_work/"imports.tsv");
   for(size_t i=0;i<b.names.size();++i){
    auto host=runtime_resolve(b.names[i].c_str(),kinds[i]==2);std::unique_ptr<HleCallAdapter> net_adapter(host?static_cast<HleCallAdapter*>(bb_arm_net_adapter(host)):nullptr);auto av_adapter=host&&kinds[i]!=2?BbAvPlayerBridge::Adapter(runtime_import_name(b.names[i].c_str()),host):nullptr;std::string route;
    if(heap_fixture&&b.names[i]=="bb.prototype.extra_heap_check"){imported[i]=veneer(s,s.registry.Register(framed(MakeHleCallAdapter(ArmExtraHeaps::FixtureCheck)),"fixture.extra_heap_check"));++native;route="authored-fixture";}
@@ -575,8 +617,8 @@ int game_main(int argc,char** argv){
   if(graphics&&!heap_fixture)ArmGameMenu::Install(b,image,game_menu_stubs);
   if(s.code_files){
    s.code_files->Finalize(std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
-   s.code_files->Report(state/"cpu-code-manifest.json");
-   if(code_profile)s.code_output=std::make_unique<CodeMapOutput>(state/("cpu-code-"+std::to_string(getpid())+".map"));
+   s.code_files->Report(runtime_work/"cpu-code-manifest.json");
+   if(code_profile)s.code_output=std::make_unique<CodeMapOutput>(runtime_work/("cpu-code-"+std::to_string(getpid())+".map"));
    printf("ARM CPU CODEMAP static_bytes=%zu excluded_mutated_pages=%zu relocated_pages=%zu retained_hash_bytes=%zu; profiling only, JIT budget unchanged\n",s.code_files->EligibleBytes(),s.code_files->ModifiedPages(),s.code_files->RelocationPages(),s.code_files->RetainedHashBytes());
   }
   runtime_quicksave_bind(image.ptr,b.size);
@@ -615,7 +657,7 @@ int game_main(int argc,char** argv){
    BbCpuCache::Identity key{};key.runtime_build=BbCacheBuild::Runtime;key.patched_code=s.code_files->Identity();
    std::vector<std::byte> modules;const auto& source=s.code_files->SourceIdentity();BbCacheInputs::Append(modules,"linked-image",std::string_view(reinterpret_cast<const char*>(source.data()),source.size()));
    if(runtime_net_enabled()){
-    const char* module=getenv("BB_NET_MODULE");check(module&&private_path(module),"cache identity requires private online module");auto digest=BbCacheInputs::Build(module);
+    const char* module=getenv("BB_NET_MODULE");check(module&&(bundled?bundled->runtime.contains("bin/gpu-net/libbbnet.dylib")&&fs::path(module)==bundled->Runtime("bin/gpu-net/libbbnet.dylib"):private_path(module)),"cache identity requires admitted online module");auto digest=BbCacheInputs::Build(module);
     check(std::any_of(digest.begin(),digest.end(),[](auto b){return b!=0;}),"cache online module digest unavailable");
     BbCacheInputs::Append(modules,"online-module",std::string_view(reinterpret_cast<const char*>(digest.data()),digest.size()));
    }else BbCacheInputs::Append(modules,"online-module","disabled");
@@ -624,7 +666,7 @@ int game_main(int argc,char** argv){
    check(BbCpuCache::Valid(key),"cache identity incomplete");
    auto usage=s.cpu->InspectStartupCodeCache();check(std::holds_alternative<AetherPS4::Fex::StartupCpuCacheInfo>(usage),"startup JIT metadata unavailable");
    const auto budget=std::get<AetherPS4::Fex::StartupCpuCacheInfo>(usage).current_jit_bytes;
-   std::ofstream metadata(state/"cpu-cache-environment.json");
+   std::ofstream metadata(runtime_work/"cpu-cache-environment.json");
    metadata<<"{\"schema\":1,\"veneer_layout\":\""<<s.veneers.LayoutName()<<"\",\"runtime_build\":\""<<BbStaticCode::Hex(key.runtime_build)<<"\",\"bridge_build\":\""<<BbStaticCode::Hex(BbCacheBuild::Bridge)<<"\",\"patched_code\":\""<<BbStaticCode::Hex(key.patched_code)<<"\",\"module_set\":\""<<BbStaticCode::Hex(key.module_set)<<"\",\"bridge_abi\":\""<<BbStaticCode::Hex(key.bridge_abi)<<"\",\"host_features\":\""<<BbStaticCode::Hex(key.host_features)<<"\",\"codegen_config\":\""<<BbStaticCode::Hex(key.codegen_config)<<"\",\"software_tso\":"<<(env.software_tso?"true":"false")<<",\"normal_jit\":"<<(env.normal_jit?"true":"false")<<",\"initial_jit_bytes\":"<<budget<<"}\n";metadata.flush();check(bool(metadata),"cache environment report failed");
    if(cache_path&&*cache_path){
     bool attempted=false;

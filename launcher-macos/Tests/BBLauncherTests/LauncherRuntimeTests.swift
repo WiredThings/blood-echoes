@@ -2,6 +2,41 @@ import XCTest
 @testable import BBLauncher
 
 final class LauncherRuntimeTests: XCTestCase {
+    func testFexSessionIsEphemeralAndSharedWithOriginalSupervisor() {
+        let runtime = LauncherRuntime(isFexArm64: true)
+        let old = ["BB_ARM_SESSION_NONCE": String(repeating: "c", count: 32),
+                   "BB_ARM_RESTART_NONCE": String(repeating: "d", count: 32),
+                   "BB_ARM_GPU_BASE_DIR": "/old/cache", "BB_CONFIG": "/original/bbport.ini",
+                   "BB_USER_DIR": "/original/user", "BB_QUICKSAVE": "1", "BB_ONLINE": "1"]
+        var calls = 0
+        let current = runtime.launchEnvironment(old, nonce: {
+            calls += 1
+            return String(repeating: calls == 1 ? "a" : "b", count: 32)
+        })
+        XCTAssertEqual(calls, 2)
+        XCTAssertEqual(current["BB_ARM_SESSION_NONCE"], String(repeating: "a", count: 32))
+        XCTAssertEqual(current["BB_ARM_RESTART_NONCE"], String(repeating: "b", count: 32))
+        XCTAssertEqual(current["BB_ARM_LAUNCHER_COMPAT"], "1")
+        XCTAssertNil(current["BB_ARM_GPU_BASE_DIR"])
+        for key in ["BB_CONFIG", "BB_USER_DIR", "BB_QUICKSAVE", "BB_ONLINE"] { XCTAssertEqual(current[key], old[key]) }
+        XCTAssertEqual(old["BB_ARM_GPU_BASE_DIR"], "/old/cache")
+        XCTAssertEqual(LauncherRuntime.legacy.launchEnvironment(old), old)
+    }
+
+    func testQASessionRetainsOnlyCompleteValidSessionPair() {
+        let runtime = LauncherRuntime(isFexArm64: true)
+        let good = ["BB_ARM_SESSION_NONCE": String(repeating: "a", count: 32), "BB_ARM_RESTART_NONCE": String(repeating: "b", count: 32)]
+        let result = runtime.launchEnvironment(good, isolatedQA: true, nonce: { XCTFail("QA pair regenerated"); return "" })
+        XCTAssertEqual(result["BB_ARM_SESSION_NONCE"], good["BB_ARM_SESSION_NONCE"])
+        XCTAssertEqual(result["BB_ARM_RESTART_NONCE"], good["BB_ARM_RESTART_NONCE"])
+        for invalid in [String(repeating: "A", count: 32), String(repeating: "a", count: 31), "", "../../bad"] {
+            var bad = good; bad["BB_ARM_RESTART_NONCE"] = invalid
+            var calls = 0
+            let next = runtime.launchEnvironment(bad, isolatedQA: true, nonce: { calls += 1; return String(repeating: "c", count: 32) })
+            XCTAssertEqual(calls, 2)
+            XCTAssertEqual(next["BB_ARM_SESSION_NONCE"], String(repeating: "c", count: 32))
+        }
+    }
     func testNativePackageDoesNotRequireRosettaButRejectsWrongArchitecture() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
