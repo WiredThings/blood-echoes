@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "library-preparation-and-pixels-passed-local-tiling-pixel-attribution-pending",
+  "status": "library-preparation-passed-local-tiling-pixels-verified-in-followup",
   "enabled": false,
   "game_tested": false,
   "formal_data_modified": false,
@@ -151,15 +151,16 @@
     "swap_mib": 9226.0625
   },
   "pixel_author_runtime_stubs": true,
-  "local_tiling_pixel_path_proven": false,
+  "local_tiling_pixel_path_proven": true,
   "old_schema_packet_rejected": {
     "exit": 65,
     "reason": "author harness accidentally retained schema1; rejected before Device; corrected fixture and kept old evidence"
   },
   "uncompleted": [
-    "attribute zero local-hit logs in pixel controls",
     "negative missing entry/corrupt library tests for all14",
     "coherent CPU/app packaging and actual original-entry cold/warm integration",
     "full-game final PSO catalogue and all remaining original goals"
-  ]
+  ],
+  "local_pixel_followup": "../tiling-local-pixel-validation-20261026/summary.json",
+  "original_pixel_cases_are_historical_source_fallback": true
 }

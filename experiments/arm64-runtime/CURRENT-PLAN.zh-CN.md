@@ -311,3 +311,14 @@ handle15658 terminal passed：P/evidence/launcher-engine-abba-179297535583002000
 ## 额度停止线已触发：余14%
 
 十四库E10已完成230GPU闭包/配对worker链接；11核心+4固定准备原生进程过，22库建成，暖14Local/8strict/普通PSO0，缺build正确Source回退。四像素进程过但Local hit0，未证明Local像素路径；应先核对测试的AOT root与GPU user命名空间，再做定向验证，不能直接改生产逻辑。没有配对CPU游戏/App、未启用候选，最新QA包仍e3689f86。详公开native summary与HANDOFF末节。停止开发测试，完成交接同步；不把额度停止当整体完成。
+
+
+## 2026-10-26：授权定向复测已完成，Local 像素归因补齐
+
+用户仅对本轮目录修正与像素复测取消15%额度停止限制。旧作者脚本的 AOT root 位于另一个 GPU user 目录；只修正测试配置，将缓存克隆到每例自己的 gpu/local-metal，未改任何运行时目录校验。
+
+九个最终进程通过：bounds0/1普通纹理各Source0/Local4、18例输出相同；代理各Source0/Local6、2例输出相同。代理额外的原SceneTargets CopySource库由现有builder仅在新测试克隆补建，不混入14种平铺库统计。错误目录仍以load模式运行并回退Source4/Local0，输出相同，证明未绕过目录准入。新增脚本从实际DSO读取API统计，避免作者executable重复inline变量造成假零。详evidence/tiling-local-pixel-validation-20261026。
+
+28.16秒、426系统样本、最高压力2、swap减少8MiB；原fixture92文件散列清单不变。未运行游戏、未改正式数据/既有缓存、未改运行时代码、未重编QA App或发布Release。这些是作者GPU正确性控制，不是游戏性能/峰值内存或全部最终PSO覆盖证明。
+
+Local像素归因待办已完成；仍缺14库缺entry/坏摘要反例、配对CPU/App及原入口冷暖和其它原目标。候选继续未启用，最新游戏QA包仍e3689f86。本轮授权测试已结束，整个旧目标仍保持原暂停状态，不凭本轮额度例外自动恢复其它开发。

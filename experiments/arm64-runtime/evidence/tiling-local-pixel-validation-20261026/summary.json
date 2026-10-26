@@ -1,0 +1,627 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "scope": "authored-native-tiling-and-proxy-pixels-only",
+  "enabled": false,
+  "game_tested": false,
+  "performance_evidence": false,
+  "author_runtime_stubs": true,
+  "source_result_sha256": "a979b94c1428b86c72b3c75431331b6ef4e262e4f6e1a2f31b91e87a33278ab6",
+  "runner": "../../tools/run_tiling_local_pixels.py",
+  "runner_sha256": "d70731269b74b6118d65dfcd3053713617b9def4eb19c8c26b1d00bae759229a",
+  "gpu_library_sha256": "ffbbdbd1292340e6d491ef0d735c7109f0690363a589860bf037553e5c043ec3",
+  "test_directory_fix": {
+    "local_root": "per-case gpu/local-metal",
+    "gpu_user_root": "same per-case gpu",
+    "loader_checks_modified": false,
+    "wrong_root_test_keeps_mode_load": true
+  },
+  "final_cases": [
+    {
+      "test": "test_mtl_runtime",
+      "bounded": "0",
+      "mode": "off",
+      "exit": 0,
+      "source_calls": 4,
+      "source_failed": 0,
+      "local_calls": 0,
+      "local_failed": 0,
+      "hit_keys": [],
+      "digests": [
+        [
+          "native 32 128 64 0 33280",
+          "cc67073f664c7a3f8b36943e713a3cead5795f3676373434fafdc8e99a720d10"
+        ],
+        [
+          "native 32 128 64 1 33280",
+          "cc9436f03f758d6b314eadeebae8d085aa49e9f1c9c79e29a135b4e99da2aa92"
+        ],
+        [
+          "native 32 128 64 3 33280",
+          "665d9cc9bc1ead5c8865e6fa5ae984da515ecfa55e80aa01bc7f5789882ac558"
+        ],
+        [
+          "native 32 128 73 0 66048",
+          "82b6642fad4657b1cb15a7a75764ab0c738a5a20fedc2a6b1a1c8ca4d4278ce7"
+        ],
+        [
+          "native 32 128 73 1 66048",
+          "a96c80cdc64732ce8f9458dd2e52c03eac8153c50e0c3247d03b86ed04808e67"
+        ],
+        [
+          "native 32 128 73 3 66048",
+          "3701ad039ab2a4de38d8398543b6508f773cb857bd4f5ef5522b9984e4e9fe07"
+        ],
+        [
+          "native 32 1920 1080 0 8356352",
+          "72b88121d917ee5526abfebdf6bc3edebf8f2c47f6e83e39dc2fbc7f66aa5c25"
+        ],
+        [
+          "native 32 1920 1080 1 8356352",
+          "ecfa7343716903644fafc44b87bb499f6cfd07cd0d4c7fc9d481f75fef45f046"
+        ],
+        [
+          "native 32 1920 1080 3 8356352",
+          "12a73479d8ed741e4edc8a1bcd6fc86dcc8196b7e5e72b83c8874f8b1ac70a75"
+        ],
+        [
+          "native 64 128 64 0 66048",
+          "a90ca55a6f5878bd265af893dc296a6b80bd3a0aec9ce38e47e1cada65163158"
+        ],
+        [
+          "native 64 128 64 1 66048",
+          "435635a15f03457f22ad149fbd0d4fbc8a8f6d38fbf8b9356777c10bb76c937d"
+        ],
+        [
+          "native 64 128 64 3 66048",
+          "1e8a861bf5d034e214737cd0e40329f162ee044024445a5dcfe4ada475607a63"
+        ],
+        [
+          "native 64 128 73 0 131584",
+          "a3dde6affb77016893f38d8ec1dac4cecc6e4da17231d5cdeb9be6de300d034a"
+        ],
+        [
+          "native 64 128 73 1 131584",
+          "a81643059e494979dc021fed24e2641a91538093c165196b9ca415fc54fcc96f"
+        ],
+        [
+          "native 64 128 73 3 131584",
+          "6037343633ac2f274957f62f15c55f5f4968be5064f71b0a0b93e2e76dee1a53"
+        ],
+        [
+          "native 64 1920 1080 0 16712192",
+          "cf4fc442d396b3f42844f1a846a1997705c2ef0e9b5813d99f5d49de27fc2d98"
+        ],
+        [
+          "native 64 1920 1080 1 16712192",
+          "5aa0c138e24b964361a0ced7ac291ab810e5f9da1362dc51aa5199c8dc7cead6"
+        ],
+        [
+          "native 64 1920 1080 3 16712192",
+          "b13ef4584f6b2185b00f32fc62616a248038cadbfb679a125c4130f3641f9030"
+        ]
+      ],
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_runtime",
+      "bounded": "0",
+      "mode": "load",
+      "exit": 0,
+      "source_calls": 0,
+      "source_failed": 0,
+      "local_calls": 4,
+      "local_failed": 0,
+      "hit_keys": [
+        "63ddc3b4340130bfdd0a6c0f9e62237c84c08e85286d48317174a1d8732c3a47",
+        "8f9b8a7d185f0286f9b634e01c52468dded2bec6ee889a864741451d6c39c6c4",
+        "906721c2abd980582c5ecdd6b46e16a531d2a245e9d5db578c4cc92230bce3cb",
+        "d145487cf5ab174ce8b704f28f6cea7c9eddf4a1852919894331e2b3aa65aced"
+      ],
+      "digests": [
+        [
+          "native 32 128 64 0 33280",
+          "cc67073f664c7a3f8b36943e713a3cead5795f3676373434fafdc8e99a720d10"
+        ],
+        [
+          "native 32 128 64 1 33280",
+          "cc9436f03f758d6b314eadeebae8d085aa49e9f1c9c79e29a135b4e99da2aa92"
+        ],
+        [
+          "native 32 128 64 3 33280",
+          "665d9cc9bc1ead5c8865e6fa5ae984da515ecfa55e80aa01bc7f5789882ac558"
+        ],
+        [
+          "native 32 128 73 0 66048",
+          "82b6642fad4657b1cb15a7a75764ab0c738a5a20fedc2a6b1a1c8ca4d4278ce7"
+        ],
+        [
+          "native 32 128 73 1 66048",
+          "a96c80cdc64732ce8f9458dd2e52c03eac8153c50e0c3247d03b86ed04808e67"
+        ],
+        [
+          "native 32 128 73 3 66048",
+          "3701ad039ab2a4de38d8398543b6508f773cb857bd4f5ef5522b9984e4e9fe07"
+        ],
+        [
+          "native 32 1920 1080 0 8356352",
+          "72b88121d917ee5526abfebdf6bc3edebf8f2c47f6e83e39dc2fbc7f66aa5c25"
+        ],
+        [
+          "native 32 1920 1080 1 8356352",
+          "ecfa7343716903644fafc44b87bb499f6cfd07cd0d4c7fc9d481f75fef45f046"
+        ],
+        [
+          "native 32 1920 1080 3 8356352",
+          "12a73479d8ed741e4edc8a1bcd6fc86dcc8196b7e5e72b83c8874f8b1ac70a75"
+        ],
+        [
+          "native 64 128 64 0 66048",
+          "a90ca55a6f5878bd265af893dc296a6b80bd3a0aec9ce38e47e1cada65163158"
+        ],
+        [
+          "native 64 128 64 1 66048",
+          "435635a15f03457f22ad149fbd0d4fbc8a8f6d38fbf8b9356777c10bb76c937d"
+        ],
+        [
+          "native 64 128 64 3 66048",
+          "1e8a861bf5d034e214737cd0e40329f162ee044024445a5dcfe4ada475607a63"
+        ],
+        [
+          "native 64 128 73 0 131584",
+          "a3dde6affb77016893f38d8ec1dac4cecc6e4da17231d5cdeb9be6de300d034a"
+        ],
+        [
+          "native 64 128 73 1 131584",
+          "a81643059e494979dc021fed24e2641a91538093c165196b9ca415fc54fcc96f"
+        ],
+        [
+          "native 64 128 73 3 131584",
+          "6037343633ac2f274957f62f15c55f5f4968be5064f71b0a0b93e2e76dee1a53"
+        ],
+        [
+          "native 64 1920 1080 0 16712192",
+          "cf4fc442d396b3f42844f1a846a1997705c2ef0e9b5813d99f5d49de27fc2d98"
+        ],
+        [
+          "native 64 1920 1080 1 16712192",
+          "5aa0c138e24b964361a0ced7ac291ab810e5f9da1362dc51aa5199c8dc7cead6"
+        ],
+        [
+          "native 64 1920 1080 3 16712192",
+          "b13ef4584f6b2185b00f32fc62616a248038cadbfb679a125c4130f3641f9030"
+        ]
+      ],
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_runtime",
+      "bounded": "0",
+      "mode": "wrong-root",
+      "exit": 0,
+      "source_calls": 4,
+      "source_failed": 0,
+      "local_calls": 0,
+      "local_failed": 0,
+      "hit_keys": [],
+      "digests": [
+        [
+          "native 32 128 64 0 33280",
+          "cc67073f664c7a3f8b36943e713a3cead5795f3676373434fafdc8e99a720d10"
+        ],
+        [
+          "native 32 128 64 1 33280",
+          "cc9436f03f758d6b314eadeebae8d085aa49e9f1c9c79e29a135b4e99da2aa92"
+        ],
+        [
+          "native 32 128 64 3 33280",
+          "665d9cc9bc1ead5c8865e6fa5ae984da515ecfa55e80aa01bc7f5789882ac558"
+        ],
+        [
+          "native 32 128 73 0 66048",
+          "82b6642fad4657b1cb15a7a75764ab0c738a5a20fedc2a6b1a1c8ca4d4278ce7"
+        ],
+        [
+          "native 32 128 73 1 66048",
+          "a96c80cdc64732ce8f9458dd2e52c03eac8153c50e0c3247d03b86ed04808e67"
+        ],
+        [
+          "native 32 128 73 3 66048",
+          "3701ad039ab2a4de38d8398543b6508f773cb857bd4f5ef5522b9984e4e9fe07"
+        ],
+        [
+          "native 32 1920 1080 0 8356352",
+          "72b88121d917ee5526abfebdf6bc3edebf8f2c47f6e83e39dc2fbc7f66aa5c25"
+        ],
+        [
+          "native 32 1920 1080 1 8356352",
+          "ecfa7343716903644fafc44b87bb499f6cfd07cd0d4c7fc9d481f75fef45f046"
+        ],
+        [
+          "native 32 1920 1080 3 8356352",
+          "12a73479d8ed741e4edc8a1bcd6fc86dcc8196b7e5e72b83c8874f8b1ac70a75"
+        ],
+        [
+          "native 64 128 64 0 66048",
+          "a90ca55a6f5878bd265af893dc296a6b80bd3a0aec9ce38e47e1cada65163158"
+        ],
+        [
+          "native 64 128 64 1 66048",
+          "435635a15f03457f22ad149fbd0d4fbc8a8f6d38fbf8b9356777c10bb76c937d"
+        ],
+        [
+          "native 64 128 64 3 66048",
+          "1e8a861bf5d034e214737cd0e40329f162ee044024445a5dcfe4ada475607a63"
+        ],
+        [
+          "native 64 128 73 0 131584",
+          "a3dde6affb77016893f38d8ec1dac4cecc6e4da17231d5cdeb9be6de300d034a"
+        ],
+        [
+          "native 64 128 73 1 131584",
+          "a81643059e494979dc021fed24e2641a91538093c165196b9ca415fc54fcc96f"
+        ],
+        [
+          "native 64 128 73 3 131584",
+          "6037343633ac2f274957f62f15c55f5f4968be5064f71b0a0b93e2e76dee1a53"
+        ],
+        [
+          "native 64 1920 1080 0 16712192",
+          "cf4fc442d396b3f42844f1a846a1997705c2ef0e9b5813d99f5d49de27fc2d98"
+        ],
+        [
+          "native 64 1920 1080 1 16712192",
+          "5aa0c138e24b964361a0ced7ac291ab810e5f9da1362dc51aa5199c8dc7cead6"
+        ],
+        [
+          "native 64 1920 1080 3 16712192",
+          "b13ef4584f6b2185b00f32fc62616a248038cadbfb679a125c4130f3641f9030"
+        ]
+      ],
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_runtime",
+      "bounded": "1",
+      "mode": "off",
+      "exit": 0,
+      "source_calls": 4,
+      "source_failed": 0,
+      "local_calls": 0,
+      "local_failed": 0,
+      "hit_keys": [],
+      "digests": [
+        [
+          "native 32 128 64 0 33280",
+          "cc67073f664c7a3f8b36943e713a3cead5795f3676373434fafdc8e99a720d10"
+        ],
+        [
+          "native 32 128 64 1 33280",
+          "cc9436f03f758d6b314eadeebae8d085aa49e9f1c9c79e29a135b4e99da2aa92"
+        ],
+        [
+          "native 32 128 64 3 33280",
+          "665d9cc9bc1ead5c8865e6fa5ae984da515ecfa55e80aa01bc7f5789882ac558"
+        ],
+        [
+          "native 32 128 73 0 66048",
+          "82b6642fad4657b1cb15a7a75764ab0c738a5a20fedc2a6b1a1c8ca4d4278ce7"
+        ],
+        [
+          "native 32 128 73 1 66048",
+          "a96c80cdc64732ce8f9458dd2e52c03eac8153c50e0c3247d03b86ed04808e67"
+        ],
+        [
+          "native 32 128 73 3 66048",
+          "3701ad039ab2a4de38d8398543b6508f773cb857bd4f5ef5522b9984e4e9fe07"
+        ],
+        [
+          "native 32 1920 1080 0 8356352",
+          "72b88121d917ee5526abfebdf6bc3edebf8f2c47f6e83e39dc2fbc7f66aa5c25"
+        ],
+        [
+          "native 32 1920 1080 1 8356352",
+          "ecfa7343716903644fafc44b87bb499f6cfd07cd0d4c7fc9d481f75fef45f046"
+        ],
+        [
+          "native 32 1920 1080 3 8356352",
+          "12a73479d8ed741e4edc8a1bcd6fc86dcc8196b7e5e72b83c8874f8b1ac70a75"
+        ],
+        [
+          "native 64 128 64 0 66048",
+          "a90ca55a6f5878bd265af893dc296a6b80bd3a0aec9ce38e47e1cada65163158"
+        ],
+        [
+          "native 64 128 64 1 66048",
+          "435635a15f03457f22ad149fbd0d4fbc8a8f6d38fbf8b9356777c10bb76c937d"
+        ],
+        [
+          "native 64 128 64 3 66048",
+          "1e8a861bf5d034e214737cd0e40329f162ee044024445a5dcfe4ada475607a63"
+        ],
+        [
+          "native 64 128 73 0 131584",
+          "a3dde6affb77016893f38d8ec1dac4cecc6e4da17231d5cdeb9be6de300d034a"
+        ],
+        [
+          "native 64 128 73 1 131584",
+          "a81643059e494979dc021fed24e2641a91538093c165196b9ca415fc54fcc96f"
+        ],
+        [
+          "native 64 128 73 3 131584",
+          "6037343633ac2f274957f62f15c55f5f4968be5064f71b0a0b93e2e76dee1a53"
+        ],
+        [
+          "native 64 1920 1080 0 16712192",
+          "cf4fc442d396b3f42844f1a846a1997705c2ef0e9b5813d99f5d49de27fc2d98"
+        ],
+        [
+          "native 64 1920 1080 1 16712192",
+          "5aa0c138e24b964361a0ced7ac291ab810e5f9da1362dc51aa5199c8dc7cead6"
+        ],
+        [
+          "native 64 1920 1080 3 16712192",
+          "b13ef4584f6b2185b00f32fc62616a248038cadbfb679a125c4130f3641f9030"
+        ]
+      ],
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_runtime",
+      "bounded": "1",
+      "mode": "load",
+      "exit": 0,
+      "source_calls": 0,
+      "source_failed": 0,
+      "local_calls": 4,
+      "local_failed": 0,
+      "hit_keys": [
+        "63ddc3b4340130bfdd0a6c0f9e62237c84c08e85286d48317174a1d8732c3a47",
+        "8f9b8a7d185f0286f9b634e01c52468dded2bec6ee889a864741451d6c39c6c4",
+        "906721c2abd980582c5ecdd6b46e16a531d2a245e9d5db578c4cc92230bce3cb",
+        "d145487cf5ab174ce8b704f28f6cea7c9eddf4a1852919894331e2b3aa65aced"
+      ],
+      "digests": [
+        [
+          "native 32 128 64 0 33280",
+          "cc67073f664c7a3f8b36943e713a3cead5795f3676373434fafdc8e99a720d10"
+        ],
+        [
+          "native 32 128 64 1 33280",
+          "cc9436f03f758d6b314eadeebae8d085aa49e9f1c9c79e29a135b4e99da2aa92"
+        ],
+        [
+          "native 32 128 64 3 33280",
+          "665d9cc9bc1ead5c8865e6fa5ae984da515ecfa55e80aa01bc7f5789882ac558"
+        ],
+        [
+          "native 32 128 73 0 66048",
+          "82b6642fad4657b1cb15a7a75764ab0c738a5a20fedc2a6b1a1c8ca4d4278ce7"
+        ],
+        [
+          "native 32 128 73 1 66048",
+          "a96c80cdc64732ce8f9458dd2e52c03eac8153c50e0c3247d03b86ed04808e67"
+        ],
+        [
+          "native 32 128 73 3 66048",
+          "3701ad039ab2a4de38d8398543b6508f773cb857bd4f5ef5522b9984e4e9fe07"
+        ],
+        [
+          "native 32 1920 1080 0 8356352",
+          "72b88121d917ee5526abfebdf6bc3edebf8f2c47f6e83e39dc2fbc7f66aa5c25"
+        ],
+        [
+          "native 32 1920 1080 1 8356352",
+          "ecfa7343716903644fafc44b87bb499f6cfd07cd0d4c7fc9d481f75fef45f046"
+        ],
+        [
+          "native 32 1920 1080 3 8356352",
+          "12a73479d8ed741e4edc8a1bcd6fc86dcc8196b7e5e72b83c8874f8b1ac70a75"
+        ],
+        [
+          "native 64 128 64 0 66048",
+          "a90ca55a6f5878bd265af893dc296a6b80bd3a0aec9ce38e47e1cada65163158"
+        ],
+        [
+          "native 64 128 64 1 66048",
+          "435635a15f03457f22ad149fbd0d4fbc8a8f6d38fbf8b9356777c10bb76c937d"
+        ],
+        [
+          "native 64 128 64 3 66048",
+          "1e8a861bf5d034e214737cd0e40329f162ee044024445a5dcfe4ada475607a63"
+        ],
+        [
+          "native 64 128 73 0 131584",
+          "a3dde6affb77016893f38d8ec1dac4cecc6e4da17231d5cdeb9be6de300d034a"
+        ],
+        [
+          "native 64 128 73 1 131584",
+          "a81643059e494979dc021fed24e2641a91538093c165196b9ca415fc54fcc96f"
+        ],
+        [
+          "native 64 128 73 3 131584",
+          "6037343633ac2f274957f62f15c55f5f4968be5064f71b0a0b93e2e76dee1a53"
+        ],
+        [
+          "native 64 1920 1080 0 16712192",
+          "cf4fc442d396b3f42844f1a846a1997705c2ef0e9b5813d99f5d49de27fc2d98"
+        ],
+        [
+          "native 64 1920 1080 1 16712192",
+          "5aa0c138e24b964361a0ced7ac291ab810e5f9da1362dc51aa5199c8dc7cead6"
+        ],
+        [
+          "native 64 1920 1080 3 16712192",
+          "b13ef4584f6b2185b00f32fc62616a248038cadbfb679a125c4130f3641f9030"
+        ]
+      ],
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_scene_targets",
+      "bounded": "0",
+      "mode": "off",
+      "exit": 0,
+      "source_calls": 6,
+      "source_failed": 0,
+      "local_calls": 0,
+      "local_failed": 0,
+      "hit_keys": [],
+      "digests": [
+        [
+          "proxy 32 1920 1080 0 8355840",
+          "d50792c5aa4489560048455c3f5cf9148c1caa8ed978efafd8955e6a2ca2a388"
+        ],
+        [
+          "proxy 64 1920 1080 0 16711680",
+          "efb76ab14258cfa29b792457f539664d14de269ea3506e34978bf00a9ecec3bb"
+        ]
+      ],
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_scene_targets",
+      "bounded": "0",
+      "mode": "load",
+      "exit": 0,
+      "source_calls": 0,
+      "source_failed": 0,
+      "local_calls": 6,
+      "local_failed": 0,
+      "hit_keys": [
+        "906721c2abd980582c5ecdd6b46e16a531d2a245e9d5db578c4cc92230bce3cb",
+        "92a68f18c8ed013e0863e669b4a64bb756729edae3b6535700f44476eccc3d30",
+        "d145487cf5ab174ce8b704f28f6cea7c9eddf4a1852919894331e2b3aa65aced"
+      ],
+      "digests": [
+        [
+          "proxy 32 1920 1080 0 8355840",
+          "d50792c5aa4489560048455c3f5cf9148c1caa8ed978efafd8955e6a2ca2a388"
+        ],
+        [
+          "proxy 64 1920 1080 0 16711680",
+          "efb76ab14258cfa29b792457f539664d14de269ea3506e34978bf00a9ecec3bb"
+        ]
+      ],
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_scene_targets",
+      "bounded": "1",
+      "mode": "off",
+      "exit": 0,
+      "source_calls": 6,
+      "source_failed": 0,
+      "local_calls": 0,
+      "local_failed": 0,
+      "hit_keys": [],
+      "digests": [
+        [
+          "proxy 32 1920 1080 0 8355840",
+          "d50792c5aa4489560048455c3f5cf9148c1caa8ed978efafd8955e6a2ca2a388"
+        ],
+        [
+          "proxy 64 1920 1080 0 16711680",
+          "efb76ab14258cfa29b792457f539664d14de269ea3506e34978bf00a9ecec3bb"
+        ]
+      ],
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_scene_targets",
+      "bounded": "1",
+      "mode": "load",
+      "exit": 0,
+      "source_calls": 0,
+      "source_failed": 0,
+      "local_calls": 6,
+      "local_failed": 0,
+      "hit_keys": [
+        "906721c2abd980582c5ecdd6b46e16a531d2a245e9d5db578c4cc92230bce3cb",
+        "92a68f18c8ed013e0863e669b4a64bb756729edae3b6535700f44476eccc3d30",
+        "d145487cf5ab174ce8b704f28f6cea7c9eddf4a1852919894331e2b3aa65aced"
+      ],
+      "digests": [
+        [
+          "proxy 32 1920 1080 0 8355840",
+          "d50792c5aa4489560048455c3f5cf9148c1caa8ed978efafd8955e6a2ca2a388"
+        ],
+        [
+          "proxy 64 1920 1080 0 16711680",
+          "efb76ab14258cfa29b792457f539664d14de269ea3506e34978bf00a9ecec3bb"
+        ]
+      ],
+      "fail_lines": []
+    }
+  ],
+  "scene_copy_dependency": {
+    "source_sha256": "0c9ec2e185a9a6eff86e7eac8b742ba458e645c2602666c2e057dc09b3d056d1",
+    "request_key": "92a68f18c8ed013e0863e669b4a64bb756729edae3b6535700f44476eccc3d30",
+    "warmup_runs": 2,
+    "source_calls_per_initial_warmup": 2,
+    "local_tiling_calls_per_initial_warmup": 4,
+    "builder_requests": 23,
+    "new_libraries_built_per_clone": 1,
+    "existing_libraries_skipped_per_clone": 22,
+    "location": "new authored test cache clones only",
+    "purpose": "original SceneTargets CopySource dependency, separate from fourteen tiling library seeds"
+  },
+  "comparisons": {
+    "native": 36,
+    "proxy": 4,
+    "wrong_root": 18,
+    "source_local_output_digests_equal": true,
+    "original_reference_and_guard_checks_passed": true
+  },
+  "safety": {
+    "formal_data_modified": false,
+    "renderer_modified": false,
+    "loader_checks_modified": false,
+    "original_fixture_cache_modified": false,
+    "game_started": false
+  },
+  "observation": {
+    "seconds": 28.161674999981187,
+    "samples": 426,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9233.0625
+    },
+    "after": {
+      "pressure": 2,
+      "locked": false,
+      "swap_mib": 9225.0625
+    },
+    "max_pressure": 2,
+    "max_swap_mib": 9233.0625,
+    "swap_growth_mib": 0.0,
+    "locked": false,
+    "policy": {
+      "schema": 2,
+      "severe_seconds": 5.0,
+      "swap_total_mib": 2048.0,
+      "burst_window_seconds": 5.0,
+      "burst_growth_mib": 1024.0,
+      "warning_stops": false,
+      "lock_stops": true
+    }
+  },
+  "earlier_attempts": [
+    {
+      "attempt": "v1",
+      "result": "authored counter reader owned a second inline counter store; corrected to actual loaded DSO storage, executable checked with nm"
+    },
+    {
+      "attempt": "v2",
+      "result": "tiling Local passed; proxy retained two Source calls for separate SceneTargets CopySource library; prepared only that dependency in new clone and reran strictly"
+    }
+  ],
+  "limitations": [
+    "No actual game or FEX system-interface coverage",
+    "No matched performance or peak process-memory result",
+    "No all-game final PSO coverage",
+    "Candidate remains unapplied to runtime source and QA app",
+    "Missing-entry and corrupt-library negatives for all fourteen seeds still pending"
+  ]
+}
