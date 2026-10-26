@@ -1,0 +1,46 @@
+{
+  "status": "native-extension-closure-and-hash-microcheck-passed",
+  "measurements": [
+    {
+      "case": "original",
+      "implementation": "_sha256",
+      "MiB_per_second": 450.9968176032224,
+      "digest": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+      "peak_rss_native_units": 14696448
+    },
+    {
+      "case": "repaired",
+      "implementation": "_hashlib",
+      "MiB_per_second": 2215.2163720403637,
+      "digest": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+      "peak_rss_native_units": 17137664
+    },
+    {
+      "case": "repaired",
+      "implementation": "_hashlib",
+      "MiB_per_second": 2902.6863960381324,
+      "digest": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+      "peak_rss_native_units": 16941056
+    },
+    {
+      "case": "original",
+      "implementation": "_sha256",
+      "MiB_per_second": 449.4558239280291,
+      "digest": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+      "peak_rss_native_units": 14680064
+    }
+  ],
+  "source_python_unchanged": true,
+  "formal_data_modified": false,
+  "full_startup_speedup_proven": false,
+  "game_started": false,
+  "author_controls": 9,
+  "native_dependencies": [
+    "_hashlib.cpython-311-darwin.so",
+    "libcrypto.3.dylib"
+  ],
+  "extra_disk_bytes": 4924480,
+  "source_evidence": "packaged-hashlib-closure-1793021244925087000/result.json",
+  "actual_new_package": "arm64-ui-audit-20261026-06",
+  "current_default_launch_in_progress": true
+}

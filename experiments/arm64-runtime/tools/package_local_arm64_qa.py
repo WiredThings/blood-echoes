@@ -167,6 +167,7 @@ def main():
     for name in ['python','deps-metal-arm64','bin/gpu-net']:
         dst=stage/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copytree((original/name).resolve(),dst,symlinks=False)
     python_closure=complete_python_sqlite(stage/'python',writable_stage=stage,provider=a.python_provider)
+    python_hashlib_closure=complete_python_sqlite(stage/'python',writable_stage=stage,provider=a.python_provider,module_name='_hashlib')
     cpu=stage/'bin/bb-probe-metal';cpu.parent.mkdir(exist_ok=True)
     cpu_game_source=Path(cpu_runtime['game']['path'])
     shutil.copy2(cpu_game_source,cpu)
@@ -230,7 +231,7 @@ def main():
     manifest=dict(schema=2,created_ns=time.time_ns(),app=str(app),private_case=case,
         host_local_only=True,portable_installer=False,formal_data_modified=False,
         default_local_metal_preparation=True,protected_resource_writeback=True,new_component_stage=str(admitted_stage),
-        python_sqlite_closure=python_closure,local_metal_preparation=prepared['manifest'],game_pso_component=component,default_game_pso_preparation=True,
+        python_sqlite_closure=python_closure,python_hashlib_closure=python_hashlib_closure,local_metal_preparation=prepared['manifest'],game_pso_component=component,default_game_pso_preparation=True,
         private_gpu_cache=str(new_gpu),previous_QA_cache_modified=False,gpu_cache_seed=cache_seed,
         frozen_runtime=native['frozen_runtime'],cpu_runtime_manifest=dict(path=str(a.cpu_runtime_manifest.resolve()),sha256=sha(a.cpu_runtime_manifest),protocol_version=cpu_runtime['protocol_version'],live_payload_version=cpu_runtime['live_payload_version'],author_instrumentation=cpu_runtime.get('author_instrumentation',False)),
         launcher_build=dict(path=str(products),source_executable_sha256=sha(launcher),code_identity_sha256=launcher_identity),qa_preferences_seed=preferences_seed,
