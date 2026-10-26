@@ -37,5 +37,11 @@ class PayloadTests(unittest.TestCase):
    path=self.app/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('{}')
    with self.assertRaises(ValueError):check_relative_payload(self.app)
    path.unlink()
+ def test_development_probe_marker_across_read_boundary_is_rejected(self):
+  p=self.app/'Contents/Resources/bbport/bin/bb-probe-metal';p.parent.mkdir(parents=True)
+  p.write_bytes(b'x'*65530+b'BB_DEVELOPMENT_WORLD_WARPER_V1'+b'author data')
+  with self.assertRaisesRegex(ValueError,'World Warper'):check_relative_payload(self.app)
+  p.write_bytes(b'ordinary authored probe')
+  self.assertTrue(check_relative_payload(self.app))
 
 if __name__=='__main__':unittest.main()

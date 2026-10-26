@@ -32,6 +32,15 @@ def disjoint_output(output,inputs):
   need(not output.is_relative_to(source)and not source.is_relative_to(output),
        'staging output overlaps a source application or product directory')
 
+def development_probe(path):
+ marker=b'BB_DEVELOPMENT_WORLD_WARPER_V1';tail=b''
+ with path.open('rb')as stream:
+  for block in iter(lambda:stream.read(65536),b''):
+   data=tail+block
+   if marker in data:return True
+   tail=data[-(len(marker)-1):]
+ return False
+
 def check_relative_payload(root):
  """Keep internal executable aliases; never package external QA dependencies."""
  root=owned(root)
@@ -47,6 +56,10 @@ def check_relative_payload(root):
               for row in rows for i in range(len(Path(row['path']).parts))),
       'development automation in staged application')
  need(not any(Path(row['path']).name in('ARM64-QA-MANIFEST.json','DEVELOPMENT-WORLD-WARPER.json')for row in rows),'QA/development manifest in application')
+ for row in rows:
+  path=root/row['path']
+  if path.name in('bb-probe','bb-probe-metal')and path.is_file():
+   need(not development_probe(path),'development World Warper runtime in application')
  return rows
 
 def stage(*,qa_app,baseline,output,launcher_products,revision):

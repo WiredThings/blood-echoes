@@ -69,6 +69,81 @@ def admit(conditions):
  cache=validate(manifest,project=P,expected_upstream_gpu_sha256=m['upstream_inputs']['gpu_library'])
  return dict(cpu=cpu,gpu=gpu),cache
 
+CPU_ROLES=('bin/bb-probe-metal','bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal')
+FORMAL_ROLES=frozenset((*CPU_ROLES,'bin/gpu-metal/libbbgpu.dylib',
+ 'bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu','bin/gpu-metal-arm64/libbbgpu.dylib',
+ 'bin/gpu-net/libbbnet.dylib','bin/game-pso-preparer','bin/game-module-preparer'))
+
+def cpu_paths(conditions):
+ # Exact independently admitted roles. The shell chooses nested when present;
+ # do not pretend the top executable was the observed nested process.
+ return {str(conditions['runtime'][role])for role in CPU_ROLES if role in conditions['runtime']}
+
+def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,identity_resolver=None):
+ """Extra code-only admission. Original QA selection/save reader is unchanged.
+
+ Default loaders perform real bundle byte, Mach-O ARM64, signature and declared
+ load-edge checks. Test injections exercise contracts without native processes.
+ """
+ from qa_launch_conditions import canonical,SCRIPTS
+ from launcher_runtime_profile import bundle,code_bytes
+ from gpu_candidate_identity import verify
+ from warm_archive_manifest import resolve_gpu_identity
+ project=canonical(project,directory=True)
+ if project!=P:raise ValueError('formal benchmark uses only the fixed Shared development project')
+ app=canonical(app,directory=True,within=project/'evidence')
+ if app.suffix!='.app':raise ValueError('formal-stage must be a new staged .app under development evidence')
+ stage=canonical(app/'Contents/Resources/bbport',directory=True,within=app)
+ admitted=(bundle_loader or bundle)(stage)
+ if admitted is None or admitted.stage!=stage or admitted.app!=app:raise ValueError('actual outer formal bundle admission missing')
+ hashes=dict(admitted.native['frozen_runtime'])
+ if set(hashes)!=FORMAL_ROLES:raise ValueError('formal stage requires exactly eight frozen actual runtime roles')
+ runtime={role:canonical(stage/role,within=stage)for role in hashes}
+ parity=json.loads(code_bytes(stage/'SOURCE-PARITY.json')[0])['effective_sources']
+ if set(parity)!=set(SCRIPTS)or dict(source['effective_scripts'])!=parity:raise ValueError('formal stage differs from original QA receipt sixteen scripts')
+ owners={'code_owners':(0,os.getuid())};cpus={}
+ for role in CPU_ROLES:
+  value=(identity_resolver or resolve_gpu_identity)(runtime[role],stage,**owners)
+  if value.get('target')!=str(runtime[role])or value.get('target_sha256')!=hashes[role]or value.get('library')!=str(runtime['bin/gpu-metal/libbbgpu.dylib'])or value.get('library_sha256')!=hashes['bin/gpu-metal/libbbgpu.dylib']or value.get('load_edge_verified')is not True or value.get('strict_signatures')is not True or value.get('architecture')!='arm64':
+   raise ValueError('formal actual CPU/host role identity differs: '+role)
+  cpus[role]=value
+ gpu_role='bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'
+ gpu=(gpu_verifier or verify)(dict(target=str(runtime[gpu_role]),library=str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib']),library_sha256=hashes['bin/gpu-metal-arm64/libbbgpu.dylib']),stage,**owners)
+ if gpu.get('target')!=str(runtime[gpu_role])or gpu.get('target_sha256')!=hashes[gpu_role]or gpu.get('library')!=str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib'])or gpu.get('library_sha256')!=hashes['bin/gpu-metal-arm64/libbbgpu.dylib']or gpu.get('load_edge_verified')is not True or gpu.get('strict_signatures')is not True or gpu.get('architecture')!='arm64':
+  raise ValueError('formal actual GPU/DSO role identity differs')
+ return dict(app=app,stage=stage,runtime=runtime,runtime_sha256=hashes,
+  identity=dict(profile='staged-formal-bundle-isolated-CLI',app=str(app),stage=str(stage),
+   native_manifest_sha256=sha(stage/'NATIVE-METAL.json'),runtime_sha256=hashes,
+   effective_scripts=parity,cpu=cpus,gpu=gpu,formal_GUI_started=False,formal_data_read=False))
+
+def execution_conditions(source,formal):
+ if formal is None:return source
+ return dict(source,stage=formal['stage'],app=formal['app'],runtime=formal['runtime'],runtime_sha256=formal['runtime_sha256'])
+
+def execution_environment(source,case,formal=None,*,functional_f3=False):
+ """The already cloned original conditions, with code path changes only."""
+ stage=formal['stage']if formal is not None else source['stage']
+ env=dict(PATH='/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin',HOME=str(P/'state'),TMPDIR=str(case['data_root'])+'/',PYTHON=str(stage/'python/bin/python3'),PYTHONHOME=str(stage/'python'),PYTHONNOUSERSITE='1',PYTHONUNBUFFERED='1',**case['environment'])
+ if formal is not None:env['BB_GPU_PROCESS']=str(formal['runtime']['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'])
+ if env.get('BB_FRAME_STATS','0')=='1'or env.get('BB_SAVE_LOG','0')=='1':raise ValueError('unprofiled benchmark requires original heavy statistics off')
+ if env.get('BB_AUDIO')!='none':raise ValueError('night QA requires original GUI audio=none')
+ env.update(BB_PAD_FILE=str(case['pad']),BB_PAD_FILE_ONLY='1',BB_QUICKSAVE='0')
+ if functional_f3:
+  if source['environment'].get('BB_QUICKSAVE')!='1':raise ValueError('original GUI quicksave must already be enabled')
+  env.update(BB_QUICKSAVE='1',BB_FRAME_STATS='1')
+ return env
+
+def benchmark_changes(source,case,env,*,formal=None,functional_f3=False):
+ changes={k:dict(before=source['environment'].get(k),after=env.get(k))for k in sorted(set(source['environment'])|{k for k in env if k.startswith(('BB_','MTL_'))})if source['environment'].get(k)!=env.get(k)}
+ allowed=set(case['allowed_changes'])|{'BB_QUICKSAVE','BB_PAD_FILE_ONLY'}|({'BB_FRAME_STATS'}if functional_f3 else set())
+ if formal is not None:allowed.add('BB_GPU_PROCESS')
+ if set(changes)-allowed:raise ValueError('unapproved game setting override')
+ return changes,sorted(allowed)
+
+def selected_cache_mode(requested,formal_stage):
+ if formal_stage is not None and requested not in(None,'empty'):raise ValueError('formal-stage requires empty cache mode; QA shader cache import is forbidden')
+ return 'empty'if formal_stage is not None else requested or'seeded'
+
 def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False):
  from qa_launch_clone import inventory_savedata
  from qa_f3_contract import F3Check,NewLogLines
@@ -124,7 +199,7 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
       # Consume all pre-save logs before requesting a new checkpoint. An old
       # startup confirmation must never authorize restoring that old checkpoint.
       if drained or f3.phase not in('entering','settling'):
-       token=f3.step(elapsed,scene=in_scene,cpus={pid for pid,ppid,path in rows if path==str(c['runtime']['bin/bb-probe-metal'])},gpus={pid for pid,ppid,path in rows if path==str(c['runtime']['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'])},log=log_text)
+       token=f3.step(elapsed,scene=in_scene,cpus={pid for pid,ppid,path in rows if path in cpu_paths(c)},gpus={pid for pid,ppid,path in rows if path==str(c['runtime']['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'])},log=log_text)
       if token:
        input_(token+'\n');pressed=True;last_press=now
        with(root/'actions.jsonl').open('a')as f:f.write(json.dumps(dict(action=token,seconds=elapsed,phase=f3.phase,utc_ns=time.time_ns()))+'\n')
@@ -151,35 +226,28 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
  return report
 
 def main():
- ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'),default='seeded');ap.add_argument('--runs',type=int,choices=(1,2),default=1);ap.add_argument('--functional-f3',action='store_true');a=ap.parse_args()
+ ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));ap.add_argument('--formal-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2),default=1);ap.add_argument('--functional-f3',action='store_true');a=ap.parse_args()
  assert 60<=a.startup_seconds<=1800 and 45<=a.scene_seconds<=180
  assert not a.functional_f3 or a.runs==1,'functional F3 is one supervised session'
  from qa_launch_conditions import load
  from qa_launch_clone import create
  c=load(a.receipt,stage=a.stage,project=P);require_no_games()
+ a.cache_mode=selected_cache_mode(a.cache_mode,a.formal_stage)
  status=subprocess.run(['/Users/k.d./.local/bin/cua-driver','status'],capture_output=True,text=True,timeout=10)
  assert 'daemon is not running'in(status.stdout+status.stderr).lower(),'Cua must be stopped'
  native,cache_admission=admit(c)
+ formal=admit_formal(a.formal_stage,c)if a.formal_stage is not None else None
+ execution=execution_conditions(c,formal)
  observer=NativeObserver();before=observer.system();assert not before['locked']and before['pressure']!=4
  tag=str(time.time_ns());root=P/'evidence'/('original-launch-benchmark-'+tag);root.mkdir(mode=0o700)
  case=create(c,cache_admission,project=P,tag=tag,cache_mode=a.cache_mode)
- env=dict(PATH='/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin',HOME=str(P/'state'),TMPDIR=str(case['data_root'])+'/',PYTHON=str(c['stage']/'python/bin/python3'),PYTHONHOME=str(c['stage']/'python'),PYTHONNOUSERSITE='1',PYTHONUNBUFFERED='1',**case['environment'])
- # Use the original explicit benchmark entry. Normal Play intentionally strips
- # scripted input/log-only telemetry. That entry also requires quicksave off;
- # log this control difference, never silently call it identical UI behavior.
- if env.get('BB_FRAME_STATS','0')=='1' or env.get('BB_SAVE_LOG','0')=='1':raise ValueError('unprofiled benchmark requires original heavy statistics off')
- if env.get('BB_AUDIO')!='none':raise ValueError('night QA requires original GUI audio=none')
- env.update(BB_PAD_FILE=str(case['pad']),BB_PAD_FILE_ONLY='1',BB_QUICKSAVE='0')
- if a.functional_f3:
-  assert c['environment'].get('BB_QUICKSAVE')=='1','original GUI quicksave must already be enabled'
-  env.update(BB_QUICKSAVE='1',BB_FRAME_STATS='1')
- actual_changes={k:dict(before=c['environment'].get(k),after=env.get(k))for k in sorted(set(c['environment'])|{k for k in env if k.startswith(('BB_','MTL_'))})if c['environment'].get(k)!=env.get(k)}
- allowed_changes=sorted(set(case['allowed_changes'])|{'BB_QUICKSAVE','BB_PAD_FILE_ONLY'}|({'BB_FRAME_STATS'}if a.functional_f3 else set()))
- assert set(actual_changes)<=set(allowed_changes),'unapproved game setting override'
- command=[c['executable'],str(c['stage']/c['arguments'][0])]+([]if a.functional_f3 else['--benchmark'])
+ env=execution_environment(c,case,formal,functional_f3=a.functional_f3)
+ actual_changes,allowed_changes=benchmark_changes(c,case,env,formal=formal,functional_f3=a.functional_f3)
+ command=[c['executable'],str(execution['stage']/c['arguments'][0])]+([]if a.functional_f3 else['--benchmark'])
  report=dict(schema=1,status='running',receipt_sha256=sha(a.receipt),launch_id=c['launch_id'],native_identity=native,original_shell_entry_preserved=True,original_benchmark_flag_added=True,benchmark_control_overrides=dict(BB_QUICKSAVE='0',BB_PAD_FILE_ONLY='1'),cache_mode=a.cache_mode,silent=True,screen_capture=False,Cua=False,profiler=False,scripted_actions=['Continue until real scene camera'],formal_data_modified=False,source_save_unchanged=False,settings_sha256=case['config_sha256'],startup_budget_seconds=a.startup_seconds,scene_seconds=a.scene_seconds,quality_or_effects_changed=False)
+ if formal is not None:report.update(formal_native_identity=formal['identity'],execution_profile='staged-formal-bundle-isolated-CLI',source_QA_only_for_clone=True,cache_namespace_policy='empty-base-to-new-namespace-by-original-bootstrap')
  if a.functional_f3:report.update(original_benchmark_flag_added=False,benchmark_control_overrides={'BB_FRAME_STATS':'1','BB_ARM_QA_PAD_FILE':'isolated existing native QA API'},performance_sample=False,functional_f3_requested=True,incremental_log_events=True,scripted_actions=['Continue before first scene','quicksave API','quickload API','automatic continue observed; no scripted Continue after F3'])
- write(root/'conditions.json',dict(command=command,cwd=str(c['stage']),environment=env,source_receipt=str(a.receipt),data=str(case['data_root']),user=str(case['user_root']),cache=str(case['cache_root']),pad=str(case['pad']),allowed_changes=allowed_changes,actual_changes=actual_changes,cache_clone=case['cache_clone']))
+ write(root/'conditions.json',dict(command=command,cwd=str(execution['stage']),environment=env,source_receipt=str(a.receipt),data=str(case['data_root']),user=str(case['user_root']),cache=str(case['cache_root']),pad=str(case['pad']),allowed_changes=allowed_changes,actual_changes=actual_changes,cache_clone=case['cache_clone']))
  write(root/'result.json',report);print('Evidence:',root,flush=True)
  protection_start=time.monotonic();policy=MemoryPolicy(before)
  reports=[]
@@ -190,7 +258,7 @@ def main():
    run=root/('run-'+str(index+1));run.mkdir(mode=0o700)
    row=dict(report,run=index+1,phase='initial'if index==0 else'warm',
        same_private_cache_and_user=index>0)
-   result=sample(c,case,env,command,row,run,startup_seconds=a.startup_seconds,
+   result=sample(execution,case,env,command,row,run,startup_seconds=a.startup_seconds,
        scene_seconds=a.scene_seconds,observer=observer,policy=policy,protection_start=protection_start,functional_f3=a.functional_f3)
    reports.append(result)
    write(root/'result.json',dict(schema=2,status=('functional-checked'if a.functional_f3 else'sampled')if all(r['status']in('sampled','functional-checked')for r in reports)and len(reports)==a.runs else'incomplete',runs=reports,formal_data_modified=False,memory_policy_continuous=True))
