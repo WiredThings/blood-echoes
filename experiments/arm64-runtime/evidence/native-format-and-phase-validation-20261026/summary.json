@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "native_library_sha256": "a4d1ddf1b67e6ec4f43a67a59b04d9065c658269cdf14fb91166d6232450b8c0",
+  "coherent_GPU_units_rebuilt": 230,
+  "cpu_units": 30,
+  "avplayer_overrides": 2,
+  "actual_active_native_api_sites": 35,
+  "inactive_metal4_sites": 1,
+  "formal_data_modified": false,
+  "release_updated": false,
+  "native_cases": [
+    {
+      "name": "format",
+      "report_sha256": "27b035f7c23a3a327ec67eedf82a86c7b41bb585e469b07a700f2bd1e77bae70",
+      "passed": true,
+      "processes": 7,
+      "seconds": 4.887281792005524,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6900.8125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6900.8125
+      }
+    },
+    {
+      "name": "camera",
+      "report_sha256": "694690112e22e32350577f9fa594c7e4ed0d3b010bc177b94675e3eed8d76d7a",
+      "passed": true,
+      "processes": 7,
+      "seconds": 2.602313250070438,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6852.8125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6852.8125
+      }
+    },
+    {
+      "name": "postprocess",
+      "report_sha256": "55d61652fe267f3cc08fa270839da8fcf6580884b61b2458ea2c99a9638515cd",
+      "passed": true,
+      "processes": 7,
+      "seconds": 2.6382147499825805,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6852.8125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6852.8125
+      }
+    },
+    {
+      "name": "core",
+      "report_sha256": "7dba2f1a66d861c4b6d517481524b23eb0561103738fb666596f3d43074099e1",
+      "passed": true,
+      "processes": 11,
+      "seconds": 2.8813504590652883,
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6852.8125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 6852.8125
+      }
+    }
+  ],
+  "csv_validation": {
+    "passed": true,
+    "csv_sha256": "a7210151ff4bf7c38776edf07b143fa737f57ce7234429e497b6f94f128b7b06",
+    "new_csv_fields": [
+      "metal_gpu_ready_seen",
+      "metal_source_calls",
+      "metal_source_failed",
+      "metal_source_api_ms",
+      "metal_local_calls",
+      "metal_local_failed",
+      "metal_local_api_ms",
+      "metal_strict_pso_attempts",
+      "metal_strict_pso_hits",
+      "metal_strict_pso_api_ms",
+      "metal_render_calls",
+      "metal_compute_calls",
+      "metal_pso_failed",
+      "metal_pso_api_ms",
+      "metal_archive_add_calls",
+      "metal_archive_add_failed",
+      "metal_archive_add_api_ms"
+    ],
+    "complete_rows": 5785,
+    "malformed_middle_rows": 0,
+    "ignored_only_terminal_truncated_row": true,
+    "original_benchmark_already_filters_truncated_rows": true,
+    "ready_seen": {
+      "1": 5785
+    },
+    "startup_summary": "Metal native API startup: phase=pre_gpu_ready settled=1 source=96/96/0/11.308 local_data=451/451/0/2.505 strict_render=310/310/0/21.409 strict_compute=96/96/0/3.604 render=61/61/0/11.954 compute=37/37/0/1.872 archive_render=0/0/0/0.000 archive_compute=0/0/0/0.000 units=calls/ok/failed/api_wall_ms; not_gpu_or_pure_compile_time",
+    "after_gpu_ready_totals": {
+      "metal_source_calls": 11.0,
+      "metal_source_failed": 0.0,
+      "metal_source_api_ms": 1.69,
+      "metal_local_calls": 0.0,
+      "metal_local_failed": 0.0,
+      "metal_local_api_ms": 0.0,
+      "metal_strict_pso_attempts": 0.0,
+      "metal_strict_pso_hits": 0.0,
+      "metal_strict_pso_api_ms": 0.0,
+      "metal_render_calls": 21.0,
+      "metal_compute_calls": 14.0,
+      "metal_pso_failed": 0.0,
+      "metal_pso_api_ms": 2.8930000000000002,
+      "metal_archive_add_calls": 0.0,
+      "metal_archive_add_failed": 0.0,
+      "metal_archive_add_api_ms": 0.0
+    },
+    "last_api_csv_t_s": 6.0153,
+    "csv_end_t_s": 104.3567,
+    "warm_last30_api_events": 0.0,
+    "warm_last30_source_calls": 0,
+    "qualification": "Actual GPU-process telemetry. GPU-ready includes later menu/loading; it is not the camera/control-ready boundary. Native API wall time is not GPU or pure compiler time. newFunction specialization, archive open/serialize, and MetalFX internals are outside these counters. Static tail zero does not establish all-map/driver zero compilation. First naive all-row parser failed on the one SIGTERM-interrupted terminal row; raw CSV retained."
+  },
+  "qualification": "32 native processes scoped to original factories/known pipelines and bit/guard controls, not whole-game coverage or FPS/RAM benefit. Original counter author report writer exited1 after assertions, preserved; actual native/game/CSV validation independent. One terminal CSV record interrupted by planned143 is filtered by original complete_rows, no middle corruption. Cold game prep partial336/404 at600s; warm integration passed:424 current-cache eligible recipes, not full-game coverage or matched performance acceptance.",
+  "warm_game_integration_passed": true,
+  "warm_game_aggregate": "warm-game-aggregate.json",
+  "current_cache_eligible_prepared": 424
+}

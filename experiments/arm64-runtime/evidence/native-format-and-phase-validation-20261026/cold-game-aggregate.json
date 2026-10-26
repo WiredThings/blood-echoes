@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "passed": true,
+  "native_library_sha256": "a4d1ddf1b67e6ec4f43a67a59b04d9065c658269cdf14fb91166d6232450b8c0",
+  "formal_data_modified": false,
+  "preparation": {
+    "status": "partial",
+    "completed": 336,
+    "policy_eligible_records": 404,
+    "recorded": 300,
+    "verified_artifact_hits": 36,
+    "wall_seconds": 600.0221030829707,
+    "builder_session": {
+      "calls": 42,
+      "full_builds": 42,
+      "reuses": 0,
+      "invalidations": 20,
+      "metadata_entries": 1538,
+      "seconds": 429.67726308701094,
+      "full_build_seconds": 424.026987876161,
+      "reuse_validation_seconds": 0.0,
+      "events": [
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        }
+      ]
+    }
+  },
+  "loaded_scene_seconds": 632.3758221670287,
+  "scene": {
+    "engine": "arm64",
+    "qa_cpu_qos": null,
+    "fps": 48.640919406660736,
+    "p95_ms": 21.35,
+    "p99_ms": 21.93,
+    "gpu_ms": 19.456630136986302,
+    "draws_median": 1368.0,
+    "camera": [
+      [
+        "-190.784",
+        "-27.226",
+        "71.116"
+      ]
+    ],
+    "cpu_percent": {
+      "bb-game-arm64": 273.25437330597225,
+      "bb-gpu": 138.78643543352032
+    },
+    "combined_footprint_mib": 5939.606349945068,
+    "max_pressure": 2,
+    "swap_change_mib": 459.875,
+    "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+    "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+    "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+    "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f"
+  },
+  "csv_validation": {
+    "passed": true,
+    "csv_sha256": "a7210151ff4bf7c38776edf07b143fa737f57ce7234429e497b6f94f128b7b06",
+    "new_csv_fields": [
+      "metal_gpu_ready_seen",
+      "metal_source_calls",
+      "metal_source_failed",
+      "metal_source_api_ms",
+      "metal_local_calls",
+      "metal_local_failed",
+      "metal_local_api_ms",
+      "metal_strict_pso_attempts",
+      "metal_strict_pso_hits",
+      "metal_strict_pso_api_ms",
+      "metal_render_calls",
+      "metal_compute_calls",
+      "metal_pso_failed",
+      "metal_pso_api_ms",
+      "metal_archive_add_calls",
+      "metal_archive_add_failed",
+      "metal_archive_add_api_ms"
+    ],
+    "complete_rows": 5785,
+    "malformed_middle_rows": 0,
+    "ignored_only_terminal_truncated_row": true,
+    "original_benchmark_already_filters_truncated_rows": true,
+    "ready_seen": {
+      "1": 5785
+    },
+    "startup_summary": "Metal native API startup: phase=pre_gpu_ready settled=1 source=96/96/0/11.308 local_data=451/451/0/2.505 strict_render=310/310/0/21.409 strict_compute=96/96/0/3.604 render=61/61/0/11.954 compute=37/37/0/1.872 archive_render=0/0/0/0.000 archive_compute=0/0/0/0.000 units=calls/ok/failed/api_wall_ms; not_gpu_or_pure_compile_time",
+    "after_gpu_ready_totals": {
+      "metal_source_calls": 11.0,
+      "metal_source_failed": 0.0,
+      "metal_source_api_ms": 1.69,
+      "metal_local_calls": 0.0,
+      "metal_local_failed": 0.0,
+      "metal_local_api_ms": 0.0,
+      "metal_strict_pso_attempts": 0.0,
+      "metal_strict_pso_hits": 0.0,
+      "metal_strict_pso_api_ms": 0.0,
+      "metal_render_calls": 21.0,
+      "metal_compute_calls": 14.0,
+      "metal_pso_failed": 0.0,
+      "metal_pso_api_ms": 2.8930000000000002,
+      "metal_archive_add_calls": 0.0,
+      "metal_archive_add_failed": 0.0,
+      "metal_archive_add_api_ms": 0.0
+    },
+    "last_api_csv_t_s": 6.0153,
+    "csv_end_t_s": 104.3567,
+    "warm_last30_api_events": 0.0,
+    "warm_last30_source_calls": 0,
+    "qualification": "Actual GPU-process telemetry. GPU-ready includes later menu/loading; it is not the camera/control-ready boundary. Native API wall time is not GPU or pure compiler time. newFunction specialization, archive open/serialize, and MetalFX internals are outside these counters. Static tail zero does not establish all-map/driver zero compilation. First naive all-row parser failed on the one SIGTERM-interrupted terminal row; raw CSV retained."
+  },
+  "qualification": "New native/CPU cohort, baseline QA cache rather than old-cohort seed. 600s preparation budget left 68 of 404 pending; not full directory preparation. Actual static integration passes, not matched FPS/RAM gain or long-test/white-model/death/online/menu acceptance. Combined footprint double counts shared pages; transient source compiler memory differs from all-Local warm runs."
+}

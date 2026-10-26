@@ -51,6 +51,7 @@ std::optional<HostPso::Recipe> HostKernels::Describe(const HostPso::Invocation&i
  }else if(i.kind==HK::InlineUpdate){source(HostSource(InlineUpdateSource),"inline_update");r.entry0="inline_update";}
  else if(i.kind==HK::RenderInlineUpdate){source(HostSource(RenderInlineUpdateSource),"update");r.entry0="update";}
  else if(i.kind==HK::Fill){source(HostSource(FillSource),"fill_u32");r.entry0="fill_u32";}
+ else if(i.kind==HK::FormatRgb||i.kind==HK::FormatDepth){r.entry0=i.kind==HK::FormatRgb?"rgb_convert":"depth_convert";source(HostSource(FormatConvert::KernelSource),r.entry0);}
  else if(i.kind==HK::MsCopy||i.kind==HK::MsDepth||i.kind==HK::PostProcess){
   const H::Shader&fragment=i.kind==HK::PostProcess?H::POST_PROCESS_FRAG:(i.kind==HK::MsDepth?H::COLOR_TO_MS_DEPTH_FRAG:(i.src_msaa?H::MS_IMAGE_BLIT_MSAA_FRAG:H::MS_IMAGE_BLIT_FRAG));
   source(H::FS_TRI_VERT.msl,H::FS_TRI_VERT.entry);source(fragment.msl,fragment.entry);r.entry0=std::string(H::FS_TRI_VERT.entry);r.entry1=std::string(fragment.entry);
@@ -94,11 +95,11 @@ id<MTLComputePipelineState> HostKernels::MakeCompute(MTLComputePipelineDescripto
   state=(__bridge_transfer id<MTLComputePipelineState>)pso_cache->CreateArtifactPipeline((__bridge void*)d,true,key,warming,artifact_outcome,why,!warming||warm_allow_compile);
   if(!state&&error)*error=[NSError errorWithDomain:@"bbport-host-pso" code:1 userInfo:@{NSLocalizedDescriptionKey:@(why.c_str())}];
   }
-  if(bytes.empty())state=[dev.device newComputePipelineStateWithFunction:d.computeFunction error:error];
- }else state=[dev.device newComputePipelineStateWithFunction:d.computeFunction error:error];
+  if(bytes.empty()){BbMetalPhase::Call bb_metal_call_97{BbMetalPhase::Kind::Compute}; state=[dev.device newComputePipelineStateWithFunction:d.computeFunction error:error]; bb_metal_call_97.Finish(bool(state));}
+ }else {BbMetalPhase::Call bb_metal_call_98{BbMetalPhase::Kind::Compute}; state=[dev.device newComputePipelineStateWithFunction:d.computeFunction error:error]; bb_metal_call_98.Finish(bool(state));}
  }catch(...){
   artifact_outcome.state=HostPso::ArtifactState::Failed;
-  if(!warming&&!state){d.binaryArchives=@[];state=[dev.device newComputePipelineStateWithFunction:d.computeFunction error:error];}
+  if(!warming&&!state){d.binaryArchives=@[];{BbMetalPhase::Call bb_metal_call_101{BbMetalPhase::Kind::Compute}; state=[dev.device newComputePipelineStateWithFunction:d.computeFunction error:error]; bb_metal_call_101.Finish(bool(state));}}
  }
  if(state)RecordRecipe(i,d);return state;
 }
@@ -118,11 +119,11 @@ id<MTLRenderPipelineState> HostKernels::MakeRender(MTLRenderPipelineDescriptor*d
   state=(__bridge_transfer id<MTLRenderPipelineState>)pso_cache->CreateArtifactPipeline((__bridge void*)d,false,key,warming,artifact_outcome,why,!warming||warm_allow_compile);
   if(!state&&error)*error=[NSError errorWithDomain:@"bbport-host-pso" code:1 userInfo:@{NSLocalizedDescriptionKey:@(why.c_str())}];
   }
-  if(bytes.empty())state=[dev.device newRenderPipelineStateWithDescriptor:d error:error];
- }else state=[dev.device newRenderPipelineStateWithDescriptor:d error:error];
+  if(bytes.empty()){BbMetalPhase::Call bb_metal_call_121{BbMetalPhase::Kind::Render}; state=[dev.device newRenderPipelineStateWithDescriptor:d error:error]; bb_metal_call_121.Finish(bool(state));}
+ }else {BbMetalPhase::Call bb_metal_call_122{BbMetalPhase::Kind::Render}; state=[dev.device newRenderPipelineStateWithDescriptor:d error:error]; bb_metal_call_122.Finish(bool(state));}
  }catch(...){
   artifact_outcome.state=HostPso::ArtifactState::Failed;
-  if(!warming&&!state){d.binaryArchives=@[];state=[dev.device newRenderPipelineStateWithDescriptor:d error:error];}
+  if(!warming&&!state){d.binaryArchives=@[];{BbMetalPhase::Call bb_metal_call_125{BbMetalPhase::Kind::Render}; state=[dev.device newRenderPipelineStateWithDescriptor:d error:error]; bb_metal_call_125.Finish(bool(state));}}
  }
  if(state)RecordRecipe(i,d);return state;
 }
@@ -144,6 +145,7 @@ bool HostKernels::Replay(const HostPso::Recipe&r) {
  if(i.kind==HK::MsDepth)return bool(MsDepthPipeline(i.samples,MTLPixelFormat(i.format)));
  if(i.kind==HK::UpscaleMerge){NSError*error=nil;return bool(UpscaleMerge(&error));}
  if(i.kind==HK::CameraMotion){NSError*error=nil;return bool(CameraMotionPipeline(&error));}
+ if(i.kind==HK::FormatRgb||i.kind==HK::FormatDepth){NSError*error=nil;return bool(FormatConversionPipeline(i.kind==HK::FormatDepth,&error));}
  if(i.kind==HK::PostProcess){NSError*error=nil;return bool(PostProcessPipeline(MTLPixelFormat(i.format),&error));}
  return false;
 }

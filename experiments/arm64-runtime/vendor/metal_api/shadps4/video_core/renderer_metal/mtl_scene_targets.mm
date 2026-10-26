@@ -1,4 +1,5 @@
 #include "video_core/renderer_metal/mtl_local_library.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Counterpart: renderer_vulkan/vk_scene_resolution.cpp (the Metal part of the reduced scene
 // targets: proxy textures, the copies between a proxy and the native image, views). The
@@ -245,8 +246,8 @@ struct SceneTargets::Impl {
             alpha_attempted = true;
             EnsureLibrary();
             NSError* error = nil;
-            alpha_merge = [dev.device newComputePipelineStateWithFunction:
-                [library newFunctionWithName:@"scene_upscale_alpha"] error:&error];
+            BbMetalPhase::Call bb_metal_call_248{BbMetalPhase::Kind::Compute}; alpha_merge = [dev.device newComputePipelineStateWithFunction:
+                [library newFunctionWithName:@"scene_upscale_alpha"] error:&error]; bb_metal_call_248.Finish(bool(alpha_merge));
             if (!alpha_merge) std::printf("Metal upscale alpha: pipeline unavailable (%s); original merge retained\n", ErrorText(error).c_str());
         }
         return alpha_merge;
@@ -292,7 +293,7 @@ struct SceneTargets::Impl {
             descriptor.colorAttachments[0].pixelFormat = format;
         }
         NSError* error = nil;
-        pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+        BbMetalPhase::Call bb_metal_call_295{BbMetalPhase::Kind::Render}; pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error]; bb_metal_call_295.Finish(bool(pipeline));
         ASSERT_MSG(pipeline, "Scene proxy copy pipeline failed (pixel format {}): {}", u32(format),
                    ErrorText(error));
         return pipeline;

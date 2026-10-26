@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "passed": true,
+  "formal_data_modified": false,
+  "preparation": {
+    "status": "completed",
+    "completed": 424,
+    "policy_eligible_records": 424,
+    "recorded": 74,
+    "verified_artifact_hits": 350,
+    "wall_seconds": 241.31302854104433,
+    "builder_session": {
+      "calls": 33,
+      "full_builds": 7,
+      "reuses": 26,
+      "invalidations": 6,
+      "metadata_entries": 2007,
+      "seconds": 134.9409180835355,
+      "full_build_seconds": 121.26606829289813,
+      "reuse_validation_seconds": 10.733401250792667,
+      "events": [
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        },
+        {
+          "state": "invalidated",
+          "reason": "record-phase"
+        }
+      ]
+    }
+  },
+  "loaded_scene_seconds": 324.55,
+  "scene": {
+    "engine": "arm64",
+    "qa_cpu_qos": null,
+    "fps": 48.544012794029456,
+    "p95_ms": 21.52,
+    "p99_ms": 22.67,
+    "gpu_ms": 19.413644474948523,
+    "draws_median": 1367,
+    "camera": [
+      [
+        "-190.784",
+        "-27.226",
+        "71.116"
+      ]
+    ],
+    "cpu_percent": {
+      "bb-game-arm64": 274.680385841938,
+      "bb-gpu": 138.9420986004772
+    },
+    "combined_footprint_mib": 5966.887748718262,
+    "max_pressure": 2,
+    "swap_change_mib": 9.0,
+    "boot_sha256": "b5cb1da3a15bb853c2adbc9ef03d7d8058f729b247a0646370cf61f056398e1d",
+    "content_sha256": "6c749b4537aca734e52ccce8c9a19563cdde18f62612c2f3d1124ccb3d1a0846",
+    "patch_sha256": "230d208afddec97a9f38aa1b335669dd768233ef97224991b183542d8bac7ecc",
+    "settings_sha256": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f"
+  },
+  "csv": {
+    "passed": true,
+    "fields": [
+      "metal_gpu_ready_seen",
+      "metal_source_calls",
+      "metal_source_failed",
+      "metal_source_api_ms",
+      "metal_local_calls",
+      "metal_local_failed",
+      "metal_local_api_ms",
+      "metal_strict_pso_attempts",
+      "metal_strict_pso_hits",
+      "metal_strict_pso_api_ms",
+      "metal_render_calls",
+      "metal_compute_calls",
+      "metal_pso_failed",
+      "metal_pso_api_ms",
+      "metal_archive_add_calls",
+      "metal_archive_add_failed",
+      "metal_archive_add_api_ms"
+    ],
+    "complete_rows": 5785,
+    "ignored_terminal_rows": 1,
+    "no_malformed_middle": true,
+    "ready_seen_all": true,
+    "startup_summary": [
+      "Metal native API startup: phase=pre_gpu_ready settled=1 source=0/0/0/0.000 local_data=564/564/0/2.756 strict_render=386/386/0/24.082 strict_compute=128/128/0/3.895 render=7/7/0/1.357 compute=35/35/0/3.581 archive_render=1/1/0/0.076 archive_compute=15/15/0/0.405 units=calls/ok/failed/api_wall_ms; not_gpu_or_pure_compile_time"
+    ],
+    "after_gpu_ready_totals": {
+      "metal_source_calls": 0.0,
+      "metal_source_failed": 0.0,
+      "metal_source_api_ms": 0.0,
+      "metal_local_calls": 11.0,
+      "metal_local_failed": 0.0,
+      "metal_local_api_ms": 0.158,
+      "metal_strict_pso_attempts": 13.0,
+      "metal_strict_pso_hits": 13.0,
+      "metal_strict_pso_api_ms": 0.9610000000000001,
+      "metal_render_calls": 1.0,
+      "metal_compute_calls": 1.0,
+      "metal_pso_failed": 0.0,
+      "metal_pso_api_ms": 0.963,
+      "metal_archive_add_calls": 0.0,
+      "metal_archive_add_failed": 0.0,
+      "metal_archive_add_api_ms": 0.0
+    },
+    "warm_last30_api_events": 0.0
+  },
+  "qualification": "Warm replay of new native cohort, but 74 recipes still required recording/preparation. Not a single-variable FPS/RAM comparison; all 424 current-cache eligible inputs now complete, not full-game coverage. No Cua/recording/character actions/death/online/menu tests."
+}

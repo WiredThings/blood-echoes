@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 #include "video_core/renderer_metal/mtl_local_aot.h"
 #include "video_core/renderer_metal/mtl_library_origin.h"
 #include <cstdio>
@@ -87,7 +88,7 @@ inline id<MTLLibrary> BuildInner(id<MTLDevice> device, NSString* source,
     };
     const auto source_build=[&] {
         if(error)*error=nil;
-        return [device newLibraryWithSource:source options:actual_options error:error];
+        BbMetalPhase::Call bb_metal_call_90{BbMetalPhase::Kind::SourceLibrary}; id<MTLLibrary> bb_metal_result=[device newLibraryWithSource:source options:actual_options error:error]; bb_metal_call_90.Finish(bool(bb_metal_result)); return bb_metal_result;
     };
     const auto source_admitted=[&] {
         auto library=source_build();
@@ -137,7 +138,7 @@ inline id<MTLLibrary> BuildInner(id<MTLDevice> device, NSString* source,
                    LocalAot::String(receipt,@"library_sha256",library_sha)) {
                     dispatch_data_t data=dispatch_data_create(blob.bytes,blob.length,
                         dispatch_get_global_queue(QOS_CLASS_UTILITY,0),^{(void)blob.length;});
-                    id<MTLLibrary> library=[device newLibraryWithData:data error:nil];
+                    BbMetalPhase::Call bb_metal_call_140{BbMetalPhase::Kind::LocalLibraryData}; id<MTLLibrary> library=[device newLibraryWithData:data error:nil]; bb_metal_call_140.Finish(bool(library));
                     // Reflection names alone cannot accept an artifact. The caller
                     // creates its real entries using its actual constant values.
                     if(library&&factory(library)) {

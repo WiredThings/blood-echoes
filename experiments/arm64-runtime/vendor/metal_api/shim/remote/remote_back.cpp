@@ -1,4 +1,5 @@
 #include "runtime_exit_codes.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // bbport: the native GPU process, bb-gpu (docs/macos-native-gpu.md). It reserves the guest's
 // address ranges, maps the game process's memory pool at the same addresses, and runs the GPU
@@ -308,6 +309,7 @@ void Init(const Message& message, auto&& reply) {
                              args.psf_attributes, args.width, args.height};
     const int result = bbgpu_init(&config);
     if (result == 0) {
+        BbMetalPhase::MarkGpuReady();
         g.control->state.gpu_ready.store(1, std::memory_order_release);
         std::printf("GPU process: native GPU core ready\n");
     }

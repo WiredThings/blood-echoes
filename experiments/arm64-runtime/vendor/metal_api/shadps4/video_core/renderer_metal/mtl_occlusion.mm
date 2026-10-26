@@ -1,4 +1,5 @@
 #include "video_core/renderer_metal/mtl_local_library.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The scale, counter sharing and max-of-three history follow Awakenchan's OcclusionModel
 // (BloodBorneButPc 4f93643e); Metal counting, GPU snapshots and retirement are implemented here.
@@ -111,7 +112,7 @@ OcclusionQueries::OcclusionQueries(Device& device, Scheduler& scheduler, Runtime
     options.mathMode = MTLMathModeSafe;
     id<MTLLibrary> library = Metal::LocalLibrary::Build(d.device, source, options, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"snapshot"}); });
     ASSERT_MSG(library, "Metal occlusion resolve compile: {}", error.localizedDescription.UTF8String);
-    impl->pipeline = [d.device newComputePipelineStateWithFunction:[library newFunctionWithName:@"snapshot"] error:&error];
+    BbMetalPhase::Call bb_metal_call_114{BbMetalPhase::Kind::Compute}; impl->pipeline = [d.device newComputePipelineStateWithFunction:[library newFunctionWithName:@"snapshot"] error:&error]; bb_metal_call_114.Finish(bool(impl->pipeline));
     ASSERT_MSG(impl->pipeline, "Metal occlusion pipeline: {}", error.localizedDescription.UTF8String);
     impl->results = [d.device newBufferWithLength:Slots * sizeof(u64) options:MTLResourceStorageModeShared];
     impl->total = [d.device newBufferWithLength:sizeof(u64) options:MTLResourceStorageModeShared];

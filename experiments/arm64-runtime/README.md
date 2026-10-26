@@ -17,8 +17,12 @@ The 2026-10-26 native PSO preparation checkpoint is described in
 The coherent native closure passes source/local-library strict archive and GPU
 pixel controls, including the original CameraMotion::RecordMotion and Presenter
 post-processing factories. The Camera upload now pads its 108-byte public constants
-to the 112 bytes required by MSL without changing fields or shader math. Eleven
-helper families have preparation entries; other final pipeline families remain open.
+to the 112 bytes required by MSL without changing fields or shader math. Thirteen helper families now have preparation entries, including the unchanged
+RGB/depth FormatConvert factories; other final pipeline families remain open.
+[Native format/phase-counter validation](docs/native-format-and-phase-counters.zh-CN.md)
+adds 35 active native API boundaries and 17 GPU-process CSV fields; first new-cohort
+game integration passes, while cold directory preparation remains partial. No
+whole-game, matched performance or zero-driver-compilation claim is made.
 Three real complete game recipes previously prepared seven native PSOs, with all
 seven strictly reused in independent processes. These are scoped controls, not
 whole-game coverage or gameplay acceptance.

@@ -18,6 +18,7 @@
 #include "common/assert.h"
 #include "common/logging/log.h"
 #include "video_core/renderer_metal/mtl_runtime_impl.h"
+#include "video_core/renderer_metal/mtl_format_convert_source.h"
 #include "video_core/renderer_metal/mtl_texture_tiling.h"
 #include "video_core/frame_capture.h"
 #include "video_core/renderer_metal/mtl_scene_targets.h"
@@ -357,6 +358,23 @@ id<MTLComputePipelineState> HostKernels::UpscaleMerge(NSError** error) {
     auto* descriptor=(MTLComputePipelineDescriptor*)Descriptor(invocation);
     descriptor.computeFunction=function;
     return function?MakeCompute(descriptor,invocation,origins,error):nil;
+}
+
+id<MTLComputePipelineState> HostKernels::FormatConversionPipeline(bool depth,NSError** error) {
+    // Preserve the original Converter's language3.1 / Safe options and nil
+    // function constants. Both entry checks preserve the old local-library gate.
+    LocalLibrary::Origin origin;
+    auto options=CompileOptions();
+    id<MTLLibrary> library=LocalLibrary::Build(dev.device,FormatConvert::KernelSource,options,error,
+        [](id<MTLLibrary> local){return LocalLibrary::PlainEntries(local,{@"rgb_convert",@"depth_convert"});},true,&origin);
+    if(!library)return nil;
+    id<MTLFunction> function=[library newFunctionWithName:(depth?@"depth_convert":@"rgb_convert")];
+    if(!function)return nil;
+    HostPso::Invocation invocation{};invocation.kind=depth?HostPso::Kind::FormatDepth:HostPso::Kind::FormatRgb;
+    auto* descriptor=(MTLComputePipelineDescriptor*)Descriptor(invocation);
+    descriptor.computeFunction=function;
+    const std::array<LocalLibrary::Origin,1> origins{origin};
+    return MakeCompute(descriptor,invocation,origins,error);
 }
 
 id<MTLComputePipelineState> HostKernels::CameraMotionPipeline(NSError** error) {

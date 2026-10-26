@@ -1,4 +1,5 @@
 #include "video_core/renderer_metal/mtl_local_library.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <array>
@@ -57,10 +58,8 @@ void SelfTest(Device::Impl& impl, id<MTLBuffer> buffer, std::uint8_t* host, u64 
         "}\n";
     NSError* error = nil;
     id<MTLLibrary> library = Metal::LocalLibrary::Build(impl.device, source, nil, &error, [](id<MTLLibrary> local) { return Metal::LocalLibrary::PlainEntries(local, {@"probe"}); });
-    id<MTLComputePipelineState> pipeline =
-        library ? [impl.device newComputePipelineStateWithFunction:[library newFunctionWithName:@"probe"]
-                                                             error:&error]
-                : nil;
+    id<MTLComputePipelineState> pipeline=nil; if(library){BbMetalPhase::Call bb_metal_call_61{BbMetalPhase::Kind::Compute}; pipeline=[impl.device newComputePipelineStateWithFunction:[library newFunctionWithName:@"probe"]
+                                                             error:&error]; bb_metal_call_61.Finish(bool(pipeline));}
     if (!pipeline) {
         std::fprintf(stderr, "Guest memory: Metal self-test not compiled: %s\n",
                      error ? error.localizedDescription.UTF8String : "unknown");

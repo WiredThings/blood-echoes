@@ -1,4 +1,5 @@
 #include "video_core/renderer_metal/mtl_local_library.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #import <Metal/Metal.h>
@@ -237,8 +238,7 @@ IndirectKernels::IndirectKernels(Device& device) {
         }
         const auto make = [&](NSString* name) -> id<MTLComputePipelineState> {
             id<MTLFunction> function = [library newFunctionWithName:name];
-            return function ? [mtl_device newComputePipelineStateWithFunction:function error:nil]
-                            : nil;
+            if(!function)return nil; BbMetalPhase::Call bb_metal_call_240{BbMetalPhase::Kind::Compute}; id<MTLComputePipelineState> bb_metal_result=[mtl_device newComputePipelineStateWithFunction:function error:nil]; bb_metal_call_240.Finish(bool(bb_metal_result)); return bb_metal_result;
         };
         id<MTLComputePipelineState> prep_state = make(@"bb_gs_prep");
         id<MTLComputePipelineState> copy_state = make(@"bb_gs_copy_indices");

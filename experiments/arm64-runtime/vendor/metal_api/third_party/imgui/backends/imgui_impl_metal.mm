@@ -46,6 +46,7 @@
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
 #include "imgui_impl_metal.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 #import <time.h>
 #import <Metal/Metal.h>
 
@@ -672,7 +673,9 @@ void ImGui_ImplMetal_Shutdown()
     pipelineDescriptor.depthAttachmentPixelFormat = self.framebufferDescriptor.depthPixelFormat;
     pipelineDescriptor.stencilAttachmentPixelFormat = self.framebufferDescriptor.stencilPixelFormat;
 
+    BbMetalPhase::Call bb_imgui_pipeline_call{BbMetalPhase::Kind::Render};
     id<MTLRenderPipelineState> renderPipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:&error];
+    bb_imgui_pipeline_call.Finish(renderPipelineState != nil);
     if (error != nil)
         NSLog(@"Error: failed to create Metal pipeline state: %@", error);
 

@@ -1,4 +1,5 @@
 #include "video_core/renderer_metal/mtl_local_library.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Counterpart: renderer_vulkan/vk_temporal_upscaler.cpp (the UI composition of a scaled session and
 // its temporal background, RunScaled; MetalFX instead of FSR 3, no FSR 4, TAA or DLSS: D10).
@@ -374,7 +375,7 @@ struct Upscaler::Impl {
             descriptor.fragmentFunction = [library newFunctionWithName:@"ui_copy_main"];
             descriptor.colorAttachments[0].pixelFormat = format;
             NSError* error = nil;
-            pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+            BbMetalPhase::Call bb_metal_call_377{BbMetalPhase::Kind::Render}; pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error]; bb_metal_call_377.Finish(bool(pipeline));
             ASSERT_MSG(pipeline, "UI background pipeline failed: {}", ErrorText(error));
         }
         return pipeline;
@@ -393,7 +394,7 @@ struct Upscaler::Impl {
                 descriptor.stencilAttachmentPixelFormat = format;
             }
             NSError* error = nil;
-            pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+            BbMetalPhase::Call bb_metal_call_396{BbMetalPhase::Kind::Render}; pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor error:&error]; bb_metal_call_396.Finish(bool(pipeline));
             ASSERT_MSG(pipeline, "UI depth pipeline failed: {}", ErrorText(error));
         }
         return pipeline;

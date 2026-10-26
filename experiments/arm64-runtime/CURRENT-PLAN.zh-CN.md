@@ -264,3 +264,19 @@ UpscaleMerge、Presenter后处理和Camera共享原冷工厂，原owner槽/算�
 最新工具包原生组件仍c2ec/f894，没有混入尚未验证的Format/counter。真实448请求克隆审核16.328秒→0.401/0.398秒，源cache不动、pressure1/swap0。整包0hint新进度域先实际strict探测，424/424完成、0record，496nativehit/0built/0failed；27builder中1full/26reuse，整体准备103.72秒、同场景进场155.91秒，90秒49.70FPS、p99 21.43ms、maxpressure2。不同冷暖/旧轮曾补4PSO，所以不称匹配帧率/RAM收益。原生严格准入及全部保护不变。
 
 最新本机QA zip是artifacts/arm64-qa-20261026-session-startup，SHA bf4f9ae5...580e05（host-local）。源/对应文档同步dev，Release不变。接下来FormatConvert原工厂与Metal实际API阶段计数需同源重建/真实原生验收，仍不能将其作者控制视为已启用；其它固定helper/new-user种子及全游戏完整状态仍未完。目标active。
+
+
+## 2026-10-26：原生Format工厂与真实阶段计数
+
+同源230TU为a4d1，Format7/Camera7/Post7/核心11共32进程通过；匹配30CPU+2AvPlayer+main、007/Live6已配对。原RGB/Depth字节算法不变，主kernels共享原两slot；统计35个active raw API点（含unit228 ImGui，Metal4 inactive），17新CSV列，512B计数数据不含小状态。无draw hash/资源查询/新GPU对象。
+
+首次新cohort原入口通过但600秒只准备336/404，42full占430秒，进场632秒，48.64FPS/最高压力2。实际5785完整CSV行ready1，唯一末尾143打断行按原reader过滤；ready后11source/35ordinary，全在前6.015CSV秒，tail30这些API0，不等于所有驱动零编译。无匹配FPS/RAM收益声明，常量特化/open/serialize/MetalFX内部未计。详见docs/native-format-and-phase-counters.zh-CN.md及去内容汇总。新包0d86536f当前只完成冷整合，同包暖轮正在测；E7/bf4f是先前完整424准备的包。
+
+继续最小有界两遍（可靠首审至多1+收集后build至多1）消除cold每页重扫，并保留全strict暖快捷；另无历史h2首启固定8kind收集是未验证私有草稿。它们尚未替换上述实测工具/原生包，不能当已经合入。正式app/data/旧cache/Release不变，未完全目录/接口/翻译协同目标继续active。
+
+
+### a4同包暖轮已完成
+
+handle15658 terminal passed：P/evidence/launcher-engine-abba-1792975355830020000，worker1792975405838075000。424/424、record74、strict350，准备241秒、进场325秒；source API0，ready后13strict全命中、2ordinary，tail30 API0；17列实际结构再次通过。48.54FPS/合计footprint5967MiB/maxpressure2/swap+9。与c2ec包49.70/5808的跨轮差异未归因，不能承诺性能/内存无退化；3匹配顶点样本字节同/有效env同也不证明全缓存等价。详见原生文档。
+
+原生23源文件、项目自有Format fixture和计数/ARC作者源及准确汇总已整理，源仅同步dev；正式应用/数据/Release保持。新测试包0d86536f已两轮原入口通过，未包含当前独立两遍/8fixed种子草稿。当前无游戏运行，原agents正在仅CPU验证后两项，冻结E6不可修改。目标active。

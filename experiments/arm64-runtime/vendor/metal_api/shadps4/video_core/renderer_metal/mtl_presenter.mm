@@ -1,4 +1,5 @@
 #include "video_core/renderer_metal/mtl_local_library.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Counterpart: renderer_vulkan/vk_presenter.cpp (cut down: no FSR, HDR).
 
@@ -271,8 +272,8 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
         descriptor.vertexFunction = vertex;
         descriptor.fragmentFunction = [library newFunctionWithName:@"present_main"];
         descriptor.colorAttachments[0].pixelFormat = FramePixelFormat;
-        impl->present_pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor
-                                                                            error:&error];
+        BbMetalPhase::Call bb_metal_call_274{BbMetalPhase::Kind::Render}; impl->present_pipeline = [dev.device newRenderPipelineStateWithDescriptor:descriptor
+                                                                            error:&error]; bb_metal_call_274.Finish(bool(impl->present_pipeline));
         ASSERT_MSG(impl->present_pipeline, "Present pipeline failed: {}", ErrorText(error));
     }
     {

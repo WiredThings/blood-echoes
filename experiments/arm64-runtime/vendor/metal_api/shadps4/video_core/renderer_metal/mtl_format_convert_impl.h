@@ -10,6 +10,8 @@
 
 #include "video_core/renderer_metal/mtl_format_convert.h"
 
+namespace Metal { class HostKernels; }
+
 namespace Metal::FormatConvert {
 
 /// The kernels that rewrite texel bytes between a guest layout and the layout of a Metal blit
@@ -18,7 +20,9 @@ namespace Metal::FormatConvert {
 /// the owner releases it only after the GPU work is finished (Runtime's destructor finishes).
 class Converter {
 public:
-    explicit Converter(id<MTLDevice> device) : device{device} {}
+    // Runtime::Impl owns kernels before converter, and finishes the scheduler
+    // before either is destroyed. Keep the existing two pipeline owner slots.
+    explicit Converter(HostKernels& kernels) : kernels{kernels} {}
 
     /// One copy's worth of texels: `width` x `height` texels in each of `slices` slices (array
     /// layers or depth slices).
@@ -51,7 +55,7 @@ public:
 private:
     id<MTLComputePipelineState> Pipeline(Kind kind);
 
-    id<MTLDevice> device;
+    HostKernels& kernels;
     id<MTLComputePipelineState> rgb = nil;
     id<MTLComputePipelineState> depth = nil;
 };

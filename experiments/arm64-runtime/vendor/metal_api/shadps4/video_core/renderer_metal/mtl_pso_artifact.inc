@@ -129,20 +129,20 @@ void* PsoCache::CreateArtifactPipeline(void*raw,bool compute,std::string_view ke
  if(compute){
   auto*d=(__bridge MTLComputePipelineDescriptor*)raw;if(!d||!d.computeFunction)return nullptr;
   state=PsoArtifactCreate(impl->mtl_device,d,archive_path.parent_path(),preparation_identity,key,prepare,allow_compile,impl->archive!=nil,out,error,
-    [&](MTLPipelineOption o,NSError**e){return [impl->mtl_device newComputePipelineStateWithDescriptor:d options:o reflection:nil error:e];},
-    [](id<MTLBinaryArchive>a,MTLComputePipelineDescriptor*d,NSError**e){return [a addComputePipelineFunctionsWithDescriptor:d error:e];});
+    [&](MTLPipelineOption o,NSError**e){BbMetalPhase::Call bb_metal_call_132{BbMetalPhase::PsoKind(true, (std::uint64_t(o) & std::uint64_t(MTLPipelineOptionFailOnBinaryArchiveMiss)) != 0)}; id<MTLComputePipelineState> bb_metal_result=[impl->mtl_device newComputePipelineStateWithDescriptor:d options:o reflection:nil error:e]; bb_metal_call_132.Finish(bool(bb_metal_result)); return bb_metal_result;},
+    [](id<MTLBinaryArchive>a,MTLComputePipelineDescriptor*d,NSError**e){return BbMetalPhase::Invoke(BbMetalPhase::Kind::ArchiveCompute, [&] { return [a addComputePipelineFunctionsWithDescriptor:d error:e]; });});
  }else{
   auto*d=(__bridge MTLRenderPipelineDescriptor*)raw;if(!d||!d.vertexFunction)return nullptr;
   state=PsoArtifactCreate(impl->mtl_device,d,archive_path.parent_path(),preparation_identity,key,prepare,allow_compile,impl->archive!=nil,out,error,
-    [&](MTLPipelineOption o,NSError**e){return [impl->mtl_device newRenderPipelineStateWithDescriptor:d options:o reflection:nil error:e];},
-    [](id<MTLBinaryArchive>a,MTLRenderPipelineDescriptor*d,NSError**e){return [a addRenderPipelineFunctionsWithDescriptor:d error:e];});
+    [&](MTLPipelineOption o,NSError**e){BbMetalPhase::Call bb_metal_call_137{BbMetalPhase::PsoKind(false, (std::uint64_t(o) & std::uint64_t(MTLPipelineOptionFailOnBinaryArchiveMiss)) != 0)}; id<MTLRenderPipelineState> bb_metal_result=[impl->mtl_device newRenderPipelineStateWithDescriptor:d options:o reflection:nil error:e]; bb_metal_call_137.Finish(bool(bb_metal_result)); return bb_metal_result;},
+    [](id<MTLBinaryArchive>a,MTLRenderPipelineDescriptor*d,NSError**e){return BbMetalPhase::Invoke(BbMetalPhase::Kind::ArchiveRender, [&] { return [a addRenderPipelineFunctionsWithDescriptor:d error:e]; });});
  }
  }catch(...){
   out.state=HostPso::ArtifactState::Failed;
   if(!prepare&&allow_compile&&!state){
    out.compiled=true;NSError*e=nil;
-   if(compute){auto*d=(__bridge MTLComputePipelineDescriptor*)raw;d.binaryArchives=@[];state=[impl->mtl_device newComputePipelineStateWithDescriptor:d options:MTLPipelineOptionNone reflection:nil error:&e];}
-   else{auto*d=(__bridge MTLRenderPipelineDescriptor*)raw;d.binaryArchives=@[];state=[impl->mtl_device newRenderPipelineStateWithDescriptor:d options:MTLPipelineOptionNone reflection:nil error:&e];}
+   if(compute){auto*d=(__bridge MTLComputePipelineDescriptor*)raw;d.binaryArchives=@[];BbMetalPhase::Call bb_metal_call_144{BbMetalPhase::PsoKind(true, (std::uint64_t(MTLPipelineOptionNone) & std::uint64_t(MTLPipelineOptionFailOnBinaryArchiveMiss)) != 0)}; state=[impl->mtl_device newComputePipelineStateWithDescriptor:d options:MTLPipelineOptionNone reflection:nil error:&e]; bb_metal_call_144.Finish(bool(state));}
+   else{auto*d=(__bridge MTLRenderPipelineDescriptor*)raw;d.binaryArchives=@[];BbMetalPhase::Call bb_metal_call_145{BbMetalPhase::PsoKind(false, (std::uint64_t(MTLPipelineOptionNone) & std::uint64_t(MTLPipelineOptionFailOnBinaryArchiveMiss)) != 0)}; state=[impl->mtl_device newRenderPipelineStateWithDescriptor:d options:MTLPipelineOptionNone reflection:nil error:&e]; bb_metal_call_145.Finish(bool(state));}
   }
  }
  // Caller owns its ordinary archive-hit accounting; do not double count here.

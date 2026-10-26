@@ -1,4 +1,5 @@
 #include "bb_stutter_audit.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 #include "remote/bb_remote.h"
 // SPDX-FileCopyrightText: Copyright 2025-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -445,6 +446,7 @@ void VideoOutDriver::Flip(const Request& req) {
             if(f) {
                 std::fprintf(f,"t_s,frame_ms,draws,dispatches,compiles,cam_x,cam_y,cam_z,gpu_ms");
                 if(timing_only)std::fprintf(f,",rec_busy_ms,gpu_wait_ms,replay_wait_ms,present_wait_ms,gnm_wait_ms,submit_age_ms,ready_age_ms,guest_age_ms,find_images");
+                BbMetalPhase::CsvHeader(f);
                 std::fputc('\n',f);
             }
             return f;
@@ -500,6 +502,8 @@ void VideoOutDriver::Flip(const Request& req) {
                     guest ? (now_ns-guest)/1e6 : 0,
                     (unsigned long long)delta(BbStats::find_image_calls.load(std::memory_order_relaxed),old_find));
             }
+            static BbMetalPhase::Snapshot metal_previous{};
+            BbMetalPhase::CsvDelta(file,metal_previous);
             std::fputc('\n',file);
             last=now;static unsigned pending=0;if(++pending>=120){std::fflush(file);pending=0;}
         }
@@ -645,6 +649,7 @@ void VideoOutDriver::Flip(const Request& req) {
                         std::fputc(*c == ' ' ? '_' : *c, file);
                     }
                 }
+                BbMetalPhase::CsvHeader(file);
                 std::fputc('\n', file);
             }
             return file;
@@ -728,6 +733,8 @@ void VideoOutDriver::Flip(const Request& req) {
                              tsc_per_ms > 0 ? (c - log_sections[i]) / tsc_per_ms : 0.0);
                 log_sections[i] = c;
             }
+            static BbMetalPhase::Snapshot metal_previous{};
+            BbMetalPhase::CsvDelta(frame_log,metal_previous);
             std::fputc('\n', frame_log);
             static u32 unflushed = 0;
             if (++unflushed >= 120) {

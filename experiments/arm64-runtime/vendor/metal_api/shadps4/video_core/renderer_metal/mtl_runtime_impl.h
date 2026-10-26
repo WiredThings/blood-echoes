@@ -64,6 +64,9 @@ public:
     // state, with no Upscaler/MetalFX/texture construction and no extra native map.
     id<MTLComputePipelineState> UpscaleMerge(NSError** error=nullptr);
     id<MTLComputePipelineState> CameraMotionPipeline(NSError** error=nullptr);
+    // The original Converter owns rgb/depth slots. No buffers, Converter or
+    // extra active map are constructed by loading-period preparation.
+    id<MTLComputePipelineState> FormatConversionPipeline(bool depth,NSError** error=nullptr);
     // Presenter keeps its original slot and may reuse the existing shared vertex
     // object+actual origin. Warm replay omits it and builds the same two stages.
     id<MTLRenderPipelineState> PostProcessPipeline(MTLPixelFormat format,NSError** error=nullptr,
@@ -161,7 +164,7 @@ struct Runtime::Impl {
     /// retains a pipeline for the GPU.
     FormatConvert::Converter& Convert() {
         if (!converter) {
-            converter = std::make_unique<FormatConvert::Converter>(dev.device);
+            converter = std::make_unique<FormatConvert::Converter>(kernels);
         }
         return *converter;
     }

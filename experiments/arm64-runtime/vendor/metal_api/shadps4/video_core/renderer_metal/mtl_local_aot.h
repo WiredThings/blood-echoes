@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 // Private Objective-C++ helper. OFF does no filesystem work. No compiler processes,
 // shader/PSO residency, guest pointers, or work on an ordinary draw cache hit.
 #import <Foundation/Foundation.h>
@@ -122,7 +123,7 @@ inline Result Try(id<MTLDevice> device,const std::string& source,const std::stri
      const auto library_sha=data?Sha(data.bytes,data.length):std::string{};
      if(data&&Integer(receipt,@"library_bytes",data.length)&&String(receipt,@"library_sha256",library_sha)){
       NSError* error=nil;dispatch_data_t input=dispatch_data_create(data.bytes,data.length,dispatch_get_global_queue(QOS_CLASS_UTILITY,0),^{(void)data.length;});
-      id<MTLLibrary> library=[device newLibraryWithData:input error:&error];
+      BbMetalPhase::Call bb_metal_call_125{BbMetalPhase::Kind::LocalLibraryData}; id<MTLLibrary> library=[device newLibraryWithData:input error:&error]; bb_metal_call_125.Finish(bool(library));
       // A name in reflection is insufficient: the requested function must actually
       // be constructible before the artifact can bypass source compilation.
       id<MTLFunction> function=library?[library newFunctionWithName:[NSString stringWithUTF8String:entry.c_str()]]:nil;

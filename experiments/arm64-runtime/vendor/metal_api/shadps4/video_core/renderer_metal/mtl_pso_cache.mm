@@ -1,4 +1,5 @@
 #include "video_core/renderer_metal/mtl_local_library.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 #include "video_core/renderer_metal/mtl_game_pso_recipe.h"
 #include "runtime_exit_codes.h"
 #include <cstdlib>
@@ -388,9 +389,9 @@ bool PsoCache::Flush() {
             for(id descriptor:impl->archive_descriptors) {
                 if(!rebuilt)break;
                 if([descriptor isKindOfClass:[MTLRenderPipelineDescriptor class]])
-                    rebuilt=[fresh addRenderPipelineFunctionsWithDescriptor:descriptor error:&rebuild_error];
+                    rebuilt=BbMetalPhase::Invoke(BbMetalPhase::Kind::ArchiveRender, [&] { return [fresh addRenderPipelineFunctionsWithDescriptor:descriptor error:&rebuild_error]; });
                 else
-                    rebuilt=[fresh addComputePipelineFunctionsWithDescriptor:descriptor error:&rebuild_error];
+                    rebuilt=BbMetalPhase::Invoke(BbMetalPhase::Kind::ArchiveCompute, [&] { return [fresh addComputePipelineFunctionsWithDescriptor:descriptor error:&rebuild_error]; });
             }
             impl->archive=fresh;
             archive_loaded=false;
@@ -737,13 +738,13 @@ const RenderPipeline* PsoCache::GetRenderPipeline(const Vulkan::GraphicsPipeline
             if (!artifact.handled) state = CreateWithArchive(
                 *impl, archive_loaded, desc,
                 [&](MTLPipelineOption options, NSError** err) {
-                    return [impl->mtl_device newRenderPipelineStateWithDescriptor:desc
+                    BbMetalPhase::Call bb_metal_call_740{BbMetalPhase::PsoKind(false, (std::uint64_t(options) & std::uint64_t(MTLPipelineOptionFailOnBinaryArchiveMiss)) != 0)}; id<MTLRenderPipelineState> bb_metal_result=[impl->mtl_device newRenderPipelineStateWithDescriptor:desc
                                                                           options:options
                                                                        reflection:nil
-                                                                            error:err];
+                                                                            error:err]; bb_metal_call_740.Finish(bool(bb_metal_result)); return bb_metal_result;
                 },
                 [](id<MTLBinaryArchive> archive, MTLRenderPipelineDescriptor* d, NSError** err) {
-                    return [archive addRenderPipelineFunctionsWithDescriptor:d error:err];
+                    return BbMetalPhase::Invoke(BbMetalPhase::Kind::ArchiveRender, [&] { return [archive addRenderPipelineFunctionsWithDescriptor:d error:err]; });
                 },
                 from_archive, error);
             elapsed_us = UsSince(start);
@@ -800,8 +801,8 @@ void PrepareCopyWatchPipeline(Device& device,const ComputePipeline& pipeline) {
         watched.computeFunction=(__bridge id<MTLFunction>)pipeline.shader->copy_watch_reference->function;
         watched.maxTotalThreadsPerThreadgroup=total;
         NSError* error=nil;
-        id<MTLComputePipelineState> state=[device.GetImpl().device newComputePipelineStateWithDescriptor:watched
-            options:MTLPipelineOptionNone reflection:nil error:&error];
+        BbMetalPhase::Call bb_metal_call_803{BbMetalPhase::PsoKind(true, (std::uint64_t(MTLPipelineOptionNone) & std::uint64_t(MTLPipelineOptionFailOnBinaryArchiveMiss)) != 0)}; id<MTLComputePipelineState> state=[device.GetImpl().device newComputePipelineStateWithDescriptor:watched
+            options:MTLPipelineOptionNone reflection:nil error:&error]; bb_metal_call_803.Finish(bool(state));
         if(state && total<=state.maxTotalThreadsPerThreadgroup)
             pipeline.copy_watch_state=(__bridge_retained void*)state;
         else std::printf("Copy pointer watch: lazy pipeline unavailable %s\n",error?error.localizedDescription.UTF8String:"thread limit");
@@ -848,13 +849,13 @@ const ComputePipeline* PsoCache::GetComputePipeline(const Vulkan::ComputePipelin
             if (!artifact.handled) state = CreateWithArchive(
                 *impl, archive_loaded, desc,
                 [&](MTLPipelineOption options, NSError** err) {
-                    return [impl->mtl_device newComputePipelineStateWithDescriptor:desc
+                    BbMetalPhase::Call bb_metal_call_851{BbMetalPhase::PsoKind(true, (std::uint64_t(options) & std::uint64_t(MTLPipelineOptionFailOnBinaryArchiveMiss)) != 0)}; id<MTLComputePipelineState> bb_metal_result=[impl->mtl_device newComputePipelineStateWithDescriptor:desc
                                                                            options:options
                                                                         reflection:nil
-                                                                             error:err];
+                                                                             error:err]; bb_metal_call_851.Finish(bool(bb_metal_result)); return bb_metal_result;
                 },
                 [](id<MTLBinaryArchive> archive, MTLComputePipelineDescriptor* d, NSError** err) {
-                    return [archive addComputePipelineFunctionsWithDescriptor:d error:err];
+                    return BbMetalPhase::Invoke(BbMetalPhase::Kind::ArchiveCompute, [&] { return [archive addComputePipelineFunctionsWithDescriptor:d error:err]; });
                 },
                 from_archive, error);
             elapsed_us = UsSince(start);
@@ -918,13 +919,13 @@ bool MakeKernel(PsoCache& owner, PsoCache::Impl& impl, bool archive_loaded, Tess
     if (!artifact.handled) state = CreateWithArchive(
         impl, archive_loaded, desc,
         [&](MTLPipelineOption options, NSError** err) {
-            return [impl.mtl_device newComputePipelineStateWithDescriptor:desc
+            BbMetalPhase::Call bb_metal_call_921{BbMetalPhase::PsoKind(true, (std::uint64_t(options) & std::uint64_t(MTLPipelineOptionFailOnBinaryArchiveMiss)) != 0)}; id<MTLComputePipelineState> bb_metal_result=[impl.mtl_device newComputePipelineStateWithDescriptor:desc
                                                                   options:options
                                                                reflection:nil
-                                                                    error:err];
+                                                                    error:err]; bb_metal_call_921.Finish(bool(bb_metal_result)); return bb_metal_result;
         },
         [](id<MTLBinaryArchive> archive, MTLComputePipelineDescriptor* d, NSError** err) {
-            return [archive addComputePipelineFunctionsWithDescriptor:d error:err];
+            return BbMetalPhase::Invoke(BbMetalPhase::Kind::ArchiveCompute, [&] { return [archive addComputePipelineFunctionsWithDescriptor:d error:err]; });
         },
         archived, error);
     from_archive = from_archive && archived;

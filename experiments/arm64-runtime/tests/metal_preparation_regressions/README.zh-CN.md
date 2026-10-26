@@ -10,3 +10,12 @@
 原生main故意只接受新建Shared作者状态和专用marker，拒绝正式命名空间；cold、local与独立warm要分进程执行。临时作者内容不是游戏白模复现，逐字节断言数也不是独立PSO数。
 
 2026-10-26最终c2ec6e05库通过11个pipeline进程、7个Camera生产调用进程、7个PostProcess进程；内存压力1、swap无增长。最初Camera108B上传被Metal反射112B拒绝的失败已保留；生产仅补零尾4B并重新验证，公共MotionConstants仍108B，算法和字段未改。实际整包游戏/性能验收单独记录在`docs/local-pso-preparation.zh-CN.md`，不能用这些小控制代替。
+
+
+## Format 与阶段计数追加控制
+
+`format_convert.mm`为7进程真实原Converter调用fixture：Source/Local/strict及缺Depth entry负例，9RGB/3Depth双向bit/完整guard与原两slot复用；需链接当前一致库/真实host-only服务、全新Shared状态，不读游戏数据。含项目原friend元数据setter来指定作者serial，不能代替真实游戏启动。
+
+`metal_phase_counters.cpp`是纯标准C++统计/阶段/并发/异常控制，包含项目头，可用C++23、pthread与`-UNDEBUG`编译，输出仅放新Shared或系统临时目录；它不执行Metal。`metal_phase_arc.mm`为作者ObjC接口声明的LLVM IR对照源，不链接/运行Metal；`metal_phase_pointer_rejected.mm`应编译失败，防对象指针误入BOOL返回包装。不要将这些作者输入冒充真实pipeline质量或整场景开销证明。
+
+实际新库230TU、32独立GPU进程与首次游戏/17列CSV证据见docs/native-format-and-phase-counters.zh-CN.md；纯C++作者原总reporter exit1的边界也保留在文档中。

@@ -1,4 +1,5 @@
 #include "bb_stutter_audit.h"
+#include "video_core/renderer_metal/mtl_phase_counters.h"
 #include "video_core/renderer_metal/mtl_compile_audit.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -993,9 +994,9 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
             const auto source_build = [&]() -> MetalObjects {
                 BbAudit::Scope actual_compile_audit{BbAudit::MetalLibraryBuild,0,100000};
                 NSError* error = nil;
-                id<MTLLibrary> library =
+                BbMetalPhase::Call bb_metal_call_997{BbMetalPhase::Kind::SourceLibrary}; id<MTLLibrary> library =
                     [device newLibraryWithSource:[NSString stringWithUTF8String:text.c_str()]
-                                         options:options error:&error];
+                                         options:options error:&error]; bb_metal_call_997.Finish(bool(library));
                 if (!library) {
                     return {nil, nil, "Metal: " + FirstMetalError(
                         error ? error.localizedDescription.UTF8String : "unknown error")};
