@@ -73,12 +73,17 @@ def deps(p):
     return [s.strip().split(' (compatibility')[0]for s in subprocess.check_output(['/usr/bin/otool','-L',str(p)],text=True).splitlines()[1:]]
 
 def freeze_consumer(executable,old_library,new_library):
-    old=str(old_library)
-    assert old in deps(executable),(executable,old)
+    from gpu_candidate_identity import resolve_gpu_edge
+    old=Path(old_library).resolve(strict=True);new=Path(new_library).resolve(strict=True)
+    edges=[edge for edge in deps(executable)if Path(edge).name.startswith('libbbgpu')]
+    assert len(edges)==1,'exactly one GPU load edge is required for relocation'
+    edge=edges[0]
+    assert resolve_gpu_edge(executable,edge)==old,'copied consumer does not load the admitted source library'
     target='@executable_path/'+os.path.relpath(new_library,executable.parent)
-    subprocess.run(['/usr/bin/install_name_tool','-change',old,target,str(executable)],check=True)
+    subprocess.run(['/usr/bin/install_name_tool','-change',edge,target,str(executable)],check=True)
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(executable)],check=True)
-    assert target in deps(executable)and old not in deps(executable)
+    assert [edge for edge in deps(executable)if Path(edge).name.startswith('libbbgpu')]==[target]
+    assert resolve_gpu_edge(executable,target)==new,'relocated consumer does not load the copied library'
 
 def load_cpu_runtime_manifest(path,expected_gpu_sha256=None):
     assert not path.is_symlink(), 'CPU manifest must be a regular Shared file'
@@ -228,6 +233,14 @@ def main():
         production=False,baseline_revision=json.loads((P/'SOURCE.json').read_text())['blood_echoes_commit'],
         frozen_runtime={str(f.relative_to(stage)):sha(f)for f in [cpu,cpu_lib,gpu,gpu_lib,net_lib,worker,*([module_worker]if module_worker else[])]})
     (stage/'NATIVE-METAL.json').write_text(json.dumps(native,indent=2)+'\n')
+    # The shell receipt predates replacement of its placeholder CPU. Preserve
+    # that provenance separately; the final case must identify the actual copy.
+    case['shell_cpu_sha256']=case['cpu_sha256']
+    case['cpu_sha256']=native['frozen_runtime']['bin/bb-probe-metal']
+    case['cpu_source_sha256']=sha(cpu_game_source)
+    case_path=Path(case['evidence'])/'case.json'
+    assert case_path.resolve(strict=True).is_relative_to(P/'evidence')
+    case_path.write_text(json.dumps(case,indent=2)+'\n')
     manifest=dict(schema=2,created_ns=time.time_ns(),app=str(app),private_case=case,
         host_local_only=True,portable_installer=False,formal_data_modified=False,
         default_local_metal_preparation=True,protected_resource_writeback=True,new_component_stage=str(admitted_stage),

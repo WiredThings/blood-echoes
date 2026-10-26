@@ -19,7 +19,9 @@
 
 - 此次依赖来自明确的既有前缀，尚未从空依赖前缀重建，不能称完整 clean-dependency 构建。
 - 后加入的 PSO 有界批次 main 是单独候选，不能算进本次整树构建；其实际 native 对照另见 `game-pso-bounded-batch.zh-CN.md`。
-- 新 CPU／renderer／helpers／layout 尚未组成最终 QA 包并完成原启动器的功能、场景、性能和内存回归。正式应用和 Release 未更新。
+- 新 CPU／renderer／helpers／layout 已组成第 07 个本机 QA 包，严格组件、加载边、签名及原 GUI 代码身份检查通过；原启动器实际准备／运行正在验证，功能、场景、性能和内存结论尚未成立。正式应用和 Release 未更新。
 - 运行时 Shared 隔离合同仍保留，尚不是可移植安装包。
 
 布局组包同时去除开发机 Writer fixture 的绝对路径，保留完整 ABI、源摘要和 fixture 验证事实；重新绑定组包后的 layout SHA，并对复制的头文件再过原严格 loader。开发原始封口和源码目录不修改。
+
+正常产物隔离组包：`artifacts/arm64-ui-audit-20261026-07/`，archive SHA `4bd168b4a406b4414f7668a2fe8430490a660f97ace7473e2118efdada525878`（47,497,427 字节）。source CPU／GPU／helpers 来源绑定新正常构建；PSO main 的独立 batch delta 单列，未声称整个归档都含该改动。依赖、基础 QA shell 与 Shared 根仍是已声明的既有环境。组包不含游戏、存档、缓存、汉化或账号资产。
