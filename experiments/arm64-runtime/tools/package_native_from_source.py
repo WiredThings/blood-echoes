@@ -215,6 +215,10 @@ def _assemble(*,repository,native_source,build_root,renderer_build,cpu_build,
         need(run('/usr/bin/lipo','-archs',path).strip()==b'arm64', 'non-ARM final runtime role')
         need(not development_probe(path), 'development game probe refused')
     payload=check_relative_payload(app)
+    # Info.plist and resource changes invalidate the original GUI seal. Sign
+    # the completed outer bundle before verifying its main executable; strict
+    # verification of a bundle's main also validates its Info.plist binding.
+    run('/usr/bin/codesign','--force','--sign','-',app)
     for path in app.rglob('*'):
         if not path.is_file() or path.is_symlink(): continue
         with path.open('rb') as stream: magic=stream.read(4)
@@ -226,7 +230,6 @@ def _assemble(*,repository,native_source,build_root,renderer_build,cpu_build,
                 target=(path.parent/edge[len('@loader_path/'):]).resolve(strict=True)
                 need(target.is_relative_to(engine), 'final dependency escaped engine')
             run('/usr/bin/codesign','--verify','--strict',path)
-    run('/usr/bin/codesign','--force','--sign','-',app)
     run('/usr/bin/codesign','--verify','--deep','--strict',app)
     need(all(sha(path)==value for path,value in c['source_sha256'].items()), 'normal source product changed while packaging')
     result=dict(schema=1,status='native-source-app-assembled',app=str(app),source_revision=revision,
