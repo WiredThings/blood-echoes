@@ -1,6 +1,8 @@
 """Original merge algorithm plus authored APFS views; no installed game inputs."""
 from pathlib import Path
 import hashlib, json, os, shutil, sys, tempfile, unittest
+from collections import Counter
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import launcher_source_view as view
 
@@ -154,6 +156,102 @@ class SourceView(unittest.TestCase):
         extra=root/'unexpected.bin';extra.write_bytes(b'authored unadmitted file');root.chmod(0o500)
         with self.assertRaisesRegex(ValueError,'snapshot file set changed'):self.prepare()
         self.assertEqual(extra.read_bytes(),b'authored unadmitted file')
+
+    def no_ready(self):
+        self.assertFalse(list((self.gpu/'automatic-game-inputs/source-views').glob('*/READY.json')))
+
+    def test_cold_hashes_each_source_twice_and_each_clone_once(self):
+        counts=Counter();original=view.file_sha
+        def count(path,*args,**kwargs):
+            counts[Path(path)]+=1;return original(path,*args,**kwargs)
+        sources=[p for p in self.game.rglob('*')if p.is_file()]
+        with patch.object(view,'file_sha',side_effect=count):result=self.prepare()
+        for source in sources:
+            self.assertEqual(counts[source],2,'initial records and final live source SHA remain')
+            destination=result['game_root']/source.relative_to(self.game)
+            self.assertEqual(counts[destination],1,'final complete snapshot SHA remains')
+            self.assertEqual(destination.stat().st_mode&0o777,0o400)
+        self.assertEqual(result['game_root'].stat().st_mode&0o777,0o500)
+
+    def test_warm_hash_passes_unchanged_and_no_more_clones(self):
+        first=self.prepare();clones=self.clones;counts=Counter();original=view.file_sha
+        def count(path,*args,**kwargs):counts[Path(path)]+=1;return original(path,*args,**kwargs)
+        with patch.object(view,'file_sha',side_effect=count):second=self.prepare()
+        self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(self.clones,clones)
+        for source in self.game.rglob('*'):
+            if source.is_file():
+                self.assertEqual(counts[source],2)
+                self.assertEqual(counts[first['game_root']/source.relative_to(self.game)],1)
+
+    def test_same_size_change_before_clone_is_rejected_by_final_snapshot_sha(self):
+        source=self.game/'eboot.bin';old=source.read_bytes();stamp=source.stat()
+        def mutate(path,target):
+            if path==source:
+                path.write_bytes(b'X'*len(old));os.utime(path,ns=(stamp.st_atime_ns,stamp.st_mtime_ns))
+            view.clone(path,target)
+        with self.assertRaisesRegex(ValueError,'snapshot contents changed'):self.prepare(clone_file=mutate)
+        self.no_ready()
+
+    def test_corrupt_clone_even_with_restored_source_is_rejected(self):
+        source=self.game/'eboot.bin';old=source.read_bytes()
+        def mutate(path,target):
+            if path==source:path.write_bytes(b'X'*len(old))
+            view.clone(path,target)
+            if path==source:path.write_bytes(old)
+        with self.assertRaisesRegex(ValueError,'snapshot contents changed'):self.prepare(clone_file=mutate)
+        self.assertEqual(source.read_bytes(),old);self.no_ready()
+
+    def test_same_size_clone_tampering_is_rejected_by_final_snapshot_sha(self):
+        def mutate(source,target):
+            view.clone(source,target)
+            if source.name=='eboot.bin':target.write_bytes(b'X'*target.stat().st_size)
+        with self.assertRaisesRegex(ValueError,'snapshot contents changed'):self.prepare(clone_file=mutate)
+        self.no_ready()
+
+    def test_source_change_after_snapshot_validation_is_rejected_by_final_live_sha(self):
+        original=view.verify_snapshot;source=self.game/'eboot.bin';old=source.read_bytes();stamp=source.stat()
+        def verify(*args,**kwargs):
+            original(*args,**kwargs)
+            source.write_bytes(b'X'*len(old));os.utime(source,ns=(stamp.st_atime_ns,stamp.st_mtime_ns))
+        with patch.object(view,'verify_snapshot',side_effect=verify):
+            with self.assertRaisesRegex(ValueError,'selected source contents changed'):self.prepare()
+        self.no_ready()
+
+    def test_final_snapshot_file_set_cannot_gain_unhashed_extra_file(self):
+        def add_extra(source,target):
+            view.clone(source,target)
+            if source.name=='eboot.bin':(target.parent/'not-in-records').write_bytes(b'author extra')
+        with self.assertRaisesRegex(ValueError,'snapshot file set changed'):self.prepare(clone_file=add_extra)
+        self.no_ready()
+
+    def test_after_clone_source_link_and_hardlink_destination_are_refused(self):
+        source=self.game/'eboot.bin';other=self.game/'other.bin';other.write_bytes(source.read_bytes())
+        def replace(path,target):
+            view.clone(path,target)
+            if path==source:path.unlink();path.symlink_to(other.name)
+        with self.assertRaisesRegex(ValueError,'linked CoW'):self.prepare(clone_file=replace)
+        self.no_ready();source.unlink();source.write_bytes(other.read_bytes())
+        def hardlink(path,target):os.link(path,target)
+        with self.assertRaisesRegex(ValueError,'must not alias'):self.prepare(clone_file=hardlink)
+        self.no_ready()
+
+    def test_late_original_mod_selection_change_prevents_ready(self):
+        actual=self.actual();original=view.verify_snapshot
+        def verify(*args,**kwargs):
+            original(*args,**kwargs);self.env['BB_MODS_ENABLED']='0'
+        with patch.object(view,'verify_snapshot',side_effect=verify):
+            with self.assertRaisesRegex(ValueError,'mod selection changed'):self.prepare(actual)
+        self.no_ready()
+
+    def test_late_mapping_change_is_rejected_even_with_equal_bytes(self):
+        mod=self.mods/'authored/dvdroot_ps4/msg';mod.mkdir(parents=True);(mod/'text.bin').write_bytes(b'author mod')
+        duplicate=self.game/'duplicate.bin';duplicate.write_bytes((self.game/'eboot.bin').read_bytes())
+        actual=self.actual();original=view.verify_snapshot
+        def verify(*args,**kwargs):
+            original(*args,**kwargs);link=actual/'eboot.bin';link.unlink();link.symlink_to(duplicate)
+        with patch.object(view,'verify_snapshot',side_effect=verify):
+            with self.assertRaisesRegex(ValueError,'mapping changed'):self.prepare(actual)
+        self.no_ready()
 
 
 if __name__=='__main__':unittest.main()

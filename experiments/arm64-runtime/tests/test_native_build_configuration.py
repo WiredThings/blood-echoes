@@ -1,22 +1,26 @@
 """Short authored configuration/generator controls; no renderer/FEX build."""
 from pathlib import Path
 import ast,json,os,subprocess,sys,tempfile,time,unittest
+from unittest.mock import patch
 D=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(D/'tools'))
-from configure_native_build import PRIVATE_RUNTIME,plan,renderer_inputs
+from configure_native_build import PRIVATE_RUNTIME,plan,renderer_inputs,prepare,sha
 
 class Configuration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.evidence=PRIVATE_RUNTIME/'evidence'/('native-build-author-controls-'+str(time.time_ns()))
-        cls.evidence.mkdir(mode=0o700)
+        # Author build outputs must remain outside the actual source root,
+        # without needing any live P/state or P/evidence write permissions.
+        cls.evidence=Path(tempfile.mkdtemp(prefix='native-build-author-controls-')).resolve()
         print('evidence:',cls.evidence,flush=True)
     def setUp(self):
         self.temporary=tempfile.TemporaryDirectory(dir=self.evidence)
         self.root=Path(self.temporary.name);self.build=self.root/'renderer';self.build.mkdir()
         self.prefix=self.root/'deps';self.prefix.mkdir();self.sdl=self.prefix/'libSDL3.dylib';self.sdl.write_text('authored path fixture, not a binary')
         self.renderer=D/'vendor/metal_api';self.reply=self.build/'.cmake/api/v1/reply';self.reply.mkdir(parents=True)
-        self.cache=dict(CMAKE_HOME_DIRECTORY=str(self.renderer),CMAKE_OSX_ARCHITECTURES='arm64',BB_BUILD_GAME_PREPARATION='ON',BB_GAME_PREPARATION_SOURCE_ROOT=str(D))
+        self.cmake=self.prefix/'cmake';self.ninja=self.prefix/'ninja'
+        for path in(self.cmake,self.ninja):path.write_text('# authored tool identity; never invoked\n');path.chmod(0o755)
+        self.cache=dict(CMAKE_HOME_DIRECTORY=str(self.renderer),CMAKE_OSX_ARCHITECTURES='arm64',BB_BUILD_GAME_PREPARATION='ON',BB_GAME_PREPARATION_SOURCE_ROOT=str(D),CMAKE_COMMAND=str(self.cmake),CMAKE_MAKE_PROGRAM=str(self.ninja),CMAKE_GENERATOR='Ninja')
         self.target=dict(artifacts=[dict(path='libbbgpu.dylib')],link=dict(commandFragments=[dict(fragment=str(self.sdl))]))
         self.write()
     def tearDown(self):self.temporary.cleanup()
@@ -41,6 +45,65 @@ class Configuration(unittest.TestCase):
         self.assertTrue(value['configure_ready']);self.assertFalse(value['cpu_host']['actual_load_and_native_ABI_validated'])
         self.assertFalse(any(a.startswith('-DBB_ARM_GPU_LIBRARY=')for a in value['configure']))
         self.assertNotIn('evidence/configure.json',str(value));self.assertFalse(value['ABI_validated'])
+        self.assertEqual(value['configure'][0],str(self.cmake))
+        self.assertIn('-DCMAKE_MAKE_PROGRAM='+str(self.ninja),value['configure'])
+        self.assertEqual(value['renderer']['build_tools']['cmake']['sha256'],sha(self.cmake))
+        self.assertEqual(value['renderer']['build_tools']['ninja']['sha256'],sha(self.ninja))
+    def test_configured_symlinks_freeze_canonical_entity_without_path_search(self):
+        for key,path in(('CMAKE_COMMAND',self.cmake),('CMAKE_MAKE_PROGRAM',self.ninja)):
+            link=path.with_name(path.name+'-selected');link.symlink_to(path.name);self.cache[key]=str(link)
+        self.write()
+        with patch('shutil.which',side_effect=AssertionError('no PATH fallback')):
+            value=self.make_plan()
+        self.assertEqual(value['configure'][0],str(self.cmake))
+        for name,path in(('cmake',self.cmake),('ninja',self.ninja)):
+            entry=value['renderer']['build_tools'][name]
+            self.assertEqual(entry['path'],str(path));self.assertEqual(entry['configured_path'],str(path.with_name(path.name+'-selected')))
+    def test_missing_empty_and_relative_tool_selection_never_fallback(self):
+        for key in('CMAKE_COMMAND','CMAKE_MAKE_PROGRAM'):
+            original=self.cache[key]
+            for value in(None,'','cmake'):
+                with self.subTest(key=key,value=value):
+                    if value is None:self.cache.pop(key,None)
+                    else:self.cache[key]=value
+                    self.write()
+                    with self.assertRaisesRegex(ValueError,'absolute configured tool'):self.make_plan()
+            self.cache[key]=original
+    def test_missing_nonregular_and_nonexecutable_tools_refused(self):
+        for key in('CMAKE_COMMAND','CMAKE_MAKE_PROGRAM'):
+            original=self.cache[key]
+            for path in(self.root/'not-existing',self.prefix):
+                with self.subTest(key=key,path=path):
+                    self.cache[key]=str(path);self.write()
+                    with self.assertRaises((ValueError,FileNotFoundError)):self.make_plan()
+            self.cache[key]=original
+        self.ninja.chmod(0o644);self.write()
+        with self.assertRaisesRegex(ValueError,'executable regular tool'):self.make_plan()
+    def test_wrong_or_missing_generator_refused(self):
+        for value in(None,'Unix Makefiles','Ninja Multi-Config'):
+            with self.subTest(value=value):
+                if value is None:self.cache.pop('CMAKE_GENERATOR',None)
+                else:self.cache['CMAKE_GENERATOR']=value
+                self.write()
+                with self.assertRaisesRegex(ValueError,'declared Ninja'):self.make_plan()
+    def test_tool_content_change_after_plan_rejected_before_generators(self):
+        value=self.make_plan();self.ninja.write_text('# different selected tool\n')
+        with patch('configure_native_build.subprocess.run',side_effect=AssertionError('no process expected')):
+            with self.assertRaisesRegex(ValueError,'changed after planning'):prepare(value)
+        self.assertFalse((self.root/'generated').exists())
+    def test_selected_symlink_retarget_after_plan_rejected(self):
+        link=self.prefix/'cmake-selected';link.symlink_to(self.cmake.name);self.cache['CMAKE_COMMAND']=str(link);self.write();value=self.make_plan()
+        other=self.prefix/'other-cmake';other.write_bytes(self.cmake.read_bytes());other.chmod(0o755);link.unlink();link.symlink_to(other.name)
+        with patch('configure_native_build.subprocess.run',side_effect=AssertionError('no process expected')):
+            with self.assertRaisesRegex(ValueError,'changed after planning'):prepare(value)
+    def test_tools_rechecked_after_mock_generation(self):
+        value=self.make_plan();calls=[]
+        def generated(*args,**kwargs):
+            calls.append(args[0]);self.cmake.write_text('# changed during generator\n')
+        with patch('configure_native_build.subprocess.run',side_effect=generated):
+            with self.assertRaisesRegex(ValueError,'changed during generation'):prepare(value)
+        self.assertEqual(len(calls),2)
+        self.assertFalse((self.root/'generated/native-build-inputs.json').exists())
     def test_wrong_source_rejected(self):
         self.cache['CMAKE_HOME_DIRECTORY']=str(self.root);self.write()
         with self.assertRaisesRegex(ValueError,'another source'):self.make_plan()

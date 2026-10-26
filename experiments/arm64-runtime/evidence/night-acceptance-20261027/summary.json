@@ -56,5 +56,46 @@
   "published_documentation_updated": false,
   "formal_saves_settings_cache_modified": false,
   "qualification": "Only original-condition static QA scene sampled; shared footprints may double-count. Not matched old/new, sustained memory, full visual/F3/network acceptance or portable/formal readiness.",
-  "targeted_python_controls": 143
+  "targeted_python_controls": null,
+  "normal_rebuild": {
+    "source_base_revision": "f8d35f4f",
+    "target_policy_delta_revision": "8a03650b",
+    "renderer_translation_units": 235,
+    "renderer_full_build_seconds": 328.12786649994086,
+    "renderer_sha256": "17c6cccff32e5293f89f7e939adc73e37c7955fc0dd88578f80099d0f5dd9968",
+    "CPU_build_completed": true,
+    "CPU_SHA256": "134aeadfb663abdbe915af1f8e6b37f3da51934f9710d648ced1e5ae1d8e349d",
+    "actual_layout_and_component_admission": true,
+    "dependency_prefixes_reused": true,
+    "all_dependencies_fresh": false
+  },
+  "QA09": {
+    "archive_sha256": "6e92b23f9147e2c8a45f870a88173d642abd56edb37603152e9d068e01725a44",
+    "archive_bytes": 47521450,
+    "archive_entries": 878,
+    "game_save_cache_assets_in_archive": false,
+    "host_local_only": true,
+    "portable_installer": false,
+    "original_GUI_receipt_verified": true,
+    "original_GUI_env_keys": 92,
+    "source_GUI_pid": 22532,
+    "old_QA08_closed": true,
+    "native_module_metadata_from_bundle_reached": true,
+    "F2_new_checkpoint_confirmed": true,
+    "F3_original_offline_supervisor_reached": true,
+    "F3_scene_return": "pending",
+    "local_app_replaced": false
+  },
+  "remaining_code_blockers": [
+    "Authenticated formal role consumer/native lifecycle integration still incomplete; Shared-only runtime cannot replace original formal user roots",
+    "F3 repeats source snapshot/static preparation for minutes; safe same-supervisor reuse under investigation"
+  ],
+  "targeted_results": {
+    "initial_receipt_clone_metadata_scope_cache_controls": 143,
+    "phase_and_original_launcher_controls": 36,
+    "late_F3_scene_observer_python_controls": 41,
+    "source_view_and_current_driver_controls": 73,
+    "native_configuration_controls": 17,
+    "qualification": "overlapping suites, do not sum as unique assertions"
+  }
 }

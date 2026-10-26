@@ -4,7 +4,7 @@ Reads current normal renderer CMake fields; does not build renderer/FEX, launch
 games or change the existing private runtime data admission.
 """
 from pathlib import Path
-import argparse,hashlib,json,os,re,shlex,subprocess,sys
+import argparse,hashlib,json,os,re,shlex,stat,subprocess,sys
 PRIVATE_RUNTIME=Path('/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype')
 SOURCE=Path(__file__).resolve().parents[1]
 def need(ok,why):
@@ -19,12 +19,21 @@ def cache_values(path):
         m=re.match(r'([^/#][^:=]*):[^=]+=(.*)$',line)
         if m:result[m[1]]=m[2]
     return result
+def configured_tool(cache,key):
+    """Resolve only the renderer's explicit tool; never search the runner PATH."""
+    selected=Path(cache.get(key,''))
+    need(bool(cache.get(key))and selected.is_absolute(),key+' must select an absolute configured tool')
+    path=selected.resolve(strict=True)
+    need(stat.S_ISREG(path.stat().st_mode)and os.access(path,os.X_OK),key+' must select an executable regular tool')
+    return dict(cache_key=key,configured_path=str(selected),path=str(path),sha256=sha(path))
 def renderer_inputs(source,build):
     source=directory(source);build=directory(build);renderer=directory(source/'vendor/metal_api');cache=cache_values(build/'CMakeCache.txt')
     need(Path(cache.get('CMAKE_HOME_DIRECTORY','')).resolve()==renderer,'renderer build belongs to another source root')
     need(cache.get('CMAKE_OSX_ARCHITECTURES')=='arm64','normal renderer must select exactly arm64')
     need(cache.get('BB_BUILD_GAME_PREPARATION')=='ON','normal renderer must include preparation targets')
     need(Path(cache.get('BB_GAME_PREPARATION_SOURCE_ROOT','')).resolve()==source,'renderer preparation source mismatch')
+    need(cache.get('CMAKE_GENERATOR')=='Ninja','normal renderer must use the declared Ninja generator')
+    tools=dict(cmake=configured_tool(cache,'CMAKE_COMMAND'),ninja=configured_tool(cache,'CMAKE_MAKE_PROGRAM'))
     reply=build/'.cmake/api/v1/reply';indices=sorted(reply.glob('index-*.json'));need(indices,'request codemodel-v2 before renderer configuration')
     index=json.loads(indices[-1].read_text());model=json.loads((reply/index['reply']['codemodel-v2']['jsonFile']).read_text())
     need(len(model['configurations'])==1,'single renderer configuration required')
@@ -61,7 +70,7 @@ def renderer_inputs(source,build):
     avplayer['threads.h']=dict(source_sha256=sha(thread_header))
     return dict(source=str(renderer),build=str(build),target='bbgpu',library=str(library),sdl_library=str(sdl[0]),includes=includes,flags=flags,
                 deployment_target=cache.get('CMAKE_OSX_DEPLOYMENT_TARGET',''),sysroot=cache.get('CMAKE_OSX_SYSROOT',''),
-                avplayer_configured_inputs=avplayer,
+                avplayer_configured_inputs=avplayer,build_tools=tools,generator='Ninja',
                 cache_sha256=sha(build/'CMakeCache.txt'),compile_commands_sha256=sha(build/'compile_commands.json'),target_description_sha256=sha(reply/record['jsonFile']))
 def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_build,runtime_root=PRIVATE_RUNTIME):
     source=directory(source_root);runtime=directory(runtime_root);need(runtime==PRIVATE_RUNTIME,'existing Shared runtime root must not be relocated')
@@ -74,7 +83,7 @@ def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_buil
     for include in renderer['includes']:native+=['--include-dir',include]
     gpu=[sys.executable,str(source/'tools/generate_gpu.py'),'--source-root',str(source),'--output-dir',str(generated),'--header-manifest',str(source/'config/gpu-adapter-headers.json')]
     aether=source/'vendor/aether';harness=[aether/'src/core/fex/fex_guest_engine.cpp',aether/'src/core/guest_cpu/fex_guest_cpu.cpp',aether/'src/core/guest_cpu/hle_call_adapter.cpp',aether/'src/core/guest_cpu/fex_hle_bridge.cpp',aether/'runtime/probes/fexcore-guest-harness.cpp']
-    command=['cmake','-S',str(aether/'runtime/sources/fexcore-darwin'),'-B',str(build),'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_OSX_ARCHITECTURES=arm64','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_DISABLE_SOURCE_CHANGES=ON','-DCMAKE_PREFIX_PATH='+';'.join(map(str,prefixes)),'-DTUNE_CPU=none','-DBUILD_FEXCORE_ONLY=ON',
+    command=[renderer['build_tools']['cmake']['path'],'-S',str(aether/'runtime/sources/fexcore-darwin'),'-B',str(build),'-G','Ninja','-DCMAKE_MAKE_PROGRAM='+renderer['build_tools']['ninja']['path'],'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_OSX_ARCHITECTURES=arm64','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_DISABLE_SOURCE_CHANGES=ON','-DCMAKE_PREFIX_PATH='+';'.join(map(str,prefixes)),'-DTUNE_CPU=none','-DBUILD_FEXCORE_ONLY=ON',
         '-DFEXCORE_PROJECT_SOURCE_DIR='+str(aether/'src'),'-DFEXCORE_SMOKE_SOURCE='+str(aether/'runtime/probes/fexcore-smoke.cpp'),'-DFEXCORE_GUEST_HARNESS_SOURCES='+';'.join(map(str,harness)),
         '-DBB_ARM64_PROTOTYPE_DIR='+str(source),'-DBB_ARM64_GENERATED_DIR='+str(generated),'-DBB_ARM64_RUNTIME_ROOT='+str(runtime),'-DBB_ARM64_DEPENDENCY_INCLUDE_DIRS='+';'.join(renderer['includes']),
         '-DBB_ARM64_SDL_LIBRARY='+renderer['sdl_library'],'-DBB_ARM64_RENDERER_LIBRARY='+renderer['library'],'-DBB_ARM64_CPU_HOST_LIBRARY='+renderer['library'],'-DBB_ARM64_RENDERER_BUILD_DIR='+renderer['build'],'-DBB_ARM64_RENDERER_TARGET=bbgpu','-DBB_ARM64_RENDERER_BUILD_JOBS=1']

@@ -21,6 +21,19 @@ def need(value,message):
     if not value:raise ValueError(message)
 
 
+def clone_metadata(path,size):
+    """Structural checks only; final whole-read-set hashes remain authoritative."""
+    path=Path(path).absolute()
+    need(path==path.resolve(strict=True),'linked CoW source or destination refused')
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
+    try:
+        info=os.fstat(fd)
+        need(stat.S_ISREG(info.st_mode)and info.st_uid==os.getuid()and info.st_size==size,
+             'owned regular CoW file with recorded size required')
+        return info
+    finally:os.close(fd)
+
+
 def clone(source,target):
     """Real APFS CoW only. A failure never falls through to a large copy."""
     api=ctypes.CDLL('/usr/lib/libSystem.B.dylib',use_errno=True).clonefile
@@ -181,11 +194,16 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
         generation.mkdir(mode=0o700);view=generation/'view';view.mkdir(mode=0o700)
         for row in records:
             check();source=Path(row['source']);destination=view/row['path'];destination.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
-            need(file_sha(source,check)==(row['sha256'],row['bytes']),'selected source changed before clone')
+            before=clone_metadata(source,row['bytes'])
             clone_file(source,destination)
-            need(file_sha(destination,check)==(row['sha256'],row['bytes'])and file_sha(source,check)==(row['sha256'],row['bytes']),
-                 'source changed during CoW snapshot')
+            target=clone_metadata(destination,row['bytes']);after=clone_metadata(source,row['bytes'])
+            need(target.st_nlink==1 and (target.st_dev,target.st_ino)not in
+                 ((before.st_dev,before.st_ino),(after.st_dev,after.st_ino)),
+                 'CoW snapshot must not alias its source')
             destination.chmod(0o400)
+        # Each immutable clone and the final selected sources must still match
+        # the initial records, including the complete file set and mod mapping.
+        # Metadata above is never treated as proof of unchanged file contents.
         verify_snapshot(view,records,check)
         verify_live_selection(actual,origins,observed,records,stage,environment,selection,check)
         for root,dirs,files in os.walk(view,topdown=False):Path(root).chmod(0o500)

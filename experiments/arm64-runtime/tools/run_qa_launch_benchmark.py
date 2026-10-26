@@ -69,8 +69,11 @@ def admit(conditions):
  cache=validate(manifest,project=P,expected_upstream_gpu_sha256=m['upstream_inputs']['gpu_library'])
  return dict(cpu=cpu,gpu=gpu),cache
 
-def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start):
+def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False):
  from qa_launch_clone import inventory_savedata
+ from qa_f3_contract import F3Check,NewLogLines
+ f3=F3Check()if functional_f3 else None
+ fresh_logs=NewLogLines()if f3 is not None else None
  before=observer.system()
  if before['locked']or before['pressure']==4:raise RuntimeError('locked or severe pressure before run')
  write(root/'result.json',report);print('Run:',root,flush=True)
@@ -108,16 +111,27 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
     now=time.monotonic();elapsed=now-started;rows=descendants();s=observer.system();s.update(seconds=elapsed,processes=rows,usage=usage([f'{i} {j} 0 {path}'for i,j,path in rows]));samples.append(s);peak_pressure=max(peak_pressure,s['pressure']);sample_log.write(json.dumps(s,separators=(',',':'))+'\n');sample_log.flush()
     reason=policy.observe(now-protection_start,s)
     if pressed and now-last_press>=.18:input_('');pressed=False
-    if ready is None and now>=next_frames:
+    if (ready is None or f3 is not None)and now>=next_frames:
      next_frames=now+1
      if frames.exists():
       try:last_frame_rows=read_tail(frames)
       except ValueError:last_frame_rows=[]
-     if scene_seen(last_frame_rows):ready=elapsed;print('Scene camera observed:',round(ready,2),flush=True)
-     elif last_frame_rows and elapsed>=12 and now-last_press>=4:
+     in_scene=scene_seen(last_frame_rows)
+     if in_scene and ready is None:ready=elapsed;print('Scene camera observed:',round(ready,2),flush=True)
+     if f3 is not None:
+      log_text,drained=fresh_logs.read(root/'console.log')
+      token=None
+      # Consume all pre-save logs before requesting a new checkpoint. An old
+      # startup confirmation must never authorize restoring that old checkpoint.
+      if drained or f3.phase not in('entering','settling'):
+       token=f3.step(elapsed,scene=in_scene,cpus={pid for pid,ppid,path in rows if path==str(c['runtime']['bin/bb-probe-metal'])},gpus={pid for pid,ppid,path in rows if path==str(c['runtime']['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'])},log=log_text)
+      if token:
+       input_(token+'\n');pressed=True;last_press=now
+       with(root/'actions.jsonl').open('a')as f:f.write(json.dumps(dict(action=token,seconds=elapsed,phase=f3.phase,utc_ns=time.time_ns()))+'\n')
+     if ready is None and(f3 is None or f3.phase=='entering')and last_frame_rows and elapsed>=12 and now-last_press>=4:
       input_('cross\n');pressed=True;last_press=now
       with(root/'actions.jsonl').open('a')as f:f.write(json.dumps(dict(action='cross',seconds=elapsed,reason='Continue before scene camera'))+'\n')
-    reason=reason or deadline(elapsed,ready,startup_seconds,scene_seconds)
+    reason=reason or(('functional F3 completed'if f3.phase=='completed'else 'functional F3 time budget'if elapsed>=startup_seconds else None)if f3 is not None else deadline(elapsed,ready,startup_seconds,scene_seconds))
     if reason:break
     time.sleep(.25)
    if reason is None:reason='unexpected process exit'
@@ -126,18 +140,20 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
  finally:
   input_('');stop();after=observer.system()
   source_same=inventory_savedata(c['user_root']/'savedata')==case['source_save_manifest']
-  report.update(status='sampled'if reason=='scene sample completed'and source_same else'incomplete',stop=reason,process_exit=proc.returncode if proc else None,seconds=time.monotonic()-started,scene_ready=ready,before=before,after=after,peak_pressure=peak_pressure,swap_growth_mib=after['swap_mib']-before['swap_mib'],source_save_unchanged=source_same,memory_policy=MemoryPolicy.MANIFEST)
+  report.update(status=('functional-checked'if f3 is not None else'sampled')if reason in('scene sample completed','functional F3 completed')and source_same else'incomplete',stop=reason,process_exit=proc.returncode if proc else None,seconds=time.monotonic()-started,scene_ready=ready,before=before,after=after,peak_pressure=peak_pressure,swap_growth_mib=after['swap_mib']-before['swap_mib'],source_save_unchanged=source_same,memory_policy=MemoryPolicy.MANIFEST)
+  if f3 is not None:report['functional_f3']={**vars(f3),'scripted_api_not_physical_key_test':True}
   if report['status']=='sampled':
    try:report['scene_sample']=scene_summary(frames,samples,ready,scene_seconds)
    except ValueError as error:report.update(status='incomplete',error=str(error))
-  report['qualification']='Original Swift frozen conditions; Continue only. Scene camera is not full gameplay/visual/network/F3 acceptance. Telemetry has overhead; combined footprints may double-count shared memory. No matched old/new performance or sustained-memory conclusion.'
+  report['qualification']=('Original normal Play and original offline F3 supervisor; isolated scripted quicksave/quickload API, not a physical keyboard test. No FPS/performance or full visual/network conclusion.'if f3 is not None else'Original Swift frozen conditions; Continue only. Scene camera is not full gameplay/visual/network/F3 acceptance. Telemetry has overhead; combined footprints may double-count shared memory. No matched old/new performance or sustained-memory conclusion.')
   if frames.exists():os.replace(frames,root/'frames.csv')
   write(root/'result.json',report);print(json.dumps({k:v for k,v in report.items()if k not in('native_identity','qualification')},indent=2),flush=True)
  return report
 
 def main():
- ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'),default='seeded');ap.add_argument('--runs',type=int,choices=(1,2),default=1);a=ap.parse_args()
+ ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'),default='seeded');ap.add_argument('--runs',type=int,choices=(1,2),default=1);ap.add_argument('--functional-f3',action='store_true');a=ap.parse_args()
  assert 60<=a.startup_seconds<=1800 and 45<=a.scene_seconds<=180
+ assert not a.functional_f3 or a.runs==1,'functional F3 is one supervised session'
  from qa_launch_conditions import load
  from qa_launch_clone import create
  c=load(a.receipt,stage=a.stage,project=P);require_no_games()
@@ -152,12 +168,17 @@ def main():
  # scripted input/log-only telemetry. That entry also requires quicksave off;
  # log this control difference, never silently call it identical UI behavior.
  if env.get('BB_FRAME_STATS','0')=='1' or env.get('BB_SAVE_LOG','0')=='1':raise ValueError('unprofiled benchmark requires original heavy statistics off')
+ if env.get('BB_AUDIO')!='none':raise ValueError('night QA requires original GUI audio=none')
  env.update(BB_PAD_FILE=str(case['pad']),BB_PAD_FILE_ONLY='1',BB_QUICKSAVE='0')
+ if a.functional_f3:
+  assert c['environment'].get('BB_QUICKSAVE')=='1','original GUI quicksave must already be enabled'
+  env.update(BB_QUICKSAVE='1',BB_FRAME_STATS='1')
  actual_changes={k:dict(before=c['environment'].get(k),after=env.get(k))for k in sorted(set(c['environment'])|{k for k in env if k.startswith(('BB_','MTL_'))})if c['environment'].get(k)!=env.get(k)}
- allowed_changes=sorted(set(case['allowed_changes'])|{'BB_QUICKSAVE','BB_PAD_FILE_ONLY'})
+ allowed_changes=sorted(set(case['allowed_changes'])|{'BB_QUICKSAVE','BB_PAD_FILE_ONLY'}|({'BB_FRAME_STATS'}if a.functional_f3 else set()))
  assert set(actual_changes)<=set(allowed_changes),'unapproved game setting override'
- command=[c['executable'],str(c['stage']/c['arguments'][0]),'--benchmark']
+ command=[c['executable'],str(c['stage']/c['arguments'][0])]+([]if a.functional_f3 else['--benchmark'])
  report=dict(schema=1,status='running',receipt_sha256=sha(a.receipt),launch_id=c['launch_id'],native_identity=native,original_shell_entry_preserved=True,original_benchmark_flag_added=True,benchmark_control_overrides=dict(BB_QUICKSAVE='0',BB_PAD_FILE_ONLY='1'),cache_mode=a.cache_mode,silent=True,screen_capture=False,Cua=False,profiler=False,scripted_actions=['Continue until real scene camera'],formal_data_modified=False,source_save_unchanged=False,settings_sha256=case['config_sha256'],startup_budget_seconds=a.startup_seconds,scene_seconds=a.scene_seconds,quality_or_effects_changed=False)
+ if a.functional_f3:report.update(original_benchmark_flag_added=False,benchmark_control_overrides={'BB_FRAME_STATS':'1','BB_ARM_QA_PAD_FILE':'isolated existing native QA API'},performance_sample=False,functional_f3_requested=True,incremental_log_events=True,scripted_actions=['Continue before first scene','quicksave API','quickload API','automatic continue observed; no scripted Continue after F3'])
  write(root/'conditions.json',dict(command=command,cwd=str(c['stage']),environment=env,source_receipt=str(a.receipt),data=str(case['data_root']),user=str(case['user_root']),cache=str(case['cache_root']),pad=str(case['pad']),allowed_changes=allowed_changes,actual_changes=actual_changes,cache_clone=case['cache_clone']))
  write(root/'result.json',report);print('Evidence:',root,flush=True)
  protection_start=time.monotonic();policy=MemoryPolicy(before)
@@ -170,10 +191,10 @@ def main():
    row=dict(report,run=index+1,phase='initial'if index==0 else'warm',
        same_private_cache_and_user=index>0)
    result=sample(c,case,env,command,row,run,startup_seconds=a.startup_seconds,
-       scene_seconds=a.scene_seconds,observer=observer,policy=policy,protection_start=protection_start)
+       scene_seconds=a.scene_seconds,observer=observer,policy=policy,protection_start=protection_start,functional_f3=a.functional_f3)
    reports.append(result)
-   write(root/'result.json',dict(schema=2,status='sampled'if all(r['status']=='sampled'for r in reports)and len(reports)==a.runs else'incomplete',runs=reports,formal_data_modified=False,memory_policy_continuous=True))
-   if result['status']!='sampled':raise SystemExit(1)
+   write(root/'result.json',dict(schema=2,status=('functional-checked'if a.functional_f3 else'sampled')if all(r['status']in('sampled','functional-checked')for r in reports)and len(reports)==a.runs else'incomplete',runs=reports,formal_data_modified=False,memory_policy_continuous=True))
+   if result['status']not in('sampled','functional-checked'):raise SystemExit(1)
  finally:
   observer.close()
   for sig,handler in previous_handlers.items():signal.signal(sig,handler)
