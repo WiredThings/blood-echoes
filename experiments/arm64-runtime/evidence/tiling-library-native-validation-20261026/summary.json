@@ -1,0 +1,165 @@
+{
+  "schema": 1,
+  "status": "library-preparation-and-pixels-passed-local-tiling-pixel-attribution-pending",
+  "enabled": false,
+  "game_tested": false,
+  "formal_data_modified": false,
+  "quota_remaining_percent": 14,
+  "gpu_library_sha256": "ffbbdbd1292340e6d491ef0d735c7109f0690363a589860bf037553e5c043ec3",
+  "full_gpu_units": 230,
+  "build_before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9266.0625
+  },
+  "build_after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9258.0625
+  },
+  "core_processes": 11,
+  "core_passed": true,
+  "capability": {
+    "admitted_schema": 2,
+    "production_bounded_runner": true
+  },
+  "local_libraries_built": 22,
+  "local_requests": 22,
+  "phases": [
+    {
+      "phase": "helpers-probe",
+      "exit": 0,
+      "fixed_psos_ready": 0,
+      "tiling_libraries_ready": 0,
+      "tiling_library_items": 14,
+      "tiling_final_psos_prepared": false,
+      "artifact_counts": {
+        "attempts": 8,
+        "built": 0,
+        "compile_attempts": 0,
+        "critical": 0,
+        "deferred": 8,
+        "failed": 0,
+        "hits": 0
+      }
+    },
+    {
+      "phase": "helpers-prepare",
+      "exit": 0,
+      "fixed_psos_ready": 8,
+      "tiling_libraries_ready": 14,
+      "tiling_library_items": 14,
+      "tiling_final_psos_prepared": false,
+      "artifact_counts": {
+        "attempts": 8,
+        "built": 8,
+        "compile_attempts": 8,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 0
+      }
+    },
+    {
+      "phase": "helpers-probe",
+      "exit": 0,
+      "fixed_psos_ready": 8,
+      "tiling_libraries_ready": 14,
+      "tiling_library_items": 14,
+      "tiling_final_psos_prepared": false,
+      "artifact_counts": {
+        "attempts": 8,
+        "built": 0,
+        "compile_attempts": 0,
+        "critical": 0,
+        "deferred": 0,
+        "failed": 0,
+        "hits": 8
+      }
+    },
+    {
+      "phase": "helpers-probe",
+      "exit": 0,
+      "fixed_psos_ready": 0,
+      "tiling_libraries_ready": 0,
+      "tiling_library_items": 14,
+      "tiling_final_psos_prepared": false,
+      "artifact_counts": {
+        "attempts": 8,
+        "built": 0,
+        "compile_attempts": 0,
+        "critical": 0,
+        "deferred": 8,
+        "failed": 0,
+        "hits": 0
+      }
+    }
+  ],
+  "fixed_before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9250.0625
+  },
+  "fixed_after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9242.0625
+  },
+  "pixel_status": "passed",
+  "pixel_cases": [
+    {
+      "test": "test_mtl_runtime",
+      "bounded": "0",
+      "exit": 0,
+      "case_lines": 18,
+      "local_library_hits": 0,
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_runtime",
+      "bounded": "1",
+      "exit": 0,
+      "case_lines": 18,
+      "local_library_hits": 0,
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_scene_targets",
+      "bounded": "0",
+      "exit": 0,
+      "case_lines": 0,
+      "local_library_hits": 0,
+      "fail_lines": []
+    },
+    {
+      "test": "test_mtl_scene_targets",
+      "bounded": "1",
+      "exit": 0,
+      "case_lines": 0,
+      "local_library_hits": 0,
+      "fail_lines": []
+    }
+  ],
+  "pixel_before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9226.0625
+  },
+  "pixel_after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 9226.0625
+  },
+  "pixel_author_runtime_stubs": true,
+  "local_tiling_pixel_path_proven": false,
+  "old_schema_packet_rejected": {
+    "exit": 65,
+    "reason": "author harness accidentally retained schema1; rejected before Device; corrected fixture and kept old evidence"
+  },
+  "uncompleted": [
+    "attribute zero local-hit logs in pixel controls",
+    "negative missing entry/corrupt library tests for all14",
+    "coherent CPU/app packaging and actual original-entry cold/warm integration",
+    "full-game final PSO catalogue and all remaining original goals"
+  ]
+}

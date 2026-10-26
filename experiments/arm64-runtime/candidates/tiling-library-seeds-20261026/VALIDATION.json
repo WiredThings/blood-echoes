@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "not-enabled-not-native-validated",
+  "status": "not-enabled-native-library-preparation-passed-local-pixel-attribution-pending",
   "base_commit": "15bcac2270338730e0d41b9281fdaade810d4d8f",
   "files": {
     "0001-tiling-library-seeds-schema2.patch": "ca1731876d3a7ebddc75e32587da805aa2f98abecb22a1bb3aebbb689b423a59",
@@ -21,9 +21,14 @@
       "seconds": 2.0289522079983726
     }
   ],
-  "compiled_objects": false,
-  "linked_library": false,
-  "gpu_tested": false,
+  "compiled_objects": true,
+  "linked_library": true,
+  "gpu_tested": true,
   "game_tested": false,
-  "formal_data_modified": false
+  "formal_data_modified": false,
+  "full_gpu_units": 230,
+  "local_libraries_ready": 14,
+  "fixed_psos_ready": 8,
+  "local_tiling_pixel_path_proven": false,
+  "native_summary": "../../evidence/tiling-library-native-validation-20261026/summary.json"
 }
