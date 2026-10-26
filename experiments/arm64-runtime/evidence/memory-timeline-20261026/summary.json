@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "status": "passed-diagnostic-only",
+  "performance_evidence": false,
+  "game_started": true,
+  "formal_data_modified": false,
+  "desktop_capture": false,
+  "character_actions": false,
+  "samples": 946,
+  "system_vm_samples": 946,
+  "phase_points": {
+    "before": {
+      "seconds": 0.0014592079678550363,
+      "pressure": 1,
+      "swap_mib": 9284.9375,
+      "system_page_bytes": 16384,
+      "system_bytes": {
+        "free_count": 1895677952,
+        "wire_count": 4344315904,
+        "compressor_page_count": 1188872192,
+        "total_uncompressed_pages_in_compressor": 2283667456,
+        "external_page_count": 4167548928,
+        "internal_page_count": 5788385280,
+        "active_count": 4977410048,
+        "inactive_count": 4225531904
+      },
+      "system_io_delta_bytes": {
+        "swapins": 0,
+        "swapouts": 0,
+        "pageins": 0,
+        "pageouts": 0
+      }
+    },
+    "before_game_gpu": {
+      "seconds": 137.7183321249904,
+      "pressure": 1,
+      "swap_mib": 9260.9375,
+      "system_page_bytes": 16384,
+      "system_bytes": {
+        "free_count": 315015168,
+        "wire_count": 4192337920,
+        "compressor_page_count": 1019936768,
+        "total_uncompressed_pages_in_compressor": 2112749568,
+        "external_page_count": 4710744064,
+        "internal_page_count": 6455246848,
+        "active_count": 5588303872,
+        "inactive_count": 5515624448
+      },
+      "system_io_delta_bytes": {
+        "swapins": 22544384,
+        "swapouts": 0,
+        "pageins": 794050560,
+        "pageouts": 0
+      }
+    },
+    "gpu_plus_5": {
+      "seconds": 143.08214670803864,
+      "pressure": 1,
+      "swap_mib": 9260.9375,
+      "system_page_bytes": 16384,
+      "system_bytes": {
+        "free_count": 129531904,
+        "wire_count": 9393569792,
+        "compressor_page_count": 3312238592,
+        "total_uncompressed_pages_in_compressor": 6707544064,
+        "external_page_count": 2241839104,
+        "internal_page_count": 1604960256,
+        "active_count": 1932574720,
+        "inactive_count": 1863843840
+      },
+      "system_io_delta_bytes": {
+        "swapins": 24182784,
+        "swapouts": 0,
+        "pageins": 1084211200,
+        "pageouts": 7979008
+      }
+    },
+    "scene_ready": {
+      "seconds": 152.08444791694637,
+      "pressure": 2,
+      "swap_mib": 9490.125,
+      "system_page_bytes": 16384,
+      "system_bytes": {
+        "free_count": 211222528,
+        "wire_count": 10615324672,
+        "compressor_page_count": 3567370240,
+        "total_uncompressed_pages_in_compressor": 7095205888,
+        "external_page_count": 1455898624,
+        "internal_page_count": 860930048,
+        "active_count": 1170391040,
+        "inactive_count": 1067368448
+      },
+      "system_io_delta_bytes": {
+        "swapins": 27443200,
+        "swapouts": 240320512,
+        "pageins": 2105360384,
+        "pageouts": 20021248
+      }
+    },
+    "last": {
+      "seconds": 242.30785550002474,
+      "pressure": 2,
+      "swap_mib": 9466.125,
+      "system_page_bytes": 16384,
+      "system_bytes": {
+        "free_count": 120733696,
+        "wire_count": 10395467776,
+        "compressor_page_count": 2905210880,
+        "total_uncompressed_pages_in_compressor": 5684477952,
+        "external_page_count": 1209663488,
+        "internal_page_count": 2026979328,
+        "active_count": 1630650368,
+        "inactive_count": 1579745280
+      },
+      "system_io_delta_bytes": {
+        "swapins": 58359808,
+        "swapouts": 240320512,
+        "pageins": 3170533376,
+        "pageouts": 21331968
+      }
+    }
+  },
+  "peak_system_wired_bytes": 10615324672,
+  "max_pressure": 2,
+  "swap_change_mib": 181.1875,
+  "vm_api_only_timing_us": {
+    "median": 9.0,
+    "p95": 22.0,
+    "excludes_python_conversion_and_logging": true
+  },
+  "preparation": {
+    "status": "completed",
+    "completed": 424,
+    "recorded": 0,
+    "initial_local_calls": 1,
+    "final_local_calls": 0,
+    "warm_fast_path": true,
+    "seconds": 94.84057445800863,
+    "builder_session": {
+      "calls": 1,
+      "full_builds": 1,
+      "reuses": 0,
+      "invalidations": 0,
+      "metadata_entries": 2029,
+      "seconds": 18.103341334033757,
+      "full_build_seconds": 17.711549292085692,
+      "reuse_validation_seconds": 0.0,
+      "events": []
+    }
+  },
+  "limitations": [
+    "system-wide pages are not per-process or GPU attribution",
+    "compressed pages and their uncompressed contents must not be summed",
+    "resource category log reports lack a matching monotonic timestamp",
+    "no matched no-preparation or resource-residency comparison"
+  ],
+  "system_io_units": "kernel page counters times native page_bytes; logical page-equivalent volume, not measured compressed SSD bytes"
+}

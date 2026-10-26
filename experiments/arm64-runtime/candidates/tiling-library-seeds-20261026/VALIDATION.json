@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "status": "not-enabled-not-native-validated",
+  "base_commit": "15bcac2270338730e0d41b9281fdaade810d4d8f",
+  "files": {
+    "0001-tiling-library-seeds-schema2.patch": "ca1731876d3a7ebddc75e32587da805aa2f98abecb22a1bb3aebbb689b423a59",
+    "test_library_contract.py": "d2097594e5c715281b4bcf126b723b2ef834eedc81ed905c117635f66db26e21",
+    "test_delta.py": "33aadafa3861a3577689bf5800c7a11abbc5613618006539850aceb40bbdf37b",
+    "0002-short-circuit-and-old-capability.patch": "0aeba0c66a68b5fa4dd2e390a59501216798d000e279ae772d3fd490f980091c"
+  },
+  "cpu_contract_tests": 21,
+  "syntax_only_units": [
+    {
+      "source": "vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm",
+      "exit": 0,
+      "seconds": 2.566288915928453
+    },
+    {
+      "source": "src/game_pso_preparer.mm",
+      "exit": 0,
+      "seconds": 2.0289522079983726
+    }
+  ],
+  "compiled_objects": false,
+  "linked_library": false,
+  "gpu_tested": false,
+  "game_tested": false,
+  "formal_data_modified": false
+}

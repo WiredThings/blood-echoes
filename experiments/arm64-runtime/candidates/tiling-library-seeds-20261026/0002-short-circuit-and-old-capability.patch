@@ -1,0 +1,23 @@
+--- a/tools/game_pso_component.py
++++ b/tools/game_pso_component.py
+@@ -123,6 +123,9 @@
+    stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10,env=env)
+   need(isinstance(result.stdout,bytes)and len(result.stdout)<=4096,'worker capability output bound')
+   if result.returncode==64:return 0
++  # A relocated schema1 worker is a known older component, unavailable for the
++  # stronger schema2 library contract. Never silently interpret it as schema2.
++  if result.returncode==0 and result.stdout==b'FIXED_HELPER_CAPABILITY 1\n':return 0
+   need(result.returncode==0 and len(result.stdout)<=4096 and result.stdout==b'FIXED_HELPER_CAPABILITY 2\n','worker fixed helper ABI query failed')
+   return 2
+ 
+--- a/vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm
++++ b/vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm
+@@ -266,6 +266,8 @@
+     id<MTLFunction> function=nil;
+     std::array<LocalLibrary::Origin,1> origins;
+     auto library=TextureTilingLibrary(shader,dispatch.key.num_bits==64,values,&function,&origins[0],&error);
++    // Includes unsupported rewrite shape: retain the original nil-slot short circuit.
++    if(!library){if(!warming)texture_tiling.emplace(key,nil);return nil;}
+     if(!function&&library)function=[library newFunctionWithName:@"main0" constantValues:values error:&error];
+     HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::TextureTiling;
+     invocation.bits=dispatch.key.num_bits;invocation.macro=1;invocation.proxy=proxy;invocation.bounded=bounded;invocation.count=dispatch.num_constants;

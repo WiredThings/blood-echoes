@@ -1,0 +1,212 @@
+--- a/vendor/metal_api/shadps4/video_core/renderer_metal/mtl_fixed_helper_seeds.h
++++ b/vendor/metal_api/shadps4/video_core/renderer_metal/mtl_fixed_helper_seeds.h
+@@ -4,7 +4,7 @@
+ #include <vector>
+ #include "video_core/renderer_metal/mtl_host_pso_recipe.h"
+ namespace Metal::HostPso {
+-inline constexpr unsigned FixedSeedSchema=1,FixedSeedCount=8;
++inline constexpr unsigned FixedSeedSchema=2,FixedSeedCount=8;
+ // Actual frame format comes from the original Presenter constant provider.
+ // No request invents a sample count, tiler constant or fault-parser argument.
+ inline std::array<Invocation,FixedSeedCount> FixedSeeds(U presentation_format){
+@@ -14,6 +14,10 @@
+  for(unsigned i=0;i<out.size();++i){out[i].kind=kinds[i];if(kinds[i]==Kind::PostProcess)out[i].format=presentation_format;}
+  return out;
+ }
++// Library coverage is separate from final native PSO coverage. No native handles.
++inline constexpr unsigned TilingLibrarySchema=1,TilingLibraryCount=14;
++struct TilingLibraryItem {U bits{};bool macro{},texture{},entry_ready{};LocalLibrary::Origin origin;};
++struct TilingLibraryResult {std::vector<TilingLibraryItem> items;U local_ready{};bool critical{},cancelled{},complete{};};
+ struct FixedSeedItem {Kind kind{};std::string request_sha256,descriptor_sha256;ArtifactOutcome outcome;std::array<LocalLibrary::Route,2> actual_routes{};U origin_count{};bool inputs_verified{},native_ready{};};
+ struct FixedSeedResult {WarmResult progress;std::vector<FixedSeedItem> items;bool cancelled{},allow_compile{};};
+ }
+--- a/vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_impl.h
++++ b/vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_impl.h
+@@ -51,6 +51,11 @@
+     // renderer owner slots, guest memory, framebuffers or extra state maps.
+     HostPso::FixedSeedResult PrepareFixedSeeds(bool allow_compile,
+         const std::function<bool()>& cancelled);
++    HostPso::TilingLibraryResult PrepareTilingLibraries(const std::function<bool()>& cancelled);
++    // Shared original source/options/typed-entry factory; no native PSO creation.
++    id<MTLLibrary> TextureTilingLibrary(const HostShaders::Shader& shader,bool half,
++        MTLFunctionConstantValues* values,id<MTLFunction> __strong* function,
++        LocalLibrary::Origin* origin,NSError** error);
+     HostPso::WarmResult FinishPreparation();
+     const HostPso::WarmResult& PreparationResult()const{return warm_result;}
+     void ConfigureFaultParser(u32 page_bits,u32 max_faults);
+--- a/vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm
++++ b/vendor/metal_api/shadps4/video_core/renderer_metal/mtl_runtime_kernels.mm
+@@ -248,8 +248,6 @@
+     if(const auto i=texture_tiling.find(key);!warming&&i!=texture_tiling.end())return i->second;
+     if(!warming&&texture_tiling.size()>=32)return nil;
+     const auto& shader=TilingShader(dispatch.key.num_bits,true);
+-    const auto source=TextureTilingSource(shader.msl,dispatch.key.num_bits==64);
+-    if(source.empty()) {if(!warming)texture_tiling.emplace(key,nil);return nil;}
+     NSError* error=nil;
+     MTLFunctionConstantValues* values=[MTLFunctionConstantValues new];
+     for(const auto& spec:shader.spec_constants) {
+@@ -267,11 +265,7 @@
+     const u32 scale=proxy?2u:1u;[values setConstantValue:&scale type:MTLDataTypeUInt atIndex:12];
+     id<MTLFunction> function=nil;
+     std::array<LocalLibrary::Origin,1> origins;
+-    auto library=LocalLibrary::Build(dev.device, @(source.c_str()), CompileOptions(), &error,
+-        [&](id<MTLLibrary> local) {
+-            function=[local newFunctionWithName:@"main0" constantValues:values error:nil];
+-            return bool(function);
+-        },true,&origins[0]);
++    auto library=TextureTilingLibrary(shader,dispatch.key.num_bits==64,values,&function,&origins[0],&error);
+     if(!function&&library)function=[library newFunctionWithName:@"main0" constantValues:values error:&error];
+     HostPso::Invocation invocation{};invocation.kind=HostPso::Kind::TextureTiling;
+     invocation.bits=dispatch.key.num_bits;invocation.macro=1;invocation.proxy=proxy;invocation.bounded=bounded;invocation.count=dispatch.num_constants;
+@@ -281,6 +275,51 @@
+     if(!pipeline)LOG_WARNING(Render,"Texture tiling unavailable; original staging retained: {}",ErrorText(error));
+     if(!warming)texture_tiling.emplace(key,pipeline);
+     return pipeline;
++}
++
++id<MTLLibrary> HostKernels::TextureTilingLibrary(const H::Shader&shader,bool half,
++ MTLFunctionConstantValues*values,id<MTLFunction> __strong*function,
++ LocalLibrary::Origin*origin,NSError**error){
++ const auto source=TextureTilingSource(shader.msl,half);
++ if(function)*function=nil;if(origin)*origin={};if(source.empty())return nil;
++ return LocalLibrary::Build(dev.device,@(source.c_str()),CompileOptions(),error,
++  [&](id<MTLLibrary>local){auto entry=[local newFunctionWithName:@"main0" constantValues:values error:nil];
++   if(function)*function=entry;return bool(entry);},true,origin);
++}
++HostPso::TilingLibraryResult HostKernels::PrepareTilingLibraries(const std::function<bool()>&cancelled){
++ HostPso::TilingLibraryResult result;result.items.reserve(HostPso::TilingLibraryCount);
++ // The fresh headless HostKernels keeps no original runtime library/PSO slots.
++ const bool old_warming=warming;warming=true;SCOPE_EXIT{warming=old_warming;};
++ const auto start=std::chrono::steady_clock::now();
++ const auto collect=[&](u32 bits,bool macro,bool texture){
++  if(cancelled&&cancelled()){result.cancelled=true;return false;}
++  if(HostSeverePressure()){result.critical=true;return false;}
++  if(std::chrono::steady_clock::now()-start>std::chrono::seconds(10))return false;
++  HostPso::TilingLibraryItem item;item.bits=bits;item.macro=macro;item.texture=texture;
++  @autoreleasepool {try{
++   const auto&shader=TilingShader(bits,macro);id<MTLFunction>function=nil;
++   MTLFunctionConstantValues*values=[MTLFunctionConstantValues new];
++   if(texture){
++    // Original non-proxy scale; source admission only, no invented final PSO.
++    const u32 scale=1;const bool bounded=false;
++    [values setConstantValue:&scale type:MTLDataTypeUInt atIndex:12];
++    [values setConstantValue:&bounded type:MTLDataTypeBool atIndex:13];
++    NSError*error=nil;auto library=TextureTilingLibrary(shader,bits==64,values,&function,&item.origin,&error);
++    item.entry_ready=bool(library&&function);
++   }else{
++    // Omitted constants use the defaults encoded in the original generated MSL.
++    auto library=Library(shader,values,false,&function,&item.origin);
++    item.entry_ready=bool(library&&function);
++   }
++  }catch(...){item.entry_ready=false;item.origin={};}}
++  if(item.entry_ready&&item.origin.valid()&&item.origin.route==LocalLibrary::Route::LocalMetallib)++result.local_ready;
++  result.items.push_back(std::move(item));return true;
++ };
++ for(const auto bits:{8u,16u,32u,64u,96u,128u})for(const bool macro:{false,true})
++  if(!collect(bits,macro,false))return result;
++ for(const auto bits:{32u,64u})if(!collect(bits,true,true))return result;
++ result.complete=result.items.size()==HostPso::TilingLibraryCount&&result.local_ready==HostPso::TilingLibraryCount;
++ return result;
+ }
+ 
+ void HostKernels::ConfigureFaultParser(u32 page_bits,u32 max_faults){
+--- a/src/game_pso_preparer.mm
++++ b/src/game_pso_preparer.mm
+@@ -93,7 +93,15 @@
+  if(compile){const char*build=getenv("BB_MTL_LOCAL_AOT_BUILD_ID");Need(std::string_view(aot)=="load"&&build&&Metal::HostPso::Hex(build),"fixed prepare requires verified local build");}
+  Stop();Metal::Device device;Metal::Scheduler scheduler(device,"fixed helper preparation");Metal::PsoCache cache(device,artifact,Metal::ReadFloatRules()==Metal::FloatRules::RelaxedMath);cache.ReleaseWarmArchive();
+  Metal::HostKernels kernels(device.GetImpl(),scheduler);kernels.BindPsoCache(&cache);
+- const auto prepared=kernels.PrepareFixedSeeds(compile,[]{return bool(interrupted);});kernels.BindPsoCache(nullptr);Stop();
++ const auto libraries=kernels.PrepareTilingLibraries([]{return bool(interrupted);});Stop();
++ const auto prepared=libraries.critical?Metal::HostPso::FixedSeedResult{}:kernels.PrepareFixedSeeds(compile,[]{return bool(interrupted);});kernels.BindPsoCache(nullptr);Stop();
++ Json library_rows=Json::array();for(const auto&item:libraries.items)library_rows.push_back({
++  {"bits",item.bits},{"macro",item.macro},{"texture",item.texture},{"entry_ready",item.entry_ready},
++  {"actual_route",unsigned(item.origin.route)},{"source_sha256",item.origin.source_sha256},
++  {"request_key",item.origin.key},{"library_sha256",item.origin.library_sha256}});
++ result["tiling_libraries"]={{"schema",Metal::HostPso::TilingLibrarySchema},{"known",Metal::HostPso::TilingLibraryCount},
++  {"processed",libraries.items.size()},{"local_ready",libraries.local_ready},{"complete",libraries.complete},
++  {"final_psos_prepared",false},{"items",library_rows}};
+  result["mode"]=mode;result["fixed_helper_seed_schema"]=Metal::HostPso::FixedSeedSchema;result["fixed_only"]=true;result["storage_opened"]=false;result["renderer_owners_constructed"]=false;result["guest_Runtime_constructed"]=false;
+  result["known"]=prepared.progress.known;result["processed"]=prepared.progress.processed;result["ready"]=prepared.progress.ready;result["built"]=prepared.progress.built;result["deferred"]=prepared.progress.deferred;result["failed"]=prepared.progress.failed;result["cancelled"]=prepared.cancelled;
+  bool all_local=prepared.items.size()==Metal::HostPso::FixedSeedCount;
+@@ -103,8 +111,8 @@
+   rows.push_back({{"kind",u32(item.kind)},{"request_sha256",item.request_sha256},{"descriptor_sha256",item.descriptor_sha256},{"inputs_verified",item.inputs_verified},{"native_ready",item.native_ready},{"outcome",unsigned(item.outcome.state)},{"archive_sha256",item.outcome.archive_sha256},{"actual_routes",routes}});}
+  result["items"]=rows;result["all_actual_libraries_local"]=all_local;
+  const auto&c=cache.GetCounters();result["artifact_counts"]={{"attempts",c.artifact_attempts.load()},{"hits",c.artifact_hits.load()},{"built",c.artifact_built.load()},{"compile_attempts",c.artifact_compile_attempts.load()},{"failed",c.artifact_failed.load()},{"deferred",c.artifact_deferred.load()},{"critical",c.artifact_critical.load()}};
+- const bool critical=prepared.progress.state==Metal::HostPso::WarmState::Critical;const bool complete=prepared.progress.state==Metal::HostPso::WarmState::Complete&&prepared.progress.ready==Metal::HostPso::FixedSeedCount&&all_local;
+- result["status"]=critical?"stopped":complete?"completed":compile?"deferred":"inputs-collected";result["all_fixed_native_ready"]=complete;
++ const bool critical=libraries.critical||prepared.progress.state==Metal::HostPso::WarmState::Critical;const bool native_complete=prepared.progress.state==Metal::HostPso::WarmState::Complete&&prepared.progress.ready==Metal::HostPso::FixedSeedCount&&all_local;const bool complete=libraries.complete&&native_complete;
++ result["status"]=critical?"stopped":complete?"completed":compile?"deferred":"inputs-collected";result["all_fixed_native_ready"]=native_complete;
+  std::printf("FIXED_HELPER_RESULT %s\n",result.dump().c_str());return critical?BB_ARM_EXIT_HOST_PROTECTION:0;
+ }
+ 
+--- a/tools/game_pso_component.py
++++ b/tools/game_pso_component.py
+@@ -123,8 +123,8 @@
+    stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10,env=env)
+   need(isinstance(result.stdout,bytes)and len(result.stdout)<=4096,'worker capability output bound')
+   if result.returncode==64:return 0
+-  need(result.returncode==0 and len(result.stdout)<=4096 and result.stdout==b'FIXED_HELPER_CAPABILITY 1\n','worker fixed helper ABI query failed')
+-  return 1
++  need(result.returncode==0 and len(result.stdout)<=4096 and result.stdout==b'FIXED_HELPER_CAPABILITY 2\n','worker fixed helper ABI query failed')
++  return 2
+ 
+ def freeze_inputs(stage,component,library,*,rewrite,admission_root):
+  """Call AFTER dependency relocation/signing; bind final copied GPU and worker."""
+--- a/tools/launcher_fixed_helpers.py
++++ b/tools/launcher_fixed_helpers.py
+@@ -14,7 +14,7 @@
+  if r.get('status')=='stopped':raise ProtectionStopped('fixed helper protected stop')
+  if type(row['exit'])is not int or row['exit']!=0:raise RuntimeError('fixed helper worker failed')
+  items=r.get('items',[])
+- if type(r.get('fixed_helper_seed_schema'))is not int or r['fixed_helper_seed_schema']!=1 or type(r.get('known'))is not int or r['known']!=8 or not isinstance(items,list)or len(items)>8:raise ValueError('fixed helper response shape')
++ if type(r.get('fixed_helper_seed_schema'))is not int or r['fixed_helper_seed_schema']!=2 or type(r.get('known'))is not int or r['known']!=8 or not isinstance(items,list)or len(items)>8:raise ValueError('fixed helper response shape')
+  if type(r.get('ready'))is not int or not 0<=r['ready']<=8 or type(r.get('all_fixed_native_ready'))is not bool:raise ValueError('fixed helper ready count')
+  kinds=[i['kind']for i in items]
+  if len(set(kinds))!=len(kinds)or any(type(k)is not int or k not in (4,5,6,9,10,11,12,13)for k in kinds):raise ValueError('fixed helper response kinds')
+@@ -28,8 +28,25 @@
+   if i['native_ready']and(not i['inputs_verified']or i['outcome']not in(1,2)or not isinstance(i['archive_sha256'],str)or not HEX.fullmatch(i['archive_sha256'])):raise ValueError('fixed helper ready receipt identity')
+   if phase=='helpers-probe'and i['outcome']==2:raise ValueError('fixed helper probe cannot publish a built pipeline')
+  if r['ready']!=sum(i['native_ready']for i in items):raise ValueError('fixed helper ready/item mismatch')
+- complete=r['all_fixed_native_ready']
+- if complete and(set(kinds)!={4,5,6,9,10,11,12,13}or r['ready']!=8 or not all(i['native_ready']and i['actual_routes']in([2],[2,2])for i in items)):raise ValueError('fixed helper incomplete success')
++ libraries=r.get('tiling_libraries')
++ if not isinstance(libraries,dict)or type(libraries.get('schema'))is not int or libraries['schema']!=1 or type(libraries.get('known'))is not int or libraries['known']!=14 or libraries.get('final_psos_prepared')is not False:raise ValueError('tiling library schema/PSO separation')
++ entries=libraries.get('items');expected={(b,m,False)for b in(8,16,32,64,96,128)for m in(False,True)}|{(b,True,True)for b in(32,64)}
++ if not isinstance(entries,list)or len(entries)>14 or type(libraries.get('complete'))is not bool:raise ValueError('tiling library response shape')
++ seen=set();local=0
++ for item in entries:
++  if not isinstance(item,dict)or type(item.get('bits'))is not int or type(item.get('macro'))is not bool or type(item.get('texture'))is not bool or type(item.get('entry_ready'))is not bool or type(item.get('actual_route'))is not int:raise ValueError('tiling library item types')
++  key=(item['bits'],item['macro'],item['texture'])
++  if key not in expected or key in seen or item['actual_route']not in(0,1,2):raise ValueError('tiling library identity domain')
++  seen.add(key)
++  if item['entry_ready']:
++   if item['actual_route']not in(1,2)or not HEX.fullmatch(item.get('source_sha256','')):raise ValueError('tiling library successful origin')
++   if item['actual_route']==2:
++    if not HEX.fullmatch(item.get('request_key',''))or not HEX.fullmatch(item.get('library_sha256','')):raise ValueError('tiling library local receipt')
++    local+=1
++ if type(libraries.get('processed'))is not int or libraries['processed']!=len(entries)or type(libraries.get('local_ready'))is not int or libraries['local_ready']!=local:raise ValueError('tiling library counts')
++ if libraries['complete']and(seen!=expected or local!=14):raise ValueError('tiling library incomplete success')
++ complete=r['all_fixed_native_ready'] and libraries['complete']
++ if r['all_fixed_native_ready'] and(set(kinds)!={4,5,6,9,10,11,12,13}or r['ready']!=8 or not all(i['native_ready']and i['actual_routes']in([2],[2,2])for i in items)):raise ValueError('fixed helper incomplete success')
+  count=r.get('artifact_counts',{}).get('compile_attempts')
+  if type(count)is not int or not 0<=count<=64:raise ValueError('fixed helper compile count')
+  if phase=='helpers-probe'and count!=0:raise ValueError('fixed helper probe ordinary compile forbidden')
+@@ -46,7 +63,7 @@
+  if component_loader is None:
+   from game_pso_component import load as component_loader
+  component=component_loader(stage)
+- if component is None or component.get('fixed_helper_seed_schema')!=1:
++ if component is None or component.get('fixed_helper_seed_schema')!=2:
+   return {},dict(status='unavailable',reason='fixed helper worker ABI unavailable')
+  if toolchain_probe is None:
+   from local_aot_policy import available_toolchain as toolchain_probe
+@@ -73,7 +90,7 @@
+  def execute(phase,env,ordinal):
+   check();require_no_games();case=job/(phase+'-'+str(ordinal));case.mkdir(mode=0o700)
+   scratch=case/'scratch';scratch.mkdir();tmp=case/'tmp';tmp.mkdir();packet=case/'packet.json'
+-  packet.write_text(json.dumps(dict(packet_schema=1,fixed_helper_seed_schema=1,candidate_only=True,
++  packet.write_text(json.dumps(dict(packet_schema=1,fixed_helper_seed_schema=2,candidate_only=True,
+    runtime_cache_import_allowed=False,current_cohort=cohort,artifact_cache_dir=str(artifact)),sort_keys=True)+'\n')
+   child={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))}
+   child.update({k:v for k,v in env.items()if k=='BB_GS_DEBUG'or k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))or k in ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES','MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')})

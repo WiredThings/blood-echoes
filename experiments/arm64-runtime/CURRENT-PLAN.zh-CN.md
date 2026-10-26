@@ -299,3 +299,11 @@ handle15658 terminal passed：P/evidence/launcher-engine-abba-179297535583002000
 新QA包中央目录854条，未包含AIR/metallib/binaryarchive/SPV/游戏payload或savedata；仍host-local。当前在同一QA包做下一暖重启，只让已有builder消费4新请求，验证Source4→0；保持原保护、静音、无Cua/录屏/角色动作。该结果后补，不以意图当通过。
 
 以上最小复测已完成：Shared launcher-engine-abba-1792984355921423000，原builder453条/449 verified skipped/4 built与既知四key逐一相符；目录424/424/record0。GPUready后Source4→0、Local7→11，strict13/13、ordinaryrender/compute各1。90秒站桩48.510FPS/p95 21.36/p99 21.72，1%low44.20；combinedfootprint5816.26MiB，maxpressure2、swap+373.06。无匹配系统A/B，不说FPS或内存收益；14库静态首启入口仍未实现。只改了新QA缓存中的正常建库产物，没有运行时代码或正式数据改动。
+
+## 2026-10-26 VM诊断与14库候选交接
+
+开发控制器新增默认off的--memory-timeline，SDK 24字段/152B验证通过；同增量用于私有原入口诊断完成，946/946 VM样本，performance_evidence=false，maxpressure2/swap+181.1875。GPU前wired约3998MiB，GPU+5秒8958MiB，scene-ready10124MiB；系统compressed物理约3402MiB。系统IO累计swapout229.2MiB不能当占用增量，也不能归到单进程。该轮424/424首遍strict、record0、final local0，warm_fast_path=true、94.84秒，实际证明单遍分支，不声称性能收益。Shared case launcher-engine-abba-1792985185717589000，旧test包未重编。
+
+14库后续候选只保存在candidates/tiling-library-seeds-20261026两patch；未应用当前运行时或QA包。组合21项CPU控制过，两个实际ObjC++ TU的fsyntax-only过（依赖已备外部头，不是clean build、无objects/link/GPU）。schema2区分8PSO与14库，旧1/64安全unavailable，恢复原nil库短路；原三元保护一直存在，不称崩溃修复。下一必须同源全闭包构建+真实14库Local/8PSO/pixel与负例，再接默认入口。不因无FPS收益默认关闭，只因尚缺原生验收保持未启用。
+
+最新已测QA包仍e3689f86，全部正式数据/Release不变。当前余量15%，不再开新大批构建或游戏；低于15停止开发测试、保留目标未完并按交接续做。不得把此条当目标完成。

@@ -35,3 +35,13 @@
 直接从相同相机最后30秒完整CSV行计算：旧1457帧、当前1469帧，各取最慢ceil(N×1%)=15帧；1% low定义为1000除以这些帧frame_ms的均值，分别约40.98和45.39 FPS。最大帧时间29.03/23.24 ms。它们来自单次、系统条件不匹配的历史采样，不能作为因果收益或替代ABBA。
 
 当前暖态平均GPU 19.186ms，record busy 6.622ms、replay wait 0.672ms、GPU wait约0.00019ms；present/gnm wait记为0。字段存在重叠，不能相加解释整帧。结合最后30秒编译API均0，能确认这段站桩没有现场编译尖峰；仍不能代表探索新场景。原始定义与数值见同目录warm-timing-derived.json。
+
+## 已补一次系统VM诊断
+
+新增开发命令行`--memory-timeline`复用既有NativeVMObserver；默认关闭，不进正式App路径，不触发角色动作，也不改变安全策略。该模式显式`performance_evidence=false`。内核VM结构与本机SDK的24字段/152字节前缀已对照通过；公开CLI help可解析。四项相同控制变更已用于现有私有frozen-component runner完成实际QA诊断，不能据此冒充其它CLI模式全部回归。
+
+诊断收到946/946份完整系统VM样本，最高压力2，swap增181.1875MiB。全系统wired在GPU宿主启动前约3998MiB、启动5秒后8958MiB、场景首次相机时10124MiB；compressed物理页约973→3159→3402MiB。压缩前内容对应的约6767MiB不是另一份可相加的物理内存。到最后累计swapout约229.2MiB、swapin约55.7MiB，是按原生16KiB页折算的全系统逻辑页量，不是压缩后SSD实际写入字节，也不能与swap占用增量混同。
+
+这些观测把下一调查重点收敛到游戏加载时的页驻留、共享guest映射及驱动持有；**还没有证明哪种资源导致wired变化，也没有证明泄漏**，不据此修改回收逻辑。不要将全系统wired与两个进程footprint直接相加。内核读取时钟段中位9微秒、p95为22微秒，未包含Python转换和日志，也不证明整帧无开销。
+
+同轮目录424/424全部首遍strict命中，record0、final builder0，实际验证了暖单遍快路径；准备94.84秒。该时间来自诊断条件，不声明匹配性能收益。汇总见`evidence/memory-timeline-20261026/summary.json`。
