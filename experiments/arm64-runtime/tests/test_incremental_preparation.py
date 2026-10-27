@@ -15,6 +15,10 @@ class Views(unittest.TestCase):
  actual=source_test.SourceView.actual
  clone=source_test.SourceView.clone
  prepare=source_test.SourceView.prepare
+ def remove_registered_hint(self):
+  # Exercise the lower incremental-hash fallback in this suite. A valid upper
+  # registration legitimately need not read an unused legacy speed hint.
+  for p in (self.gpu/'automatic-game-inputs/source-views').glob('selection-*.json'):p.unlink()
  def test_only_changed_selected_source_is_read(self):
   first=self.prepare();p=self.game/'eboot.bin';old=p.stat();p.write_bytes(b'Z'*old.st_size);os.utime(p,ns=(old.st_atime_ns,old.st_mtime_ns));calls=[];original=view.file_sha
   def count(path,*a,**kw):
@@ -23,11 +27,11 @@ class Views(unittest.TestCase):
   with patch.object(view,'file_sha',side_effect=count):second=self.prepare()
   self.assertEqual(calls,[p]);self.assertNotEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['source_hashes']['hashed_files'],1)
  def test_corrupt_source_hint_falls_back_but_keeps_valid_snapshot(self):
-  first=self.prepare();hint=next((self.gpu/'automatic-game-inputs/source-views').glob('source-metadata-*.json'));hint.write_text('broken');hint.chmod(0o600);second=self.prepare();self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['source_hashes']['receipt'],'invalid');self.assertEqual(second['report']['source_hashes']['hashed_files'],2)
+  first=self.prepare();self.remove_registered_hint();hint=next((self.gpu/'automatic-game-inputs/source-views').glob('source-metadata-*.json'));hint.write_text('broken');hint.chmod(0o600);second=self.prepare();self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['source_hashes']['receipt'],'invalid');self.assertEqual(second['report']['source_hashes']['hashed_files'],2)
  def test_corrupt_snapshot_hint_full_validates_snapshot(self):
-  first=self.prepare();hint=next((self.gpu/'automatic-game-inputs/source-views').glob('snapshot-metadata-*.json'));hint.write_text('broken');hint.chmod(0o600);second=self.prepare();self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['snapshot_hashes']['hashed_files'],2);self.assertEqual(second['report']['source_hashes']['hashed_files'],0)
+  first=self.prepare();self.remove_registered_hint();hint=next((self.gpu/'automatic-game-inputs/source-views').glob('snapshot-metadata-*.json'));hint.write_text('broken');hint.chmod(0o600);second=self.prepare();self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['snapshot_hashes']['hashed_files'],2);self.assertEqual(second['report']['source_hashes']['hashed_files'],0)
  def test_legacy_snapshot_without_hints_enrolls_without_reclone(self):
-  first=self.prepare();root=first['game_root'];ready=(root.parent/'READY.json').read_bytes();count=self.clones
+  first=self.prepare();self.remove_registered_hint();root=first['game_root'];ready=(root.parent/'READY.json').read_bytes();count=self.clones
   for p in (self.gpu/'automatic-game-inputs/source-views').glob('*metadata-*.json'):p.unlink()
   second=self.prepare();self.assertEqual(second['game_root'],root);self.assertEqual(self.clones,count);self.assertEqual((root.parent/'READY.json').read_bytes(),ready);self.assertEqual(second['report']['source_hashes']['hashed_files'],2)
  def test_content_identical_rewrite_does_not_rebuild_snapshot(self):

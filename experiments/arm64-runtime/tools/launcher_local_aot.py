@@ -194,6 +194,31 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     from quick_restart_preparation import binding as restart_binding
     restart = restart_binding(executable=executable, arguments=arguments, environment=env,
         cohort=cohort, stage=code_root, archive_identity=identity,**kw(runtime_profile))
+    # Test the original same-supervisor receipt BEFORE ordinary library/helper
+    # batches. A miss merely follows the existing normal preparation below.
+    if restart is not None and env.get('BB_QUICKLOAD_PENDING')=='1' and mode in (None,'','auto','load'):
+        from quick_restart_preparation import prepared_local
+        previous=prepared_local(bound=restart,environment=env,gpu=env['BB_GPU_USER_DIR'],**kw(runtime_profile))
+        if previous is not None:
+            if game_prepare is None:
+                from launcher_game_pso import prepare as game_prepare
+            with preparation_phase('game-preparation'):
+                reused=game_prepare(project=project,execution_root=code_root,arguments=arguments,
+                    environment={**env,**previous},cohort=cohort,options=options,observe=observe,
+                    restart_binding=restart,resume_only=True,**kw(runtime_profile))
+            if reused is not None and reused.get('status')=='same-supervisor-f3-schedule-reused':
+                capture=reused.get('capture_environment',{})
+                if set(capture)-{'BB_FETCH_CAPTURE_ROOT','BB_FETCH_CAPTURE_GAME_ROOT'}:
+                    raise ValueError('unexpected runtime capture environment')
+                after=observe()
+                if after['locked']or after['pressure']==4 or after['swap_mib']-before['swap_mib']>2048:
+                    raise RuntimeError('protection after F3 preparation reuse')
+                env.update(previous);env.update(capture)
+                return env,dict(schema=1,status='prepared',requested=mode or 'auto',
+                    local=dict(status='prepared',builder_invoked=False,same_supervisor_reused=True),
+                    game_pso=reused,fixed_helpers=dict(status='same-supervisor-reused'),
+                    cohort=cohort,before=before,after=after,original_arguments_preserved=True,
+                    formal_data_modified=False)
     with preparation_phase('local-libraries'):
         updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
                                        cohort=cohort, engine='arm64', graphics=True,**kw(runtime_profile))
@@ -248,7 +273,8 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
             if sample['locked'] or sample['pressure']==4 or sample['swap_mib']-before['swap_mib']>2048:
                 raise RuntimeError('protection during F3 preparation receipt')
         try:
-            publish(bound=restart, context=restart_context, gpu=env['BB_GPU_USER_DIR'], check=restart_check,**kw(runtime_profile))
+            publish(bound=restart, context=restart_context, gpu=env['BB_GPU_USER_DIR'], check=restart_check,
+                    local_environment=env,**kw(runtime_profile))
         except (ValueError,OSError,KeyError,TypeError):
             pass # Optional scheduling hint cannot replace a completed original launch.
     manifest = dict(schema=1, status=report['status'], requested=mode or 'auto',
@@ -279,7 +305,7 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
             if type(value.get('journal_reused'))is bool:counts[name]['journal_reused']=value['journal_reused']
     if counts:visible['incremental_inputs']=counts
     local=report.get('local',{})
-    visible_local={k:local[k]for k in('built','skipped','requests')if type(local.get(k))is int and local[k]>=0}
+    visible_local={k:local[k]for k in('built','skipped','reused_products','requests')if type(local.get(k))is int and local[k]>=0}
     if type(local.get('persistent_audit_reused'))is bool:visible_local['persistent_audit_reused']=local['persistent_audit_reused']
     if visible_local:visible['local_libraries']=visible_local
     modules=report.get('game_pso',{}).get('scan',{}).get('automatic_modules',{})

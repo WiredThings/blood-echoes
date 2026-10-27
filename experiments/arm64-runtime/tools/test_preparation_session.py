@@ -70,7 +70,10 @@ class Controls(unittest.TestCase):
  def test_selected_tool_path_change_invalidates(self):
   self.settled();p=self.P/'metal-other';p.write_bytes(b'OTHER-AUTHOR-TOOL');self.tools['metal']=p;self.assertFalse(self.call()['session_reused'])
  def test_sdk_settings_or_selection_and_os_change_invalidates(self):
-  self.settled();(self.sdk/'SDKSettings.json').write_text('{"author":1}');self.assertFalse(self.call()['session_reused']);self.assertTrue(self.call()['session_reused'])
+  first=self.settled();(self.sdk/'SDKSettings.json').write_text('{"author":1}')
+  changed=self.call();self.assertFalse(changed['session_reused']);self.assertNotEqual(first['build_id'],changed['build_id']);self.assertGreater(changed['built'],0)
+  # New SDK products require their own stable byte audit before a session memo.
+  self.assertFalse(self.call()['session_reused']);self.assertTrue(self.call()['session_reused'])
   new=self.P/'Other.sdk';new.mkdir();(new/'SDKSettings.json').write_text('{}');self.sdk=new;self.assertFalse(self.call()['session_reused']);self.os_build='CHANGED-AUTHOR-OS';self.assertFalse(self.call()['session_reused'])
  def test_delete_rename_and_external_link_rejected_or_invalidated(self):
   self.settled();p=next(self.requests.glob('*.metal'));os.link(p,self.P/'outside-link');self.assertEqual(self.call()['status'],'refused');self.assertIsNone(self.session.summary)

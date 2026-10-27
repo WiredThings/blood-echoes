@@ -28,14 +28,14 @@ def title_id(arguments,stage,project,runtime_profile=None):
 
 def prepare(*,project,execution_root,arguments,environment,cohort,options,observe,
             runner=None,component_loader=load,candidate_builder=build,toolchain_probe=None,prepared_inputs=None,
-            catalogue_prepare=None,module_prepare=None,capture_configure=None,source_view_prepare=None,restart_binding=None,runtime_profile=None):
+            catalogue_prepare=None,module_prepare=None,capture_configure=None,source_view_prepare=None,restart_binding=None,runtime_profile=None,resume_only=False):
  from launcher_runtime_profile import kw,work
  project=Path(project).resolve(strict=True)
  if execution_root is None:return dict(status='unavailable',reason='packaged PSO component unavailable')
  stage=Path(execution_root).resolve(strict=True);component=component_loader(stage,**kw(runtime_profile))
  if component is None:return dict(status='unavailable',reason='packaged PSO component unavailable')
  from local_aot_policy import available_toolchain
- if not (toolchain_probe or available_toolchain)():return dict(status='source-fallback',reason='toolchain-unavailable')
+ if not resume_only and not (toolchain_probe or available_toolchain)():return dict(status='source-fallback',reason='toolchain-unavailable')
  # Verify selected original renderer loads the SAME final packaged DSO; a mere
  # independently valid worker/library pair is insufficient for this launch.
  from warm_archive_manifest import resolve_gpu_identity
@@ -58,6 +58,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
       backend=selected['library'],cohort=cohort,check=check,configure_capture=capture_configure,**kw(runtime_profile))
   if reused is not None:
    check();return reused
+ if resume_only:return None
  # Default source preparation precedes cache enumeration, including a fresh
  # install with no shader-cache records. Keep original app0/arguments unchanged.
  if prepared_inputs is None:

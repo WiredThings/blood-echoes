@@ -65,6 +65,71 @@ class SourceView(unittest.TestCase):
         self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(self.clones,count)
         self.assertEqual(second['report']['status'],'reused')
 
+    def journal(self,roots,previous=None):
+        # Authored deterministic event ledger; it is intentionally independent
+        # of the production mapping/hash helpers asserted absent below.
+        rows=[]
+        for root in roots:
+            p=Path(root);s=p.lstat();rows.append((str(p),s.st_ino,s.st_mode))
+            for parent,dirs,names in os.walk(p):
+                for name in sorted(dirs+names):
+                    f=Path(parent)/name;s=f.lstat()
+                    rows.append((str(f),s.st_mode,s.st_ino,hashlib.sha256(f.read_bytes()).hexdigest()if f.is_file()else None))
+        return dict(schema=1,authored=view.digest(rows))
+
+    def history(self):
+        import contextlib,startup_change_journal as journal
+        stack=contextlib.ExitStack();stack.enter_context(patch.object(journal,'query',side_effect=self.journal))
+        stack.enter_context(patch.object(journal,'unchanged',side_effect=lambda token,roots:token==self.journal(roots)))
+        return stack
+
+    def test_registered_warm_does_not_walk_stat_or_hash_game_files(self):
+        mod=self.mods/'a/dvdroot_ps4/msg';mod.mkdir(parents=True);(mod/'text.bin').write_bytes(b'text')
+        with self.history():
+            first=self.prepare();before=self.clones;hasher=view.file_sha
+            actual=self.actual();read=[]
+            def record(path,*args):read.append(Path(path));return hasher(path,*args)
+            with patch.object(view,'mapping',side_effect=AssertionError('full mapping on warm launch')),patch.object(view,'plain_tree',side_effect=AssertionError('full tree on warm launch')),patch.object(view,'file_sha',side_effect=record):
+                second=self.prepare(actual)
+            self.assertEqual(second['game_root'],first['game_root']);self.assertEqual(before,self.clones)
+            self.assertEqual(second['report']['reuse_mode'],'registered-selection')
+            self.assertFalse(second['report']['full_tree_enumerated'])
+            self.assertFalse(any(p.is_relative_to(self.game)or p.is_relative_to(first['game_root'])for p in read))
+
+    def test_mod_A_AB_A_returns_to_registered_A_without_full_registration(self):
+        a=self.mods/'a/dvdroot_ps4/msg';a.mkdir(parents=True);(a/'text.bin').write_bytes(b'a')
+        config=self.base/'mods.json';config.write_text('{"disabled":["b"]}');self.env['BB_MODS_CONFIG']=str(config)
+        with self.history():
+            first=self.prepare();b=self.mods/'b/dvdroot_ps4/msg';b.mkdir(parents=True);(b/'text.bin').write_bytes(b'b')
+            config.write_text('{}');both=self.prepare()
+            self.assertNotEqual(first['game_root'],both['game_root'])
+            config.write_text('{"disabled":["b"]}')
+            actual=self.module().build_overlay(self.game,self.out,[('a',self.mods/'a')])
+            with patch.object(view,'mapping',side_effect=AssertionError('full game registration repeated')):
+                restored=self.prepare(actual)
+            self.assertEqual(restored['game_root'],first['game_root'])
+            self.assertEqual((restored['game_root']/'dvdroot_ps4/msg/text.bin').read_bytes(),b'a')
+
+    def test_registered_hint_missing_history_and_single_bad_receipt_fall_back_preserving_old(self):
+        import startup_change_journal as journal
+        with self.history():
+            first=self.prepare();hint=next((self.gpu/'automatic-game-inputs/source-views').glob('selection-*.json'))
+            original=first['game_root']/'eboot.bin';old=original.read_bytes()
+            with patch.object(journal,'unchanged',return_value=False):
+                fallback=self.prepare();self.assertNotIn('reuse_mode',fallback['report'])
+            hint.write_text('broken selection hint')
+            fallback=self.prepare();self.assertNotIn('reuse_mode',fallback['report'])
+            self.assertEqual(original.read_bytes(),old)
+
+    def test_registered_source_change_or_unexpected_overlay_still_rejected_or_reprepared(self):
+        mod=self.mods/'a/dvdroot_ps4/msg';mod.mkdir(parents=True);(mod/'text.bin').write_bytes(b'text')
+        with self.history():
+            first=self.prepare();(self.game/'eboot.bin').write_bytes(b'real change')
+            changed=self.prepare();self.assertNotEqual(first['game_root'],changed['game_root'])
+            actual=self.actual();outside=self.base/'outside';outside.write_bytes(b'not selected')
+            (actual/'eboot.bin').unlink();(actual/'eboot.bin').symlink_to(outside)
+            with self.assertRaisesRegex(ValueError,'escape'):self.prepare(actual)
+
     def test_unknown_link_target_rejected_before_clone(self):
         mod=self.mods/'authored/dvdroot_ps4/msg';mod.mkdir(parents=True);(mod/'text.bin').write_bytes(b'text')
         actual=self.actual();outside=self.base/'unselected';outside.write_bytes(b'private unrelated bytes')

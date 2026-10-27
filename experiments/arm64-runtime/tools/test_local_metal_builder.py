@@ -64,6 +64,46 @@ class BuilderTests(unittest.TestCase):
   chain=builder.NativeToolchain(self.runner,fingerprint=self.runner.fingerprint)
   return builder.build(self.root,self.cohort,enabled=True,guard=self.guard,toolchain=chain)
  def artifact(self,result,key,suffix):return self.folder/'artifacts'/result['build_id']/(key+suffix)
+ def select_cohort(self,value):
+  self.cohort=value;self.folder=self.root/value;self.folder.mkdir(exist_ok=True)
+  self.requests=self.folder/'requests';self.requests.mkdir(exist_ok=True)
+ def test_retained_full_source_product_reused_across_cohorts_and_back(self):
+  key,request=self.export();first=self.run_builder();self.assertEqual(first['status'],'passed',first)
+  previous=self.artifact(first,key,'.metallib');old=previous.read_bytes();receipt=self.artifact(first,key,'.json');old_receipt=receipt.read_bytes();compiles=len(self.runner.compiles())
+  self.select_cohort('b'*64);newkey,newrequest=self.export();self.assertNotEqual(key,newkey)
+  second=self.run_builder();self.assertEqual(second['status'],'passed',second)
+  self.assertEqual(second['built'],0);self.assertEqual(second['reused_products'],1);self.assertEqual(len(self.runner.compiles()),compiles)
+  self.assertEqual(self.artifact(second,newkey,'.metallib').read_bytes(),old)
+  self.assertTrue(builder.already_succeeded(self.folder/'artifacts'/second['build_id'],newrequest,second['build_id']))
+  adoption=json.loads(self.artifact(second,newkey,'.adoption.json').read_bytes());self.assertEqual(adoption['original_request'],request);self.assertEqual(adoption['current_request'],newrequest)
+  self.assertEqual(receipt.read_bytes(),old_receipt);self.assertEqual(previous.read_bytes(),old)
+  self.select_cohort('a'*64);third=self.run_builder();self.assertEqual(third['built'],0);self.assertEqual(len(self.runner.compiles()),compiles)
+ def test_real_source_entry_math_or_sdk_change_cannot_alias_retained_product(self):
+  self.export();first=self.run_builder();self.assertEqual(first['status'],'passed',first)
+  for i,changes in enumerate((dict(source=b'kernel void another() {}\n'),dict(entry='other'),dict(math_mode='relaxed'))):
+   self.select_cohort(str(i+1)*64);self.export(**changes);second=self.run_builder()
+   self.assertEqual(second['status'],'passed',second);self.assertEqual(second['built'],1);self.assertEqual(second.get('reused_products',0),0)
+ def test_bad_retained_origin_is_preserved_and_only_current_product_compiles(self):
+  key,_=self.export();first=self.run_builder();self.assertEqual(first['status'],'passed',first)
+  old=self.artifact(first,key,'.metallib');old.write_bytes(b'bad retained bytes')
+  self.select_cohort('b'*64);self.export();count=len(self.runner.compiles());second=self.run_builder()
+  self.assertEqual(second['status'],'passed',second);self.assertEqual(second['built'],1)
+  self.assertEqual(len(self.runner.compiles()),count+1);self.assertEqual(old.read_bytes(),b'bad retained bytes')
+ def test_legacy_without_sdk_product_identity_does_not_gain_adoption_authority(self):
+  _,request=self.export();self.assertFalse(builder.remember_product(self.root,request,'c'*64,dict(schema=1)))
+  self.assertIsNone(builder.retained_product(self.root,request,b'author source','c'*64,dict(schema=1),self.guard))
+ def test_v2_complete_library_reuse_uses_real_v2_key_without_inventing_entry(self):
+  def emit():
+   source=b'kernel void main0() {}\n'
+   request=dict(schema=2,recipe=builder.LIBRARY_RECIPE,cohort=self.cohort,source_sha256=builder.digest(source),language='metal3.1',math_mode='safe',math_fp32='fast')
+   request['key']=builder.derive_key(request);key=request['key']
+   (self.requests/(key+'.metal')).write_bytes(source);(self.requests/(key+'.json')).write_bytes(builder.canonical(request))
+   return key,request
+  oldkey,old=emit();first=self.run_builder();self.assertEqual(first['status'],'passed',first);count=len(self.runner.compiles())
+  self.select_cohort('b'*64);key,request=emit();second=self.run_builder()
+  self.assertEqual(second['status'],'passed',second);self.assertEqual(second['reused_products'],1);self.assertEqual(second['built'],0)
+  self.assertNotEqual(oldkey,key);self.assertNotIn('entry',request);self.assertNotIn('entry',old)
+  self.assertEqual(len(self.runner.compiles()),count)
  def test_off_does_not_resolve_scan_hash_or_construct_services(self):
   with patch.object(builder,'checked_root',side_effect=AssertionError('IO')),patch.object(builder,'digest',side_effect=AssertionError('hash')),patch.object(builder,'real_services',side_effect=AssertionError('native')):
    self.assertEqual(builder.build('/nonexistent','bad',enabled=False)['status'],'off')
@@ -78,6 +118,32 @@ class BuilderTests(unittest.TestCase):
   self.assertEqual(receipt,builder.expected_receipt(request,result['build_id'],library));count=len(self.runner.compiles())
   warmed=self.run_builder();self.assertEqual(warmed['status'],'passed');self.assertEqual(warmed['skipped'],1);self.assertEqual(len(self.runner.compiles()),count)
   self.assertTrue(all(path.is_relative_to(self.folder/'artifacts')for path in self.folder.rglob('*')if path.is_file()and not path.is_relative_to(self.requests)))
+ def test_actual_sdk_metadata_changes_product_identity_and_keeps_old_artifacts(self):
+  key,_=self.export();first=self.run_builder();self.assertEqual(first['status'],'passed',first)
+  old=self.artifact(first,key,'.metallib');before=old.read_bytes()
+  (self.runner.sdk/'SDKSettings.json').write_text('{"Version":"next SDK"}')
+  changed=self.run_builder();self.assertEqual(changed['status'],'passed',changed)
+  self.assertNotEqual(first['build_id'],changed['build_id']);self.assertEqual(changed['built'],1)
+  self.assertEqual(old.read_bytes(),before)
+ def test_sdk_timestamp_only_touch_does_not_change_compile_product(self):
+  self.export();first=self.run_builder();os.utime(self.runner.sdk/'SDKSettings.json',None)
+  second=self.run_builder();self.assertEqual(second['status'],'passed',second)
+  self.assertEqual(first['build_id'],second['build_id']);self.assertEqual(second['built'],0)
+ def test_same_sdk_metadata_at_another_location_does_not_change_product(self):
+  import shutil
+  self.export();first=self.run_builder();moved=self.tools/'Relocated.sdk'
+  shutil.copytree(self.runner.sdk,moved);self.runner.sdk=moved;second=self.run_builder()
+  self.assertEqual(second['status'],'passed',second);self.assertEqual(first['build_id'],second['build_id']);self.assertEqual(second['built'],0)
+ def test_sdk_change_mid_compile_is_refused_without_publish(self):
+  self.export();original=self.runner.run
+  def run(argv,*args,**kw):
+   value=original(argv,*args,**kw)
+   if argv[:2]==['/usr/bin/xcrun','metallib']and '-o'in argv:
+    (self.runner.sdk/'SDKSettings.json').write_text('{"Version":"changed during compile"}')
+   return value
+  self.runner.run=run;result=self.run_builder()
+  self.assertEqual(result['status'],'refused',result);self.assertEqual(result['built'],0)
+  self.assertIn('SDK changed',result['error'])
  def test_relaxed_uses_only_fixed_recipe_argv(self):
   self.export(math_mode='relaxed');result=self.run_builder();self.assertEqual(result['status'],'passed')
   self.assertEqual(self.runner.compiles()[0][3],'-fmetal-math-mode=relaxed')

@@ -50,6 +50,63 @@ class Restart(unittest.TestCase):
   self.assertIs(result['artifact_authority'],False);self.assertIs(result['static_registry_rescanned'],False)
   self.assertIn('not-captured',result['dynamic_capture_gap']);self.assertEqual(len(self.calls),1)
   self.assertEqual(self.calls[0]['catalog'],self.generation/'catalog.json');self.assertEqual(self.calls[0]['index'],self.generation/'static-program-index.jsonl')
+ def local_env(self):
+  root=self.gpu/'local-metal';(root/self.cohort/'requests').mkdir(parents=True,exist_ok=True)
+  (root/self.cohort/'artifacts'/('d'*64)).mkdir(parents=True,exist_ok=True)
+  return dict(BB_MTL_LOCAL_AOT_MODE='load',BB_MTL_LOCAL_AOT_ROOT=str(root),
+   BB_MTL_LOCAL_AOT_COHORT=self.cohort,BB_MTL_LOCAL_AOT_BUILD_ID='d'*64,BB_MTL_LOCAL_AOT_ENVIRONMENT_ID='e'*64)
+ def early(self,**overrides):
+  values=dict(bound=self.bound(),environment={**self.env,'BB_QUICKLOAD_PENDING':'1'},gpu=self.gpu,probe=self.probe,cwd_probe=self.cwd_probe)
+  values.update(overrides);return quick.prepared_local(**values)
+ def test_front_local_receipt_has_only_preparation_fields_and_requires_continuous_history(self):
+  import startup_change_journal as journal
+  local=self.local_env()
+  with patch.object(journal,'query',return_value=dict(schema=1,author='journal')):
+   self.assertTrue(self.publish(local_environment=local))
+  with patch.object(journal,'unchanged',return_value=True)as unchanged:
+   self.assertEqual(self.early(),local);self.assertEqual(len(unchanged.call_args.args[1]),2)
+   self.assertNotIn('BB_THD_TOKEN',self.early())
+  with patch.object(journal,'unchanged',return_value=False):self.assertIsNone(self.early())
+  self.assertTrue(self.publish()) # Old receipts remain valid for late game-only reuse.
+  with patch.object(journal,'unchanged',return_value=True):self.assertIsNone(self.early())
+  self.assertIsNotNone(self.resume())
+ def test_front_local_rejects_wrong_roots_keys_secrets_and_mode(self):
+  local=self.local_env()
+  for field,value in [('BB_MTL_LOCAL_AOT_ROOT',str(self.root)),('BB_MTL_LOCAL_AOT_MODE','record'),
+      ('BB_MTL_LOCAL_AOT_COHORT','b'*64),('BB_MTL_LOCAL_AOT_BUILD_ID','bad')]:
+   self.assertIsNone(quick.local_selection({**local,field:value},self.gpu,self.cohort))
+  self.assertNotIn('BB_THD_TOKEN',quick.local_selection({**local,'BB_THD_TOKEN':'never-in-receipt'},self.gpu,self.cohort)[0])
+  self.assertIsNone(quick.local_selection([],self.gpu,self.cohort))
+ def test_front_local_requires_f3_offline_and_same_supervisor_and_nonce(self):
+  import startup_change_journal as journal
+  with patch.object(journal,'query',return_value=dict(author='journal')):self.assertTrue(self.publish(local_environment=self.local_env()))
+  with patch.object(journal,'unchanged',return_value=True):
+   for field,value in [('BB_QUICKLOAD_PENDING','0'),('BB_ONLINE','1'),('BB_ARM_SESSION_NONCE','3'*32),('BB_RESTART_SUPERVISED','0')]:
+    self.assertIsNone(self.early(environment={**self.env,'BB_QUICKLOAD_PENDING':'1',field:value}))
+   bound=self.bound();self.owner['start']='different supervisor'
+   self.assertIsNone(self.early(bound=bound))
+ def test_front_controller_skips_library_helper_and_normal_game_batches(self):
+  import launcher_local_aot as local
+  import test_launcher_local_aot as fixture
+  f=fixture.Startup();f.setUp();self.addCleanup(f.tearDown)
+  previous=self.local_env();calls=[]
+  def forbidden(**kw):raise AssertionError('ordinary preparation batch invoked')
+  def game(**kw):
+   calls.append(kw);self.assertTrue(kw['resume_only']);return dict(status='same-supervisor-f3-schedule-reused',capture_environment={})
+  with patch.object(quick,'binding',return_value=dict(author='bound')),patch.object(quick,'prepared_local',return_value=previous):
+   result,report=local.prepare_launch(str(f.inputs/'runtime'),f.args,{**f.env,'BB_QUICKLOAD_PENDING':'1'},project=f.root,
+    archive_prepare=f.identity,local_prepare=forbidden,fixed_helper_prepare=forbidden,game_prepare=game,
+    observe=lambda:dict(locked=False,pressure=1,swap_mib=0))
+  self.assertEqual(len(calls),1);self.assertFalse(report['local']['builder_invoked'])
+  self.assertEqual(result['BB_THD_TOKEN'],f.env['BB_THD_TOKEN']);self.assertEqual(result['BB_MTL_LOCAL_AOT_BUILD_ID'],'d'*64)
+  self.assertEqual(report['fixed_helpers']['status'],'same-supervisor-reused')
+ def test_resume_only_miss_does_not_prepare_sources_modules_or_probe_toolchain(self):
+  import test_launcher_game_pso_automatic as fixture
+  f=fixture.Entry();f.setUp();self.addCleanup(f.tearDown)
+  with patch.object(quick,'resume',return_value=None):
+   result=f.prepare(restart_binding=dict(author='bound'),resume_only=True,
+    toolchain_probe=lambda:(_ for _ in ()).throw(AssertionError('toolchain probe on F3')))
+  self.assertIsNone(result);self.assertEqual(f.calls,[])
  def test_no_receipt_and_cold_or_menu_restart_do_not_reuse(self):
   self.assertIsNone(self.resume());self.assertTrue(self.publish())
   for value in(None,'0',''):

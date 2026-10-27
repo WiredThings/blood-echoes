@@ -1,0 +1,38 @@
+{
+  "status": "failed",
+  "total_tests": 425,
+  "failed_suites": [
+    {
+      "suite": "test_incremental_preparation",
+      "exit": 1,
+      "tests": 12,
+      "seconds": 3.327
+    },
+    {
+      "suite": "test_persistent_library_audit",
+      "exit": 1,
+      "tests": 5,
+      "seconds": 1.861
+    },
+    {
+      "suite": "test_local_metal_builder",
+      "exit": 1,
+      "tests": 30,
+      "seconds": 2.159
+    },
+    {
+      "suite": "test_preparation_session",
+      "exit": 1,
+      "tests": 18,
+      "seconds": 4.805
+    }
+  ],
+  "superseded_by": "directed-result.json",
+  "notes": [
+    "Lower hash-hint controls now explicitly exercise the fallback beneath an independently valid registered-selection hint.",
+    "SDK metadata compatibility uses actual content plus location/inode/security identity during compilation; timestamps remain separate scheduling provenance.",
+    "New SDK products require a stable audit before a session memo; old immediate-memo expectation corrected."
+  ],
+  "game_started": false,
+  "formal_data_modified": false
+}

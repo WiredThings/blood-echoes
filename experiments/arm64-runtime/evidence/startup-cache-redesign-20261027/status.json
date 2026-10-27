@@ -1,0 +1,35 @@
+{
+  "status": "source-integrated-partial-design",
+  "native_cache_namespace_switched": false,
+  "registered_selection_fast_path": true,
+  "early_offline_same_supervisor_f3": true,
+  "source_validated_module_reuse": true,
+  "pso_protocol_identity_separated": true,
+  "retained_identical_msl_library_adoption": true,
+  "sdk_content_compatibility": true,
+  "directed_tests": 430,
+  "actual_sdk_metadata": {
+    "status": "passed",
+    "json_bytes": 7948,
+    "plist_bytes": 5538,
+    "compiler_invoked": false
+  },
+  "remaining": [
+    "base-and-Mod-per-resource-dependency-registry",
+    "required-module-product-index-without-full-capture-enumeration",
+    "retained-PSO-migration-and-shared-native-semantic-keys",
+    "preserving-repair-of-current-corrupt-artifact-pair",
+    "integrated-package-and-concentrated-runtime-acceptance"
+  ],
+  "native_metal_adoption_verified": false,
+  "game_performance_measured": false,
+  "formal_data_modified": false,
+  "installed_app_changed_by_this_design": false,
+  "release_updated": false,
+  "texture_capture_task_retained": true,
+  "excluded_test": {
+    "name": "legacy-live-stable-mirror",
+    "reason": "required prior build manifest missing; stopped before GPU/game start",
+    "passed": false
+  }
+}

@@ -175,7 +175,7 @@ def atomic_json(path,value):
 def expected_receipt(request,build_id,library):
     return dict(request,build_id=build_id,library_sha256=digest(library),library_bytes=len(library))
 
-def already_succeeded(folder,request,build_id):
+def verified_library_bytes(folder,request,build_id):
     library=folder/(request['key']+'.metallib');receipt=folder/(request['key']+'.json')
     has_lib=os.path.lexists(library);has_receipt=os.path.lexists(receipt)
     if has_receipt:
@@ -183,11 +183,72 @@ def already_succeeded(folder,request,build_id):
         blob=regular_bytes(library,LIBRARY_MAX)
         if not blob:raise Refused('empty existing library')
         if canonical(read_json(receipt))!=canonical(expected_receipt(request,build_id,blob)):raise Refused('existing receipt/library identity mismatch')
-        return True
+        return blob
     if has_lib:
         # An interrupted library-first publish is not a success and cannot be skipped.
         regular_bytes(library,LIBRARY_MAX)
-    return False
+    return None
+
+def already_succeeded(folder,request,build_id):
+    return verified_library_bytes(folder,request,build_id)is not None
+
+def retained_product(root,request,source,build_id,manifest,guard):
+    """One content-addressed lookup; retain all native/origin identities.
+
+    A library compile consumes exact MSL/entry/options and SDK/toolchain, not
+    the launch cohort string. Validate BOTH full native request keys, actual
+    source equality, original build and receipt/bytes before adopting. Unknown
+    legacy SDK identities cannot enter this migration.
+    """
+    if manifest.get('schema')!=2 or not manifest.get('sdk'):return None
+    from compilation_domains import library_product_key
+    product=library_product_key(request,build_id)
+    try:
+        index=child_directory(root,'.products-v1');group=child_directory(index,product)
+        with os.scandir(group)as stream:
+            for n,item in enumerate(stream):
+                guard.check(preflight=True)
+                if n>=32:return None # lookup budget; never delete/shrink stored products
+                if not re.fullmatch('[0-9a-f]{64}\\.json',item.name):continue
+                try:
+                    row=read_json(Path(item.path))
+                    if set(row)!={'schema','product','build_id','request'}or type(row['schema'])is not int or row['schema']!=1:continue
+                    if digest(canonical(row))+'.json'!=item.name or row['product']!=product or row['build_id']!=build_id:continue
+                    old=row['request'];oldcohort=old['cohort'];oldkey=old['key']
+                    if not HEX.fullmatch(oldcohort)or not HEX.fullmatch(oldkey)or library_product_key(old,build_id)!=product:continue
+                    previous=child_directory(root,oldcohort);requests=child_directory(previous,'requests')
+                    originals=[]
+                    for folder in(requests,requests/oldkey[:2]):
+                        if not folder.exists():continue
+                        check_directory(folder)
+                        if not os.path.lexists(folder/(oldkey+'.json'))or not os.path.lexists(folder/(oldkey+'.metal')):continue
+                        actual,original=load_request(folder,oldkey,oldcohort)
+                        if actual!=old or original!=source:raise Refused('retained product original input mismatch')
+                        originals.append(True)
+                    if not originals:continue
+                    artifacts=child_directory(child_directory(previous,'artifacts'),build_id)
+                    if read_json(artifacts/'build.json')!=manifest:continue
+                    blob=verified_library_bytes(artifacts,old,build_id)
+                    if blob is not None:
+                        return blob,dict(schema=1,kind='verified-identical-compile-input-adoption',product=product,
+                            original_request=old,original_build_id=build_id,original_library_sha256=digest(blob),
+                            current_request=request,original_native_key_preserved=True)
+                except(OSError,ValueError,TypeError,KeyError,Refused)as error:
+                    if isinstance(error,Stopped):raise
+                    continue
+    except(OSError,ValueError,TypeError,KeyError,Refused)as error:
+        if isinstance(error,Stopped):raise
+    return None
+
+def remember_product(root,request,build_id,manifest):
+    if manifest.get('schema')!=2 or not manifest.get('sdk'):return False
+    from compilation_domains import library_product_key
+    product=library_product_key(request,build_id)
+    index=child_directory(root,'.products-v1',create=True);group=child_directory(index,product,create=True)
+    row=dict(schema=1,product=product,build_id=build_id,request=request)
+    path=group/(digest(canonical(row))+'.json')
+    if os.path.lexists(path):return read_json(path)==row
+    write_new(path,canonical(row)+b'\n');return True
 
 class Safety:
     def __init__(self,observer,require_no_games,policy_factory,clock=time.monotonic):
@@ -270,6 +331,23 @@ def tool_fingerprint(path):
 
 class NativeToolchain:
     def __init__(self,runner,*,fingerprint=tool_fingerprint):self.runner=runner;self.fingerprint=fingerprint
+    def sdk_identity(self,guard):
+        guard.check(preflight=True)
+        raw=self.runner.run(['/usr/bin/xcrun','--show-sdk-path'],10,guard).decode().strip()
+        if not raw.startswith('/')or '\n'in raw:raise Refused('invalid selected SDK path')
+        selected=Path(raw);sdk=selected.resolve(strict=True)
+        if not sdk.is_dir():raise Refused('selected SDK is not a directory')
+        pins={str(selected):_session_stat(selected.lstat()),str(sdk):_session_stat(sdk.stat())};files={}
+        for name in ('SDKSettings.json','SDKSettings.plist'):
+            p=sdk/name
+            if not p.exists():continue
+            before=p.lstat()
+            if before.st_uid not in(0,os.getuid())or before.st_mode&0o022:raise Refused('untrusted SDK identity file')
+            blob=regular_bytes(p,1024*1024,owned=False)
+            if not blob or _session_stat(before)!=_session_stat(p.lstat()):raise Refused('SDK identity changed during read')
+            files[name]=dict(sha256=digest(blob),bytes=len(blob));pins[str(p)]=_session_stat(before)
+        if not files:raise Refused('missing SDK identity files')
+        return dict(schema=1,metadata=files),dict(selected=str(selected),canonical=str(sdk),pins=pins)
     def identify(self,guard):
         tools={};versions={}
         for name in('metal','metallib'):
@@ -283,8 +361,11 @@ class NativeToolchain:
         tools['xcrun']=self.fingerprint('/usr/bin/xcrun')
         versions['xcrun']=self.runner.run(['/usr/bin/xcrun','--version'],10,guard).decode().strip()
         if not versions['xcrun']or len(versions['xcrun'].encode())>1024:raise Refused('empty or oversized xcrun version')
-        # Stat pins detect mid-build replacement; only actual binary SHA/version/OS define ID.
-        manifest=dict(schema=1,recipe=RECIPE,tools={name:{'sha256':row['sha256'],'version':versions[name]}for name,row in tools.items()},os_build=build)
+        sdk,self.sdk_selection=self.sdk_identity(guard)
+        # Paths/stamps only pin this invocation. Real compiler, SDK release
+        # metadata and OS define product compatibility; a timestamp touch does
+        # not create another product. Old schema1 directories remain intact.
+        manifest=dict(schema=2,recipe=RECIPE,tools={name:{'sha256':row['sha256'],'version':versions[name]}for name,row in tools.items()},os_build=build,sdk=sdk)
         self.pins=tools;self.build_manifest=manifest;self.build_id=digest(canonical(manifest))
         return self.build_id,manifest
     def unchanged(self,guard):
@@ -294,6 +375,13 @@ class NativeToolchain:
             if str(Path(found).resolve(strict=True))!=self.pins[name]['path']:raise Refused('selected toolchain changed during build')
         for row in self.pins.values():
             if list(_identity(Path(row['path']).stat()))!=row['stat']:raise Refused('tool binary changed during build')
+        sdk,selection=self.sdk_identity(guard)
+        # sdk_identity rereads and hashes actual version metadata. xattr/time
+        # changes do not alter that compile input; location/inode/security
+        # changes still refuse this invocation. Full stamps remain provenance
+        # in preparation_environment's independent scheduling checks.
+        stable=lambda s:dict(selected=s['selected'],canonical=s['canonical'],pins={p:v[:6]for p,v in s['pins'].items()})
+        if sdk!=self.build_manifest['sdk']or stable(selection)!=stable(self.sdk_selection):raise Refused('selected SDK changed during build')
     def preparation_environment(self,guard):
         # Session invalidation only, never a replacement for artifact/toolchain ID.
         guard.check(preflight=True)
@@ -415,12 +503,23 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
           for key in batch:
             guard.check(preflight=True)
             request,source=index.load_owned(key,cohort)
+            from compilation_domains import library_product_key
+            product_key=library_product_key(request,build_id)
             if already_succeeded(artifacts,request,build_id):
-                summary['skipped']+=1;record_result(dict(key=key,status='skipped-verified'));continue
+                try:remember_product(root,request,build_id,manifest)
+                except(OSError,ValueError,TypeError,KeyError,Refused):pass
+                summary['skipped']+=1;record_result(dict(key=key,status='skipped-verified',compile_product_id=product_key));continue
             with tempfile.TemporaryDirectory(prefix=key+'-',dir=private_tmp)as scratch:
                 scratch=Path(scratch);snapshot=scratch/'source.metal';air=scratch/'output.air';library=scratch/'output.metallib'
                 write_new(snapshot,source);del source
-                toolchain.compile(snapshot,air,library,request,guard)
+                adopted=retained_product(root,request,regular_bytes(snapshot,SOURCE_MAX),build_id,manifest,guard)
+                reused=adopted is not None
+                # The current native request/key remains untouched. The adopted
+                # binary gets its own ordinary receipt plus explicit provenance.
+                if adopted is None:toolchain.compile(snapshot,air,library,request,guard)
+                else:
+                    toolchain.unchanged(guard);write_new(library,adopted[0])
+                    write_new(scratch/'adoption.json',canonical(adopted[1])+b'\n');del adopted
                 blob=regular_bytes(library,LIBRARY_MAX)
                 if not blob:raise Refused('empty metallib output')
                 receipt=expected_receipt(request,build_id,blob);del blob
@@ -432,10 +531,17 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
                 guard.check(preflight=True)
                 os.replace(library,artifacts/(key+'.metallib'))
                 os.replace(staged_receipt,artifacts/(key+'.json'))
+                if(scratch/'adoption.json').exists():
+                    proof=artifacts/(key+'.adoption.json')
+                    if not os.path.lexists(proof):os.rename(scratch/'adoption.json',proof)
                 fd=os.open(artifacts,os.O_RDONLY|os.O_DIRECTORY)
                 try:os.fsync(fd)
                 finally:os.close(fd)
-            summary['built']+=1;record_result(dict(key=key,status='built'))
+            if reused:summary['reused_products']=summary.get('reused_products',0)+1
+            else:summary['built']+=1
+            try:remember_product(root,request,build_id,manifest)
+            except(OSError,ValueError,TypeError,KeyError,Refused):pass
+            record_result(dict(key=key,status='reused-verified-product'if reused else'built',compile_product_id=product_key))
         summary['status']='partial'if index.deferred_count else'passed'
         summary['request_window']=dict(max_batch=index.max_batch_len,max_final_pins=index.max_pin_count)
         if summary['status']=='passed' and audit_binding is not None and audit_token is not None:
@@ -586,7 +692,7 @@ class PreparationSession:
                     fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
                     if self._tools_unchanged(self.toolchain,guard)and self.toolchain.preparation_environment(guard)==self.environment and self.snapshot.unchanged(guard):
                         self.stats['reuses']+=1;self.stats['reuse_validation_seconds']+=self.clock()-started
-                        return dict(self.summary,built=0,skipped=self.summary['requests'],results=[],session_reused=True,
+                        return dict(self.summary,built=0,reused_products=0,skipped=self.summary['requests'],results=[],session_reused=True,
                                     session_verification='same-call-current-tools-sdk-os-and-authenticated-stat-pins')
                 except (OSError,ValueError,Refused)as error:
                     if isinstance(error,Stopped):raise

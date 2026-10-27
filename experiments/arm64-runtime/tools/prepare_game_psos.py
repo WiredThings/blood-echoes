@@ -365,7 +365,8 @@ def prepare(config,*,services=None):
   if native_services and a.phase=='all' and a.max_recipes is None:
    from pso_startup_schedule import Schedule
    from game_pso_queue import fingerprint
-   code_identity=runtime_profile.bundle.local['runtime_tools']if runtime_profile is not None else None
+   from compilation_domains import pso_schedule_identity
+   code_identity=pso_schedule_identity(runtime_profile.bundle.local['runtime_tools'])if runtime_profile is not None else None
    if code_identity is not None:
     schedule=Schedule(a.manifest,context=context,environment=provided,gpu=gpu,artifact=artifact,progress=progress,
         code_identity=code_identity,rows=rows,fingerprint=fingerprint,check=check)

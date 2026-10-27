@@ -198,6 +198,8 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
  nonce=checked_bytes(nonce_path,limit=64)[0].decode();need(len(nonce)==64 and all(x in'0123456789abcdef'for x in nonce),'owned preparation nonce')
  index_path=root/'index.json';index=json.loads(checked_bytes(index_path,limit=32*1024*1024)[0])if index_path.exists()else dict(schema=1,compiler_identity=compiler,modules={},geometry={},rejected={})
  need(index.get('schema')==1 and index.get('compiler_identity')==compiler,'same complete producer identity')
+ from module_product_schedule import ModuleProducts
+ products=ModuleProducts(root=root,source=static_context['game_root'],compiler=compiler,catalog=static_context['catalog'],check=check)
  counts=collections.Counter();gaps=collections.Counter();start=time.monotonic();admitted={};visited=set();observed_static=set()
  typed_ready={};typed_report=dict(status='unavailable',reason='normal-path companion capture not configured')
  if static_context.get('capture_root')is not None:
@@ -247,8 +249,12 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
       if stage['hardware_stage']=='geometry':
        from run_owned_geometry_contracts import canonical_geometry_packet
        reader=canonical_geometry_packet
-      p=reader(Path(existing['packet']),catalog);receipt=json.loads(checked_bytes(Path(existing['receipt']),limit=256*1024,expected=existing['receipt_sha256'])[0]);need(file_sha(existing['packet'])==existing['packet_sha256'],'indexed exact packet SHA');validate_call(0,receipt,Path(existing['spirv']).parent,p);verify_receipt(p,receipt,existing['packet_sha256']);need(p.get('automatic_preparation')==dict(schema=1,nonce=nonce,cohort=cohort),'indexed automatic admission');stage_results[stage['logical_stage']]=admitted[uid]=existing;counts['verified_existing']+=1;continue
-     except(ValueError,OSError,KeyError):gaps['invalid-indexed-module']+=1;continue
+      p=products.packet(uid,existing)if stage['hardware_stage']!='geometry'else None
+      if p is None:p=reader(Path(existing['packet']),catalog)
+      receipt=json.loads(checked_bytes(Path(existing['receipt']),limit=256*1024,expected=existing['receipt_sha256'])[0]);need(file_sha(existing['packet'])==existing['packet_sha256'],'indexed exact packet SHA');validate_call(0,receipt,Path(existing['spirv']).parent,p);verify_receipt(p,receipt,existing['packet_sha256']);need(p.get('automatic_preparation')==dict(schema=1,nonce=nonce,cohort=cohort),'indexed automatic admission')
+      if stage['hardware_stage']!='geometry':products.record(uid,existing)
+      stage_results[stage['logical_stage']]=admitted[uid]=existing;counts['verified_existing']+=1;continue
+     except(ValueError,OSError,KeyError,TypeError):gaps['invalid-indexed-module']+=1;continue
     if uid in index.get('rejected',{}):gaps['same-producer-rejected-input']+=1;continue
     if time.monotonic()-start>=seconds:gaps['bounded-total-budget-pending']+=1;continue
     if counts['native_attempts']%page_size==0:
@@ -287,5 +293,7 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
   return index['geometry'].get(digest(dict(recipe=unit['recipe_blob_identity'],inputs=ids,compiler=compiler)))
  report=dict(schema=1,status='prepared'if not gaps else'partial',counts=dict(counts),gaps=dict(gaps),typed_companions=typed_report,compiler_identity=compiler,module_index=str(index_path),stage_links=dict(path=str(links_path),sha256=file_sha(links_path)),recipe_links=dict(path=str(recipes_path),sha256=file_sha(recipes_path)),static_identities=sum(map(len,table.values())),observed_static_identities=len(observed_static),static_without_observed_inputs=sum(map(len,table.values()))-len(observed_static),full_final_PSO_ready=False,runtime_cache_import_allowed=False,game_started=False,GPU_started=False)
  atomic_json(index_path,index)
+ report['source_validated_module_reuses']=products.hits
+ report['module_product_schedule_published']=products.publish()
  atomic_json(root/'report.json',report)
  return dict(report,geometry_resolver=geometry_resolver,cache_root=root,report_path=str(root/'report.json'))

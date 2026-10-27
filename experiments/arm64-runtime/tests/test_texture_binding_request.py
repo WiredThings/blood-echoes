@@ -1,6 +1,7 @@
 """Authored temporary-selector controls; no game, preferences or GPU access."""
 from pathlib import Path
-import json,os,sys,tempfile,unittest
+import contextlib,io,json,os,sys,tempfile,unittest
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import texture_binding_request as m
 
@@ -31,5 +32,16 @@ class Request(unittest.TestCase):
    self.path.write_text(json.dumps(value));self.assertEqual(m.apply({},root=self.root,now=1500),({},None))
  def test_selection_has_no_capture_or_persistent_settings_side_effect(self):
   before={str(p.relative_to(self.root)):p.read_bytes()for p in self.root.rglob('*')if p.is_file()};m.apply({},root=self.root,now=1500);after={str(p.relative_to(self.root)):p.read_bytes()for p in self.root.rglob('*')if p.is_file()};self.assertEqual(before,after)
+ def test_original_exec_boundary_applies_request_after_preparation_only(self):
+  import launcher_local_aot as launcher
+  env=dict(BB_THD_TOKEN='authored-secret',BB_USER_DIR='/original/user',BB_GPU_USER_DIR='/original/cache');profile=object();output=io.StringIO()
+  with patch.object(launcher,'prepare_launch',return_value=(env,dict(status='prepared')))as prepare,patch.object(m,'resolve',return_value=(self.directory,self.tag)),patch.object(launcher.os,'execve')as execute,contextlib.redirect_stdout(output):
+   launcher.main(['/runtime','--original','argument'],runtime_profile=profile)
+  args=execute.call_args.args;self.assertEqual(args[:2],('/runtime',['/runtime','--original','argument']));self.assertEqual({k:args[2][k]for k in env},env);self.assertEqual(args[2]['BB_TEXTURE_BINDING_CAPTURE_DIR'],str(self.directory));self.assertNotIn('authored-secret',output.getvalue());self.assertIs(prepare.call_args.kwargs['runtime_profile'],profile)
+ def test_nonformal_exec_does_not_enable_shared_diagnosis(self):
+  import launcher_local_aot as launcher
+  env={'BB_LANGUAGE':'11'}
+  with patch.object(launcher,'prepare_launch',return_value=(env,dict(status='prepared'))),patch.object(m,'resolve',side_effect=AssertionError('unexpected private selector')),patch.object(launcher.os,'execve')as execute,contextlib.redirect_stdout(io.StringIO()):launcher.main(['/runtime','arg'])
+  self.assertEqual(execute.call_args.args[2],env)
 
 if __name__=='__main__':unittest.main(verbosity=2)

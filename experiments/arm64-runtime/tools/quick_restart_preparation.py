@@ -107,13 +107,62 @@ def pending(context):
         ready_sha256=file_sha(Path(context['generation'])/'READY.json')[0],
         snapshot_ready_sha256=file_sha(Path(context['game_root']).parent/'READY.json')[0])
 
-def publish(*,bound,context,gpu,check=lambda:None,probe=process,cwd_probe=process_cwd,runtime_profile=None):
+LOCAL_ENV=frozenset(('BB_MTL_LOCAL_AOT_MODE','BB_MTL_LOCAL_AOT_ROOT',
+    'BB_MTL_LOCAL_AOT_COHORT','BB_MTL_LOCAL_AOT_BUILD_ID','BB_MTL_LOCAL_AOT_ENVIRONMENT_ID'))
+
+def local_selection(environment,gpu,cohort):
+    """Only preparation-owned fields; never restore account or game state."""
+    if not isinstance(environment,dict):return None
+    selected={k:v for k,v in environment.items()if k.startswith('BB_MTL_LOCAL_AOT_')}
+    if set(selected)!=LOCAL_ENV or selected['BB_MTL_LOCAL_AOT_MODE']!='load':return None
+    if selected['BB_MTL_LOCAL_AOT_COHORT']!=cohort:return None
+    if not all(isinstance(selected[k],str)and HEX64.fullmatch(selected[k])for k in
+        ('BB_MTL_LOCAL_AOT_COHORT','BB_MTL_LOCAL_AOT_BUILD_ID','BB_MTL_LOCAL_AOT_ENVIRONMENT_ID')):return None
+    root=directory(selected['BB_MTL_LOCAL_AOT_ROOT'])
+    if root!=directory(gpu)/'local-metal':return None
+    roots=[directory(root/cohort/'requests'),directory(root/cohort/'artifacts'/selected['BB_MTL_LOCAL_AOT_BUILD_ID'])]
+    return selected,roots
+
+def prepared_local(*,bound,environment,gpu,probe=process,cwd_probe=process_cwd,runtime_profile=None):
+    """Front-loaded F3 hint; changed/unobservable products use normal policy.
+
+    The original completed builder publishes this, not a child-supplied env.
+    Runtime still admits actual libraries/PSOs by their full native keys.
+    """
+    if bound is None or environment.get('BB_QUICKLOAD_PENDING')!='1':return None
+    try:
+        if environment.get('BB_ONLINE')!='0' or environment.get('BB_RESTART_SUPERVISED')!='1' or environment.get('BB_ARM_LAUNCHER_COMPAT')!='1':return None
+        nonces=[environment.get(k,'')for k in('BB_ARM_SESSION_NONCE','BB_ARM_RESTART_NONCE')]
+        if not all(HEX32.fullmatch(n)for n in nonces)or digest(nonces)!=bound['value']['nonce_identity']:return None
+        if bound['value']['gpu_root']!=str(directory(gpu)):return None
+        if supervisor(bound['value']['stage'],probe,cwd_probe,expected_parity_sha=bound['value']['component_files']['SOURCE-PARITY.json'],runtime_profile=runtime_profile)!=bound['value']['supervisor']:return None
+        path=_path(gpu,bound);info=path.lstat()
+        if info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o600:return None
+        saved=json.loads(checked_bytes(path,limit=16384)[0])
+        if saved.get('schema')!=1 or saved.get('kind')!='same-supervisor-f3-preparation-schedule' or saved.get('binding')!=bound or saved.get('artifact_authority')is not False or saved.get('source_contents_revalidated')is not False:return None
+        local=saved.get('local_preparation')
+        if not isinstance(local,dict)or set(local)!={'environment','journal'}:return None
+        if not isinstance(local['environment'],dict)or set(local['environment'])!=LOCAL_ENV:return None
+        current=local_selection(local['environment'],gpu,bound['value']['cohort'])
+        if current is None:return None
+        from startup_change_journal import unchanged
+        if not unchanged(local['journal'],current[1]):return None
+        return dict(current[0])
+    except(ValueError,OSError,KeyError,TypeError,subprocess.SubprocessError):return None
+
+def publish(*,bound,context,gpu,check=lambda:None,probe=process,cwd_probe=process_cwd,runtime_profile=None,local_environment=None):
     try:
         if bound is None or supervisor(bound['value']['stage'],probe,cwd_probe,expected_parity_sha=bound['value']['component_files']['SOURCE-PARITY.json'],runtime_profile=runtime_profile)!=bound['value']['supervisor']:return False
         _context(context,gpu,check)
         path=_path(gpu,bound)
         payload=dict(schema=1,kind='same-supervisor-f3-preparation-schedule',binding=bound,context=context,
             artifact_authority=False,source_contents_revalidated=False)
+        if local_environment is not None:
+            current=local_selection(local_environment,gpu,bound['value']['cohort'])
+            if current is not None:
+                from startup_change_journal import query
+                journal=query(current[1]);check()
+                if journal is not None:payload['local_preparation']=dict(environment=current[0],journal=journal)
         if len(json.dumps(payload,sort_keys=True,separators=(',',':')).encode())>16384:return False
         write_json(path,payload)
         return True

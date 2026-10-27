@@ -160,5 +160,11 @@
     }
   ],
   "formal_data_modified": false,
-  "game_started": false
+  "game_started": false,
+  "supplemental_exec_wiring_tests": {
+    "status": "passed",
+    "tests": 2,
+    "source_runtime_revision": "684cc230",
+    "runtime_source_unchanged": true
+  }
 }

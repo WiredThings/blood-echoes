@@ -100,6 +100,89 @@ def mapping(root,origins,check):
     return files
 
 
+def overlay_shape(root,base,origins,check):
+    """Compare the original sparse link tree, never descend into base links.
+
+    Full source registration remains authoritative. This only proves that the
+    new ephemeral app0 selects the SAME registered sources as the original
+    merger; continuous history separately proves those sources did not change.
+    """
+    root=directory(root)
+    if root==base:return [('base',str(base))]
+    rows=[]
+    for parent,dirs,names in os.walk(root,followlinks=False):
+        check();folder=directory(parent)
+        for name in sorted(dirs+names):
+            p=folder/name;info=p.lstat();relative=str(p.relative_to(root))
+            if stat.S_ISLNK(info.st_mode):
+                target=p.resolve(strict=True)
+                need(any(target==origin or target.is_relative_to(origin)for origin in origins),'source-view shape escape')
+                rows.append((relative,'link',str(target)))
+            else:
+                need(stat.S_ISDIR(info.st_mode)and info.st_uid==os.getuid(),'original overlay has a non-link leaf')
+                rows.append((relative,'directory'))
+            need(len(rows)<=MAX_FILES,'source-view shape budget')
+    return sorted(rows)
+
+
+def selection_binding(selection,algorithm,layers,shape):
+    # Deliberately no temporary overlay path or entire launcher/UI identity.
+    return dict(schema=1,original_algorithm=algorithm,
+        selection=json.loads(json.dumps(selection,default=str,sort_keys=True)),
+        layers=layers,overlay_shape_sha256=digest(shape))
+
+
+def reuse_selection(views,bound,origins,check,verify_current=lambda:None):
+    """Unchanged registered selection; uncertainty returns to full admission."""
+    from game_pso_owned_audit import checked_bytes
+    from startup_change_journal import unchanged
+    path=views/('selection-'+digest(bound)+'.json')
+    try:
+        info=path.lstat()
+        need(info.st_nlink==1 and stat.S_IMODE(info.st_mode)==0o600,'selection receipt mode/link identity')
+        check();raw,_=checked_bytes(path,limit=16384);saved=json.loads(raw)
+        need(set(saved)=={'schema','binding','generation','ready_sha256','identity','files','logical_bytes','journal'},'selection receipt fields')
+        need(type(saved['schema'])is int and saved['schema']==1 and saved['binding']==bound,'selection receipt binding')
+        name=saved['generation'];identity=saved['identity']
+        need(isinstance(name,str)and Path(name).name==name and isinstance(identity,str)and len(identity)==64
+            and all(c in '0123456789abcdef'for c in identity)
+            and(name==identity or name.startswith(identity+'-retry-')),'registered selection generation')
+        need(type(saved['files'])is int and 0<saved['files']<=MAX_FILES and type(saved['logical_bytes'])is int
+            and 0<=saved['logical_bytes']<=MAX_BYTES,'registered selection bounds')
+        generation=directory(views/name);view=directory(generation/'view')
+        need(stat.S_IMODE(view.stat().st_mode)==0o500,'registered readonly view')
+        roots=list(dict.fromkeys([*origins,view]))
+        if not unchanged(saved['journal'],roots):return None
+        need(file_sha(generation/'READY.json',check)[0]==saved['ready_sha256'],'registered selection receipt changed')
+        verify_current();check()
+        if not unchanged(saved['journal'],roots):return None
+        counts=dict(hashed_files=0,hashed_bytes=0,reused_files=saved['files'],metadata_only=True,journal_reused=True)
+        return dict(game_root=view,report=dict(status='reused',reuse_mode='registered-selection',source_identity=identity,
+            files=saved['files'],logical_bytes=saved['logical_bytes'],CoW=True,original_app0_preserved=True,
+            source_hashes=counts,snapshot_hashes=dict(counts),full_tree_enumerated=False))
+    except(OSError,ValueError,KeyError,TypeError):return None
+
+
+def publish_selection(views,bound,origins,view,identity,records,total,check,verify):
+    """Publish only AFTER the existing complete source/view validation.
+
+    Anchor history before a final original validation; never put a cursor after
+    an unobserved mutation. A missing/dropped journal never grants reuse.
+    """
+    from startup_change_journal import query,unchanged
+    path=views/('selection-'+digest(bound)+'.json')
+    if not replaceable(path):return False
+    roots=list(dict.fromkeys([*origins,view]));token=query(roots)
+    if token is None:return False
+    verify();check()
+    ready=file_sha(view.parent/'READY.json',check)[0]
+    if not unchanged(token,roots):return False
+    saved=dict(schema=1,binding=bound,generation=view.parent.name,ready_sha256=ready,
+        identity=identity,files=len(records),logical_bytes=total,journal=token)
+    if len(json.dumps(saved,separators=(',',':')).encode())>16384:return False
+    write_json(path,saved);return True
+
+
 def recipe(stage,environment,runtime_profile=None):
     stage=runtime_profile.code(stage)if runtime_profile is not None else directory(stage);env=environment
     base=directory(absolute(env.get('BB_GAME_DIR','../CUSA03173'),stage))
@@ -185,7 +268,18 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
             with contextlib.redirect_stdout(stdout):module.main()
         finally:sys.argv=original_argv
         lines=stdout.getvalue().splitlines();need(len(lines)==1,'original mod view result envelope')
-        expected=directory(Path(lines[0]));wanted=mapping(expected,origins,check)
+        expected=directory(Path(lines[0]))
+        expected_shape=overlay_shape(expected,selection['base'],origins,check)
+        actual_shape=overlay_shape(actual,selection['base'],origins,check)
+        need(expected_shape==actual_shape,'final app0 differs from original selected mod view')
+        bound=selection_binding(selection,algorithm,layers,expected_shape)
+        def verify_current():
+            need(recipe(stage,environment,runtime_profile)==selection,'original mod selection changed during registered reuse')
+            need(overlay_shape(actual,selection['base'],origins,check)==actual_shape,'final app0 shape changed during registered reuse')
+        reused=reuse_selection(views,bound,origins,check,verify_current)
+        if reused is not None:
+            return reused
+        wanted=mapping(expected,origins,check)
         observed=mapping(actual,origins,check)
         need(wanted==observed,'final app0 differs from original selected mod view')
         selection_identity=digest(dict(schema=1,role='selected-file-content',algorithm=algorithm,base=str(selection['base'])))
@@ -222,6 +316,10 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
             else:
                 verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes)
                 snapshot_hashes.verify();live_hashes.publish();snapshot_hashes.publish()
+                def verify_registered():
+                    verify_snapshot(view,records,check,snapshot_hashes)
+                    verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes)
+                publish_selection(views,bound,origins,view,identity,records,total,check,verify_registered)
                 return dict(game_root=view,report=dict(status='reused',source_identity=identity,files=len(records),logical_bytes=total,CoW=True,original_app0_preserved=True,
                     source_hashes=live_hashes.report(),snapshot_hashes=snapshot_hashes.report()))
         if generation.exists()or generation.is_symlink():generation=views/(identity+'-retry-'+str(time.time_ns()))
@@ -245,5 +343,9 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
         # Existing invalid links/foreign nodes are retained; never follow or
         # delete them to publish a speed hint. A future launch rechecks safely.
         if replaceable(pointer):write_json(pointer,dict(generation=generation.name))
+        def verify_registered():
+            verify_snapshot(view,records,check,snapshot_hashes)
+            verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes)
+        publish_selection(views,bound,origins,view,identity,records,total,check,verify_registered)
         return dict(game_root=view,report=dict(status='snapshotted',source_identity=identity,files=len(records),logical_bytes=total,CoW=True,original_app0_preserved=True,
             source_hashes=live_hashes.report(),snapshot_hashes=snapshot_hashes.report(),cache_recovery=cache_problem))

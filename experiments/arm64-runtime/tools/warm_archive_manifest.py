@@ -48,5 +48,12 @@ def prepare_startup_archive_policy(*,enabled,engine,selected_executable,backend_
     selected=resolver(Path(selected_executable),backend_root)
     token,manifest=manifest_builder(translator_artifacts={'gpu_library':Path(selected['library'])},
                                    game_artifacts=game_artifacts,options=options,profile=profile)
-    return {'BB_MTL_ARCHIVE_COMPATIBILITY_ID':token},dict(mode='arm64-v3',namespaced=True,
-        manifest_created=True,token=token,manifest=manifest,selected_gpu=selected)
+    identity=dict(mode='arm64-v3',namespaced=True,manifest_created=True,
+                  token=token,manifest=manifest,selected_gpu=selected)
+    # Separate the domains in the ACTUAL existing producer. Keep the current
+    # native namespace until retained-product migration is wired and verified;
+    # a new digest alone must not silently strand all existing artifacts.
+    if isinstance(manifest,dict)and manifest.get('schema')==1 and set(manifest)=={'schema','translator','game','options','profile'}:
+        from compilation_domains import split_manifest
+        identity['domains']=split_manifest(manifest)
+    return {'BB_MTL_ARCHIVE_COMPATIBILITY_ID':token},identity

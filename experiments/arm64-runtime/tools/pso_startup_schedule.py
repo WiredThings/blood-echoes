@@ -38,16 +38,20 @@ def startup_preference(path,check):
  if actual!=expected or actual_size!=size:return None
  return dict(schema=1,preparation=prep,verified_artifact_preference=True)
 
-def content_proof(roots,check):
+def content_proof(roots,check,*,module_products=False):
  """Bounded streaming proof of logical bytes and security-relevant metadata.
 
  Timestamp/xattr-only changes are not byte changes. Enumerate the exact set,
  reject links/foreign nodes, and do not keep libraries in Python memory. The
  BEFORE and AFTER proofs must agree around an ACTUAL full native validation.
  """
- value=hashlib.sha256();total=0;count=0;folders=0
+ value=hashlib.sha256();total=0;count=0;proof_files=0;folders=0
  def append(row):value.update(json.dumps(row,sort_keys=True,separators=(',',':')).encode()+b'\n')
- def security(s):return [s.st_dev,s.st_mode,s.st_uid,s.st_gid,s.st_nlink]
+ def security(s):return [s.st_dev,s.st_mode,s.st_uid,s.st_gid,0 if module_products and stat.S_ISDIR(s.st_mode)else s.st_nlink]
+ def administrative(relative,is_directory):
+  if not module_products or len(relative.parts)!=1:return False
+  name=relative.name
+  return bool(re.fullmatch(r'companion-inventory-[0-9a-f]{24}',name))if is_directory else(name=='report.json'or bool(re.fullmatch(r'(stage|recipe)-links-[0-9]+\.jsonl',name)))
  for raw in sorted(roots):
   root=directory(raw);s=root.stat();append(['root',str(root),s.st_dev,s.st_ino,security(s)])
   for base,dirs,names in os.walk(root,followlinks=False):
@@ -55,9 +59,13 @@ def content_proof(roots,check):
    if folders>MAX_PROOF_FILES or len(Path(base).relative_to(root).parts)>16:return None
    dirs.sort();names.sort();folder=directory(base);append(['dir',str(folder.relative_to(root)),security(folder.stat())])
    for name in dirs:directory(folder/name)
+   dirs[:]=[name for name in dirs if not administrative((folder/name).relative_to(root),True)]
    for name in names:
     check();p=folder/name;s=p.lstat();count+=1
     if count>MAX_PROOF_FILES or not stat.S_ISREG(s.st_mode)or s.st_uid!=os.getuid()or s.st_size<0 or total+s.st_size>MAX_PROOF_BYTES:return None
+    if module_products and s.st_nlink!=1:return None
+    if administrative(p.relative_to(root),False):continue
+    proof_files+=1
     sha,size=file_sha(p,check)
     preference=None
     if p.name=='startup-entry.json':
@@ -67,7 +75,9 @@ def content_proof(roots,check):
     stamp=lambda x:(x.st_dev,x.st_ino,x.st_mode,x.st_uid,x.st_gid,x.st_nlink,x.st_size,x.st_mtime_ns,x.st_ctime_ns)
     if stamp(s)!=stamp(after)or size!=s.st_size:return None
     total+=size;append(['file',str(p.relative_to(root)),security(s),size,preference if preference is not None else sha])
- return dict(schema=1,sha256=value.hexdigest(),files=count,bytes=total)
+ result=dict(schema=1,sha256=value.hexdigest(),files=proof_files,bytes=total)
+ if module_products:result['scope']='module-products-v1'
+ return result
 
 class Schedule:
  def __init__(self,manifest,*,context,environment,gpu,artifact,progress,code_identity,rows,fingerprint,check):
