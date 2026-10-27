@@ -69,8 +69,18 @@ def write_json(path, value):
 
 
 def source_inventory(game_root, check=lambda: None):
-    """Content hashes, including additions/removals; stat-only trust is not used."""
+    """Complete content identities; readonly prior byte proofs may be reused."""
     root = directory(game_root)
+    # A fresh large CoW tree can temporarily lack continuous FSEvents history.
+    # Retain its actual complete byte proof after CURRENT readonly membership
+    # and mutation-sensitive stamps pass. Changed bytes still read/hash.
+    if root.name=='view'and root.parent.parent.name=='source-views':
+        hint=registered_snapshot_hashes(root,root.parent.parent.parent,check)
+        if hint is not None:
+            result=sorted((dict(path=str(Path(name).relative_to(root)),sha256=row['sha256'],bytes=row['bytes'])
+                           for name,row in hint.seen.items()),key=lambda row:row['path'])
+            hint.verify()
+            return result
     sources = []
     for base, dirs, names in os.walk(root, followlinks=False):
         check()
@@ -154,8 +164,10 @@ def plain_files(root,check=lambda:None):
 def registered_snapshot_hashes(game,cache,check):
     """Reuse the original snapshot's complete byte proof across catalogues.
 
-    A changed/lost history or any receipt mismatch returns to the existing
-    source inventory. This does not grant compiler/product admission.
+    Without continuous history, revalidate the complete readonly membership
+    and current mutation-sensitive file stamps. Only changed files reread
+    bytes. A receipt/content mismatch still returns to original inventory.
+    This never grants compiler/product admission.
     """
     try:
         if game.name!='view' or game.parent.parent!=cache/'source-views':return None
@@ -174,11 +186,9 @@ def registered_snapshot_hashes(game,cache,check):
         hint=Hashes(cache/'source-views'/('snapshot-metadata-'+game.parent.name+'.json'),
             digest(dict(schema=1,role='readonly-mod-view',identity=identity,view=str(game))),
             hasher=file_sha,check=check,watch_roots=[game])
-        if not hint.journal_valid:return None
         from launcher_source_view import verify_snapshot
         verify_snapshot(game,rows,check,hint)
         check();hint.verify()
-        if not hint.journal_valid:return None
         return hint
     except(OSError,ValueError,KeyError,TypeError):return None
 

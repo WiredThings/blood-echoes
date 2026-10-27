@@ -311,7 +311,7 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     if visible_local:visible['local_libraries']=visible_local
     modules=report.get('game_pso',{}).get('scan',{}).get('automatic_modules',{})
     typed=modules.get('typed_companions',{}).get('counts',{})
-    module_counts={k:typed[k]for k in('inventory_records','native_attempts','native_completed','verified_target_products','verified_target_reuses','verified_existing','required_target_keys','verified_required_products','unresolved_static_stage_records')if type(typed.get(k))is int and typed[k]>=0}
+    module_counts={k:typed[k]for k in('inventory_records','native_attempts','native_completed','verified_target_products','verified_target_reuses','verified_existing','required_target_keys','verified_required_products','unresolved_static_stage_records','verified_generic_target_coverage')if type(typed.get(k))is int and typed[k]>=0}
     if modules.get('typed_companions',{}).get('historical_capture_inventory_skipped')is True:module_counts['historical_capture_inventory_skipped']=True
     if module_counts:visible['typed_modules']=module_counts
     print('Metal local preparation: '+json.dumps(visible,sort_keys=True),flush=True)

@@ -26,7 +26,7 @@ Mod组合变化但最终物理来源映射完全相同（例如下层覆盖被�
 8. **F3 已前置，原在线→离线语义保持。** 同 supervisor 的 Local 选择与 resume-only 在普通整批库/helper/资源/模块/PSO准备之前。在线运行可以登记完成的 GPU 准备，但只有原 supervisor 的离线 F3 child 可以采用；不会恢复 token/账号或在线状态。当前实际 boot/patch/settings、选择、代码、nonces、SDK/local 目录及上下文仍匹配；真实变化就回退原准备。原 F2、自动继续和退出码完全沿用。
 9. **本机库兼容身份与保留式采用。** actual NativeToolchain schema2 绑定 Metal/metallib/xcrun 的代码/版本、OS build 和默认 SDKSettings.json/plist 内容。SDK 路径/时间另作来源/本次固定条件，同版本换目录/仅时间变化不换产品。真实跨 cohort 库采用须原 native derive_key 有效，原 MSL 与当前逐字节相同，完整 options/build/receipt/library 字节通过。v1 entry 与 v2 整库语义保持。旧 schema1 未记录 SDK，及旧 PSO 仅有不可逆 recipe digest 的情况，不能伪造兼容或重贴 ready；保留旧产品，必要时一次性为当前真实输入重建。未来 Mod 变化不再因此整体更换 compiler cohort。
 
-本轮43套、669项定向检查（含系统真实 CoW/文件历史控制）通过；另有独立真实 FSEvents+fclonefileat 作者数据端到端证明，源/目标字节另行完整比对，新 Mod 只 hash 1 个文件并复用 2 个已验证只读 clone。见 evidence/startup-cache-redesign-20261027/integration-directed-result.json 与 real-cow-admission.json。早期430项/393项及先前游戏数字是不同源码阶段，保留为历史，不拿来冒充当前包结果。
+本轮43套、670项定向检查（含系统真实 CoW/文件历史控制）通过；另有独立真实 FSEvents+fclonefileat 作者数据端到端证明，源/目标字节另行完整比对，新 Mod 只 hash 1 个文件并复用 2 个已验证只读 clone。见 evidence/startup-cache-redesign-20261027/integration-directed-result.json 与 real-cow-admission.json。早期430项/393项及先前游戏数字是不同源码阶段，保留为历史，不拿来冒充当前包结果。
 
 下一步交付阻塞：冻结并同步当前源码 → 干净 Git 归档组隔离包并核 native 载荷/闭包/签名 → 实际本机库与 native worker 命中及迁移 → 一次集中启动/Mod 往返/坏项局部修复/F3验收，记录 worker/编译次数、阶段耗时、长帧、峰值和场景持续内存。尚未运行当前完整设计的游戏或更新正式应用；不能据定向通过宣称这些已完成。若实际日志暴露未覆盖协议/缺少事件，则按具体输入修复，不能把 ready 计数补成成功。
 
@@ -34,7 +34,11 @@ Mod组合变化但最终物理来源映射完全相同（例如下层覆盖被�
 
 76e208d5隔离包真实进场：旧0.2.56暖启动51.49秒，首次新身份登记479.64秒，随后53.90/25.40秒；场景48.02→48.23/48.86 FPS，不宣称渲染加速。source-view从9.72秒降0.58秒，内容读取0；PSO从整批进入每recipe复用0.82秒，最终Local231项built=0且persistent audit实际命中。场景合计footprint旧6136.78MiB，新6167.53/6147.84MiB，压力最高均2，无持续内存等同结论。首轮更换解析/SDK命名空间一次性登记单列，不算暖启动收益。
 
-现场发现：87模块已完整采用，但93个typed候选中6个没有唯一静态源关联，仍触发历史inventory。修正typed required集合只含原算法真正能准备的唯一静态源；原完整stage循环与missing-or-ambiguous-static-source缺口保留，另外显式报告unresolved_static_stage_records，不删除导入/统计或冒称全部准备。新定向反例通过，待最终包合并进后续Mod/F3集中矩阵。尚未替换正式应用，Release不更新。
+现场进一步分解，纠正初步归因：93个目标均有唯一静态代码关联；未命中typed索引的6项是4个非fetch和2个无companion的fetch输入，已有完整通用模块原生结果。沿用同一个verify_existing_module准入函数，只有全部当前变体的完整packet/receipt/SPIR-V、nonce/cohort通过，才让该目标跳过重复typed捕获枚举；仍由原stage循环独立采用/修复，不冒充typed产物。优先87个原typed索引，再对六个剩余通用目标完整验证，真实只读控制6/93、约18ms，无native子进程或缓存写入。原tessellation等7项拒绝仍明确统计。
+
+实际Mod A→A+B→A/原版恢复与F3功能矩阵已完成，但新建大视图的FSEvents历史一度不可用，导致目录层仍重复读约31GB，不能算最终增量验收通过。现在允许原snapshot完整字节证明在连续历史不可用时，经CURRENT完整只读成员集/链接/权限及mutation-sensitive stamps重验继续使用；变化文件实际读SHA，增加/删除/坏证明回原路径。worker前后source_inventory也共用这个证明，不重复读未变文件。此处修改扫描准入代码，旧索引与原生GPU产物均保留；新的目录解析身份会一次性重登记，不伪装成旧解析器命中。原生MSL/函数/PSO真实键和编译cohort保持。
+
+当前670项控制通过，保留初次沙箱FSEvents不可用的失败记录，系统可访问环境17项调度和13项recipe反例均通过，没有放宽检查。等待最终统一包复验新视图、暖启动、Mod往返及F3；不把此前中间包结果冒称最终源码全部通过。正式应用仍0.2.56、正式数据不动，无Release。
 
 ## 复用现有实现
 
@@ -75,7 +79,7 @@ Mod组合变化但最终物理来源映射完全相同（例如下层覆盖被�
 5. F3在同supervisor会话前置复用刚完成的准备环境/required products，避免重复整批库检查；代码/关键条件真不一致按相应范围回退。原运行时库加载、创建本进程Metal对象依然必要，计数单独统计，不能算成离线预编译失败。
 6. 全部源码集成后再统一构建/集中验收；不因局部修改立刻开长测。临时纹理诊断独立收尾，性能测试不启用它。
 
-早期1956c367里程碑28套、430项定向检查通过，见evidence/startup-cache-redesign-20261027/directed-result.json（当前669项见上文）。实际Xcode SDK元数据读取检查通过（JSON7948字节、plist5538字节），没有调用编译器或游戏。先前失败记录保留：旧增量提示的测试需显式选择下层回退路径；新SDK产品需要新建库后再完成稳定审计，旧“两次即可memo”假设已修正；新源证明测试的重复seed与拒绝返回约定已纠正。初次沙箱内变化记录不可用及SDK路径查询混入xcodebuild系统告警，退出沙箱重验通过，没有放宽原解析或路径校验。一次旧live Metal测试因缺少它要求的旧构建manifest，在启动任何GPU/游戏前失败，留待集中包验收，不记通过。430项通过不包含此项，也不构成真实Metal库迁移或游戏性能验收。
+早期1956c367里程碑28套、430项定向检查通过，见evidence/startup-cache-redesign-20261027/directed-result.json（当前670项见上文）。实际Xcode SDK元数据读取检查通过（JSON7948字节、plist5538字节），没有调用编译器或游戏。先前失败记录保留：旧增量提示的测试需显式选择下层回退路径；新SDK产品需要新建库后再完成稳定审计，旧“两次即可memo”假设已修正；新源证明测试的重复seed与拒绝返回约定已纠正。初次沙箱内变化记录不可用及SDK路径查询混入xcodebuild系统告警，退出沙箱重验通过，没有放宽原解析或路径校验。一次旧live Metal测试因缺少它要求的旧构建manifest，在启动任何GPU/游戏前失败，留待集中包验收，不记通过。430项通过不包含此项，也不构成真实Metal库迁移或游戏性能验收。
 
 ## 定向及最终验收矩阵
 

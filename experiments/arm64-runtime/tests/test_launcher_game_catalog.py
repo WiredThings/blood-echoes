@@ -57,7 +57,7 @@ class AutomaticCatalogue(unittest.TestCase):
             self.assertTrue(result['report']['source_hashes']['journal_reused'])
             self.assertEqual(len(self.calls),1)
 
-    def test_registered_snapshot_bad_proof_or_lost_history_cannot_authorize_inventory(self):
+    def test_registered_snapshot_lost_history_rechecks_members_and_stamps_not_unchanged_bytes(self):
         from test_launcher_source_view import SourceView
         authored=SourceView();authored.setUp();self.addCleanup(authored.tearDown)
         import startup_change_journal as journal
@@ -65,7 +65,18 @@ class AutomaticCatalogue(unittest.TestCase):
             selected=authored.prepare();game=selected['game_root'];cache=authored.gpu/'automatic-game-inputs'
             self.assertIsNotNone(catalog.registered_snapshot_hashes(game,cache,lambda:None))
             with patch.object(journal,'unchanged',return_value=False):
+                original=catalog.file_sha
+                def no_unchanged_source_read(path,*args):
+                    self.assertFalse(Path(path).is_relative_to(game),'unchanged registered bytes reread')
+                    return original(path,*args)
+                with patch.object(catalog,'file_sha',side_effect=no_unchanged_source_read):
+                    hint=catalog.registered_snapshot_hashes(game,cache,lambda:None)
+                    worker_inventory=catalog.source_inventory(game)
+                self.assertIsNotNone(hint);self.assertFalse(hint.journal_valid)
+                self.assertEqual(worker_inventory,sorted((dict(path=str(Path(name).relative_to(game)),sha256=row['sha256'],bytes=row['bytes'])for name,row in hint.seen.items()),key=lambda row:row['path']))
+                added=game/'unexpected';game.chmod(0o700);added.write_bytes(b'new member');added.chmod(0o400);game.chmod(0o500)
                 self.assertIsNone(catalog.registered_snapshot_hashes(game,cache,lambda:None))
+                game.chmod(0o700);added.unlink();game.chmod(0o500)
             ready=game.parent/'READY.json';old=ready.read_bytes();value=json.loads(old);value['proof']['files'][0]['sha256']='0'*64;ready.write_text(json.dumps(value))
             self.assertIsNone(catalog.registered_snapshot_hashes(game,cache,lambda:None));self.assertNotEqual(old,ready.read_bytes())
 

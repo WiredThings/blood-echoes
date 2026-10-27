@@ -110,6 +110,49 @@ def companion_targets(units,table):
    required_code[key]=matches[0]['identity']['code_sha256'];observed[key]=stage['spirv']
  return targets,required_code,observed,dict(gaps)
 
+def verify_existing_module(uid,existing,stage,*,products,catalog,nonce,cohort):
+ """Same complete admission for scheduling coverage and actual stage use."""
+ from complete_geometry_psos import verify_receipt
+ reader=canonical_packet
+ if stage['hardware_stage']=='geometry':
+  from run_owned_geometry_contracts import canonical_geometry_packet
+  reader=canonical_geometry_packet
+ p=products.packet(uid,existing)if stage['hardware_stage']!='geometry'else None
+ if p is None:p=reader(Path(existing['packet']),catalog)
+ receipt=json.loads(checked_bytes(Path(existing['receipt']),limit=256*1024,expected=existing['receipt_sha256'])[0])
+ need(file_sha(existing['packet'])==existing['packet_sha256'],'indexed exact packet SHA')
+ validate_call(0,receipt,Path(existing['spirv']).parent,p);verify_receipt(p,receipt,existing['packet_sha256'])
+ need(p.get('automatic_preparation')==dict(schema=1,nonce=nonce,cohort=cohort),'indexed automatic admission')
+ if stage['hardware_stage']!='geometry':products.record(uid,existing)
+ return existing
+
+def prepared_generic_targets(units,table,index,*,layout,catalog,products,nonce,cohort,check):
+ """An existing FULL generic product also covers a typed scheduling request.
+
+ Every current variant must pass the same full native output admission. This
+ neither manufactures a typed companion nor consumes a generic proof as one.
+ The original stage loop independently revalidates/uses its generic product.
+ """
+ from game_companion_modules import stage_key
+ covered={}
+ for unit in units:
+  if unit['record_type']!='offline-pso-input':continue
+  for stage in unit['stages']:
+   if stage['logical_stage']!='vertex'or stage['hardware_stage']not in('vertex','export','local'):continue
+   check();key=stage_key(unit,stage)
+   # This hint only prefers the existing typed admission path. It grants no
+   # product readiness; required_products still checks the full current input.
+   # Avoid an additional generic validation of the same already-indexed stage.
+   if index.get('companion_required_index',{}).get(digest(list(key))):continue
+   if covered.get(key)is False:continue
+   try:
+    matches=table.get((stage['program_hash'],stage['hardware_stage']),[]);need(len(matches)==1,'unique native-stage static code source required')
+    uid=stage_input_identity(unit,stage,matches[0]['identity'],layout,catalog['game_identity']);entry=index['modules'][uid]
+    verify_existing_module(uid,entry,stage,products=products,catalog=catalog,nonce=nonce,cohort=cohort)
+    covered[key]=True
+   except(ValueError,OSError,KeyError,TypeError):covered[key]=False
+ return {key for key,valid in covered.items()if valid}
+
 def _automatic_packet(packet,path,nonce,cohort):
  packet['automatic_preparation']=dict(schema=1,nonce=nonce,cohort=cohort)
  atomic_json(path,packet)
@@ -254,10 +297,13 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
    path=Path(cache)/'profile.bin';_,ref=checked_bytes(path);profiles[ref['sha256']]=ref
   targets,required_code,observed_modules,association_gaps=companion_targets(
       selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest),table)
+  generic=prepared_generic_targets(selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest),table,index,layout=layout,catalog=catalog,products=products,nonce=nonce,cohort=cohort,check=check)
+  for key in generic:targets.pop(key,None)
   typed_report,typed_ready=prepare_companions(context=static_context,gpu=gpu,root=root,component={**component,'library':identity['library']},identity=identity,catalog=catalog,cohort=cohort,nonce=nonce,profiles=profiles,targets=targets,index=index,index_path=index_path,check=check,deadline=start+seconds,native_runner=native_runner,
       required_only=True,required_code=required_code,observed_modules=observed_modules)
   typed_report['static_association_gaps']=association_gaps
   typed_report.setdefault('counts',{})['unresolved_static_stage_records']=sum(association_gaps.values())
+  typed_report['counts']['verified_generic_target_coverage']=len(generic)
  links_path=root/('stage-links-'+str(time.time_ns())+'.jsonl');recipes_path=root/('recipe-links-'+str(time.time_ns())+'.jsonl');link_bytes=0
  def emit(stream,value):
   nonlocal link_bytes
@@ -290,15 +336,7 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
     existing=index['modules'].get(uid);repairing=False
     if existing is not None:
      try:
-      from complete_geometry_psos import verify_receipt
-      reader=canonical_packet
-      if stage['hardware_stage']=='geometry':
-       from run_owned_geometry_contracts import canonical_geometry_packet
-       reader=canonical_geometry_packet
-      p=products.packet(uid,existing)if stage['hardware_stage']!='geometry'else None
-      if p is None:p=reader(Path(existing['packet']),catalog)
-      receipt=json.loads(checked_bytes(Path(existing['receipt']),limit=256*1024,expected=existing['receipt_sha256'])[0]);need(file_sha(existing['packet'])==existing['packet_sha256'],'indexed exact packet SHA');validate_call(0,receipt,Path(existing['spirv']).parent,p);verify_receipt(p,receipt,existing['packet_sha256']);need(p.get('automatic_preparation')==dict(schema=1,nonce=nonce,cohort=cohort),'indexed automatic admission')
-      if stage['hardware_stage']!='geometry':products.record(uid,existing)
+      verify_existing_module(uid,existing,stage,products=products,catalog=catalog,nonce=nonce,cohort=cohort)
       stage_results[stage['logical_stage']]=admitted[uid]=existing;counts['verified_existing']+=1;continue
      except(ValueError,OSError,KeyError,TypeError)as error:
       # Preserve the previous index entry AND its untouched case directory.

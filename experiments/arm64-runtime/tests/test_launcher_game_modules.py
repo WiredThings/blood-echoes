@@ -6,6 +6,21 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import launcher_game_modules as m
 
 class ModuleControllerControls(unittest.TestCase):
+ def test_generic_coverage_requires_every_current_variant_and_complete_admission(self):
+  from game_companion_modules import stage_key
+  def unit(spec):
+   return dict(record_type='offline-pso-input',profile=dict(reference=dict(sha256='profile')),stages=[dict(
+    program_hash='source',hardware_stage='vertex',logical_stage='vertex',permutation_hash='perm',
+    spirv=dict(sha256='module'),serialized_spec_sha256=spec,metadata=dict(sha256=spec))])
+  a,b=unit('valid'),unit('bad');table={('source','vertex'):[dict(identity={})]};index=dict(modules={'valid':{},'bad':{}})
+  kwargs=dict(layout={},catalog=dict(game_identity={}),products=None,nonce='n',cohort='c',check=lambda:None)
+  def verify(uid,*args,**kw):
+   if uid=='bad':raise ValueError('complete receipt rejected')
+  with patch.object(m,'stage_input_identity',side_effect=lambda u,s,*args:s['serialized_spec_sha256']),patch.object(m,'verify_existing_module',side_effect=verify)as gate:
+   self.assertEqual(m.prepared_generic_targets([a],table,index,**kwargs),{stage_key(a,a['stages'][0])})
+   self.assertEqual(m.prepared_generic_targets([a,b],table,index,**kwargs),set());self.assertGreaterEqual(gate.call_count,3)
+   self.assertEqual(m.prepared_generic_targets([a],table,dict(modules={}),**kwargs),set())
+  self.assertEqual(len(a['stages']),1);self.assertEqual(len(b['stages']),1)
  def test_required_typed_scope_keeps_unresolved_sources_as_explicit_gaps(self):
   def stage(program,logical='vertex'):
    return dict(program_hash=program,hardware_stage='vertex',logical_stage=logical,permutation_hash='p',

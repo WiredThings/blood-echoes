@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "total_tests": 669,
+  "total_tests": 670,
   "suites": [
     {
       "suite": "test_incremental_file_hashes",
@@ -65,7 +65,7 @@
     {
       "suite": "test_launcher_game_modules",
       "exit": 0,
-      "tests": 15,
+      "tests": 16,
       "seconds": 0.706
     },
     {
