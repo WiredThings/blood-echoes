@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "source-verified-packaging-pending",
+  "status": "local-0.2.53-installed-verified",
   "actual_GUI_source": "launcher-macos",
   "progress_protocol": "existing bounded Metal preparation phase and supervisor log events",
   "phase_milestones": true,
@@ -22,5 +22,33 @@
   "integrity_policy_modified": false,
   "cache_fast_path_implemented": false,
   "GUI_visual_acceptance": false,
-  "release_updated": false
+  "release_updated": false,
+  "source_revision": "59a261a75c2914f2e7f4a20bcf1e967f8c358af9",
+  "version": "0.2.53",
+  "case": "/Users/Shared/BloodEchoesDevelopment/startup-progress-ui-1793070910744068000",
+  "build_seconds": 74.49289516697172,
+  "build_pressure_before": 1,
+  "build_pressure_after": 1,
+  "build_swap_growth_mib": 0.0,
+  "native_source_identity": {
+    "files": 9463,
+    "sha256": "b198c713a4cfa61f643f5bff01fb360ce329b4d2f7f1b83646b39824f1515ee1"
+  },
+  "native_products_unchanged": true,
+  "local_install": {
+    "status": "installed-verified",
+    "version": "0.2.53",
+    "source_revision": "59a261a75c2914f2e7f4a20bcf1e967f8c358af9",
+    "previous_source_revision": "8f6302e081d8981a187b1838243f56facc02dffd",
+    "app": "/Applications/Blood Echoes.app",
+    "old_code_backup": "/Users/Shared/BloodEchoesDevelopment/startup-progress-ui-1793070910744068000/previous-installed-code/Blood Echoes 0.2.52.app",
+    "atomic_exchange": true,
+    "files": 982,
+    "whole_app_deep_strict_seal": true,
+    "formal_data_modified": false,
+    "formal_GUI_started": false,
+    "game_started": false,
+    "release_updated": false
+  },
+  "game_runtime_acceptance": "Existing unchanged native code; previous actual cold/F3/death results are 0.2.52. This GUI-only change has Swift tests and log replay; no new 0.2.53 game or visual acceptance claim."
 }
