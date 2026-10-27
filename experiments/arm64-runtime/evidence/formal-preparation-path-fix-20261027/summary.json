@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "status": "local-0.2.52-installed-automatic-functional-regressions-running",
+  "source_revision": "8f6302e081d8981a187b1838243f56facc02dffd",
+  "original_failure": {
+    "launcher_exit": 74,
+    "phase": "fixed-helpers before game start",
+    "outer_error": "fixed helper result record count",
+    "actual_native_error": "fresh empty Shared source scratch required",
+    "root_cause": "Native PSO/module worker mains retained Shared data path gates after formal code admission; prior final-layout QA data was still under Shared/state so that gate was not exercised outside development paths."
+  },
+  "fix": [
+    "Actual authenticated worker role selects formal launcher data/work and selected native GPU namespace; non-formal programs retain original Shared checks",
+    "Keep canonical ownership/private work/fresh empty scratch/cache separation/nonce and semantic input validation",
+    "Handle native GAME_PSO_RESULT rejection explicitly without accepting it as a helper success"
+  ],
+  "directed_controls": {
+    "native_authored_path_cases": 17,
+    "native_result_error_cases": 7,
+    "fixed_response_cases": 17,
+    "formal_runtime_profile_cases": 19,
+    "game_started": false
+  },
+  "native_build": {
+    "seconds": 82.38297362509184,
+    "main_CPU_GPU_network_products_unchanged_relative_to_2a050545_build": true,
+    "native_source_identity": {
+      "files": 9463,
+      "sha256": "b198c713a4cfa61f643f5bff01fb360ce329b4d2f7f1b83646b39824f1515ee1"
+    },
+    "fresh_all_dependency_rebuild": false
+  },
+  "real_path_regression": {
+    "status": "real-formal-helper-paths-verified",
+    "data_root_outside_Shared_project": true,
+    "formal_data_modified": false,
+    "game_started": false,
+    "purpose": "real default fixed-helper startup at Application Support shaped data paths; module malformed-input rejection only",
+    "fixed_helpers_status": "completed",
+    "native_calls": 2,
+    "fixed_ready": 8,
+    "tiling_ready": null,
+    "cohort": "7345c7d8f2b55510ee9f706fa0f02b669eca5b69b9059b153639d84472bc6921",
+    "module_invalid_input_rejected_after_path_admission": true,
+    "module_exit": 65,
+    "whole_app_pre_post_seal": true,
+    "seconds": 11.621582624968141,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8535.9375
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8535.9375
+    }
+  },
+  "local_install": {
+    "status": "installed-verified",
+    "version": "0.2.52",
+    "source_revision": "8f6302e081d8981a187b1838243f56facc02dffd",
+    "previous_source_revision": "340e9c8685f5d70ec76c332a64b00ac422f5fad8",
+    "atomic_exchange": true,
+    "files": 982,
+    "whole_app_deep_strict_seal": true,
+    "formal_data_modified": false,
+    "formal_GUI_started": false,
+    "game_started": false,
+    "release_updated": false
+  },
+  "formal_save_read_or_modified": false,
+  "formal_settings_or_cache_modified": false,
+  "formal_startup_outputs_and_ini_readonly_copied_for_targeted_regression": true,
+  "release_updated": false,
+  "public_docs_updated": false,
+  "functional_regression": {
+    "cold_case": "original-launch-benchmark-1793066985770878000",
+    "cold_status": "incomplete-protected-stop-before-scene",
+    "cold_reason": "unexpected >1GiB swap growth within5s",
+    "cold_source_QA_save_unchanged": true,
+    "warm_resume": "preparation-fix-warm-functional-1793067690090646000",
+    "warm_status": "running-at-this-checkpoint",
+    "limits": "No fresh F3/death/online pass claim until actual terminal results; menu/exploration/combat white-model visual acceptance reserved for user."
+  }
+}
