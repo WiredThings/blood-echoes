@@ -91,6 +91,25 @@ def atomic_json(path,value):
   json.dump(value,stream,sort_keys=True,separators=(',',':'));stream.write('\n');stream.flush();os.fsync(stream.fileno())
  os.replace(temp,path)
 
+def companion_targets(units,table):
+ """Only provable static source associations enter typed required products.
+
+ Missing/ambiguous sources remain explicit gaps in the original full-stage
+ loop; they cannot be prepared by repeatedly enumerating capture history.
+ """
+ from game_companion_modules import stage_key
+ targets=collections.defaultdict(dict);required_code={};observed={};gaps=collections.Counter()
+ for unit in units:
+  if unit['record_type']!='offline-pso-input':continue
+  for stage in unit['stages']:
+   if stage['logical_stage']!='vertex'or stage['hardware_stage']not in('vertex','export','local'):continue
+   matches=table.get((stage['program_hash'],stage['hardware_stage']),[])
+   if len(matches)!=1:
+    gaps['missing-or-ambiguous-static-source']+=1;continue
+   key=stage_key(unit,stage);targets[key][stage['serialized_spec_sha256']]=stage['metadata']
+   required_code[key]=matches[0]['identity']['code_sha256'];observed[key]=stage['spirv']
+ return targets,required_code,observed,dict(gaps)
+
 def _automatic_packet(packet,path,nonce,cohort):
  packet['automatic_preparation']=dict(schema=1,nonce=nonce,cohort=cohort)
  atomic_json(path,packet)
@@ -230,18 +249,15 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
  typed_ready={};typed_report=dict(status='unavailable',reason='normal-path companion capture not configured')
  if static_context.get('capture_root')is not None:
   from game_companion_modules import prepare as prepare_companions,stage_key
-  profiles={};targets=collections.defaultdict(dict);required_code={};observed_modules={}
+  profiles={}
   for cache in caches:
    path=Path(cache)/'profile.bin';_,ref=checked_bytes(path);profiles[ref['sha256']]=ref
-  for unit in selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest):
-   if unit['record_type']!='offline-pso-input':continue
-   for stage in unit['stages']:
-    if stage['logical_stage']=='vertex'and stage['hardware_stage']in('vertex','export','local'):
-     target_key=stage_key(unit,stage);targets[target_key][stage['serialized_spec_sha256']]=stage['metadata'];observed_modules[target_key]=stage['spirv']
-     matches=table.get((stage['program_hash'],stage['hardware_stage']),[])
-     if len(matches)==1:required_code[target_key]=matches[0]['identity']['code_sha256']
+  targets,required_code,observed_modules,association_gaps=companion_targets(
+      selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest),table)
   typed_report,typed_ready=prepare_companions(context=static_context,gpu=gpu,root=root,component={**component,'library':identity['library']},identity=identity,catalog=catalog,cohort=cohort,nonce=nonce,profiles=profiles,targets=targets,index=index,index_path=index_path,check=check,deadline=start+seconds,native_runner=native_runner,
       required_only=True,required_code=required_code,observed_modules=observed_modules)
+  typed_report['static_association_gaps']=association_gaps
+  typed_report.setdefault('counts',{})['unresolved_static_stage_records']=sum(association_gaps.values())
  links_path=root/('stage-links-'+str(time.time_ns())+'.jsonl');recipes_path=root/('recipe-links-'+str(time.time_ns())+'.jsonl');link_bytes=0
  def emit(stream,value):
   nonlocal link_bytes

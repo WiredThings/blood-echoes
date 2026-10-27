@@ -6,6 +6,18 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import launcher_game_modules as m
 
 class ModuleControllerControls(unittest.TestCase):
+ def test_required_typed_scope_keeps_unresolved_sources_as_explicit_gaps(self):
+  def stage(program,logical='vertex'):
+   return dict(program_hash=program,hardware_stage='vertex',logical_stage=logical,permutation_hash='p',
+      serialized_spec_sha256='s',metadata=dict(sha256='m'),spirv=dict(sha256='v'))
+  unit=dict(record_type='offline-pso-input',profile=dict(reference=dict(sha256='f')),
+      stages=[stage('unique'),stage('missing'),stage('ambiguous'),stage('ignored','fragment')])
+  targets,code,observed,gaps=m.companion_targets([unit],{('unique','vertex'):[dict(identity=dict(code_sha256='real-code'))],
+      ('ambiguous','vertex'):[dict(identity=dict(code_sha256='a')),dict(identity=dict(code_sha256='b'))]})
+  self.assertEqual(len(targets),1);self.assertEqual(list(code.values()),['real-code']);self.assertEqual(len(observed),1)
+  self.assertEqual(gaps,{'missing-or-ambiguous-static-source':2})
+  # Unknown inputs are not promoted to valid products or removed from the unit.
+  self.assertEqual(len(unit['stages']),4)
  def test_geometry_recipe_dependency_identity_changes_only_for_used_repaired_module(self):
   u=dict(recipe_blob_identity='a'*64);entries={name:dict(packet_sha256=name*64,receipt_sha256='b'*64,spirv_sha256='c'*64)for name in('1','2','3')}
   original=m.geometry_recipe_identity(u,['1','2'],'d'*64,entries)
