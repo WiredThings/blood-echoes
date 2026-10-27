@@ -13,7 +13,7 @@
   "online_preparation_to_offline_F3_allowed": true,
   "qualified_library_product_adoption": true,
   "legacy_SDK1_and_opaque_PSO_not_forged": true,
-  "directed_tests": 665,
+  "directed_tests": 666,
   "directed_suites": 43,
   "real_kernel_CoW_and_journal_control": true,
   "actual_current_package_native_adoption_tested": false,
@@ -28,5 +28,6 @@
     "clean-archive-isolated-package-and-native-payload-signature-checks",
     "actual-library-and-native-worker-product-reuse",
     "concentrated-launch-Mod-repair-F3-and-memory-matrix"
-  ]
+  ],
+  "catalogue_source_alias_full_readonly_byte_proof": true
 }

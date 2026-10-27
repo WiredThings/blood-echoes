@@ -330,7 +330,7 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
     identity = digest(dict(schema=SCHEMA, source_files=sources, scanner=scan_identity))
     generation = cache / identity
     current = cache / 'current.json'
-    cache_problem=None
+    cache_problem=None;compiler_game=game
     try:
         if current.exists()or current.is_symlink():
             file_sha(current)
@@ -348,6 +348,18 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
                 need(name == identity or name.startswith(identity + '-retry-'), 'static generation pointer identity')
                 generation = cache / name
         ready = read_ready(generation, identity) if generation.exists() else None
+        if ready is not None:
+            # Catalogue products deliberately exclude the source-view location.
+            # Preserve their original physical provenance, but only reuse that
+            # view if its COMPLETE readonly byte set equals today's selection.
+            # Never relabel a catalog's game_root or fabricate a source alias.
+            catalog_root=directory(json.loads((generation/'catalog.json').read_text())['game_root'])
+            if catalog_root!=game:
+                retained=registered_snapshot_hashes(catalog_root,cache,check)
+                need(retained is not None,'retained catalogue source proof unavailable')
+                previous=[dict(path=str(Path(name).relative_to(catalog_root)),sha256=row['sha256'],bytes=row['bytes'])for name,row in sorted(retained.seen.items())]
+                need(previous==sources,'retained catalogue source bytes differ from selected input')
+                retained.verify();compiler_game=catalog_root
     except(OSError,ValueError,KeyError,TypeError):
         ready=None;cache_problem='static-metadata-invalid'
     reused = ready is not None
@@ -389,11 +401,13 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
     if not hashes.journal_valid:need(plain_files(game,check)==selected_files,'static source file set changed during preparation')
     hashes.publish()
     return dict(catalog=generation / 'catalog.json', index=generation / 'static-program-index.jsonl',
-                game_root=game, gpu_root=gpu, source_root=Path(source_root), cache_root=cache,
+                game_root=compiler_game, gpu_root=gpu, source_root=Path(source_root), cache_root=cache,
                 identity=identity, cohort=cohort, generation=generation,
                 report=dict(status='reused' if reused else 'indexed', identity=identity,
                             source_files=len(sources), scanner_identity=scan_identity,scheduler_identity=scheduler_identity,
                             source_hashes=hashes.report(),cache_recovery=cache_problem,
+                            selected_game_root=str(game),compiler_game_root=str(compiler_game),
+                            source_view_reused_by_complete_byte_identity=compiler_game!=game,
                             seconds=time.monotonic() - started, ready=ready,
                             full_pso_claim=False, default_enabled=True, formal_data_modified=False))
 

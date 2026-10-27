@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "total_tests": 665,
+  "total_tests": 666,
   "suites": [
     {
       "suite": "test_incremental_file_hashes",
@@ -12,7 +12,7 @@
       "suite": "test_incremental_preparation",
       "exit": 0,
       "tests": 13,
-      "seconds": 4.684
+      "seconds": 4.419
     },
     {
       "suite": "test_launcher_source_view",
@@ -23,14 +23,14 @@
     {
       "suite": "test_launcher_game_catalog",
       "exit": 0,
-      "tests": 15,
-      "seconds": 1.436
+      "tests": 16,
+      "seconds": 1.474
     },
     {
       "suite": "test_source_code_closure",
       "exit": 0,
       "tests": 13,
-      "seconds": 0.553
+      "seconds": 0.559
     },
     {
       "suite": "test_launcher_runtime_scope",
@@ -60,7 +60,7 @@
       "suite": "test_launcher_game_pso_automatic",
       "exit": 0,
       "tests": 10,
-      "seconds": 0.124
+      "seconds": 0.138
     },
     {
       "suite": "test_launcher_game_modules",
@@ -156,7 +156,7 @@
       "suite": "test_prepare_local_aot_stage",
       "exit": 0,
       "tests": 15,
-      "seconds": 0.543
+      "seconds": 0.565
     },
     {
       "suite": "test_compilation_domains",
@@ -180,7 +180,7 @@
       "suite": "test_recipe_preparation_schedule",
       "exit": 0,
       "tests": 13,
-      "seconds": 0.249
+      "seconds": 0.215
     },
     {
       "suite": "test_game_shader_catalog",

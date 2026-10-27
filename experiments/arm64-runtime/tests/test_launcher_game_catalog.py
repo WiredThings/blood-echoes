@@ -24,7 +24,7 @@ class AutomaticCatalogue(unittest.TestCase):
     def runner(self, path, check):
         check(); request = json.loads(path.read_text()); self.calls.append(request)
         output = Path(request['output'])
-        (output / 'catalog.json').write_text('{}\n')
+        (output / 'catalog.json').write_text(json.dumps(dict(game_root=request['game_root']))+'\n')
         (output / 'static-program-index.jsonl').write_text('')
         catalog.write_json(output / 'READY.json', dict(schema=1, identity=request['identity'],
             files=catalog.output_receipt(output), complete_pso_claim=False))
@@ -68,6 +68,23 @@ class AutomaticCatalogue(unittest.TestCase):
                 self.assertIsNone(catalog.registered_snapshot_hashes(game,cache,lambda:None))
             ready=game.parent/'READY.json';old=ready.read_bytes();value=json.loads(old);value['proof']['files'][0]['sha256']='0'*64;ready.write_text(json.dumps(value))
             self.assertIsNone(catalog.registered_snapshot_hashes(game,cache,lambda:None));self.assertNotEqual(old,ready.read_bytes())
+
+    def test_identical_mod_bytes_reuse_catalogue_with_its_proven_readonly_source_root(self):
+        from test_launcher_source_view import SourceView
+        authored=SourceView();authored.setUp();self.addCleanup(authored.tearDown)
+        with authored.history(),patch.object(catalog,'scanner_identity',return_value='b'*64):
+            first=authored.prepare(clone_file=authored.clone)
+            def prepare(game):return catalog.prepare(project=authored.project,gpu_root=authored.gpu,game_root=game,source_root=self.source,cohort='a'*64,runner=self.runner)
+            registered=prepare(first['game_root'])
+            mod=authored.mods/'same/dvdroot_ps4/shader';mod.mkdir(parents=True);(mod/'example.bin').write_bytes((authored.game/'dvdroot_ps4/shader/example.bin').read_bytes())
+            second=authored.prepare();self.assertNotEqual(first['game_root'],second['game_root'])
+            current=prepare(second['game_root'])
+            self.assertEqual(current['generation'],registered['generation']);self.assertEqual(current['game_root'],first['game_root']);self.assertEqual(len(self.calls),1)
+            self.assertTrue(current['report']['source_view_reused_by_complete_byte_identity'])
+            self.assertEqual(current['report']['selected_game_root'],str(second['game_root']))
+            old=first['game_root']/'eboot.bin';old.chmod(0o600);old.write_bytes(b'bad old source');old.chmod(0o400)
+            repaired=prepare(second['game_root']);self.assertNotEqual(repaired['generation'],registered['generation']);self.assertEqual(repaired['game_root'],second['game_root'])
+            self.assertEqual(len(self.calls),2);self.assertEqual(old.read_bytes(),b'bad old source')
 
     def test_warm_start_revalidates_outputs_and_skips_decoder(self):
         first = self.prepare(); second = self.prepare()
