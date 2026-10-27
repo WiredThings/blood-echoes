@@ -246,13 +246,94 @@ def assemble(**arguments):
     try: return _assemble(**arguments)
     finally: os.umask(previous)
 
+def build_manifest_arguments(manifest, *, output, search_dirs=()):
+    """Consume the normal builder's actual receipt, never an old app/QA stage.
+
+    The receipt selects inputs, not trust: source identity and all recorded
+    output bytes are rechecked here, then normal assembly checks CMake origins,
+    real load edges, layout, architectures and the original bare GUI again.
+    """
+    from build_native_source import source_snapshot, identify_source, directory as source_directory
+    receipt=regular(manifest)
+    need(receipt.stat().st_size<=16*1024*1024, 'normal build receipt exceeds size bound')
+    def unique_pairs(rows):
+        result={}
+        for key,value in rows:
+            need(key not in result, 'duplicate build receipt field')
+            result[key]=value
+        return result
+    m=json.loads(receipt.read_text(),object_pairs_hook=unique_pairs)
+    required={'schema','status','repository','source_root','build_root','revision','version',
+              'targets_built','installed','game_started','source_identity','artifacts',
+              'renderer','cpu','net','library','layout_result','layout_result_sha256',
+              'gui_app','gui_sha256','python_provider','dependency_prefixes'}
+    need(isinstance(m,dict) and required<=m.keys(), 'incomplete normal build receipt')
+    need(m['schema']==1 and m['status']=='source-built-not-packaged' and m['targets_built'] is True
+         and m['installed'] is False and m['game_started'] is False, 'successful uninstalled normal build required')
+    root=directory(m['build_root']);repo=directory(m['repository'])
+    need(receipt==root/'build-manifest.json', 'normal build receipt location mismatch')
+    need(Path(m['source_root'])==repo/'experiments/arm64-runtime', 'receipt source-root mismatch')
+    identity=m['source_identity']
+    need(isinstance(identity,dict) and identity.get('revision')==m['revision'], 'receipt source revision mismatch')
+    if identity.get('mode')=='source-export':
+        need(not os.path.lexists(repo/'.git'), 'source-export identity became a Git checkout')
+        snapshot=source_snapshot(repo)
+        encoded=json.dumps(snapshot,sort_keys=True,separators=(',',':')).encode()
+        need(snapshot==identity.get('source_files') and hashlib.sha256(encoded).hexdigest()==identity.get('snapshot_sha256'),
+             'source changed since normal build')
+    elif identity.get('mode')=='git':
+        def git(*args):return run('/usr/bin/git','-C',repo,*args).decode().strip()
+        actual=identify_source(repo,m['revision'],git_top=lambda:git('rev-parse','--show-toplevel'),git=git)
+        need(actual==identity, 'Git source changed since normal build')
+    else:raise ValueError('unknown normal build source identity')
+    artifacts=m['artifacts']
+    roles={'library':root/'renderer/libbbgpu.dylib','gpu':root/'renderer/bb-gpu',
+           'worker':root/'renderer/game-pso-preparer','module':root/'renderer/game-module-preparer',
+           'metadata':root/'renderer/metadata-layout','cpu':root/'cpu/Bin/bb-game-arm64',
+           'net':root/'net/libbbnet.dylib'}
+    need(isinstance(artifacts,dict) and set(artifacts)==set(roles), 'normal build artifact roles mismatch')
+    for role,expected in roles.items():
+        row=artifacts[role]
+        need(isinstance(row,dict) and set(row)=={'path','sha256'}, 'invalid normal artifact receipt')
+        need(Path(row['path'])==expected and sha(regular(expected))==row['sha256'], 'normal build artifact changed: '+role)
+    need(Path(m['renderer'])==root/'renderer' and Path(m['cpu'])==roles['cpu']
+         and Path(m['net'])==roles['net'] and Path(m['library'])==roles['library'], 'normal build artifact aliases mismatch')
+    gui=directory(m['gui_app']);layout=regular(m['layout_result'])
+    need(gui==root/'gui/Blood Echoes.app' and sha(regular(gui/'Contents/MacOS/bbport'))==m['gui_sha256'], 'normal GUI product changed')
+    need(layout==root/'evidence/layout/result.json' and sha(layout)==m['layout_result_sha256'], 'normal layout receipt changed')
+    prefixes=[source_directory(p) for p in m['dependency_prefixes']]
+    need(prefixes and len(prefixes)==len(set(prefixes)), 'normal dependency providers missing or duplicated')
+    selected=[*prefixes,*(p/'lib' for p in prefixes if (p/'lib').is_dir()),*search_dirs]
+    return dict(repository=repo,native_source=Path(m['source_root']),build_root=root,
+        renderer_build=root/'renderer',cpu_build=root/'cpu',net_library=roles['net'],
+        layout_result=layout,launcher_app=gui,python_provider=Path(m['python_provider']),
+        output=output,version=m['version'],revision=m['revision'],search_dirs=list(dict.fromkeys(selected)))
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    for name in ('repository','native-source','build-root','renderer-build','cpu-build','net-library','layout-result','launcher-app','python-provider','output'):
-        parser.add_argument('--'+name,type=Path,required=True)
-    parser.add_argument('--version',required=True);parser.add_argument('--revision',required=True)
+    parser.add_argument('--build-manifest',type=Path,help='Consume build_native_source.py output; original package.sh uses this native route')
+    fields=('repository','native-source','build-root','renderer-build','cpu-build','net-library','layout-result','launcher-app','python-provider')
+    for name in fields:parser.add_argument('--'+name,type=Path)
+    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--version');parser.add_argument('--revision')
     parser.add_argument('--search-dir',type=Path,action='append',default=[])
-    args=vars(parser.parse_args());args['search_dirs']=args.pop('search_dir')
-    print(json.dumps(assemble(**args),indent=2,default=str))
+    args=vars(parser.parse_args());args['search_dirs']=args.pop('search_dir');manifest=args.pop('build_manifest')
+    if sys.version_info<(3,11):
+        parser.error('Packaging requires Python 3.11 or newer. Set BB_PACKAGE_PYTHON to the selected build Python executable when using package.sh.')
+    if manifest is not None:
+        if any(args[name.replace('-','_')] is not None for name in (*fields,'version','revision')):
+            parser.error('--build-manifest cannot be mixed with explicit build/source identities')
+        args=build_manifest_arguments(manifest,output=args['output'],search_dirs=args['search_dirs'])
+    else:
+        missing=[name for name in (*fields,'version','revision') if args[name.replace('-','_')] is None]
+        if missing:parser.error('use --build-manifest or supply: '+', '.join('--'+name for name in missing))
+    result=assemble(**args)
+    if manifest is not None:
+        # The source receipt must remain true for the entire assembly, including
+        # copied scripts/resources, not only the already-built native objects.
+        rechecked=build_manifest_arguments(manifest,output=args['output'],search_dirs=())
+        need(all(rechecked[key]==args[key] for key in rechecked if key!='search_dirs'),
+             'normal build receipt inputs changed during packaging')
+    print(json.dumps(result,indent=2,default=str))
 
 if __name__=='__main__': main()

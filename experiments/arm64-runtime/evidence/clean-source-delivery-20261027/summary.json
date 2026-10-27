@@ -105,8 +105,8 @@
   },
   "qualification": "Clean tracked source export completed the normal build driver (all native targets, original thin ARM64 Swift GUI and actual sealed layout), then final source-only app assembly and real scalar schema2. Explicit ordinary dependency providers were reused; not an all-dependency rebuild. No game was launched, no new package gameplay/network claim, no formal data read or changed. Installed gameplay-accepted 340e9c86 is unchanged; Release/public docs await human feedback.",
   "remaining": [
-    "Await human gameplay feedback on the installed 340e9c86 before Release/public docs",
-    "When human approves, reconcile public build/release instructions with this verified normal ARM64 build path; do not invoke legacy Rosetta packaging by accident"
+    "Await human gameplay feedback on installed340e9c86 before Release/public docs",
+    "After human approval, update public source-build instructions to the verified normal build and native package.sh receipt route; no release now"
   ],
   "assembler_source_revision": "5dacb719444074f27fb7dacf88cdefa91e41c7b5",
   "source_assembly": {
@@ -252,5 +252,35 @@
     "game_started": false,
     "formal_data_used": false,
     "release_updated": false
+  },
+  "original_package_entry": {
+    "status": "original-package-entry-native-source-verified",
+    "native_source_revision": "2a0505453da0a3262e31c17538a62815393549d6",
+    "schema": 2,
+    "frozen_roles": 8,
+    "payload_files": 982,
+    "source_receipt_rechecked_before_and_after": true,
+    "seconds": 45.97106679202989,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8904.0
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8904.0
+    },
+    "formal_data_or_app_modified": false,
+    "game_started": false,
+    "release_updated": false,
+    "author_controls": 21,
+    "entry_tools_sha256": {
+      "tools/macos/package.sh": "68b6326bb065faf5e1007ba2665686ecb40f08e760eaf6b1c253e5c7dad74e2b",
+      "experiments/arm64-runtime/tools/package_native_from_source.py": "627c12193110fdf7f1b035fb1588f6afd654fa0a94ad8afe2a2ed1c28d5fb710",
+      "experiments/arm64-runtime/tests/test_native_build_manifest_package.py": "3f317cb85901f94b8ef9283e9b4cdd06290493418fb924a9c63bd4b005878f49"
+    },
+    "qualification": "Original package.sh now dispatches native source assembly with explicit successful build receipt; tests check source snapshot, seven actual artifacts, GUI/layout receipts, aliases, provider roots and before/after source consistency. Actual receipt/core revision2a050545 reused; no new native compilation or gameplay claim.",
+    "python_requirement": "Python3.11+; BB_PACKAGE_PYTHON explicitly selects the build interpreter. Old system Python3.9 is rejected before source or artifact reads; no implicit QA/provider fallback."
   }
 }
