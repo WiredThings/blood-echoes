@@ -1,48 +1,48 @@
 {
   "status": "passed",
-  "total_tests": 347,
+  "total_tests": 351,
   "suites": [
     {
       "suite": "test_incremental_file_hashes",
       "exit": 0,
       "tests": 17,
-      "seconds": 0.121
+      "seconds": 0.116
     },
     {
       "suite": "test_incremental_preparation",
       "exit": 0,
       "tests": 12,
-      "seconds": 1.93
+      "seconds": 1.841
     },
     {
       "suite": "test_launcher_source_view",
       "exit": 0,
       "tests": 26,
-      "seconds": 3.339
+      "seconds": 3.029
     },
     {
       "suite": "test_launcher_game_catalog",
       "exit": 0,
       "tests": 13,
-      "seconds": 1.529
+      "seconds": 1.22
     },
     {
       "suite": "test_source_code_closure",
       "exit": 0,
       "tests": 13,
-      "seconds": 0.619
+      "seconds": 0.545
     },
     {
       "suite": "test_launcher_runtime_scope",
       "exit": 0,
       "tests": 25,
-      "seconds": 0.085
+      "seconds": 0.077
     },
     {
       "suite": "test_launcher_runtime_scope_observer",
       "exit": 0,
       "tests": 18,
-      "seconds": 0.242
+      "seconds": 0.227
     },
     {
       "suite": "test_quick_restart_preparation",
@@ -54,91 +54,91 @@
       "suite": "test_launcher_local_aot",
       "exit": 0,
       "tests": 21,
-      "seconds": 2.136
+      "seconds": 2.16
     },
     {
       "suite": "test_launcher_game_pso_automatic",
       "exit": 0,
       "tests": 10,
-      "seconds": 0.106
+      "seconds": 0.111
     },
     {
       "suite": "test_launcher_game_modules",
       "exit": 0,
       "tests": 10,
-      "seconds": 0.134
+      "seconds": 0.129
     },
     {
       "suite": "test_qa_launch_clone",
       "exit": 0,
       "tests": 20,
-      "seconds": 0.636
+      "seconds": 0.595
     },
     {
       "suite": "test_qa_launch_conditions",
       "exit": 0,
       "tests": 34,
-      "seconds": 0.572
+      "seconds": 0.494
     },
     {
       "suite": "test_qa_memory_policy",
       "exit": 0,
       "tests": 13,
-      "seconds": 0.065
+      "seconds": 0.061
     },
     {
       "suite": "test_native_source_package",
       "exit": 0,
       "tests": 8,
-      "seconds": 0.133
+      "seconds": 0.106
     },
     {
       "suite": "test_normal_preparation_build_plan",
       "exit": 0,
       "tests": 9,
-      "seconds": 0.07
+      "seconds": 0.066
     },
     {
       "suite": "test_fixed_helper_failure_records",
       "exit": 0,
       "tests": 7,
-      "seconds": 0.042
+      "seconds": 0.039
     },
     {
       "suite": "test_startup_change_journal",
       "exit": 0,
       "tests": 9,
-      "seconds": 1.312
+      "seconds": 1.38
     },
     {
       "suite": "test_persistent_library_audit",
       "exit": 0,
       "tests": 5,
-      "seconds": 3.275
+      "seconds": 4.143
     },
     {
       "suite": "test_pso_startup_schedule",
       "exit": 0,
-      "tests": 8,
-      "seconds": 1.488
+      "tests": 12,
+      "seconds": 2.704
     },
     {
       "suite": "test_local_metal_builder",
       "exit": 0,
       "tests": 26,
-      "seconds": 2.204
+      "seconds": 1.47
     },
     {
       "suite": "test_preparation_session",
       "exit": 0,
       "tests": 18,
-      "seconds": 3.874
+      "seconds": 6.633
     },
     {
       "suite": "test_local_aot_policy",
       "exit": 0,
       "tests": 6,
-      "seconds": 0.062
+      "seconds": 0.057
     }
   ],
   "formal_data_modified": false,

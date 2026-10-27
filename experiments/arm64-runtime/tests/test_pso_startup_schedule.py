@@ -37,6 +37,20 @@ class Scheduling(unittest.TestCase):
   self.seed();self.environment['BB_MTL_LOCAL_AOT_ENVIRONMENT_ID']='f'*64;self.assertIsNone(self.schedule().reuse());del self.environment['BB_MTL_LOCAL_AOT_ENVIRONMENT_ID'];self.assertIsNone(self.schedule().path)
  def test_bad_hint_and_unavailable_journal_use_original_path(self):
   old=self.seed();old.path.write_text('bad');self.assertIsNone(self.schedule().reuse());s=self.schedule();s.publish(self.full)
+  with patch('pso_startup_schedule.unchanged',return_value=False):
+   r=self.schedule().reuse();self.assertEqual(r['schedule_reuse_proof'],'unchanged-logical-bytes')
+ def test_metadata_only_touch_uses_full_logical_byte_proof(self):
+  self.seed();p=self.cache/self.u['key']['reference']['name'];os.utime(p,None)
+  with patch('pso_startup_schedule.unchanged',return_value=False):
+   r=self.schedule().reuse();self.assertIsNotNone(r);self.assertEqual(r['schedule_reuse_proof'],'unchanged-logical-bytes')
+ def test_content_changes_during_native_validation_do_not_publish_byte_proof(self):
+  s=self.schedule();(self.artifact/'new.hostpso').write_bytes(b'created-during-native');self.assertTrue(s.publish(self.full));body=json.loads(s.path.read_text())['body'];self.assertNotIn('content_proof',body)
+ def test_content_budget_refusal_does_not_authorize_skip(self):
+  self.seed()
+  with patch('pso_startup_schedule.unchanged',return_value=False),patch('pso_startup_schedule.MAX_PROOF_BYTES',1):
+   self.assertIsNone(self.schedule().reuse())
+ def test_permission_or_file_set_changes_are_not_content_equal(self):
+  self.seed();p=self.cache/self.u['key']['reference']['name'];p.chmod(0o400)
   with patch('pso_startup_schedule.unchanged',return_value=False):self.assertIsNone(self.schedule().reuse())
  def test_geometry_and_unknown_protocol_cannot_shortcut(self):
   self.u['owned_geometry_pso']={};self.write();self.assertIsNone(self.schedule().path);del self.u['owned_geometry_pso'];self.u['record_type']='unknown';self.write();self.assertIsNone(self.schedule().path)
