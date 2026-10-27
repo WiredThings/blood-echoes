@@ -1,0 +1,262 @@
+{
+  "schema": 1,
+  "status": "completion-not-proven-final-gameplay-acceptance-outstanding",
+  "reviewed_source_revision": "0b9bad25ab0c814f976e0576352015e5ff03a81b",
+  "previous_goal_turn": "progress: original package.sh was actually integrated and validated, source pushed",
+  "game_or_gui_started_this_audit": false,
+  "formal_data_or_application_modified": false,
+  "release_updated": false,
+  "new_code_blocker_demonstrated": false,
+  "new_long_term_work_added": false,
+  "goal_complete": false,
+  "source_hashes": {
+    "src/game_runtime.cpp": "84ac385cd134b6a41840215f9502300144baf69da741c482f96cdf06b0c14c1a",
+    "src/guest_module_info.h": "bbef9f0bce03b474830662cd6de5df0198979c607a56a72ca2f0922d5e709c1a",
+    "src/guest_process_parameters.h": "5c4d1add135a73bda1d10bdc388c534077ac5fc107dc7e3d2483339798d9eaed",
+    "vendor/bb_runtime/src/runtime_memory.c": "21bb7d249a53e95efe86ab59d6406cca7ec9a87e578c5adcac6b261cd3284ce6",
+    "vendor/bb_runtime/src/runtime_thread.c": "6092cad70c380d601720dfbbdd4689b54a8b42ed0566b78dac646565eaa9e7c1",
+    "vendor/bb_runtime/src/bounded_mlock.h": "69520e712c54ff23d632dd7a6e87d0e1d47742fb84b7d38b747ffdb64c884257",
+    "tools/launcher_local_aot.py": "cd06ec511bde02983690763219bb5eead1bc894e23b3531718efe5b197c68e6d",
+    "tools/launcher_game_modules.py": "461f64d06b9f8537759ba0e00c4eff1cfcceb80d0cfae1e2f69aa6a9b7146cab",
+    "tools/launcher_game_pso.py": "5e323779bef300fc31a4f7cbf9d96a5f87b794f324bdd9365179efb23ab32657",
+    "tools/quick_restart_preparation.py": "700412e3de0559d17d31c90e5d3908c5b913a75a58845966ee7a86de07644599",
+    "tools/local_aot_policy.py": "70d5ba7e336c7bcacdd9f835023772f7faee29376f0a50c1b2397e035005049b"
+  },
+  "requirements": [
+    {
+      "requirement": "Native ARM64 host runtime and original launcher integration",
+      "status": "source-build-and-isolated-launch-verified",
+      "evidence": [
+        "src/game_runtime.cpp; src/launcher_cli.h; launcher-macos original Swift implementation",
+        "evidence/night-acceptance-20261027/summary.json:empty_queue_F3_fix",
+        "evidence/clean-source-delivery-20261027/summary.json:normal_driver,final_source_assembly,original_package_entry"
+      ],
+      "limits": [
+        "Guest Bloodborne x86 instructions remain intentional FEX inputs.",
+        "Latest gameplay-tested installed code is340e9c86; packaging-only revisions are not mislabeled as additional gameplay tests."
+      ]
+    },
+    {
+      "requirement": "Static scan -> provable owned input -> bounded local preparation -> runtime reuse",
+      "status": "integrated-and-observed-in-scoped-runtime",
+      "evidence": [
+        "tools/launcher_local_aot.py:prepare_launch/_prepared",
+        "tools/launcher_game_catalog.py; tools/launcher_source_view.py; tools/launcher_game_modules.py; tools/launcher_game_pso.py",
+        "evidence/automatic-launcher-final-source-20261026/summary.json",
+        "evidence/night-acceptance-20261027/summary.json:runtime_reuse"
+      ],
+      "limits": [
+        "Static/dynamic gaps remain explicit; runtime recording supplies complete owned inputs for later starts.",
+        "Observed counters after GPU-ready include menus/loading; no whole-game zero-compilation claim."
+      ]
+    },
+    {
+      "requirement": "Default enabled, bounded batches and no developer compiled-game assets shipped",
+      "status": "source-and-package-verified",
+      "evidence": [
+        "tools/launcher_local_aot.py:_prepared(mode or auto)",
+        "tools/package_native_from_source.py:_assemble",
+        "evidence/clean-source-delivery-20261027/summary.json:final_source_assembly"
+      ],
+      "limits": [
+        "Default preparation is independent of average FPS benefit.",
+        "Ordinary build dependencies were reused; this is not a fresh rebuild of every dependency."
+      ]
+    },
+    {
+      "requirement": "Cache identity, invalidation and original F3 supervisor reuse",
+      "status": "targeted-and-live-reuse-verified",
+      "evidence": [
+        "tools/quick_restart_preparation.py; tools/local_aot_policy.py",
+        "tests/test_quick_restart_preparation.py:19 current tests passed",
+        "tests/test_launcher_local_aot.py:20 current tests passed",
+        "evidence/night-acceptance-20261027/summary.json:empty_queue_F3_fix,runtime_reuse"
+      ],
+      "limits": [
+        "Changed boot/settings/cohort/CPU/component/selection/CWD/parity/catalog fail closed in author controls.",
+        "Physical different-GPU/OS testing has not been performed on this single Mac."
+      ]
+    },
+    {
+      "requirement": "sceKernelMlock",
+      "status": "implemented-targeted-tested-and-in-current-native-source",
+      "evidence": [
+        "vendor/bb_runtime/src/runtime_memory.c:kernel_mlock and resolver",
+        "vendor/bb_runtime/src/bounded_mlock.h:16MiB call/64MiB total hard caps",
+        "src/game_runtime.cpp:bb_arm_mlock_native; mapping lease and real syscall",
+        "docs/six-import-integration-readonly.zh-CN.md; historical directed FEX/native receipts named there",
+        "evidence/clean-source-delivery-20261027/normal-driver-receipt.json"
+      ],
+      "limits": [
+        "Directed tests prove supported contracts, not every possible game call.",
+        "Mlock request distribution in normal gameplay is not separately established."
+      ]
+    },
+    {
+      "requirement": "msync",
+      "status": "implemented-targeted-tested-and-in-current-native-source",
+      "evidence": [
+        "vendor/bb_runtime/src/runtime_memory.c:posix_msync, runtime_memory_msync_native_leased",
+        "src/game_runtime.cpp:bb_arm_msync_native",
+        "docs/six-import-integration-readonly.zh-CN.md; historical directed FEX/native receipts named there",
+        "evidence/clean-source-delivery-20261027/normal-driver-receipt.json"
+      ],
+      "limits": [
+        "Directed tests prove supported contracts, not every possible game call.",
+        "No new broad API expansion is required for this audit."
+      ]
+    },
+    {
+      "requirement": "sceKernelGetModuleInfoFromAddr",
+      "status": "implemented-targeted-tested-and-in-current-native-source",
+      "evidence": [
+        "src/game_runtime.cpp:module_query and Ready registry gated NID binding",
+        "docs/six-import-integration-readonly.zh-CN.md; historical directed FEX/native receipts named there",
+        "evidence/clean-source-delivery-20261027/normal-driver-receipt.json"
+      ],
+      "limits": [
+        "Directed tests prove supported contracts, not every possible game call.",
+        "No new broad API expansion is required for this audit."
+      ]
+    },
+    {
+      "requirement": "__elf_phdr_match_addr",
+      "status": "implemented-targeted-tested-and-in-current-native-source",
+      "evidence": [
+        "src/game_runtime.cpp:module_match and canonical fixed module info",
+        "src/guest_module_info.h",
+        "docs/six-import-integration-readonly.zh-CN.md; historical directed FEX/native receipts named there",
+        "evidence/clean-source-delivery-20261027/normal-driver-receipt.json"
+      ],
+      "limits": [
+        "Directed tests prove supported contracts, not every possible game call.",
+        "No new broad API expansion is required for this audit."
+      ]
+    },
+    {
+      "requirement": "__pthread_cxa_finalize",
+      "status": "implemented-targeted-tested-and-in-current-native-source",
+      "evidence": [
+        "src/game_runtime.cpp:module_finalize and bb_arm_finalize_module_from_dso",
+        "vendor/bb_runtime/src/runtime_thread.c",
+        "docs/six-import-integration-readonly.zh-CN.md; historical directed FEX/native receipts named there",
+        "evidence/clean-source-delivery-20261027/normal-driver-receipt.json"
+      ],
+      "limits": [
+        "Directed tests prove supported contracts, not every possible game call.",
+        "No new broad API expansion is required for this audit."
+      ]
+    },
+    {
+      "requirement": "__progname",
+      "status": "implemented-targeted-tested-and-in-current-native-source",
+      "evidence": [
+        "src/guest_process_parameters.h",
+        "src/game_runtime.cpp:BbGuestProcess::Initialize/IsProgramName data slot route",
+        "docs/six-import-integration-readonly.zh-CN.md; historical directed FEX/native receipts named there",
+        "evidence/clean-source-delivery-20261027/normal-driver-receipt.json"
+      ],
+      "limits": [
+        "Directed tests prove supported contracts, not every possible game call.",
+        "No new broad API expansion is required for this audit."
+      ]
+    },
+    {
+      "requirement": "_is_signal_return and ordinary __Ux86_64_setcontext candidates",
+      "status": "retained-default-off-not-delivery-gates",
+      "evidence": [
+        "src/game_runtime.cpp:BB_ARM_CONTEXT_IMPORTS==1 plus observed ABI admission",
+        "evidence/context-continuation-frozen-20261026/withdrawal-and-six-review.json"
+      ],
+      "limits": [
+        "27 scenes/282 assertions are directed candidate tests, not Bloodborne real runtime use."
+      ]
+    },
+    {
+      "requirement": "sigreturn",
+      "status": "explicitly-unsupported-and-frozen-not-delivery-gate",
+      "evidence": [
+        "src/game_runtime.cpp:unknown imports retain Missing adapter/protected data and imports.tsv counts",
+        "docs/context-interfaces-integration.zh-CN.md"
+      ],
+      "limits": [
+        "No registered sigreturn/417, no fabricated signal frame, no empty success.",
+        "Future work only after an actual normal-regression call site."
+      ]
+    },
+    {
+      "requirement": "Matched quality, FPS, frame times and memory",
+      "status": "short-static-matched-samples-verified-broad-stability-unproven",
+      "evidence": [
+        "evidence/night-acceptance-20261027/matched-performance.json"
+      ],
+      "limits": [
+        "Same original Swift conditions, settings/mod/patch hashes, camera and1367 draws.",
+        "90 seconds scene per run,30-second reported window; not long exploration.",
+        "ARM footprint was112-293MiB higher in the reported windows. No stable speedup or zero additional memory claim."
+      ]
+    },
+    {
+      "requirement": "F2/new checkpoint, offline F3 and automatic continue",
+      "status": "latest-installed-code-isolated-scripted-functional-verified",
+      "evidence": [
+        "evidence/night-acceptance-20261027/summary.json:empty_queue_F3_fix",
+        "private original-launch-benchmark-1793051466746064000/result.json:actual status functional-checked inspected"
+      ],
+      "limits": [
+        "Automated API action, not a new physical-key test. Pre/post whole-app seals passed; source QA save unchanged."
+      ]
+    },
+    {
+      "requirement": "Latest-package continuous death/respawn, THD single-client, menus/Chinese/Dock/visual behavior",
+      "status": "not-completely-revalidated-on-final-package",
+      "evidence": [
+        "evidence/night-acceptance-20261027/summary.json:qualification,remaining_acceptance_and_delivery",
+        "docs/launcher-feature-audit.zh-CN.md:source routing and earlier scoped controls"
+      ],
+      "limits": [
+        "Earlier manual observations and source tests do not prove every behavior in the final installed package.",
+        "No blind movement/attacks, no new theory-driven signal tests, no reuse of QA progress as formal progress."
+      ]
+    },
+    {
+      "requirement": "Clean source build, native package.sh and movable app",
+      "status": "verified-with-explicit-dependency-providers",
+      "evidence": [
+        "evidence/clean-source-delivery-20261027/summary.json:normal_driver,final_source_assembly,final_source_relocation,original_package_entry"
+      ],
+      "limits": [
+        "Normal driver503.41sec; final assembly57.75sec; original package.sh45.97sec.",
+        "No game/QA app/save/cache/account input; actual schema2/eight-role and deep strict seal checks."
+      ]
+    },
+    {
+      "requirement": "Formal data preservation and local delivery",
+      "status": "code-only-local-install-verified",
+      "evidence": [
+        "evidence/night-acceptance-20261027/summary.json:local_install",
+        "evidence/clean-source-delivery-20261027/summary.json:installed_app_revision"
+      ],
+      "limits": [
+        "Local app340e9c86 was replaced under the later explicit conditional human authorization.",
+        "Formal GUI was not started by these tests; formal save/settings/cache/keychain not adopted or modified."
+      ]
+    },
+    {
+      "requirement": "Release and public documentation promotion",
+      "status": "intentionally-deferred-by-latest-human-instruction",
+      "evidence": [
+        "Latest human instruction: wait for morning gameplay confirmation before Release/public docs.",
+        "Development branch source and internal evidence were pushed; no Release/tag/public README update."
+      ],
+      "limits": []
+    }
+  ],
+  "current_targeted_rerun": {
+    "quick_restart": 19,
+    "launcher_local_aot": 20,
+    "failures": 0,
+    "scope": "author controls, not new game/GPU testing"
+  },
+  "next_action": "Await morning human gameplay feedback, then consolidate remaining functional acceptance before authorized publication; do not restart unchanged long tests merely because goal continuation fired."
+}
