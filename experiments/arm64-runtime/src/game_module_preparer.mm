@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CPU-only, owned GCN retranslation. No Device, old Info/SRT reader or runtime cache.
 #include "preparation_json.h"
+#include "preparation_runtime_paths.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -237,8 +238,12 @@ int PrepareCompanion(const Json&p,const fs::path&root,const fs::path&output,std:
  const auto constraints=p.at("constraints");Need(constraints.at("guest_dereference_allowed")==false&&constraints.at("old_walker_execution_allowed")==false&&constraints.at("final_runtime_import_allowed")==false&&constraints.at("require_association")==true,"typed companion ownership policy");
  const fs::path store_root=p.at("companion_root").get<std::string>(),game=p.at("game_root").get<std::string>();Directory(store_root);Directory(game);
  const char*selected=getenv("BB_GPU_USER_DIR");Need(selected&&*selected,"selected companion GPU root");const fs::path gpu=selected;Directory(gpu);
- Need(Child(gpu,fs::path(Shared)/"state")&&Child(store_root,gpu/"automatic-game-inputs"),"companion store stays below selected owned GPU");
- Need(Child(game,fs::path(Shared).parent_path()),"isolated effective game source required");
+ const auto roots=BbPreparationPaths::Actual(BbBundledRuntime::Role::ModuleWorker);
+ if(roots){Need(gpu==roots->gpu,"selected companion GPU mismatch");roots->Companion(store_root,game);}
+ else{
+  Need(Child(gpu,fs::path(Shared)/"state")&&Child(store_root,gpu/"automatic-game-inputs"),"companion store stays below selected owned GPU");
+  Need(Child(game,fs::path(Shared).parent_path()),"isolated effective game source required");
+ }
  Dl_info image{};Need(dladdr(reinterpret_cast<const void*>(&Shader::CompileOwnedToSpirv),&image)&&image.dli_fname,"actual owned compiler image");
  const fs::path library=fs::canonical(image.dli_fname);Need(library.filename().string().starts_with("libbbgpu")&&p.at("selected_backend")==library.string(),"companion actual compiler DSO identity");
  auto receipt=BbFetchCapture::VerifyPreparationReceipt(store_root,game,library);size_t total=0;const auto profile=Profile(Reference(p.at("profile"),root,total));auto source=BbFetchCapture::SourceForReceipt(receipt,profile);Need(source.require_association,"complete actual association required");
@@ -289,9 +294,11 @@ int main(int argc,char**argv){@autoreleasepool{
   OutputTransaction output_transaction;
   const fs::path packet=argv[1],output=argv[2];Directory(packet.parent_path());Directory(output);
   const fs::path evidence=fs::path(Shared)/"evidence";
-  const bool evidence_mode=Child(packet.parent_path(),evidence)&&Child(output,evidence);
+  const auto roots=BbPreparationPaths::Actual(BbBundledRuntime::Role::ModuleWorker);
+  const bool evidence_mode=!roots&&Child(packet.parent_path(),evidence)&&Child(output,evidence);
   bool automatic_mode=false;
-  if(!evidence_mode){
+  if(roots){roots->Module(packet,output);automatic_mode=true;}
+  else if(!evidence_mode){
    const char* selected=getenv("BB_GPU_USER_DIR");Need(selected&&*selected,"selected isolated GPU directory required");
    const fs::path gpu=selected;Directory(gpu);Need(Child(gpu,fs::path(Shared)/"state"),"selected GPU must be below isolated state");
    const fs::path automatic=gpu/"automatic-game-inputs";Directory(automatic);

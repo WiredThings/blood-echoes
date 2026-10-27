@@ -22,6 +22,7 @@ function(bb_add_game_preparation_targets)
     foreach(relative IN ITEMS
             src/game_pso_preparer.mm src/game_module_preparer.mm
             src/game_pso_host_services.cpp src/preparation_json.h
+            src/preparation_runtime_paths.h src/bundled_runtime_admission.h src/gpu_runtime_state.h
             src/fetch_compile_producer.h src/runtime_exit_codes.h
             vendor/bb_runtime/src/runtime_read_arm.h
             vendor/bb_runtime/src/runtime_restart_protocol.h tests/metadata_layout.cpp)

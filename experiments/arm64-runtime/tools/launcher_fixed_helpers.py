@@ -7,6 +7,17 @@ HEX=re.compile('[0-9a-f]{64}')
 MAX_LINE=64*1024
 class ProtectionStopped(RuntimeError):pass
 
+def result_record(records,rejections,exit_code):
+ """Preserve native rejection diagnostics; never accept a generic failure as ready."""
+ if rejections:
+  if len(rejections)==1 and isinstance(rejections[0],dict) and rejections[0].get('status')=='rejected':
+   error=rejections[0].get('error')
+   if isinstance(error,str) and 0<len(error)<=4096:
+    raise RuntimeError('fixed helper worker rejected request: '+error)
+  raise RuntimeError('fixed helper worker emitted invalid or conflicting rejection records')
+ if len(records)!=1:raise RuntimeError('fixed helper result record count (worker exit '+str(exit_code)+')')
+ return records[0]
+
 def validate_result(row,phase):
  """Pure response boundaries, available to self-contained CPU controls."""
  if phase not in ('helpers-probe','helpers-prepare'):raise ValueError('fixed helper response phase')
@@ -121,18 +132,19 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
    # Share the established bounded PID/path/SHA admission, including app paths
    # with spaces. Splitting a dyld line on whitespace truncates packaged paths.
    from prepare_game_psos import dyld_gpu_image,verify_loaded_gpu
-   rows=[];loaded=set()
+   rows=[];rejections=[];loaded=set()
    with log.open()as stream:
     while True:
      line=stream.readline(MAX_LINE+1)
      if not line:break
      if len(line)>MAX_LINE:raise ValueError('fixed helper result bound')
      if line.startswith('FIXED_HELPER_RESULT '):rows.append(json.loads(line.split(' ',1)[1]))
+     if line.startswith('GAME_PSO_RESULT '):rejections.append(json.loads(line.split(' ',1)[1]))
      image=dyld_gpu_image(line,proc.pid)
      if image:loaded.add(image)
-   if len(rows)!=1:raise RuntimeError('fixed helper result record count')
+   parsed=result_record(rows,rejections,proc.returncode)
    loaded_identity=verify_loaded_gpu(loaded,component)
-   row=dict(exit=proc.returncode,pid=proc.pid,result=rows[0],log=str(log),loaded_gpu_identity=loaded_identity)
+   row=dict(exit=proc.returncode,pid=proc.pid,result=parsed,log=str(log),loaded_gpu_identity=loaded_identity)
   calls.append(row)
   r,complete=validate_result(row,phase)
   check();return r,complete

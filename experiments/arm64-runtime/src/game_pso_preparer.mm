@@ -22,6 +22,7 @@
 #include "video_core/renderer_metal/mtl_cached_variants.h"
 #include "video_core/renderer_metal/mtl_runtime_impl.h"
 #include "runtime_exit_codes.h"
+#include "preparation_runtime_paths.h"
 
 namespace {
 using Json=PreparationJson::Value;namespace fs=std::filesystem;
@@ -133,7 +134,8 @@ int FixedHelpers(const std::string&mode,const Json&p,const fs::path&scratch,Json
  const char* cohort=getenv("BB_MTL_ARCHIVE_COMPATIBILITY_ID");const char* discovery=getenv("BB_MTL_LOCAL_AOT_COHORT");const char* gpu_value=getenv("BB_GPU_USER_DIR");
  Need(cohort&&discovery&&gpu_value&&Metal::HostPso::Hex(cohort)&&std::string(cohort)==discovery&&p.at("current_cohort")==cohort,"verified helper cohort");
  const fs::path gpu=gpu_value,artifact=p.at("artifact_cache_dir").get<std::string>();Directory(gpu);Directory(artifact);
- Need(Child(gpu,fs::path(Shared)/"state")&&artifact.filename()=="metal"&&artifact.parent_path().parent_path()==gpu/"cache","actual renderer artifact cache required");
+ const auto roots=BbPreparationPaths::Actual(BbBundledRuntime::Role::PsoWorker);
+ Need((roots?gpu==roots->gpu:Child(gpu,fs::path(Shared)/"state"))&&artifact.filename()=="metal"&&artifact.parent_path().parent_path()==gpu/"cache","actual renderer artifact cache required");
  const auto title=artifact.parent_path().filename().string();Need(title.size()==9&&title.starts_with("CUSA")&&title.find_first_not_of("0123456789",4)==title.npos,"actual title cache required");
  Need(artifact!=scratch&&!Child(artifact,scratch)&&!Child(scratch,artifact),"helper scratch/artifact separation");
  const char* persist=getenv("BB_MTL_PERSIST_WARM_ARCHIVE");const char* replay=getenv("BB_MTL_REPLAY_THREAD");const char*aot=getenv("BB_MTL_LOCAL_AOT_MODE");
@@ -179,8 +181,12 @@ int RunRecipe(const std::string&mode,const fs::path&packet,const fs::path&scratc
  try {
   Need(mode=="record"||mode=="prepare"||mode=="helpers-probe"||mode=="helpers-prepare","worker mode");
   Directory(scratch);
-  Need(Child(scratch,fs::path(Shared)/"state")&&fs::is_empty(scratch),"fresh empty Shared source scratch required");
-  Directory(packet.parent_path());Need(Child(packet.parent_path(),fs::path(Shared)/"state"),"Shared packet root required");
+  const auto roots=BbPreparationPaths::Actual(BbBundledRuntime::Role::PsoWorker);
+  if(roots)roots->Pso(packet,scratch);
+  else{
+   Need(Child(scratch,fs::path(Shared)/"state")&&fs::is_empty(scratch),"fresh empty Shared source scratch required");
+   Directory(packet.parent_path());Need(Child(packet.parent_path(),fs::path(Shared)/"state"),"Shared packet root required");
+  }
   auto raw=Read(packet,MaxPacket,packet_sha);Json p=Json::parse(raw);
   if(expected_allow)Need(p.at("allow_compile").get<bool>()==*expected_allow,"batch packet policy differs from frame");
   if(mode=="helpers-probe"||mode=="helpers-prepare")return FixedHelpers(mode,p,scratch,result);
