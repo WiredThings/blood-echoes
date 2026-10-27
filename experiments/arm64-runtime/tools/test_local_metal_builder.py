@@ -16,6 +16,7 @@ class FakeGuard:
 class FakeRunner:
  def __init__(self,folder):
   self.folder=folder;self.calls=[];self.fail=None;self.library_size=None;self.change_tool=False
+  self.sdk=folder/'Author.sdk';self.sdk.mkdir();(self.sdk/'SDKSettings.json').write_text('{}')
   self.tools={name:folder/name for name in('metal','metallib','xcrun')}
   for name,path in self.tools.items():path.write_bytes(('authored fake tool '+name).encode())
  def fingerprint(self,path):
@@ -24,6 +25,7 @@ class FakeRunner:
   guard.check(preflight=True);self.calls.append(list(argv))
   if argv[:2]==['/usr/bin/xcrun','--find']:return(str(self.tools[argv[2]])+'\n').encode()
   if argv==['/usr/bin/xcrun','--version']:return b'authored xcrun 1\n'
+  if argv==['/usr/bin/xcrun','--show-sdk-path']:return(str(self.sdk)+'\n').encode()
   if argv==['/usr/bin/sw_vers','-buildVersion']:return b'AUTHORED-OS-1\n'
   if len(argv)==3 and argv[0]=='/usr/bin/xcrun'and argv[2]=='--version':return('authored '+argv[1]+' version 1\n').encode()
   if argv[:2]==['/usr/bin/xcrun','metal']:

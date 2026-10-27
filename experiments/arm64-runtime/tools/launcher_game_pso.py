@@ -158,7 +158,10 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  if report.get('status')in('stopped','failed-protection'):raise RuntimeError('game PSO preparation stopped by safety guard')
  result=dict(status=report.get('status','failed'),scan=summary,preparation=report,artifact_cache_dir=str(artifact),title_id=title,
              runtime_cache_import_allowed=False,original_arguments_preserved=True,capture_environment=capture_environment)
- if restart_binding is not None and report.get('status')=='completed' and report.get('full_manifest_preparation_verified')is True and capture_environment:
+ actual_verified=report.get('status')=='completed' and report.get('full_manifest_preparation_verified')is True
+ unchanged_schedule=(report.get('status')=='unchanged-schedule-reused' and report.get('persistent_schedule_reused')is True
+                     and report.get('previous_actual_native_verification')is True and report.get('runtime_full_key_and_artifact_checks_retained')is True)
+ if restart_binding is not None and (actual_verified or unchanged_schedule) and capture_environment:
   from quick_restart_preparation import pending
   try:result['_restart_context']=pending(prepared_inputs)
   except(ValueError,OSError,KeyError,TypeError):pass

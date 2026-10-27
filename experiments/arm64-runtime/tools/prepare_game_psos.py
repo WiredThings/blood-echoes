@@ -360,10 +360,23 @@ def prepare(config,*,services=None):
   return row
  def event(value):
   with events_path.open('a')as stream:stream.write(json.dumps(value,separators=(',',':'))+'\n')
+ schedule=None
  try:
-  discover_batch()
-  result=run_manifest(a.manifest,progress_root=progress,context=context,execute=execute,prepare_phase=prep_phase,check=check,
+  if native_services and a.phase=='all' and a.max_recipes is None:
+   from pso_startup_schedule import Schedule
+   from game_pso_queue import fingerprint
+   code_identity=runtime_profile.bundle.local['runtime_tools']if runtime_profile is not None else None
+   if code_identity is not None:
+    schedule=Schedule(a.manifest,context=context,environment=provided,gpu=gpu,artifact=artifact,progress=progress,
+        code_identity=code_identity,rows=rows,fingerprint=fingerprint,check=check)
+  result=schedule.reuse()if schedule is not None else None
+  if result is None:
+   discover_batch()
+   result=run_manifest(a.manifest,progress_root=progress,context=context,execute=execute,prepare_phase=prep_phase,check=check,
        ready=preparation_ready,phase=a.phase,page_size=a.page_size,max_recipes=a.max_recipes,seconds=a.seconds,clock=clock,event_sink=event)
+  if schedule is not None:
+   try:schedule.publish(result)
+   except(OSError,ValueError,KeyError,TypeError):pass # Optional scheduling cannot replace the native result.
  except (Stopped,KeyboardInterrupt)as error:
   result=dict(status='stopped',error=str(error)or'interrupted',completed=0,protection_stops=1,full_manifest_preparation_verified=False)
  finally:

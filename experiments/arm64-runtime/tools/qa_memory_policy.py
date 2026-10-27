@@ -34,7 +34,13 @@ class MemoryPolicy:
         while self.history and self.history[0][0] < seconds - 5.0:
             self.history.popleft()
         swap = sample['swap_mib']
-        recent_minimum = min((v for _, v in self.history), default=swap)
+        # Keep only candidate minima in this exact five-second window. A later
+        # sample <= an earlier one dominates it for every future observation.
+        # Compare against the PREVIOUS window before inserting today's sample,
+        # preserving the original burst threshold, expiry and equality rules.
+        recent_minimum = self.history[0][1] if self.history else swap
+        while self.history and self.history[-1][1] >= swap:
+            self.history.pop()
         self.history.append((seconds, swap))
         if sample['pressure'] == 4:
             if self.severe_since is None:

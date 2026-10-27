@@ -339,7 +339,7 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
  return report
 
 def main():
- ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));code=ap.add_mutually_exclusive_group();code.add_argument('--formal-stage',type=Path);code.add_argument('--reference-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2),default=1);ap.add_argument('--functional-f3',action='store_true');a=ap.parse_args()
+ ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));code=ap.add_mutually_exclusive_group();code.add_argument('--formal-stage',type=Path);code.add_argument('--reference-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2,3),default=1);ap.add_argument('--functional-f3',action='store_true');a=ap.parse_args()
  assert 60<=a.startup_seconds<=1800 and 45<=a.scene_seconds<=180
  assert not a.functional_f3 or a.runs==1,'functional F3 is one supervised session'
  from qa_launch_conditions import load

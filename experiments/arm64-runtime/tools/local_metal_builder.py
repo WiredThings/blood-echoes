@@ -375,6 +375,41 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
         if os.path.lexists(build_record):
             if canonical(read_json(build_record))!=canonical(manifest):raise Refused('existing build manifest identity mismatch')
         else:atomic_json(build_record,manifest)
+        # A previous COMPLETE audit may skip repeated request/library byte
+        # reads only with continuous Darwin change history and the CURRENT
+        # real compiler/SDK/OS identity. This is scheduling, never native import
+        # authorization. Missing history or changed inputs use the original loop.
+        from startup_change_journal import query as journal_query,unchanged as journal_unchanged
+        audit_path=artifact_root/('.verified-'+build_id+'.json')
+        audit_roots=[requests,artifacts];audit_token=None;audit_binding=None;reuse=False
+        if callable(getattr(toolchain,'preparation_environment',None)):
+            try:environment=toolchain.preparation_environment(guard)
+            except (OSError,ValueError,Refused)as error:
+                if isinstance(error,Stopped):raise
+                environment=None
+            if environment is None:audit_token=None
+            else:
+                audit_binding=dict(schema=1,root=str(root),cohort=cohort,build_id=build_id,
+                                   environment=environment,requests=index.request_count,deferred=index.deferred_count)
+                try:
+                    audit=json.loads(regular_bytes(audit_path,MAX_AUDIT_BYTES),object_pairs_hook=_pairs)
+                    body=audit['body']
+                    reuse=(set(audit)=={'body','sha256'} and digest(canonical(body))==audit['sha256']
+                           and body['binding']==audit_binding and index.deferred_count==0
+                           and journal_unchanged(body['journal'],audit_roots))
+                    if reuse:audit_token=body['journal']
+                except(OSError,ValueError,TypeError,KeyError,Refused):pass
+                if not reuse:audit_token=journal_query(audit_roots)
+        if reuse:
+            guard.check(preflight=True)
+            # Recheck through the final adoption boundary, without advancing
+            # the old cursor past anything not validated by the original pass.
+            reuse=journal_unchanged(audit_token,audit_roots)
+        if reuse:
+            summary.update(status='passed',skipped=index.request_count,
+                           persistent_audit_reused=True,request_window=dict(max_batch=0,max_final_pins=0),
+                           validation='unchanged-journal-and-current-tools-sdk-os')
+            return summary
         for batch in index.batches():
           for key in batch:
             guard.check(preflight=True)
@@ -402,6 +437,15 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
             summary['built']+=1;record_result(dict(key=key,status='built'))
         summary['status']='partial'if index.deferred_count else'passed'
         summary['request_window']=dict(max_batch=index.max_batch_len,max_final_pins=index.max_pin_count)
+        if summary['status']=='passed' and audit_binding is not None and audit_token is not None:
+            body=dict(binding=audit_binding,journal=audit_token)
+            raw=canonical(dict(body=body,sha256=digest(canonical(body))))
+            if len(raw)<=MAX_AUDIT_BYTES:
+                # Never replace foreign, linked or non-regular hint nodes.
+                from incremental_file_hashes import replaceable
+                if replaceable(audit_path):
+                    try:atomic_json(audit_path,json.loads(raw))
+                    except OSError:pass # Optional speed hint cannot replace a verified build.
     except KeyboardInterrupt:
         summary['status']='stopped';summary['error']='interrupted'
     except Exception as error:
@@ -433,6 +477,8 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
         if observer is not None:observer.close()
     return summary
 
+
+MAX_AUDIT_BYTES=2*1024*1024
 
 SESSION_ENTRY_MAX=262144
 SESSION_LEDGER_MAX=64*1024*1024
@@ -551,6 +597,16 @@ class PreparationSession:
             self.stats['full_builds']+=1;actual=toolchain_factory();before=None;environment_before=None
             session=self
             class EnclosedToolchain:
+                def __getattr__(self,name):
+                    if name!='preparation_environment':raise AttributeError(name)
+                    target=getattr(actual,name)
+                    def environment(guard):
+                        nonlocal environment_before
+                        try:return target(guard)
+                        except (OSError,ValueError,Refused):
+                            environment_before=None
+                            raise
+                    return environment
                 def identify(self,inner_guard):
                     nonlocal before,environment_before
                     result=actual.identify(inner_guard)

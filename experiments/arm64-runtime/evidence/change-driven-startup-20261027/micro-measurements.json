@@ -1,0 +1,24 @@
+{
+  "scope": "isolated preparation diagnostics, not whole-launch or gameplay performance",
+  "snapshot": {
+    "old_profile_seconds": 24.314605250023305,
+    "old_rolling_minimum_seconds": 13.06,
+    "after_monotonic_queue_profile_seconds": 10.614036209066398,
+    "after_journal_seconds": 1.3224569159792736,
+    "source_content_hashes": 0,
+    "files": 28852
+  },
+  "library": {
+    "requests": 231,
+    "original_full_audit_seconds": 8.11913766595535,
+    "stable_journal_seconds": [
+      0.579941458068788,
+      0.5006803330034018
+    ],
+    "built": 0,
+    "skipped": 231
+  },
+  "formal_data_modified": false,
+  "source_cache_modified": false,
+  "game_started": false
+}

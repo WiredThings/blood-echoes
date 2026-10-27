@@ -146,19 +146,35 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
         else:
             def archive_prepare(**values):
                 return prepare_startup_archive_policy(**values,resolver=lambda t,r:resolve_gpu_identity(t,r,code_owners=(0,os.getuid())))
-    if local_prepare is None:
-        from local_aot_policy import prepare
-        local_prepare = prepare
-    if observe is None:
-        from native_observer import NativeObserver
-        observer = NativeObserver()
-        try:
-            return _prepared(executable, arguments, env, project, inputs, options,
-                             explicit, archive_prepare, local_prepare, observer.system, backend_root, code_root, game_prepare, fixed_helper_prepare,runtime_profile)
-        finally:
-            observer.close()
-    return _prepared(executable, arguments, env, project, inputs, options,
-                     explicit, archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare, fixed_helper_prepare,runtime_profile)
+    # Share one bounded, authenticated builder session across this launch's
+    # initial/fixed-helper/final library checks. The PSO controller still owns
+    # its separate native record/load phases and full final admission.
+    from contextlib import ExitStack
+    with ExitStack() as cleanup:
+        if local_prepare is None:
+            import tempfile
+            from local_aot_policy import prepare as policy_prepare
+            from local_metal_builder import PreparationSession,NativeToolchain,FixedRunner,Safety
+            from native_observer import NativeObserver
+            from qa_memory_policy import MemoryPolicy
+            from qa_build_guard import require_no_games
+            from launcher_runtime_profile import work
+            scratch=cleanup.enter_context(tempfile.TemporaryDirectory(prefix='library-session-',dir=work(project,runtime_profile)))
+            session=PreparationSession(Path(scratch),runtime_profile=runtime_profile)
+            cleanup.callback(session.close)
+            safety_observer=NativeObserver();cleanup.callback(safety_observer.close)
+            guard=Safety(safety_observer,require_no_games,MemoryPolicy)
+            def local_prepare(**values):
+                def builder(root,cohort,**build_options):
+                    return session.build(root,cohort,guard=guard,
+                        toolchain_factory=lambda:NativeToolchain(FixedRunner(Path(scratch))),**build_options)
+                return policy_prepare(builder=builder,**values)
+        if observe is None:
+            from native_observer import NativeObserver
+            observer=NativeObserver();cleanup.callback(observer.close)
+            observe=observer.system
+        return _prepared(executable, arguments, env, project, inputs, options,
+                         explicit, archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare, fixed_helper_prepare,runtime_profile)
 
 
 def _prepared(executable, arguments, env, project, inputs, options, mode,
@@ -260,7 +276,12 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     for name,value in (('source',view.get('source_hashes')),('snapshot',view.get('snapshot_hashes')),('catalogue',static.get('source_hashes'))):
         if isinstance(value,dict):
             counts[name]={k:value[k]for k in('hashed_files','hashed_bytes','reused_files')if type(value.get(k))is int and value[k]>=0}
+            if type(value.get('journal_reused'))is bool:counts[name]['journal_reused']=value['journal_reused']
     if counts:visible['incremental_inputs']=counts
+    local=report.get('local',{})
+    visible_local={k:local[k]for k in('built','skipped','requests')if type(local.get(k))is int and local[k]>=0}
+    if type(local.get('persistent_audit_reused'))is bool:visible_local['persistent_audit_reused']=local['persistent_audit_reused']
+    if visible_local:visible['local_libraries']=visible_local
     print('Metal local preparation: '+json.dumps(visible,sort_keys=True),flush=True)
     os.execve(executable, [executable, *arguments], env)
 

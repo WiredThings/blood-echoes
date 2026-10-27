@@ -252,9 +252,12 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
     if runtime_profile is not None:runtime_profile.source(game)
     else:need(game.is_relative_to(project.parent) and not gpu.is_relative_to(game), 'isolated actual app0 required')
     cache = gpu / 'automatic-game-inputs'; cache.mkdir(mode=0o700, exist_ok=True); directory(cache)
-    selected_files=plain_files(game,check)
     hashes=Hashes(cache/('catalogue-source-metadata-'+digest(str(game))+'.json'),
-        digest(dict(schema=1,role='static-source-inventory',root=str(game))),hasher=file_sha,check=check)
+        digest(dict(schema=1,role='static-source-inventory',root=str(game))),hasher=file_sha,check=check,watch_roots=[game])
+    if hashes.journal_valid:
+        selected_files={str(Path(name).relative_to(game)):Path(name)for name in hashes.previous}
+        need(selected_files,'empty game source inventory')
+    else:selected_files=plain_files(game,check)
     sources=[]
     for name,path in sorted(selected_files.items()):
         value,size=hashes.get(path,check);sources.append(dict(path=name,sha256=value,bytes=size))
@@ -318,7 +321,9 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
         ready = read_ready(generation, identity)
         need(ready is not None, 'worker did not publish complete static metadata')
         if replaceable(current):write_json(cache / 'current.json', dict(identity=identity, generation=generation.name))
-    check();need(plain_files(game,check)==selected_files,'static source file set changed during preparation');hashes.verify();hashes.publish()
+    check();hashes.verify()
+    if not hashes.journal_valid:need(plain_files(game,check)==selected_files,'static source file set changed during preparation')
+    hashes.publish()
     return dict(catalog=generation / 'catalog.json', index=generation / 'static-program-index.jsonl',
                 game_root=game, gpu_root=gpu, source_root=Path(source_root), cache_root=cache,
                 identity=identity, cohort=cohort, generation=generation,

@@ -226,7 +226,7 @@ class Startup(unittest.TestCase):
         for present in (False,True):
             report=dict(status='prepared')
             if present:
-                counts=dict(hashed_files=0,hashed_bytes=0,reused_files=123,token='must-not-log',negative=-1)
+                counts=dict(hashed_files=0,hashed_bytes=0,reused_files=123,journal_reused=True,token='must-not-log',negative=-1)
                 report['game_pso']=dict(status='completed',scan=dict(automatic_static_inputs=dict(
                     source_hashes=counts,source_view=dict(source_hashes=counts,snapshot_hashes=counts))))
             output=io.StringIO()
@@ -236,7 +236,7 @@ class Startup(unittest.TestCase):
             visible=json.loads(text.split('Metal local preparation: ',1)[1])
             if present:
                 self.assertEqual(set(visible['incremental_inputs']),{'source','snapshot','catalogue'})
-                for row in visible['incremental_inputs'].values():self.assertEqual(row,dict(hashed_files=0,hashed_bytes=0,reused_files=123))
+                for row in visible['incremental_inputs'].values():self.assertEqual(row,dict(hashed_files=0,hashed_bytes=0,reused_files=123,journal_reused=True))
             else:self.assertNotIn('incremental_inputs',visible)
 
 

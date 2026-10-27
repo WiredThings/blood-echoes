@@ -121,7 +121,15 @@ def recipe(stage,environment,runtime_profile=None):
 
 def verify_snapshot(view,records,check,hashes=None):
     """A receipt authorizes exactly this file set, not merely its named subset."""
-    view=directory(view);plain_tree(view,check)
+    view=directory(view)
+    if hashes is not None and hashes.journal_valid:
+        need(not(view.stat().st_mode&0o222),'source snapshot directory must remain readonly')
+        need(set(hashes.previous)=={str(view/row['path'])for row in records},'source snapshot file set changed')
+        for row in records:
+            need(hashes.get(view/row['path'],check)==(row['sha256'],row['bytes']),'source snapshot contents changed')
+        hashes.verify()
+        return
+    plain_tree(view,check)
     actual=mapping(view,[view],check)
     need(set(actual)=={row['path']for row in records},'source snapshot file set changed')
     for parent,dirs,files in os.walk(view):
@@ -154,7 +162,6 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
     else:need(gpu.is_relative_to(project/'state')and gpu!=project/'state','isolated source snapshot GPU root')
     actual=directory(Path(arguments[arguments.index('--app0')+1]).absolute())
     module,algorithm=load_original(stage,runtime_profile);selection=recipe(stage,environment,runtime_profile)
-    plain_tree(selection['base'],check)
     cache=gpu/'automatic-game-inputs';cache.mkdir(mode=0o700,exist_ok=True);directory(cache)
     views=cache/'source-views';views.mkdir(mode=0o700,exist_ok=True);directory(views)
     origins=[];layers=[];build=module.build_overlay
@@ -182,7 +189,9 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
         observed=mapping(actual,origins,check)
         need(wanted==observed,'final app0 differs from original selected mod view')
         selection_identity=digest(dict(schema=1,role='selected-file-content',algorithm=algorithm,base=str(selection['base'])))
-        live_hashes=Hashes(views/('source-metadata-'+selection_identity+'.json'),selection_identity,hasher=file_sha,check=check)
+        live_roots=list(dict.fromkeys(origins))
+        live_hashes=Hashes(views/('source-metadata-'+selection_identity+'.json'),selection_identity,hasher=file_sha,check=check,watch_roots=live_roots)
+        if not live_hashes.journal_valid:plain_tree(selection['base'],check)
         total=0;records=[]
         for relative,path in sorted(wanted.items()):
             check();value,size=live_hashes.get(path,check);total+=size
@@ -207,7 +216,7 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
                 previous=json.loads(ready.read_text());need(previous['identity']==identity and previous['proof']==proof,'source snapshot identity changed')
                 view=directory(generation/'view')
                 snapshot_hashes=Hashes(views/('snapshot-metadata-'+generation.name+'.json'),
-                    digest(dict(schema=1,role='readonly-mod-view',identity=identity,view=str(view))),hasher=file_sha,check=check)
+                    digest(dict(schema=1,role='readonly-mod-view',identity=identity,view=str(view))),hasher=file_sha,check=check,watch_roots=[view])
                 verify_snapshot(view,records,check,snapshot_hashes)
             except(OSError,ValueError,KeyError,TypeError):cache_problem='source-snapshot-invalid'
             else:
@@ -228,7 +237,7 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
             destination.chmod(0o400)
         for root,dirs,files in os.walk(view,topdown=False):Path(root).chmod(0o500)
         snapshot_hashes=Hashes(views/('snapshot-metadata-'+generation.name+'.json'),
-            digest(dict(schema=1,role='readonly-mod-view',identity=identity,view=str(view))),hasher=file_sha,check=check)
+            digest(dict(schema=1,role='readonly-mod-view',identity=identity,view=str(view))),hasher=file_sha,check=check,watch_roots=[view])
         verify_snapshot(view,records,check,snapshot_hashes)
         verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes)
         live_hashes.publish();snapshot_hashes.publish()
