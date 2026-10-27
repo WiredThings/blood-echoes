@@ -1,0 +1,11 @@
+{
+  "status": "verified",
+  "baseline_version": "0.2.53",
+  "catalogue_identity": "700b64ba1358453238887e4057dfbbee71114f7217d2bd1742c2666ab7ccfbbd",
+  "actual_metadata_outputs_verified": true,
+  "actual_source_proof": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/state/gui-gpu-local-aot-1793073764327531000/arm64-native-v1/automatic-game-inputs/source-views/8c2bf51a1651afc62e2a54fb1243c0e470448b41b39bdaecce589a170133d325/READY.json",
+  "known_parser_compatibility": true,
+  "decoder_invoked": false,
+  "source_or_cache_modified": false,
+  "formal_data_accessed": false
+}

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "directed-passed-isolated-cold-warm-pending",
+  "status": "verified-and-installed",
   "metadata_hint_authorizes_pipeline_import": false,
   "existing_code_path_role_owner_and_final_key_checks_preserved": true,
   "new_default_incremental_paths": [
@@ -13,5 +13,16 @@
   "existing_cache_cleared": false,
   "release_updated": false,
   "directed_tests": 272,
-  "visible_metrics": "Existing completion log includes only actual nonnegative integer source/snapshot/catalogue read counters; no environment/path/credentials."
+  "visible_metrics": "Existing completion log includes only actual nonnegative integer source/snapshot/catalogue read counters; no environment/path/credentials.",
+  "actual_comparison": "matched-startup.json",
+  "warm_start_reduction_percent": 20.78351193579903,
+  "warm_game_content_hash_bytes": 0,
+  "warm_snapshot_content_hash_bytes": 0,
+  "warm_catalogue_source_hash_bytes": 0,
+  "files_per_inventory": 28852,
+  "cold_start_delta_seconds": 20.676574834040366,
+  "warm_footprint_delta_mib": -13.671966552734375,
+  "source_revision": "780afcd07133d2dbd062759463c2cda046806487",
+  "installed_version": "0.2.54",
+  "installation": "installation.json"
 }

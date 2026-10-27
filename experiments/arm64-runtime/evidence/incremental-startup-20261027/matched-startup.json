@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "status": "isolated-cold-warm-verified-install-pending",
+  "source_revision": "780afcd07133d2dbd062759463c2cda046806487",
+  "rows": [
+    {
+      "label": "before",
+      "phase": "cold",
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793073764327531000/run-1",
+      "scene_ready_seconds": 444.7061262499774,
+      "total_seconds": 493.0847513329936,
+      "source_view_seconds": 144.222224,
+      "static_catalogue_seconds": 265.236879,
+      "resource_check_seconds": 409.459103,
+      "preparation_phases": {
+        "archive-policy": 0.126033,
+        "local-libraries": 0.000162,
+        "fixed-helpers": 10.494597,
+        "source-view": 144.222224,
+        "static-catalog": 265.236879,
+        "capture-receipt": 0.251074,
+        "candidate-scan": 0.000356,
+        "module-inputs": 0.774733,
+        "geometry-inputs": 0.000149,
+        "game-preparation": 410.831564
+      },
+      "incremental_inputs": null,
+      "peak_pressure": 2,
+      "swap_growth_mib": 818.6875,
+      "scene": {
+        "frames": 1488,
+        "fps": 49.573775472774905,
+        "p95_ms": 21.16,
+        "p99_ms": 22.49,
+        "gpu_ms": 19.067157258064515,
+        "draws_median": 1366.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6187.88786315918
+      },
+      "settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "native_library_sha256": "ac5c4a040041dd897f055eefe46f1068f34d223cc7e67b16ad1b1e245b8a0c67",
+      "source_QA_save_unchanged": true,
+      "app_pre_post_seal": true
+    },
+    {
+      "label": "before",
+      "phase": "warm",
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793073764327531000/run-2",
+      "scene_ready_seconds": 349.885539958952,
+      "total_seconds": 398.2537558339536,
+      "source_view_seconds": 125.901698,
+      "static_catalogue_seconds": 34.98657,
+      "resource_check_seconds": 160.88826799999998,
+      "preparation_phases": {
+        "archive-policy": 0.190311,
+        "local-libraries": 66.311232,
+        "fixed-helpers": 0.555259,
+        "source-view": 125.901698,
+        "static-catalog": 34.98657,
+        "capture-receipt": 0.227066,
+        "candidate-scan": 0.339057,
+        "module-inputs": 43.514308,
+        "geometry-inputs": 0.011843,
+        "complete-pso": 51.610824,
+        "game-preparation": 256.923254,
+        "local-finalize": 8.317523
+      },
+      "incremental_inputs": null,
+      "peak_pressure": 2,
+      "swap_growth_mib": -46.75,
+      "scene": {
+        "frames": 1492,
+        "fps": 49.732637076414264,
+        "p95_ms": 20.96,
+        "p99_ms": 21.59,
+        "gpu_ms": 18.9875,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6151.1691818237305
+      },
+      "settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "native_library_sha256": "ac5c4a040041dd897f055eefe46f1068f34d223cc7e67b16ad1b1e245b8a0c67",
+      "source_QA_save_unchanged": true,
+      "app_pre_post_seal": true
+    },
+    {
+      "label": "after",
+      "phase": "cold",
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793075038021132000/run-1",
+      "scene_ready_seconds": 465.38270108401775,
+      "total_seconds": 513.7412917090114,
+      "source_view_seconds": 143.094567,
+      "static_catalogue_seconds": 287.995144,
+      "resource_check_seconds": 431.08971099999997,
+      "preparation_phases": {
+        "archive-policy": 0.123307,
+        "local-libraries": 0.000149,
+        "fixed-helpers": 10.30814,
+        "source-view": 143.094567,
+        "static-catalog": 287.995144,
+        "capture-receipt": 0.234401,
+        "candidate-scan": 0.00022,
+        "module-inputs": 0.600923,
+        "geometry-inputs": 0.000471,
+        "game-preparation": 432.279974
+      },
+      "incremental_inputs": {
+        "catalogue": {
+          "hashed_bytes": 31441421851,
+          "hashed_files": 28852,
+          "reused_files": 0
+        },
+        "snapshot": {
+          "hashed_bytes": 31441421851,
+          "hashed_files": 28852,
+          "reused_files": 0
+        },
+        "source": {
+          "hashed_bytes": 31441421851,
+          "hashed_files": 28852,
+          "reused_files": 0
+        }
+      },
+      "peak_pressure": 2,
+      "swap_growth_mib": 578.1875,
+      "scene": {
+        "frames": 1483,
+        "fps": 49.40820102841022,
+        "p95_ms": 21.15,
+        "p99_ms": 21.85,
+        "gpu_ms": 19.16229939312205,
+        "draws_median": 1366,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6169.0284423828125
+      },
+      "settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "native_library_sha256": "ac5c4a040041dd897f055eefe46f1068f34d223cc7e67b16ad1b1e245b8a0c67",
+      "source_QA_save_unchanged": true,
+      "app_pre_post_seal": true
+    },
+    {
+      "label": "after",
+      "phase": "warm",
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793075038021132000/run-2",
+      "scene_ready_seconds": 277.1670369999483,
+      "total_seconds": 325.66099733300507,
+      "source_view_seconds": 69.978639,
+      "static_catalogue_seconds": 30.203463,
+      "resource_check_seconds": 100.182102,
+      "preparation_phases": {
+        "archive-policy": 0.193722,
+        "local-libraries": 62.125034,
+        "fixed-helpers": 0.553678,
+        "source-view": 69.978639,
+        "static-catalog": 30.203463,
+        "capture-receipt": 0.228309,
+        "candidate-scan": 0.408807,
+        "module-inputs": 43.41279,
+        "geometry-inputs": 0.011125,
+        "complete-pso": 44.77792,
+        "game-preparation": 189.351625,
+        "local-finalize": 7.477912
+      },
+      "incremental_inputs": {
+        "catalogue": {
+          "hashed_bytes": 0,
+          "hashed_files": 0,
+          "reused_files": 28852
+        },
+        "snapshot": {
+          "hashed_bytes": 0,
+          "hashed_files": 0,
+          "reused_files": 28852
+        },
+        "source": {
+          "hashed_bytes": 0,
+          "hashed_files": 0,
+          "reused_files": 28852
+        }
+      },
+      "peak_pressure": 2,
+      "swap_growth_mib": -152.0,
+      "scene": {
+        "frames": 1483,
+        "fps": 49.42675957430995,
+        "p95_ms": 21.15,
+        "p99_ms": 22.14,
+        "gpu_ms": 19.111220498988537,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6137.497215270996
+      },
+      "settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "native_library_sha256": "ac5c4a040041dd897f055eefe46f1068f34d223cc7e67b16ad1b1e245b8a0c67",
+      "source_QA_save_unchanged": true,
+      "app_pre_post_seal": true
+    }
+  ],
+  "warm_start_reduction_percent": 20.78351193579903,
+  "warm_resource_checks_reduction_percent": 37.731878622747054,
+  "cold_start_delta_seconds": 20.676574834040366,
+  "warm_combined_footprint_delta_mib": -13.671966552734375,
+  "formal_data_modified": false,
+  "formal_cache_cleared": false,
+  "quality_changed": false,
+  "graphics_settings_changed": false,
+  "Cua": false,
+  "screen_capture": false,
+  "release_updated": false,
+  "qualified_limits": [
+    "Cold means fresh private software GPU cache; macOS filesystem/driver caches not cleared.",
+    "Source/snapshot/catalogue counter zeros concern startup integrity phases, not legitimate gameplay asset loads.",
+    "Complete tree/path/owner/mode/link/mtime/ctime checks and cached metadata output hashes remain; metadata work still takes about100s.",
+    "Both first warm runs prepare newly recorded Metal libraries and complete PSOs; this work remains enabled.",
+    "Only short same-camera scene memory/functional results; no long exploration/combat/online conclusion."
+  ]
+}

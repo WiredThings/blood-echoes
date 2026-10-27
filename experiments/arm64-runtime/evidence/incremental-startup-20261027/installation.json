@@ -1,0 +1,15 @@
+{
+  "status": "installed-verified",
+  "version": "0.2.54",
+  "source_revision": "780afcd07133d2dbd062759463c2cda046806487",
+  "previous_source_revision": "59a261a75c2914f2e7f4a20bcf1e967f8c358af9",
+  "app": "/Applications/Blood Echoes.app",
+  "old_code_backup": "/Users/Shared/BloodEchoesDevelopment/incremental-startup-1793074779963525000/previous-installed-code/Blood Echoes 0.2.53.app",
+  "atomic_exchange": true,
+  "files": 983,
+  "whole_app_deep_strict_seal": true,
+  "formal_data_modified": false,
+  "formal_GUI_started": false,
+  "game_started": false,
+  "release_updated": false
+}
