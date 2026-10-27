@@ -195,6 +195,42 @@ class SourceView(unittest.TestCase):
             source.chmod(0o600);source.write_bytes(b'X'*len(data));source.chmod(0o400)
             target=self.base/'must-not-exist';self.assertIsNone(view.sealed_clone(source,target,entry));self.assertFalse(target.exists())
 
+    def test_hidden_mod_stack_change_reuses_actual_source_mapping_without_registration_or_clone(self):
+        chinese=self.base/'translation';(chinese/'dvdroot_ps4/msg').mkdir(parents=True);text=chinese/'dvdroot_ps4/msg/text.bin';text.write_bytes(b'visible translation')
+        self.env.update(BB_CHINESE_SOURCE='community',BB_CHINESE_LANGUAGE='11',BB_CHINESE_TRANSLATION_DIR=str(chinese))
+        with self.history():
+            first=self.prepare(self.module().build_overlay(self.game,self.out,[('Chinese Retranslation',chinese)]))
+            lower=self.mods/'a/dvdroot_ps4/msg';lower.mkdir(parents=True);(lower/'text.bin').write_bytes(b'hidden lower priority')
+            actual=self.module().build_overlay(self.game,self.out,[('a',self.mods/'a'),('Chinese Retranslation',chinese)])
+            with patch.object(view,'RegisteredSources',side_effect=AssertionError('unchanged effective resources re-enrolled')),patch.object(view,'clone',side_effect=AssertionError('unchanged view cloned')):
+                second=self.prepare(actual)
+            self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['reuse_mode'],'same-effective-source-selection');self.assertTrue(second['report']['current_selection_registered'])
+            self.assertTrue(second['report']['original_source_mapping_unchanged'])
+            # The NEW recipe now has its own normal unchanged certificate.
+            again=self.prepare(self.module().build_overlay(self.game,self.out,[('a',self.mods/'a'),('Chinese Retranslation',chinese)]))
+            self.assertEqual(again['report']['reuse_mode'],'registered-selection')
+            text.write_bytes(b'actually changed visible translation')
+            changed=self.prepare(self.module().build_overlay(self.game,self.out,[('a',self.mods/'a'),('Chinese Retranslation',chinese)]))
+            self.assertNotEqual(changed['game_root'],first['game_root']);self.assertEqual((changed['game_root']/'dvdroot_ps4/msg/text.bin').read_bytes(),b'actually changed visible translation')
+
+    def test_legacy_hash_candidates_are_rechecked_per_file_and_hidden_base_members_enrolled(self):
+        from incremental_file_hashes import Hashes
+        with self.history():
+            module,algorithm=view.load_original(self.stage);views=self.gpu/'automatic-game-inputs/source-views';views.mkdir(parents=True)
+            identity=view.digest(dict(schema=1,role='selected-file-content',algorithm=algorithm,base=str(self.game)))
+            legacy=Hashes(views/('source-metadata-'+identity+'.json'),identity,hasher=view.file_sha)
+            # This old mixed hint deliberately lacks one base member. It must
+            # never be promoted into a complete base inventory by assumption.
+            legacy.get(self.game/'eboot.bin');legacy.publish();old=(views/('source-metadata-'+identity+'.json')).read_bytes()
+            current=view.RegisteredSources(views,self.game,[self.game],algorithm,lambda:None)
+            self.assertFalse(current.base_registered);self.assertEqual(len(current.files),2)
+            self.assertEqual(current.report()['hashed_files'],1);self.assertEqual(current.report()['legacy_base_hash_candidates'],1)
+            self.assertEqual((views/('source-metadata-'+identity+'.json')).read_bytes(),old)
+            current.publish();p=self.game/'eboot.bin';p.write_bytes(b'changed after legacy source proof')
+            # A new independent registration must not borrow its old bytes.
+            reread=view.RegisteredSources(views,self.game,[self.game],algorithm,lambda:None)
+            self.assertEqual(reread.report()['hashed_files'],1)
+
     def test_registered_hint_missing_history_and_single_bad_receipt_fall_back_preserving_old(self):
         import startup_change_journal as journal
         with self.history():

@@ -187,6 +187,17 @@ class RegisteredSources:
             self.hashes[root]=Hashes(views/('origin-metadata-'+identity+'.json'),identity,
                 hasher=file_sha,check=check,watch_roots=[root])
         hashes=self.hashes[base];self.base_registered=hashes.journal_valid
+        self.legacy_candidates=0
+        if not hashes.previous:
+            # Old mixed-source hints remain intact. They may contain only a
+            # subset of base files (Mods hid others), so never treat them as a
+            # complete inventory/journal. Reuse their per-file byte proofs only
+            # after get() matches the CURRENT full mutation-sensitive stamp.
+            legacy=digest(dict(schema=1,role='selected-file-content',algorithm=algorithm,base=str(base)))
+            old=Hashes(views/('source-metadata-'+legacy+'.json'),legacy,hasher=file_sha,check=check)
+            if old.receipt_status=='verified':
+                for name,row in old.previous.items():
+                    if Path(name).is_relative_to(base):hashes.previous[name]=row;self.legacy_candidates+=1
         if self.base_registered:
             files={}
             for name in hashes.previous:
@@ -261,6 +272,7 @@ class RegisteredSources:
     def report(self):
         reports=[h.report()for h in self.hashes.values()]
         return dict(receipt='independent-origins',base_receipt=self.hashes[self.base].receipt_status,base_inventory_reused=self.base_registered,
+            legacy_base_hash_candidates=self.legacy_candidates,
             hashed_files=sum(r['hashed_files']for r in reports),hashed_bytes=sum(r['hashed_bytes']for r in reports),
             reused_files=sum(r['reused_files']for r in reports),metadata_only=all(r['metadata_only']for r in reports),
             journal_reused=all(r['journal_reused']for r in reports))
@@ -296,6 +308,59 @@ def selection_binding(selection,algorithm,layers,shape):
     return dict(schema=1,original_algorithm=algorithm,
         selection=json.loads(json.dumps(selection,default=str,sort_keys=True)),
         layers=layers,overlay_shape_sha256=digest(shape))
+
+
+def effective_path(views,bound):
+    return views/('effective-selection-'+digest(dict(schema=1,algorithm=bound['original_algorithm'],
+        base=str(bound['selection']['base']),shape=bound['overlay_shape_sha256']))+'.json')
+
+
+def remember_effective(views,bound,check):
+    """Only an already published original selection certificate is indexed."""
+    from game_pso_owned_audit import checked_bytes
+    try:
+        path=effective_path(views,bound);certificate=views/('selection-'+digest(bound)+'.json')
+        if not replaceable(path):return False
+        info=certificate.lstat();need(info.st_nlink==1 and stat.S_IMODE(info.st_mode)==0o600,'effective certificate mode/link')
+        raw,_=checked_bytes(certificate,limit=16384);saved=json.loads(raw)
+        need(type(saved['schema'])is int and saved['schema']==1 and saved['binding']==bound,'published effective certificate')
+        write_json(path,dict(schema=1,selection=digest(bound),sha256=hashlib.sha256(raw).hexdigest()))
+        return True
+    except(OSError,ValueError,KeyError,TypeError):return False
+
+
+def reuse_effective(views,bound,origins,check,verify_current):
+    """Changed Mod recipe, SAME actual sparse source mapping and source bytes.
+
+    Reuse the old complete source certificate, then register today's selection
+    separately. New hidden/ineffective Mod roots never cause a base scan/clone.
+    A different physical target, changed source or lost history cannot enter.
+    """
+    from game_pso_owned_audit import checked_bytes
+    try:
+        hint=json.loads(checked_bytes(effective_path(views,bound),limit=4096)[0])
+        need(type(hint['schema'])is int and hint['schema']==1 and isinstance(hint['selection'],str)
+            and len(hint['selection'])==64 and all(c in '0123456789abcdef'for c in hint['selection']),'effective source hint')
+        path=views/('selection-'+hint['selection']+'.json')
+        saved=json.loads(checked_bytes(path,limit=16384,expected=hint['sha256'])[0]);previous=saved['binding']
+        need(digest(previous)==hint['selection']and effective_path(views,previous)==effective_path(views,bound),'same actual original source shape')
+        old_origins=list(dict.fromkeys([directory(previous['selection']['base']),
+            *[directory(row['root'])for row in previous['layers']]]))
+        def prior():return reuse_selection(views,previous,old_origins,check,verify_current)
+        result=prior()
+        if result is None:return None
+        view=result['game_root'];raw,_=checked_bytes(view.parent/'READY.json',limit=32*1024*1024,expected=saved['ready_sha256']);ready=json.loads(raw)
+        records=ready['proof']['files']
+        def verify():
+            need(prior()is not None,'actual source selection changed during reuse')
+            verify_current()
+        registered=publish_selection(views,bound,origins,view,result['report']['source_identity'],records,
+            result['report']['logical_bytes'],check,verify)
+        if registered:remember_effective(views,bound,check)
+        result['report'].update(reuse_mode='same-effective-source-selection',launch_selection_identity=digest(bound),
+            current_selection_registered=bool(registered),original_source_mapping_unchanged=True)
+        return result
+    except(OSError,ValueError,KeyError,TypeError):return None
 
 
 def reuse_selection(views,bound,origins,check,verify_current=lambda:None):
@@ -456,7 +521,9 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
             need(recipe(stage,environment,runtime_profile)==selection,'original mod selection changed during registered reuse')
             need(overlay_shape(actual,selection['base'],origins,check)==actual_shape,'final app0 shape changed during registered reuse')
         reused=reuse_selection(views,bound,origins,check,verify_current)
+        if reused is None:reused=reuse_effective(views,bound,origins,check,verify_current)
         if reused is not None:
+            remember_effective(views,bound,check)
             remember_snapshot(views,reused['game_root'],reused['report']['source_identity'],check)
             return reused
         live_hashes=RegisteredSources(views,selection['base'],origins,algorithm,check)
@@ -500,6 +567,7 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
                     verify_snapshot(view,records,check,snapshot_hashes)
                     verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes,selected_mapping)
                 publish_selection(views,bound,origins,view,identity,records,total,check,verify_registered)
+                remember_effective(views,bound,check)
                 remember_snapshot(views,view,identity,check)
                 return dict(game_root=view,report=dict(status='reused',source_identity=identity,files=len(records),logical_bytes=total,CoW=True,original_app0_preserved=True,
                     source_hashes=live_hashes.report(),snapshot_hashes=snapshot_hashes.report()))
@@ -542,6 +610,7 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
             verify_snapshot(view,records,check,snapshot_hashes)
             verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes,selected_mapping)
         publish_selection(views,bound,origins,view,identity,records,total,check,verify_registered)
+        remember_effective(views,bound,check)
         remember_snapshot(views,view,identity,check)
         return dict(game_root=view,report=dict(status='snapshotted',source_identity=identity,files=len(records),logical_bytes=total,CoW=True,original_app0_preserved=True,
             source_hashes=live_hashes.report(),snapshot_hashes=snapshot_hashes.report(),cache_recovery=cache_problem,

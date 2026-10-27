@@ -14,6 +14,8 @@
 
 1. **真实编译域已启用。** 原 manifest 仍完整保留 boot/content_profile/patches/settings、选项及旧 selection token；实际传给原生工厂的 cohort 已改用 CompilationCompatibility。原生 MSL、全部特化、函数/管线完整字段和键算法未删减。7 个已审查的执行控制与编译身份分离（residency、barrier、staging、timing、归档持久化/释放、弱库 memo），其余未知控制显式保守保留；two-level BDA 明确保留为编译控制。UI/日志工具不进入 GPU 编译域。原生 DSO、ABI、真正编译选项或 SDK 兼容变化仍需失效。
 2. **本体与各 Mod 独立登记。** RegisteredSources 为本体保留完整文件集，包括当前被遮住的原版文件；每个 Mod 有独立 hash/journal。原 mods.py 继续决定启用、覆盖顺序、大小写、目录/文件冲突及社区汉化最后覆盖。新 Mod 组合不会作废本体登记；已登记组合直接采用 registered-selection，变化历史缺失才回到相应来源的完整登记。遍历 RAM 中的旧清单不等于重新遍历本体文件系统。
+Mod组合变化但最终物理来源映射完全相同（例如下层覆盖被汉化再次遮住），可直接从旧完整选择证明登记本次组合，无本体扫描或新视图物化；实际选中源、只读视图变化记录或完整映射任一不符即回退。旧混合源摘要仅作为当前逐文件stat匹配后的字节证明，不冒充本体完整登记；隐藏原版文件仍实际发现并检查。
+
 3. **新视图复用已验证快照。** 当前来源/完整 SHA/长度相同，且旧 readonly 文件仍匹配完整 inode/security/stamp 时，使用 Darwin fclonefileat 的原子 CoW 数据等价契约，从该精确 inode 建立新文件。无硬链接、无软链接、无大复制回退，源/目标 inode 不同、0400/nlink=1/长度/mtime 及源 fd 前后身份均检查。目标完整集合、权限和后续变化仍检查；新增/变化项及自定义 clone 回调继续实际字节验证。借用的是旧文件真实字节证明，单列 sealed_kernel_clones，不虚报新 hash 数。全新组合仍须物化一套满足原 canonical reader 的文件名/CoW 元数据；这属于当前视图格式的剩余成本，不是游戏必然需要全量检查。已完成的正常启动/F3不重复这一物化。
 4. **静态目录复用同一份快照证明。** source-view 已做完的全量校验通过其 READY、完整集合与连续变化记录传给 catalogue，不再重复读取同一批字节。既有 package、GNM 与 full-resource 三层解析器共享逐资源 metadata products：完整文件内容、路径/解析语义、解析器/loader/enum 身份，以及 BXF 头→数据体等依赖进入键。未知文件照旧扫描；变化资源重新解析，未变化的包/头/模型结果复用，并保持输出行顺序、字段顺序和全局去重/计数。实际端到端作者样本比对所有非计时索引字节一致。SQLite mmap=0、2MiB页缓存、单记录4MiB/库512MiB边界只约束这个新 metadata 加速层；超界按原解析器处理，不减少游戏/渲染缓存或覆盖范围。退出 worker 后关闭/释放。
 静态目录的物理来源与选择同样分开：两个 readonly 视图的完整文件集/所有SHA/长度相同，才复用原目录所绑定的物理根；保留本次 selected_game_root，禁止只改 catalog.game_root 字符串冒充新来源。旧物理根损坏或历史丢失则另建目录代，旧产物保留。此边界有正例和损坏反例，未启动游戏。
@@ -24,7 +26,7 @@
 8. **F3 已前置，原在线→离线语义保持。** 同 supervisor 的 Local 选择与 resume-only 在普通整批库/helper/资源/模块/PSO准备之前。在线运行可以登记完成的 GPU 准备，但只有原 supervisor 的离线 F3 child 可以采用；不会恢复 token/账号或在线状态。当前实际 boot/patch/settings、选择、代码、nonces、SDK/local 目录及上下文仍匹配；真实变化就回退原准备。原 F2、自动继续和退出码完全沿用。
 9. **本机库兼容身份与保留式采用。** actual NativeToolchain schema2 绑定 Metal/metallib/xcrun 的代码/版本、OS build 和默认 SDKSettings.json/plist 内容。SDK 路径/时间另作来源/本次固定条件，同版本换目录/仅时间变化不换产品。真实跨 cohort 库采用须原 native derive_key 有效，原 MSL 与当前逐字节相同，完整 options/build/receipt/library 字节通过。v1 entry 与 v2 整库语义保持。旧 schema1 未记录 SDK，及旧 PSO 仅有不可逆 recipe digest 的情况，不能伪造兼容或重贴 ready；保留旧产品，必要时一次性为当前真实输入重建。未来 Mod 变化不再因此整体更换 compiler cohort。
 
-本轮43套、666项定向检查（含系统真实 CoW/文件历史控制）通过；另有独立真实 FSEvents+fclonefileat 作者数据端到端证明，源/目标字节另行完整比对，新 Mod 只 hash 1 个文件并复用 2 个已验证只读 clone。见 evidence/startup-cache-redesign-20261027/integration-directed-result.json 与 real-cow-admission.json。早期430项/393项及先前游戏数字是不同源码阶段，保留为历史，不拿来冒充当前包结果。
+本轮43套、668项定向检查（含系统真实 CoW/文件历史控制）通过；另有独立真实 FSEvents+fclonefileat 作者数据端到端证明，源/目标字节另行完整比对，新 Mod 只 hash 1 个文件并复用 2 个已验证只读 clone。见 evidence/startup-cache-redesign-20261027/integration-directed-result.json 与 real-cow-admission.json。早期430项/393项及先前游戏数字是不同源码阶段，保留为历史，不拿来冒充当前包结果。
 
 下一步交付阻塞：冻结并同步当前源码 → 干净 Git 归档组隔离包并核 native 载荷/闭包/签名 → 实际本机库与 native worker 命中及迁移 → 一次集中启动/Mod 往返/坏项局部修复/F3验收，记录 worker/编译次数、阶段耗时、长帧、峰值和场景持续内存。尚未运行当前完整设计的游戏或更新正式应用；不能据定向通过宣称这些已完成。若实际日志暴露未覆盖协议/缺少事件，则按具体输入修复，不能把 ready 计数补成成功。
 
@@ -67,7 +69,7 @@
 5. F3在同supervisor会话前置复用刚完成的准备环境/required products，避免重复整批库检查；代码/关键条件真不一致按相应范围回退。原运行时库加载、创建本进程Metal对象依然必要，计数单独统计，不能算成离线预编译失败。
 6. 全部源码集成后再统一构建/集中验收；不因局部修改立刻开长测。临时纹理诊断独立收尾，性能测试不启用它。
 
-早期1956c367里程碑28套、430项定向检查通过，见evidence/startup-cache-redesign-20261027/directed-result.json（当前666项见上文）。实际Xcode SDK元数据读取检查通过（JSON7948字节、plist5538字节），没有调用编译器或游戏。先前失败记录保留：旧增量提示的测试需显式选择下层回退路径；新SDK产品需要新建库后再完成稳定审计，旧“两次即可memo”假设已修正；新源证明测试的重复seed与拒绝返回约定已纠正。初次沙箱内变化记录不可用及SDK路径查询混入xcodebuild系统告警，退出沙箱重验通过，没有放宽原解析或路径校验。一次旧live Metal测试因缺少它要求的旧构建manifest，在启动任何GPU/游戏前失败，留待集中包验收，不记通过。430项通过不包含此项，也不构成真实Metal库迁移或游戏性能验收。
+早期1956c367里程碑28套、430项定向检查通过，见evidence/startup-cache-redesign-20261027/directed-result.json（当前668项见上文）。实际Xcode SDK元数据读取检查通过（JSON7948字节、plist5538字节），没有调用编译器或游戏。先前失败记录保留：旧增量提示的测试需显式选择下层回退路径；新SDK产品需要新建库后再完成稳定审计，旧“两次即可memo”假设已修正；新源证明测试的重复seed与拒绝返回约定已纠正。初次沙箱内变化记录不可用及SDK路径查询混入xcodebuild系统告警，退出沙箱重验通过，没有放宽原解析或路径校验。一次旧live Metal测试因缺少它要求的旧构建manifest，在启动任何GPU/游戏前失败，留待集中包验收，不记通过。430项通过不包含此项，也不构成真实Metal库迁移或游戏性能验收。
 
 ## 定向及最终验收矩阵
 

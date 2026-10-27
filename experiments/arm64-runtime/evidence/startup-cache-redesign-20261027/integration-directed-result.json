@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "total_tests": 666,
+  "total_tests": 668,
   "suites": [
     {
       "suite": "test_incremental_file_hashes",
@@ -17,7 +17,7 @@
     {
       "suite": "test_launcher_source_view",
       "exit": 0,
-      "tests": 37,
+      "tests": 39,
       "seconds": 6.302
     },
     {
@@ -262,5 +262,6 @@
     }
   ],
   "qualification": "43 directed authored suites, real filesystem journals and tiny owned Python child controls; no Metal compiler, GPU worker, game, GUI or formal data use",
-  "real_kernel_cow_controls": true
+  "real_kernel_cow_controls": true,
+  "latest_focused_recheck": "source view 39, catalogue 16, incremental 13, source closure 13, F3 25"
 }
