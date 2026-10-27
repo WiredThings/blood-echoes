@@ -1,0 +1,3980 @@
+{
+  "status": "startup-isolated-concentrated-matrix-passed",
+  "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+  "runs": [
+    {
+      "phase": "baseline-056-warm",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "684cc230",
+      "scene_ready_seconds": 51.485427665989846,
+      "scene": {
+        "frames": 1441,
+        "fps": 48.0202078098653,
+        "p95_ms": 22.34,
+        "p99_ms": 26.02,
+        "gpu_ms": 19.555378209576684,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6136.778373718262
+      },
+      "startup_sampled_peak_combined_footprint_mib": 6007.5,
+      "scene_sampled_peak_combined_footprint_mib": 6154.68,
+      "peak_pressure": 2,
+      "swap_growth_mib": 859.5625,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.115169,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 3.085059,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.556614,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 9.724545,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.676952,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.216972,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.153448,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 15.881257,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009988,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.685199,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 29.676617,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.340951,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "unchanged-schedule-reused",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "requests": 231,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "inventory_records": 464,
+            "verified_target_products": 87,
+            "verified_target_reuses": 464
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-module-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      }
+    },
+    {
+      "phase": "candidate-057-migration",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "76e208d5fcba37ccd9b61f90e6c892d85e6fc738",
+      "scene_ready_seconds": 479.64440979098435,
+      "scene": {
+        "frames": 1437,
+        "fps": 47.88641621993228,
+        "p95_ms": 22.87,
+        "p99_ms": 30.03,
+        "gpu_ms": 19.46256784968685,
+        "draws_median": 1366,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6164.207946777344
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5524.93,
+      "scene_sampled_peak_combined_footprint_mib": 6180.11,
+      "peak_pressure": 2,
+      "swap_growth_mib": 70.625,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.129154,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 0.000365,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 12.267768,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 16.728181,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 225.378991,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.221471,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.144973,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 56.291546,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009795,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 140.633378,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 439.758054,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 9.453789,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 22571168,
+              "hashed_files": 12,
+              "journal_reused": false,
+              "reused_files": 28846
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "repaired_products": 0,
+            "requests": 226,
+            "reused_products": 0,
+            "skipped": 226
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "required_target_keys": 93,
+            "verified_required_products": 0
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 37,
+        "game-module-preparer": 61
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 2,
+        "metal_local_calls": 9,
+        "metal_strict_pso_attempts": 0,
+        "metal_strict_pso_hits": 0
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      }
+    },
+    {
+      "phase": "candidate-057-warm-1",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "76e208d5fcba37ccd9b61f90e6c892d85e6fc738",
+      "scene_ready_seconds": 53.897896124981344,
+      "scene": {
+        "frames": 1447,
+        "fps": 48.23034305206411,
+        "p95_ms": 22.97,
+        "p99_ms": 25.27,
+        "gpu_ms": 19.56922598479613,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6167.528511047363
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5584.51,
+      "scene_sampled_peak_combined_footprint_mib": 6180.81,
+      "peak_pressure": 2,
+      "swap_growth_mib": 272.3125,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.12214,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 11.62531,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.551053,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.579591,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.930208,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.217055,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.156984,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 12.15375,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.010392,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 0.824328,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 16.203193,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 8.461591,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "inventory_records": 87,
+            "native_attempts": 87,
+            "native_completed": 87,
+            "required_target_keys": 93,
+            "verified_required_products": 0
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 2,
+        "game-module-preparer": 28
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      }
+    },
+    {
+      "phase": "candidate-057-warm-2",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "76e208d5fcba37ccd9b61f90e6c892d85e6fc738",
+      "scene_ready_seconds": 25.39746870903764,
+      "scene": {
+        "frames": 1466,
+        "fps": 48.85881668345286,
+        "p95_ms": 21.83,
+        "p99_ms": 24.0,
+        "gpu_ms": 19.314672578444746,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6147.841033935547
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5569.87,
+      "scene_sampled_peak_combined_footprint_mib": 6166.34,
+      "peak_pressure": 2,
+      "swap_growth_mib": -32.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.125447,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.014991,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.562097,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.576869,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.928266,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.219592,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.149098,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.366293,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009724,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 0.944025,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 5.541418,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.335563,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "inventory_records": 174,
+            "required_target_keys": 93,
+            "verified_required_products": 87,
+            "verified_target_reuses": 174
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1,
+        "game-module-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      }
+    },
+    {
+      "phase": "final-code-ordinary-warm",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "364aba8c8cad58c9b8cc1e35e0b75b0be3890635",
+      "scene_ready_seconds": 27.73759745794814,
+      "scene": {
+        "frames": 1449,
+        "fps": 48.287557905912905,
+        "p95_ms": 22.12,
+        "p99_ms": 27.54,
+        "gpu_ms": 19.38952380952381,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6165.825340270996
+      },
+      "startup_sampled_peak_combined_footprint_mib": 6036.15,
+      "scene_sampled_peak_combined_footprint_mib": 6176.47,
+      "peak_pressure": 2,
+      "swap_growth_mib": 257.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.122669,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.091952,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.546251,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.669222,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 2.006394,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.219681,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.146685,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.366373,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009414,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 0.964118,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 5.705402,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.355575,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "inventory_records": 261,
+            "required_target_keys": 93,
+            "unresolved_static_stage_records": 0,
+            "verified_required_products": 87,
+            "verified_target_reuses": 261
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1,
+        "game-module-preparer": 2
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 2
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "inventory_profiles": 1,
+                "inventory_records": 261,
+                "required_target_keys": 93,
+                "source_rejections": 0,
+                "unresolved_static_stage_records": 0,
+                "verified_required_products": 87,
+                "verified_target_reuses": 261
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {
+                "required-targets-unresolved": 6
+              },
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "partial"
+            },
+            "source_validated_module_reuses": 134
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "Mod-A",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "364aba8c8cad58c9b8cc1e35e0b75b0be3890635",
+      "scene_ready_seconds": 150.9126321671065,
+      "scene": {
+        "frames": 1452,
+        "fps": 48.374377704609124,
+        "p95_ms": 22.3,
+        "p99_ms": 24.03,
+        "gpu_ms": 19.401301652892563,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5951.090965270996
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5617.53,
+      "scene_sampled_peak_combined_footprint_mib": 5968.43,
+      "peak_pressure": 2,
+      "swap_growth_mib": -40.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.128894,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.431449,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.566591,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 22.182993,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 88.665769,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.215133,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.147219,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 16.901548,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.010265,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.538821,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 129.997101,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.441367,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 31441421851,
+              "hashed_files": 28852,
+              "journal_reused": false,
+              "reused_files": 0
+            },
+            "snapshot": {
+              "hashed_bytes": 253793,
+              "hashed_files": 1,
+              "journal_reused": false,
+              "reused_files": 28851
+            },
+            "source": {
+              "hashed_bytes": 253793,
+              "hashed_files": 1,
+              "journal_reused": false,
+              "reused_files": 28858
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "required_target_keys": 93,
+            "unresolved_static_stage_records": 0,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1,
+        "game-module-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "inventory_profiles": 1,
+                "required_target_keys": 93,
+                "source_rejections": 348,
+                "unresolved_static_stage_records": 0,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {
+                "required-targets-unresolved": 6
+              },
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "partial"
+            },
+            "source_validated_module_reuses": 0
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "Mod-A-plus-B",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "364aba8c8cad58c9b8cc1e35e0b75b0be3890635",
+      "scene_ready_seconds": 185.66378766694106,
+      "scene": {
+        "frames": 1447,
+        "fps": 48.20996756905153,
+        "p95_ms": 22.51,
+        "p99_ms": 28.38,
+        "gpu_ms": 19.392087076710435,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6123.825271606445
+      },
+      "startup_sampled_peak_combined_footprint_mib": 6003.86,
+      "scene_sampled_peak_combined_footprint_mib": 6179.98,
+      "peak_pressure": 2,
+      "swap_growth_mib": -63.5,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.12304,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.295315,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.563367,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 56.448995,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 86.966845,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.257963,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.153531,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 16.373708,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.01065,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 2.494979,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 163.062484,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.383274,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 31441421851,
+              "hashed_files": 28852,
+              "journal_reused": false,
+              "reused_files": 0
+            },
+            "snapshot": {
+              "hashed_bytes": 31441421851,
+              "hashed_files": 28852,
+              "journal_reused": false,
+              "reused_files": 0
+            },
+            "source": {
+              "hashed_bytes": 284017,
+              "hashed_files": 1,
+              "journal_reused": false,
+              "reused_files": 28859
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "required_target_keys": 93,
+            "unresolved_static_stage_records": 0,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-module-preparer": 2
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 3
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "inventory_profiles": 1,
+                "required_target_keys": 93,
+                "source_rejections": 435,
+                "unresolved_static_stage_records": 0,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {
+                "required-targets-unresolved": 6
+              },
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "partial"
+            },
+            "source_validated_module_reuses": 0
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "Mod-A-restored",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "364aba8c8cad58c9b8cc1e35e0b75b0be3890635",
+      "scene_ready_seconds": 75.34013337502256,
+      "scene": {
+        "frames": 1376,
+        "fps": 45.837284967002816,
+        "p95_ms": 31.72,
+        "p99_ms": 47.71,
+        "gpu_ms": 19.32377180232558,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5925.9191818237305
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5708.29,
+      "scene_sampled_peak_combined_footprint_mib": 6451.56,
+      "peak_pressure": 2,
+      "swap_growth_mib": 290.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.121396,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.460953,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.553898,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 20.403386,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 27.373208,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.212092,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.153691,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.484537,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009432,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.875557,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 51.850896,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.353124,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": false,
+              "reused_files": 28859
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "inventory_records": 87,
+            "required_target_keys": 93,
+            "unresolved_static_stage_records": 0,
+            "verified_required_products": 87,
+            "verified_target_reuses": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1,
+        "game-module-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "inventory_profiles": 1,
+                "inventory_records": 87,
+                "required_target_keys": 93,
+                "source_rejections": 435,
+                "unresolved_static_stage_records": 0,
+                "verified_required_products": 87,
+                "verified_target_reuses": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {
+                "required-targets-unresolved": 6
+              },
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "partial"
+            },
+            "source_validated_module_reuses": 134
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "original-resources-restored",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "364aba8c8cad58c9b8cc1e35e0b75b0be3890635",
+      "scene_ready_seconds": 134.48062312498223,
+      "scene": {
+        "frames": 1488,
+        "fps": 49.58520707988783,
+        "p95_ms": 21.33,
+        "p99_ms": 22.83,
+        "gpu_ms": 18.988326612903226,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5922.466079711914
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5609.22,
+      "scene_sampled_peak_combined_footprint_mib": 5936.62,
+      "peak_pressure": 2,
+      "swap_growth_mib": -48.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.147556,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.625661,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.663746,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 35.062194,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 59.134821,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.217363,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.168541,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 16.541042,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.010303,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.150684,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 112.644383,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.383043,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 31441421851,
+              "hashed_files": 28852,
+              "journal_reused": false,
+              "reused_files": 0
+            },
+            "snapshot": {
+              "hashed_bytes": 253793,
+              "hashed_files": 1,
+              "journal_reused": false,
+              "reused_files": 28851
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": false,
+              "reused_files": 28858
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "required_target_keys": 93,
+            "unresolved_static_stage_records": 0,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1,
+        "game-module-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "inventory_profiles": 1,
+                "required_target_keys": 93,
+                "source_rejections": 609,
+                "unresolved_static_stage_records": 0,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {
+                "required-targets-unresolved": 6
+              },
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "partial"
+            },
+            "source_validated_module_reuses": 0
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "unrelated-menu-key",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "364aba8c8cad58c9b8cc1e35e0b75b0be3890635",
+      "scene_ready_seconds": 47.82856674992945,
+      "scene": {
+        "frames": 1468,
+        "fps": 48.91516950039218,
+        "p95_ms": 21.55,
+        "p99_ms": 23.22,
+        "gpu_ms": 19.17683242506812,
+        "draws_median": 1366.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5958.700157165527
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5419.84,
+      "scene_sampled_peak_combined_footprint_mib": 5976.89,
+      "peak_pressure": 1,
+      "swap_growth_mib": -24.0625,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.122743,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.642793,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.552228,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 22.00976,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.423724,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.225566,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.156361,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.43603,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.00959,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.087801,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 26.681025,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.350738,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": false,
+              "reused_files": 28858
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "inventory_records": 87,
+            "required_target_keys": 93,
+            "unresolved_static_stage_records": 0,
+            "verified_required_products": 87,
+            "verified_target_reuses": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1,
+        "game-module-preparer": 2
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "inventory_profiles": 1,
+                "inventory_records": 87,
+                "required_target_keys": 93,
+                "source_rejections": 609,
+                "unresolved_static_stage_records": 0,
+                "verified_required_products": 87,
+                "verified_target_reuses": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {
+                "required-targets-unresolved": 6
+              },
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "partial"
+            },
+            "source_validated_module_reuses": 134
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "same-supervisor-F3",
+      "status": "functional-checked",
+      "stop": "functional F3 completed",
+      "source_revision": "364aba8c8cad58c9b8cc1e35e0b75b0be3890635",
+      "scene_ready_seconds": 27.476956750033423,
+      "scene": null,
+      "startup_sampled_peak_combined_footprint_mib": 5473.87,
+      "scene_sampled_peak_combined_footprint_mib": 6149.59,
+      "peak_pressure": 2,
+      "swap_growth_mib": -8.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.123815,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 3.003689,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.684853,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.508566,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.537249,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.230813,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.177244,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.757788,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.010624,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.099279,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 5.664936,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.378753,
+          "outcome": "returned"
+        },
+        {
+          "phase": "archive-policy",
+          "seconds": 0.233858,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 0.766322,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "inventory_records": 174,
+            "required_target_keys": 93,
+            "unresolved_static_stage_records": 0,
+            "verified_required_products": 87,
+            "verified_target_reuses": 174
+          }
+        },
+        {
+          "fixed_helpers": "same-supervisor-reused",
+          "game_pso": "same-supervisor-f3-schedule-reused",
+          "local_libraries": {
+            "same_supervisor_reused": true
+          },
+          "requested": "auto",
+          "status": "prepared"
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1,
+        "game-module-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": {
+        "phase": "completed",
+        "since": 57.64495504100341,
+        "initial_ready": 27.476956750033423,
+        "completed": 73.0398879579734,
+        "offline_protocol_seen": true,
+        "automatic_continue_seen": true,
+        "scripted_api_not_physical_key_test": true
+      },
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "inventory_profiles": 1,
+                "inventory_records": 174,
+                "required_target_keys": 93,
+                "source_rejections": 609,
+                "unresolved_static_stage_records": 0,
+                "verified_required_products": 87,
+                "verified_target_reuses": 174
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {
+                "required-targets-unresolved": 6
+              },
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "partial"
+            },
+            "source_validated_module_reuses": 134
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "final-code-ordinary-warm",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+      "scene_ready_seconds": 291.4450840000063,
+      "scene": {
+        "frames": 1496,
+        "fps": 49.85897176535755,
+        "p95_ms": 21.22,
+        "p99_ms": 22.72,
+        "gpu_ms": 18.679786096256684,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5925.856521606445
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5779.58,
+      "scene_sampled_peak_combined_footprint_mib": 5950.33,
+      "peak_pressure": 2,
+      "swap_growth_mib": -65.5625,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.119944,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.726632,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.549585,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 2.110079,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 239.368444,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.222412,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.153902,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.386285,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009758,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 25.185294,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 268.756606,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.3742,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 87,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 6,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 13
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "required_target_keys": 87,
+                "unresolved_static_stage_records": 0,
+                "verified_generic_target_coverage": 6,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {},
+              "historical_capture_inventory_skipped": true,
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "prepared"
+            },
+            "source_validated_module_reuses": 149
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 12,
+              "recipes": 190,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 1,
+              "full_builds": 1,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 1087,
+              "seconds": 2.730665792012587,
+              "full_build_seconds": 2.3657814579783008,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 0,
+              "published": 190,
+              "misses": 190,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 0,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": true,
+            "work_units": 190,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "final-code-ordinary-warm-2",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+      "scene_ready_seconds": 27.509951082989573,
+      "scene": {
+        "frames": 1455,
+        "fps": 48.492160434063166,
+        "p95_ms": 21.72,
+        "p99_ms": 24.81,
+        "gpu_ms": 19.287353951890033,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5942.606636047363
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5671.29,
+      "scene_sampled_peak_combined_footprint_mib": 5952.25,
+      "peak_pressure": 2,
+      "swap_growth_mib": 0.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.122935,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.892865,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.555393,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.535553,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.555876,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.221158,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.151582,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.278058,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009517,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.952897,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 6.03829,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.365834,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 87,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 6,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "required_target_keys": 87,
+                "unresolved_static_stage_records": 0,
+                "verified_generic_target_coverage": 6,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {},
+              "historical_capture_inventory_skipped": true,
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "prepared"
+            },
+            "source_validated_module_reuses": 149
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "Mod-A",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+      "scene_ready_seconds": 40.71456108300481,
+      "scene": {
+        "frames": 1476,
+        "fps": 49.19217844362746,
+        "p95_ms": 21.53,
+        "p99_ms": 24.19,
+        "gpu_ms": 18.960657181571815,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5984.895812988281
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5627.79,
+      "scene_sampled_peak_combined_footprint_mib": 5996.0,
+      "peak_pressure": 2,
+      "swap_growth_mib": -8.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.12281,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.820574,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.55593,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 11.873531,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 4.755025,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.217888,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.149112,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.335266,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009974,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.03347,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 19.72103,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.352601,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 253793,
+              "hashed_files": 1,
+              "journal_reused": false,
+              "reused_files": 28858
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 87,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 6,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 2,
+        "game-module-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "required_target_keys": 87,
+                "unresolved_static_stage_records": 0,
+                "verified_generic_target_coverage": 6,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {},
+              "historical_capture_inventory_skipped": true,
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "prepared"
+            },
+            "source_validated_module_reuses": 149
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "Mod-A-plus-B",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+      "scene_ready_seconds": 39.66602620796766,
+      "scene": {
+        "frames": 1470,
+        "fps": 48.97613229819335,
+        "p95_ms": 21.56,
+        "p99_ms": 24.24,
+        "gpu_ms": 19.14278911564626,
+        "draws_median": 1366.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5933.043998718262
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5590.22,
+      "scene_sampled_peak_combined_footprint_mib": 5952.15,
+      "peak_pressure": 2,
+      "swap_growth_mib": -16.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.126667,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.883327,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.568448,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 11.845784,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 3.726051,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.220713,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.155484,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.314912,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009697,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.00495,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 18.624159,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.325762,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 284017,
+              "hashed_files": 1,
+              "journal_reused": false,
+              "reused_files": 28859
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 87,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 6,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 5
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "required_target_keys": 87,
+                "unresolved_static_stage_records": 0,
+                "verified_generic_target_coverage": 6,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {},
+              "historical_capture_inventory_skipped": true,
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "prepared"
+            },
+            "source_validated_module_reuses": 149
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "Mod-A-restored",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+      "scene_ready_seconds": 28.492745416006073,
+      "scene": {
+        "frames": 1434,
+        "fps": 47.783673911413594,
+        "p95_ms": 22.32,
+        "p99_ms": 24.91,
+        "gpu_ms": 19.715969316596933,
+        "draws_median": 1366.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6154.887657165527
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5586.5,
+      "scene_sampled_peak_combined_footprint_mib": 6163.98,
+      "peak_pressure": 2,
+      "swap_growth_mib": 30.5,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.127452,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.775699,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.551753,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.513818,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 3.857353,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.219938,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.160259,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.378982,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.009401,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.090779,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 7.562317,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.337554,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 87,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 6,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {},
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "required_target_keys": 87,
+                "unresolved_static_stage_records": 0,
+                "verified_generic_target_coverage": 6,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {},
+              "historical_capture_inventory_skipped": true,
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "prepared"
+            },
+            "source_validated_module_reuses": 149
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "original-resources-restored",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+      "scene_ready_seconds": 27.46135516697541,
+      "scene": {
+        "frames": 1430,
+        "fps": 47.640607254498455,
+        "p95_ms": 22.38,
+        "p99_ms": 25.24,
+        "gpu_ms": 19.87739160839161,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6164.0908279418945
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5420.29,
+      "scene_sampled_peak_combined_footprint_mib": 6169.93,
+      "peak_pressure": 2,
+      "swap_growth_mib": 131.75,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.121465,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 2.869677,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.590531,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.77976,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.605134,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.228176,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.166957,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.455679,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.010214,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.014964,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 5.616315,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.373851,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 87,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 6,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 2
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "required_target_keys": 87,
+                "unresolved_static_stage_records": 0,
+                "verified_generic_target_coverage": 6,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {},
+              "historical_capture_inventory_skipped": true,
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "prepared"
+            },
+            "source_validated_module_reuses": 149
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "unrelated-menu-key",
+      "status": "sampled",
+      "stop": "scene sample completed",
+      "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+      "scene_ready_seconds": 28.620038458961062,
+      "scene": {
+        "frames": 1402,
+        "fps": 46.725826050614536,
+        "p95_ms": 23.49,
+        "p99_ms": 29.55,
+        "gpu_ms": 20.096797432239658,
+        "draws_median": 1366.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6151.372146606445
+      },
+      "startup_sampled_peak_combined_footprint_mib": 5607.64,
+      "scene_sampled_peak_combined_footprint_mib": 6169.7,
+      "peak_pressure": 2,
+      "swap_growth_mib": -15.25,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.128673,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 3.112205,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.608935,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.759314,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.632551,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.221307,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.179887,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.482435,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.010139,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.235521,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 5.910474,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.375065,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 87,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 6,
+            "verified_required_products": 87
+          }
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 2
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13
+      },
+      "functional_f3": null,
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "required_target_keys": 87,
+                "unresolved_static_stage_records": 0,
+                "verified_generic_target_coverage": 6,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {},
+              "historical_capture_inventory_skipped": true,
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "prepared"
+            },
+            "source_validated_module_reuses": 149
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    },
+    {
+      "phase": "same-supervisor-F3",
+      "status": "functional-checked",
+      "stop": "functional F3 completed",
+      "source_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+      "scene_ready_seconds": 27.680037166923285,
+      "scene": null,
+      "startup_sampled_peak_combined_footprint_mib": 5788.29,
+      "scene_sampled_peak_combined_footprint_mib": 6123.48,
+      "peak_pressure": 2,
+      "swap_growth_mib": -8.0,
+      "preparation_phases": [
+        {
+          "phase": "archive-policy",
+          "seconds": 0.131397,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-libraries",
+          "seconds": 3.034482,
+          "outcome": "returned"
+        },
+        {
+          "phase": "fixed-helpers",
+          "seconds": 0.574786,
+          "outcome": "returned"
+        },
+        {
+          "phase": "source-view",
+          "seconds": 0.768056,
+          "outcome": "returned"
+        },
+        {
+          "phase": "static-catalog",
+          "seconds": 1.619935,
+          "outcome": "returned"
+        },
+        {
+          "phase": "capture-receipt",
+          "seconds": 0.222859,
+          "outcome": "returned"
+        },
+        {
+          "phase": "candidate-scan",
+          "seconds": 0.165357,
+          "outcome": "returned"
+        },
+        {
+          "phase": "module-inputs",
+          "seconds": 1.363589,
+          "outcome": "returned"
+        },
+        {
+          "phase": "geometry-inputs",
+          "seconds": 0.031823,
+          "outcome": "returned"
+        },
+        {
+          "phase": "complete-pso",
+          "seconds": 1.086434,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 5.603987,
+          "outcome": "returned"
+        },
+        {
+          "phase": "local-finalize",
+          "seconds": 0.354418,
+          "outcome": "returned"
+        },
+        {
+          "phase": "archive-policy",
+          "seconds": 0.206919,
+          "outcome": "returned"
+        },
+        {
+          "phase": "game-preparation",
+          "seconds": 0.764666,
+          "outcome": "returned"
+        }
+      ],
+      "local_preparation": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 87,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 6,
+            "verified_required_products": 87
+          }
+        },
+        {
+          "fixed_helpers": "same-supervisor-reused",
+          "game_pso": "same-supervisor-f3-schedule-reused",
+          "local_libraries": {
+            "same_supervisor_reused": true
+          },
+          "requested": "auto",
+          "status": "prepared"
+        }
+      ],
+      "sampled_child_PIDs": {
+        "game-pso-preparer": 1,
+        "game-module-preparer": 1
+      },
+      "child_PID_counts_are_sampling_lower_bounds": true,
+      "frame_delta_sums": {
+        "compiles": 0,
+        "metal_source_calls": 0,
+        "metal_local_calls": 11,
+        "metal_strict_pso_attempts": 13,
+        "metal_strict_pso_hits": 13,
+        "unparsed_counter_cells": 4
+      },
+      "functional_f3": {
+        "phase": "completed",
+        "since": 56.12827074993402,
+        "initial_ready": 27.680037166923285,
+        "completed": 71.3541516669793,
+        "offline_protocol_seen": true,
+        "automatic_continue_seen": true,
+        "scripted_api_not_physical_key_test": true
+      },
+      "source_save_unchanged": true,
+      "whole_app_seal": {
+        "pre": "verified",
+        "post": "verified"
+      },
+      "actual_preparation_counters": {
+        "modules": [
+          {
+            "status": "partial",
+            "counts": {
+              "exact_source_reuses": 68,
+              "records": 190,
+              "typed_companion_stage_links": 143,
+              "verified_existing": 134
+            },
+            "gaps": {
+              "same-producer-rejected-input": 7
+            },
+            "typed_companions": {
+              "actual_stage_and_permutation_separate_from_input_integrity": true,
+              "counts": {
+                "required_target_keys": 87,
+                "unresolved_static_stage_records": 0,
+                "verified_generic_target_coverage": 6,
+                "verified_required_products": 87
+              },
+              "full_final_PSO_ready": false,
+              "gaps": {},
+              "historical_capture_inventory_skipped": true,
+              "required_target_scope": true,
+              "static_association_gaps": {},
+              "status": "prepared"
+            },
+            "source_validated_module_reuses": 149
+          }
+        ],
+        "pipelines": [
+          {
+            "status": "completed",
+            "native_batch": {
+              "capability_schema": 1,
+              "processes": 0,
+              "recipes": 0,
+              "failed_recipes": 0,
+              "max_recipes": 16,
+              "legacy_fallback": false
+            },
+            "builder_session": {
+              "calls": 0,
+              "full_builds": 0,
+              "reuses": 0,
+              "invalidations": 0,
+              "metadata_entries": 0,
+              "seconds": 0.0,
+              "full_build_seconds": 0.0,
+              "reuse_validation_seconds": 0.0,
+              "events": []
+            },
+            "recipe_schedule": {
+              "reused": 190,
+              "published": 0,
+              "misses": 0,
+              "refused": 0
+            },
+            "unique_units": 190,
+            "scheduled_reused": 190,
+            "required_preparation_complete": true,
+            "full_manifest_preparation_verified": false,
+            "work_units": 0,
+            "recorded": 0
+          }
+        ]
+      }
+    }
+  ],
+  "actual_product_controls": {
+    "status": "passed",
+    "real_metal_toolchain": true,
+    "original_cache_modified": false,
+    "corrupt_scratch_bytes_retained": true,
+    "reports": [
+      {
+        "label": "initial-real-compile",
+        "status": "passed",
+        "built": 1,
+        "skipped": 0,
+        "seconds": 2.2756225829944015
+      },
+      {
+        "label": "unchanged",
+        "status": "passed",
+        "built": 0,
+        "skipped": 1,
+        "seconds": 0.5156777909724042
+      },
+      {
+        "label": "selection-only-new-cohort",
+        "status": "passed",
+        "built": 0,
+        "skipped": 0,
+        "reused_products": 1,
+        "seconds": 0.6036432499531657
+      },
+      {
+        "label": "single-library-corruption",
+        "status": "passed",
+        "built": 0,
+        "skipped": 0,
+        "reused_products": 1,
+        "repaired_products": 1,
+        "seconds": 0.8469276659889147
+      },
+      {
+        "label": "real-source-change",
+        "status": "passed",
+        "built": 1,
+        "skipped": 0,
+        "seconds": 0.7762341670459136
+      },
+      {
+        "label": "real-options-change",
+        "status": "passed",
+        "built": 1,
+        "skipped": 0,
+        "seconds": 0.8455311249708757
+      }
+    ],
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 12285.625
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 12285.625
+    }
+  },
+  "formal_data_modified": false,
+  "formal_app_modified": false,
+  "release_updated": false,
+  "Cua": false,
+  "screen_capture": false,
+  "qualification": "Only authentic private QA save/config/cache and byte-identical unused-language Mod overlays. Typed unresolved static associations remain reported. Sampled combined footprints may double-count shared pages; no long exploration/network/visual acceptance claim. Child PID polling may miss short capability or compiler processes; actual module/recipe counters remain separate. Frame counters are summed deltas, not last-row totals.",
+  "final_code_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+  "final_code_runs": 8,
+  "baseline_scene_ready_seconds": 51.485427665989846,
+  "normal_warm_scene_ready_seconds": 27.509951082989573,
+  "all_final_post_migration_native_PSO_validation_processes_zero": true,
+  "texture_request_restored": true,
+  "formal_application_version": "0.2.56",
+  "overall_ARM64_goal_complete": false,
+  "limitations": [
+    "Mod game inputs are authentic byte-identical unused-language overlays; distinct compile input/state invalidation also has directed controls and actual Metal source/options controls, not a modified gameplay shader run.",
+    "First 94ba35fa run indexed revised scanner/admission metadata in 291.45 seconds; do not call this a normal warm result. Old metadata and native products retained.",
+    "Runtime frame counter sums cover complete parsed cells; partial EOF/repeated-header cells are explicitly counted, never forged as zero.",
+    "Short static scenes do not prove long exploration memory/visual/network correctness.",
+    "Whole-game directory still contains dynamic pipeline gaps; normal owned capture remains enabled."
+  ]
+}

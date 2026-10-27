@@ -1,5 +1,5 @@
 {
-  "status": "source-integrated-pending-concentrated-package-runtime-acceptance",
+  "status": "startup-concentrated-isolated-matrix-passed",
   "compiler_domain_producer_active": true,
   "native_complete_key_fields_retained": true,
   "base_Mod_independent_registration": true,
@@ -13,21 +13,23 @@
   "online_preparation_to_offline_F3_allowed": true,
   "qualified_library_product_adoption": true,
   "legacy_SDK1_and_opaque_PSO_not_forged": true,
-  "directed_tests": 666,
+  "directed_tests": 670,
   "directed_suites": 43,
   "real_kernel_CoW_and_journal_control": true,
-  "actual_current_package_native_adoption_tested": false,
-  "current_game_performance_measured": false,
-  "current_memory_acceptance": false,
+  "actual_current_package_native_adoption_tested": true,
+  "current_game_performance_measured": true,
+  "current_memory_acceptance": "short-static-scenes-no-material-increase-observed; not long-gameplay proof",
   "formal_data_modified": false,
   "formal_app_changed": false,
   "release_updated": false,
   "texture_capture_task_retained": true,
   "remaining": [
-    "freeze-and-sync-source",
-    "clean-archive-isolated-package-and-native-payload-signature-checks",
-    "actual-library-and-native-worker-product-reuse",
-    "concentrated-launch-Mod-repair-F3-and-memory-matrix"
+    "User-notified live white/colored-speckled model capture remains armed and separate.",
+    "Formal app/Release deliberately unchanged under current instruction; whole ARM64 goal not marked complete."
   ],
-  "catalogue_source_alias_full_readonly_byte_proof": true
+  "catalogue_source_alias_full_readonly_byte_proof": true,
+  "final_code_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+  "ordinary_and_Mod_and_F3_runs": 8,
+  "texture_request_restored": true,
+  "overall_goal_complete": false
 }
