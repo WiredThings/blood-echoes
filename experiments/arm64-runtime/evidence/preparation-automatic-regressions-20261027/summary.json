@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "status": "automated-regressions-passed-manual-gameplay-pending",
+  "installed_version": "0.2.52",
+  "installed_source_revision": "8f6302e081d8981a187b1838243f56facc02dffd",
+  "silent": true,
+  "Cua": false,
+  "capture": false,
+  "formal_data_modified": false,
+  "quality_changed": false,
+  "release_updated": false,
+  "public_docs_updated": false,
+  "warm_F2_F3": {
+    "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/preparation-fix-warm-functional-1793067690090646000",
+    "status": "functional-checked",
+    "seconds": 310.5615241250489,
+    "scene_ready": 207.59027604199946,
+    "functional_f3": {
+      "phase": "completed",
+      "since": 291.9922922500409,
+      "initial_ready": 207.59027604199946,
+      "original_cpu": 77513,
+      "original_gpu": 79340,
+      "replacement_cpu": 79534,
+      "completed": 307.2221624170197,
+      "offline_protocol_seen": true,
+      "automatic_continue_seen": true,
+      "scripted_api_not_physical_key_test": true
+    },
+    "peak_pressure": 2,
+    "swap_growth_mib": 84.9375,
+    "source_save_unchanged": true,
+    "whole_app_pre_post_seal": true,
+    "qualification": "Actual 0.2.52 package, original scripts and supervisor; existing QA save/quickload API, not physical keyboard. Warm retry shares only the initial new private case, never formal data."
+  },
+  "death": {
+    "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/private-death-native-1793068526046053000/run-1793068777443668000",
+    "status": "passed",
+    "seconds": 103.10538579104468,
+    "peak_pressure": 2,
+    "swap_growth_mib": 524.625,
+    "source_save_unchanged": true,
+    "cycles": [
+      {
+        "sequence": 1,
+        "hp_zero": true,
+        "world_down": true,
+        "loading": true
+      },
+      {
+        "sequence": 2,
+        "hp_zero": true,
+        "world_down": true,
+        "loading": true
+      }
+    ],
+    "native_build": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/private-death-native-1793068526046053000",
+    "qualification": "Private CPU instrumentation overlay on the same normal source/object build. Original checked FlipperUpdate, game SetHp via FEX guest thunk with float zero. Formal CPU not replaced. Not enemy combat/white-model/menu/network/performance acceptance.",
+    "post_respawn_scene_frame_tail": {
+      "complete_rows": 407,
+      "scene_draws": 1370,
+      "scene_camera_present": true,
+      "visual_acceptance": false
+    }
+  },
+  "authored_regressions": {
+    "status": "passed",
+    "python_suites": [
+      {
+        "test": "test_fixed_helper_failure_records",
+        "exit": 0,
+        "tests": 7,
+        "seconds": 0.064
+      },
+      {
+        "test": "test_qa_f3_contract",
+        "exit": 0,
+        "tests": 15,
+        "seconds": 0.052
+      },
+      {
+        "test": "test_qa_memory_policy",
+        "exit": 0,
+        "tests": 10,
+        "seconds": 0.036
+      },
+      {
+        "test": "test_quick_restart_preparation",
+        "exit": 0,
+        "tests": 19,
+        "seconds": 0.26
+      },
+      {
+        "test": "test_launcher_game_pso_automatic",
+        "exit": 0,
+        "tests": 10,
+        "seconds": 0.131
+      },
+      {
+        "test": "test_launcher_game_modules",
+        "exit": 0,
+        "tests": 10,
+        "seconds": 0.149
+      },
+      {
+        "test": "test_launcher_local_aot",
+        "exit": 0,
+        "tests": 20,
+        "seconds": 2.148
+      },
+      {
+        "test": "test_launcher_runtime_scope",
+        "exit": 0,
+        "tests": 25,
+        "seconds": 0.089
+      },
+      {
+        "test": "test_launcher_runtime_scope_observer",
+        "exit": 0,
+        "tests": 18,
+        "seconds": 0.26
+      },
+      {
+        "test": "test_qa_launch_conditions",
+        "exit": 0,
+        "tests": 34,
+        "seconds": 0.529
+      },
+      {
+        "test": "test_qa_launch_clone",
+        "exit": 0,
+        "tests": 20,
+        "seconds": 0.706
+      }
+    ],
+    "python_tests": 188,
+    "additional_source_package_tests": 8,
+    "additional_code_closure_tests": 13,
+    "total_python_tests": 209,
+    "native_paths": 17,
+    "guest_exit_cases": 17,
+    "original_supervisor_cases": 6,
+    "private_SetHp": "guest float thunk, signature bounds, invalid health, stable player, reload and 2-cycle cap controls passed",
+    "travel": "original entry save/restore plan and 8 invalid plans; original C lifecycle transitions"
+  },
+  "current_normal_guest_exit_evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/current-exit-contract-1793069032261330000",
+  "test_controller_failures": [
+    {
+      "case": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/private-death-native-1793068526046053000",
+      "reason": "Initial direct controller omitted original shell defaults; Metal sparse-buffer path asserted before scene. Test driver now evaluates original run_optimized shell exports without executing its final game exec."
+    },
+    {
+      "case": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/private-death-native-1793068526046053000/run-1793068742577346000",
+      "reason": "Fresh frame file header had not flushed; driver now retries bounded reader until complete, as the original sampler already did."
+    },
+    {
+      "reason": "Initial pure-test invocation used unsupported macOS system Python 3.9; all 11 suites rerun on required Python 3.11, no production compatibility claim for 3.9."
+    }
+  ],
+  "fresh_cold": {
+    "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793069153888006000",
+    "status": "functional-checked",
+    "prior_initial_cold": "protected stop before scene; not a pass",
+    "seconds": 521.2709285420133,
+    "scene_ready_seconds": 410.0601490000263,
+    "peak_pressure": 2,
+    "swap_growth_mib": 164.8125,
+    "source_QA_save_unchanged": true,
+    "F2_F3": {
+      "phase": "completed",
+      "since": 502.63039029191714,
+      "initial_ready": 410.0601490000263,
+      "original_cpu": 87383,
+      "original_gpu": 88456,
+      "replacement_cpu": 88645,
+      "completed": 517.9256073749857,
+      "offline_protocol_seen": true,
+      "automatic_continue_seen": true,
+      "scripted_api_not_physical_key_test": true
+    },
+    "whole_app_pre_post_seal": true,
+    "qualification": "Fresh private empty GPU cache in actual unchanged candidate package. Required protected retry after user closed background apps. First protected failure remains historical incomplete."
+  },
+  "remaining_user_acceptance": [
+    "latest actual formal Play startup",
+    "game System menu pages and current language/Dock",
+    "exploration/new areas and combat white-model/textures"
+  ],
+  "not_retested": [
+    "THD authenticated online functions in latest package",
+    "long exploration memory",
+    "matched FPS or performance gain"
+  ],
+  "remaining_nonblocking_costs": {
+    "first_start_source_view_seconds": 132.928868,
+    "first_start_static_catalog_seconds": 247.806842,
+    "first_F3_local_library_seconds": 62.514182,
+    "first_F3_game_preparation_reuse_seconds": 0.734298,
+    "performance_improvement_claim": false
+  }
+}

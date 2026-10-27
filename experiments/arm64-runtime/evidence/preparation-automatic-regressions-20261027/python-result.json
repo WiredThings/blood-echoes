@@ -1,0 +1,75 @@
+{
+  "status": "passed",
+  "interpreter": "/opt/homebrew/opt/python@3.11/bin/python3.11",
+  "suites": [
+    {
+      "test": "test_fixed_helper_failure_records",
+      "exit": 0,
+      "tests": 7,
+      "seconds": 0.064
+    },
+    {
+      "test": "test_qa_f3_contract",
+      "exit": 0,
+      "tests": 15,
+      "seconds": 0.052
+    },
+    {
+      "test": "test_qa_memory_policy",
+      "exit": 0,
+      "tests": 10,
+      "seconds": 0.036
+    },
+    {
+      "test": "test_quick_restart_preparation",
+      "exit": 0,
+      "tests": 19,
+      "seconds": 0.26
+    },
+    {
+      "test": "test_launcher_game_pso_automatic",
+      "exit": 0,
+      "tests": 10,
+      "seconds": 0.131
+    },
+    {
+      "test": "test_launcher_game_modules",
+      "exit": 0,
+      "tests": 10,
+      "seconds": 0.149
+    },
+    {
+      "test": "test_launcher_local_aot",
+      "exit": 0,
+      "tests": 20,
+      "seconds": 2.148
+    },
+    {
+      "test": "test_launcher_runtime_scope",
+      "exit": 0,
+      "tests": 25,
+      "seconds": 0.089
+    },
+    {
+      "test": "test_launcher_runtime_scope_observer",
+      "exit": 0,
+      "tests": 18,
+      "seconds": 0.26
+    },
+    {
+      "test": "test_qa_launch_conditions",
+      "exit": 0,
+      "tests": 34,
+      "seconds": 0.529
+    },
+    {
+      "test": "test_qa_launch_clone",
+      "exit": 0,
+      "tests": 20,
+      "seconds": 0.706
+    }
+  ],
+  "total_tests": 188,
+  "real_game": false,
+  "formal_data_modified": false
+}

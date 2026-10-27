@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "local-0.2.52-installed-automatic-functional-regressions-running",
+  "status": "local-0.2.52-installed-automatic-startup-F2-F3-and-private-death-passed",
   "source_revision": "8f6302e081d8981a187b1838243f56facc02dffd",
   "original_failure": {
     "launcher_exit": 74,
@@ -39,7 +39,7 @@
     "fixed_helpers_status": "completed",
     "native_calls": 2,
     "fixed_ready": 8,
-    "tiling_ready": null,
+    "tiling_ready": 14,
     "cohort": "7345c7d8f2b55510ee9f706fa0f02b669eca5b69b9059b153639d84472bc6921",
     "module_invalid_input_rejected_after_path_admission": true,
     "module_exit": 65,
@@ -54,7 +54,8 @@
       "pressure": 1,
       "locked": false,
       "swap_mib": 8535.9375
-    }
+    },
+    "tiling_ready_source": "fixed_helpers.calls[1].result.tiling_libraries.local_ready"
   },
   "local_install": {
     "status": "installed-verified",
@@ -80,7 +81,16 @@
     "cold_reason": "unexpected >1GiB swap growth within5s",
     "cold_source_QA_save_unchanged": true,
     "warm_resume": "preparation-fix-warm-functional-1793067690090646000",
-    "warm_status": "running-at-this-checkpoint",
-    "limits": "No fresh F3/death/online pass claim until actual terminal results; menu/exploration/combat white-model visual acceptance reserved for user."
+    "warm_status": "functional-checked",
+    "limits": "Latest manual formal Play/menu/visual/gameplay/THD/long exploration remain pending; automated cold+warm F2/F3 and private two-death regressions passed. No matched performance claim.",
+    "warm_source_QA_save_unchanged": true,
+    "warm_seconds": 310.5615241250489,
+    "warm_swap_growth_mib": 84.9375,
+    "private_death_status": "two-cycles-passed",
+    "followup_evidence": "evidence/preparation-automatic-regressions-20261027/summary.json",
+    "fresh_cold_status": "functional-checked",
+    "fresh_cold_evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793069153888006000/run-1",
+    "fresh_cold_seconds": 521.2709285420133,
+    "fresh_cold_swap_growth_mib": 164.8125
   }
 }
