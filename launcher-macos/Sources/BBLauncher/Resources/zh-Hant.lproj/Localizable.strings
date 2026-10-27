@@ -561,3 +561,19 @@
 "Tries recently used DeviceLocal staging blocks first. Capacity and completion fences are unchanged; performance benefit is unconfirmed." = "優先嘗試最近使用的 DeviceLocal 暫存區塊。容量和完成柵欄保持不變，效能收益尚未確認。";
 
 "The ARM64 runtime is incomplete or has the wrong architecture." = "ARM64 執行環境不完整或元件架構不符。";
+
+// Launch preparation milestones
+"Preparing game…" = "正在準備遊戲…";
+"Checking preparation cache…" = "正在檢查準備快取…";
+"Preparing Metal libraries…" = "正在準備 Metal 編譯庫…";
+"Preparing shared pipelines…" = "正在準備共用管線…";
+"Preparing game pipelines…" = "正在準備遊戲管線…";
+"Preparing game resources…" = "正在準備遊戲資源…";
+"Indexing game resources…" = "正在建立資源索引…";
+"Checking pipeline inputs…" = "正在檢查管線輸入…";
+"Preparing game shaders…" = "正在準備遊戲著色器…";
+"Saving preparation results…" = "正在儲存準備結果…";
+"Starting game…" = "正在啟動遊戲…";
+"Preparation failed" = "啟動準備失敗";
+"Launch preparation" = "啟動準備";
+"Progress follows preparation stages, not elapsed time." = "進度依準備階段顯示，不代表已耗用時間。";

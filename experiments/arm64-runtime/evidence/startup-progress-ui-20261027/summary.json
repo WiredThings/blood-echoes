@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "status": "source-verified-packaging-pending",
+  "actual_GUI_source": "launcher-macos",
+  "progress_protocol": "existing bounded Metal preparation phase and supervisor log events",
+  "phase_milestones": true,
+  "clock_simulation": false,
+  "new_runtime_protocol": false,
+  "full_Swift_tests": 124,
+  "skipped": 1,
+  "failures": 0,
+  "targeted_progress_tests": 8,
+  "actual_cold_F3_log_replay": {
+    "preparation_completions": 2,
+    "native_starts": 2,
+    "restart_reset": 1
+  },
+  "game_started": false,
+  "formal_GUI_started": false,
+  "formal_data_modified": false,
+  "backend_modified": false,
+  "integrity_policy_modified": false,
+  "cache_fast_path_implemented": false,
+  "GUI_visual_acceptance": false,
+  "release_updated": false
+}

@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+import XCTest
+@testable import BBLauncher
+
+final class LaunchPreparationProgressTests: XCTestCase {
+    private func phase(_ name: String, _ event: String = "start", _ outcome: String = "returned") -> String {
+        "Metal preparation phase: {\"phase\":\"\(name)\",\"event\":\"\(event)\",\"outcome\":\"\(outcome)\"}"
+    }
+    private let done = "Metal local preparation: {\"status\":\"prepared\"}"
+
+    func testNestedPhasesNeverReverseOrPrematurelyFinish() {
+        var p = LaunchPreparationProgress()
+        p.consume(phase("source-view")); XCTAssertEqual(p.percent, 20)
+        p.consume(phase("source-view", "end")); XCTAssertEqual(p.percent, 45)
+        p.consume(phase("static-catalog", "end")); XCTAssertEqual(p.percent, 75)
+        p.consume(phase("complete-pso", "end")); XCTAssertEqual(p.percent, 93)
+        p.consume(phase("game-preparation", "end")); XCTAssertEqual(p.percent, 93)
+        p.consume(phase("archive-policy", "end")); XCTAssertEqual(p.percent, 93)
+        XCTAssertFalse(p.finished)
+        p.consume(phase("local-finalize", "end")); XCTAssertEqual(p.percent, 98)
+        p.consume(done); XCTAssertEqual(p.percent, 100)
+        XCTAssertFalse(p.finished) // Preparation ended; game still starting.
+        p.consume("ARM GPU frontend ready symbols=327"); XCTAssertTrue(p.finished)
+    }
+
+    func testFailedPhaseCannotTurnIntoSuccessFromLaterOutput() {
+        for error in [phase("source-view", "end", "raised"), "Metal local preparation failed: source changed"] {
+            var p = LaunchPreparationProgress()
+            p.consume(phase("source-view")); p.consume(error)
+            p.consume(done); p.consume("ARM GPU frontend ready symbols=327")
+            XCTAssertTrue(p.failed); XCTAssertFalse(p.finished); XCTAssertLessThan(p.percent, 100)
+        }
+    }
+
+    func testMalformedUnknownAndOrdinaryLogsDoNotMoveProgress() {
+        var p = LaunchPreparationProgress()
+        for line in ["GPU core ready", phase("unknown"), phase("source-view", "unexpected"),
+                     "Metal preparation phase: {}", "Metal preparation phase: []",
+                     "Metal preparation phase: invalid", "Metal local preparation: {\"status\":\"failed\"}",
+                     "Metal preparation phase: " + String(repeating: " ", count: 4097)] {
+            p.consume(line)
+        }
+        XCTAssertEqual(p, LaunchPreparationProgress())
+    }
+
+    func testFastCachedPathMaySkipStages() {
+        var p = LaunchPreparationProgress()
+        p.consume(phase("game-preparation")); p.consume(phase("game-preparation", "end"))
+        XCTAssertEqual(p.percent, 93)
+        p.consume(done); XCTAssertEqual(p.percent, 100)
+    }
+
+    func testF3RestartsProgressAfterFinishedAndFailedStates() {
+        for failed in [false, true] {
+            var p = LaunchPreparationProgress()
+            p.consume(failed ? phase("source-view", "end", "raised") : done)
+            p.consume("ARM GPU frontend ready symbols=327")
+            p.consume("Runtime: previous game exited; preparing supervised restart")
+            XCTAssertEqual(p, LaunchPreparationProgress())
+            p.consume(phase("archive-policy")); XCTAssertEqual(p.percent, 2)
+        }
+    }
+
+    func testSupportedSourceFallbackCompletesOnlyPreparation() {
+        var p = LaunchPreparationProgress()
+        p.consume("Metal local preparation: {\"status\":\"source-fallback\"}")
+        XCTAssertEqual(p.percent, 100); XCTAssertEqual(p.stageKey, "Starting game…")
+        XCTAssertFalse(p.finished)
+    }
+
+    func testNativeReadyBeforePreparationReportCannotFinish() {
+        var p = LaunchPreparationProgress()
+        p.consume("ARM GPU frontend ready symbols=327")
+        XCTAssertEqual(p.percent, 0); XCTAssertFalse(p.finished)
+    }
+
+    func testProgressLabelsHaveBothChineseTranslations() {
+        for language in ["zh-Hans", "zh-Hant"] {
+            for key in ["Preparing game…", "Preparing game resources…", "Indexing game resources…",
+                        "Preparing Metal libraries…", "Starting game…", "Preparation failed", "Launch preparation"] {
+                XCTAssertNotEqual(L10n.key(key, language: language), key)
+            }
+        }
+    }
+}

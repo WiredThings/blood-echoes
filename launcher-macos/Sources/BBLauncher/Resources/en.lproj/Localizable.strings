@@ -561,3 +561,19 @@
 "Tries recently used DeviceLocal staging blocks first. Capacity and completion fences are unchanged; performance benefit is unconfirmed." = "Tries recently used DeviceLocal staging blocks first. Capacity and completion fences are unchanged; performance benefit is unconfirmed.";
 
 "The ARM64 runtime is incomplete or has the wrong architecture." = "The ARM64 runtime is incomplete or has the wrong architecture.";
+
+// Launch preparation milestones
+"Preparing game…" = "Preparing game…";
+"Checking preparation cache…" = "Checking preparation cache…";
+"Preparing Metal libraries…" = "Preparing Metal libraries…";
+"Preparing shared pipelines…" = "Preparing shared pipelines…";
+"Preparing game pipelines…" = "Preparing game pipelines…";
+"Preparing game resources…" = "Preparing game resources…";
+"Indexing game resources…" = "Indexing game resources…";
+"Checking pipeline inputs…" = "Checking pipeline inputs…";
+"Preparing game shaders…" = "Preparing game shaders…";
+"Saving preparation results…" = "Saving preparation results…";
+"Starting game…" = "Starting game…";
+"Preparation failed" = "Preparation failed";
+"Launch preparation" = "Launch preparation";
+"Progress follows preparation stages, not elapsed time." = "Progress follows preparation stages, not elapsed time.";

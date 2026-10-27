@@ -75,6 +75,7 @@ final class LauncherModel: ObservableObject {
     @Published private(set) var state: RunState = .idle
     @Published private(set) var job: Job = .game
     @Published private(set) var logLines: [LogLine] = []
+    @Published private(set) var launchPreparation: LaunchPreparationProgress?
     /// Log window: keep scrolled to the newest line.
     @Published var followLog = true
     /// The last "STOP:" or error line, shown when the game exits with an error.
@@ -214,6 +215,9 @@ final class LauncherModel: ObservableObject {
             }
             return L10n.key("Ready")
         case .running:
+            if let progress = launchPreparation, !progress.finished {
+                return L10n.key(progress.failed ? "Preparation failed" : "Preparing game…")
+            }
             return job == .update ? L10n.key("Updating…") : L10n.key("Running")
         case .stopping:
             return L10n.key("Stopping…")
@@ -693,6 +697,8 @@ final class LauncherModel: ObservableObject {
         lastProblem = nil
         exitSeen = nil
         self.job = job
+        launchPreparation = job == .game && runtimeCapabilities.automaticMetalPreparation
+            ? LaunchPreparationProgress() : nil
         // ~/… rather than the full path: logs get pasted into reports.
         appendLines(["$ cd \((repo.path as NSString).abbreviatingWithTildeInPath)", echo])
 
@@ -715,6 +721,7 @@ final class LauncherModel: ObservableObject {
         } catch {
             if readFD >= 0 { close(readFD) }
             state = .failed(error.localizedDescription)
+            launchPreparation = nil
             appendLines([L10n.format("Could not start: %@", String(describing: error.localizedDescription))])
             return
         }
@@ -781,6 +788,7 @@ final class LauncherModel: ObservableObject {
         self.collector = nil
         pollTask = nil
         state = .exited(status: status, bySignal: bySignal)
+        launchPreparation = nil
         if job == .update {
             appendLines(["", status == 0 && !bySignal ? "— update finished —" : "— the update stopped (code \(status)) —"])
             // New code may bring new checks, mods or patches.
@@ -798,8 +806,10 @@ final class LauncherModel: ObservableObject {
 
     private func appendLines(_ lines: [String]) {
         var added: [LogLine] = []
+        var progress = launchPreparation
         added.reserveCapacity(lines.count)
         for line in lines {
+            progress?.consume(line)
             if job == .game && line == "Runtime: quickload switched to offline" { useOfflineAfterRestore() }
             if line.contains("STOP:") || line.contains("Traceback") || line.range(of: "error:", options: .caseInsensitive) != nil {
                 lastProblem = line
@@ -807,6 +817,7 @@ final class LauncherModel: ObservableObject {
             added.append(LogLine(id: nextLineID, text: line))
             nextLineID += 1
         }
+        if progress != launchPreparation { launchPreparation = progress }
         var all = logLines
         all.append(contentsOf: added)
         if all.count > Self.maxLogLines {

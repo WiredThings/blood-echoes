@@ -123,11 +123,28 @@ struct PlayBar: View {
                     statusIcon
                 }
                 .font(.headline)
-                Text(detail)
+                if let progress = model.launchPreparation, !progress.finished {
+                    HStack {
+                        Text(L10n.key(progress.stageKey))
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Text("\(progress.percent)%")
+                            .monospacedDigit()
+                    }
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
+                    ProgressView(value: Double(progress.percent), total: 100)
+                        .tint(progress.failed ? .red : .accentColor)
+                        .accessibilityLabel(L10n.key("Launch preparation"))
+                        .accessibilityValue("\(progress.percent)%")
+                        .help(L10n.key("Progress follows preparation stages, not elapsed time."))
+                } else {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 8)
             Button(action: showLog) {
