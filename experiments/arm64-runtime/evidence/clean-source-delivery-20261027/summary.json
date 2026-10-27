@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "clean-native-build-and-source-closure-verified-final-assembler-pending",
+  "status": "clean-normal-source-build-source-only-assembly-and-relocation-verified",
   "native_source_revision": "4d634fc30862fcf7ca36534704b122a7f518b083",
   "closure_source_revision": "aac9cdca716945ffea9c37376bd7c79df6192b09",
   "installed_app_revision": "340e9c8685f5d70ec76c332a64b00ac422f5fad8",
@@ -96,13 +96,161 @@
   "validation": {
     "build_config_controls": 18,
     "new_code_closure_controls": 13,
-    "legacy_QA_stage_controls": 15
+    "legacy_QA_stage_controls": 15,
+    "native_build_driver_controls": 33,
+    "dependency_assets_controls": 31,
+    "source_package_controls": 8,
+    "component_finalization_controls": 11,
+    "formal_runtime_profile_controls": 19
   },
-  "qualification": "Clean tracked project sources were compiled without prepared project objects. External dependency packages and developer-only monitoring helpers were reused; this is not an all-dependency rebuild or a completed QA-free app assembler.",
+  "qualification": "Clean tracked source export completed the normal build driver (all native targets, original thin ARM64 Swift GUI and actual sealed layout), then final source-only app assembly and real scalar schema2. Explicit ordinary dependency providers were reused; not an all-dependency rebuild. No game was launched, no new package gameplay/network claim, no formal data read or changed. Installed gameplay-accepted 340e9c86 is unchanged; Release/public docs await human feedback.",
   "remaining": [
-    "Wire existing native/layout/8-role sealing and code closure into original GUI/Python/dependency assembly without a QA app, cache, save or old formal app input",
-    "Decouple source/layout freezing from old Shared scalar capability lookup; run actual final worker scalar contract in existing code-only formal scratch, never fake game inputs",
-    "Add ARM64 standalone bbnet to normal source build orchestration, including explicit compatible protobuf compiler and dependency discovery",
-    "Validate final fresh package and payload, then await human gameplay acceptance before Release/public docs"
-  ]
+    "Await human gameplay feedback on the installed 340e9c86 before Release/public docs",
+    "When human approves, reconcile public build/release instructions with this verified normal ARM64 build path; do not invoke legacy Rosetta packaging by accident"
+  ],
+  "assembler_source_revision": "5dacb719444074f27fb7dacf88cdefa91e41c7b5",
+  "source_assembly": {
+    "status": "native-source-app-assembled",
+    "seconds": 73.42849354201462,
+    "native_source_files": 9462,
+    "native_source_identity": "1ecf513ff4312e3c4efd886ef356a58d27913837c3955629b66977c1600aa1ea",
+    "actual_fixed_helper_seed_schema": 2,
+    "frozen_runtime_roles": 8,
+    "payload_files": 982,
+    "native_host_gpu_library_identical": true,
+    "all_macho_thin_arm64": true,
+    "whole_app_deep_strict_seal": true,
+    "QA_inputs_used": false,
+    "game_inputs_used": false,
+    "user_data_used": false,
+    "application_started": false,
+    "pressure_before_after": [
+      1,
+      1
+    ],
+    "swap_before_after_mib": [
+      8928,
+      8928
+    ],
+    "all_macho_files": 191
+  },
+  "relocation": {
+    "status": "source-package-relocation-scalar-verified",
+    "seconds": 1.321698790998198,
+    "regular_files": 981,
+    "real_native_schema": 2,
+    "package_python_sqlite_and_hashlib": true,
+    "code_unchanged": true,
+    "deep_strict_seal": true,
+    "game_started": false,
+    "formal_data_used": false
+  },
+  "build_failures_resolved": [
+    "Distinct Framework Python command-line wrappers verified by exact load edge",
+    "Bare loader/executable rpath tokens resolved without source-root weakening",
+    "Canonical dependency traversal memo bounds cycles and diamond graphs while retaining per-context SHA/plan checks",
+    "Selected Xcode SDK links normalized; app output locations remain prohibited",
+    "Outer GUI Info.plist/resource seal refreshed before strict executable verification",
+    "Unpackageable release identities rejected before building"
+  ],
+  "normal_driver_prior_failure": {
+    "status": "incomplete",
+    "error": "GUI must be thin ARM64",
+    "seconds": 507.21259254193865,
+    "gui_archs": "x86_64 arm64",
+    "native_targets_thin_arm64": true,
+    "cause": "Extra BB_SWIFT_BUILD_SYSTEM=xcode produced a universal GUI; original SwiftPM default preserves thin ARM64",
+    "fix_revision": "2a0505453da0a3262e31c17538a62815393549d6",
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8928.0
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8920.0
+    },
+    "formal_or_game_data_used": false
+  },
+  "normal_driver": {
+    "status": "source-built-not-packaged",
+    "version": "0.2.51",
+    "revision": "2a0505453da0a3262e31c17538a62815393549d6",
+    "targets_built": true,
+    "game_started": false,
+    "installed": false,
+    "seconds": 503.4116469169967,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8920.0
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8904.0
+    },
+    "dependency_construction_verified": false,
+    "packaged_ABI_validated": false,
+    "source_identity_mode": "source-export",
+    "source_snapshot_sha256": "e6bb895ae549fa32297d24439cf18f1b8dfb5bcdd51d7282fe2c5d8afe8f94ce",
+    "source_snapshot_entries": 11977,
+    "pressure_max": 1,
+    "swap_peak_mib": 8920.0,
+    "all_eight_target_archs": "arm64",
+    "gui_deep_strict_seal": true,
+    "original_gui_default_build_system": true
+  },
+  "final_source_assembly": {
+    "status": "normal-driver-app-assembled",
+    "source_revision": "2a0505453da0a3262e31c17538a62815393549d6",
+    "actual_fixed_helper_seed_schema": 2,
+    "roles": 8,
+    "payload_files": 982,
+    "seconds": 57.7455222500721,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8904.0
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 8904.0
+    },
+    "formal_app_or_data_modified": false,
+    "game_started": false,
+    "native_source_identity": {
+      "files": 9462,
+      "sha256": "1ecf513ff4312e3c4efd886ef356a58d27913837c3955629b66977c1600aa1ea"
+    },
+    "frozen_runtime": {
+      "bin/bb-probe-metal": "50b2707dd0de23fb850611d371f1f5082dc9a8d74f84bb577321ee973eecbe09",
+      "bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal": "e3df08d0c00a3f2ce4db3847596815e838834a5f85fa7ebf5078108dffecbf9c",
+      "bin/gpu-metal/libbbgpu.dylib": "ac5c4a040041dd897f055eefe46f1068f34d223cc7e67b16ad1b1e245b8a0c67",
+      "bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu": "e20c98d59d6b1ac2a6d18ce56941fb8aa375f41506083ce319c48ed93f72f048",
+      "bin/gpu-metal-arm64/libbbgpu.dylib": "ac5c4a040041dd897f055eefe46f1068f34d223cc7e67b16ad1b1e245b8a0c67",
+      "bin/gpu-net/libbbnet.dylib": "dfe722b247f45c62e5fa8763775c39b0b1d974b64ec8ed14f83ae824f66a9a78",
+      "bin/game-pso-preparer": "1a32859d389628b87231bac35721c2399ee9d0807c85e36c1498d509d4274a49",
+      "bin/game-module-preparer": "b83f15c6632df192176e86b226d556e4a8b196a50ba0d5998ea9d8a5b93d90df"
+    },
+    "QA_inputs_used": false,
+    "game_inputs_used": false,
+    "user_data_used": false,
+    "application_started": false,
+    "all_macho_thin_arm64": true,
+    "whole_app_deep_strict_seal": true
+  },
+  "final_source_relocation": {
+    "status": "source-package-relocation-scalar-verified",
+    "seconds": 1.3376006670296192,
+    "files": 981,
+    "schema": 2,
+    "component_production": true,
+    "code_unchanged": true,
+    "game_started": false,
+    "formal_data_used": false,
+    "release_updated": false
+  }
 }

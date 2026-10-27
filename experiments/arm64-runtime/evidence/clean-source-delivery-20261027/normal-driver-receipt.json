@@ -1,0 +1,72 @@
+{
+  "status": "source-built-not-packaged",
+  "version": "0.2.51",
+  "revision": "2a0505453da0a3262e31c17538a62815393549d6",
+  "artifacts": {
+    "library": {
+      "path": "/private/tmp/blood-echoes-clean-driver-arsakeqk/build/renderer/libbbgpu.dylib",
+      "sha256": "c21991aff68956b329b03bc75c5d800cd1a7952b7d36845fd6fb57fe426d0148"
+    },
+    "gpu": {
+      "path": "/private/tmp/blood-echoes-clean-driver-arsakeqk/build/renderer/bb-gpu",
+      "sha256": "7c70656d0c9d9f0e5b1aa37929034d9e28dcfdbad2749abe2afa4d1c6a1268af"
+    },
+    "worker": {
+      "path": "/private/tmp/blood-echoes-clean-driver-arsakeqk/build/renderer/game-pso-preparer",
+      "sha256": "56c2bde82432631f8c44912d798570071bead9fe989a45b1525067c61f41db06"
+    },
+    "module": {
+      "path": "/private/tmp/blood-echoes-clean-driver-arsakeqk/build/renderer/game-module-preparer",
+      "sha256": "1fceb88bcb492c28235ebf88904d3cfc58213a58ca9b0ed3669da8ba203afbc9"
+    },
+    "metadata": {
+      "path": "/private/tmp/blood-echoes-clean-driver-arsakeqk/build/renderer/metadata-layout",
+      "sha256": "f5a5c68368e639828565f1bcafdbddea3368a55624f3ed3ed449ab4ae7e226c4"
+    },
+    "cpu": {
+      "path": "/private/tmp/blood-echoes-clean-driver-arsakeqk/build/cpu/Bin/bb-game-arm64",
+      "sha256": "2f0e972d046655f107c0b2a5ddbbe4effa3aa8e9fe11a234d2bf9104279ca322"
+    },
+    "net": {
+      "path": "/private/tmp/blood-echoes-clean-driver-arsakeqk/build/net/libbbnet.dylib",
+      "sha256": "1d784c19d9f2eb1a6b1b388282972ce35c45d5171813ba02cd27930c079059de"
+    }
+  },
+  "gui_sha256": "32ca5465873a934cccbc9afb4a9c467e0ce0a0975865dbb6fed7361e2c91dba0",
+  "layout_result_sha256": "474f8523d02813a10f4284eb75b9abc568e375b0a22a78519a6b87758641a12e",
+  "tools": {
+    "cmake": {
+      "path": "/opt/homebrew/Cellar/cmake/4.3.1/bin/cmake",
+      "sha256": "7ae392dfb6f02efaaf89504df5bf3d59abfabc9f865fad5fca0dfc3a089ed533"
+    },
+    "ninja": {
+      "path": "/opt/homebrew/Cellar/ninja/1.13.2/bin/ninja",
+      "sha256": "48761628046784f59bd789f5a72b88da99205c5849e5d19ae4d317854ae09e83"
+    },
+    "pkg-config": {
+      "path": "/opt/homebrew/Cellar/pkgconf/3.0.7/bin/pkgconf",
+      "sha256": "1f3beefb56b473037af764da65297c3527e50533294891a07dfe91f0279150fd"
+    },
+    "protoc": {
+      "path": "/opt/homebrew/Cellar/protobuf/36.2/bin/protoc-36.2.0",
+      "sha256": "acb9d966be4bc739afc77f1f55f14bd5d277e50efd31de49678edb7f3843d784"
+    },
+    "python": {
+      "path": "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/bin/python3.11",
+      "sha256": "831807be3d255aae0708810462ce0cde2467235f7daaa86e93d0ddc58b1a4101"
+    }
+  },
+  "seconds": 503.4116469169967,
+  "before": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 8920.0
+  },
+  "after": {
+    "pressure": 1,
+    "locked": false,
+    "swap_mib": 8904.0
+  },
+  "source_snapshot_sha256": "e6bb895ae549fa32297d24439cf18f1b8dfb5bcdd51d7282fe2c5d8afe8f94ce",
+  "paths_are_build_products_only": true
+}
