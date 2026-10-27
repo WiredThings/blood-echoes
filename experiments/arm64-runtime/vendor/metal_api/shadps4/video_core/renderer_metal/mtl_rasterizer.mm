@@ -2,6 +2,7 @@
 #include "video_core/renderer_metal/mtl_memory_stats.h"
 #include "video_core/renderer_metal/mtl_copy_watch.h"
 #include "video_core/renderer_metal/mtl_texture_probe.h"
+#include "video_core/renderer_metal/mtl_texture_lineage.h"
 #include "common/scope_exit.h"
 #include "video_core/renderer_metal/mtl_occlusion.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -125,6 +126,21 @@ struct Rasterizer::Impl {
     bool velocity_requested = false;
     id<MTLBuffer> copy_watch_buffer=nil;
     TextureProbe texture_probe;
+    void TraceStorage(Scheduler& scheduler,const CompiledShader& shader,u64 hash,const char* phase)noexcept try {
+        auto& trace=TextureLineage::Get();if(!trace.Armed())return;
+        for(const auto& binding:shader.bindings) {
+            if(binding.kind!=ShaderBinding::Kind::StorageTexture)continue;
+            for(u32 e=0;e<binding.count;++e) {
+                const u64 index=u64(binding.binding)+e;
+                if(index>=num_textures)continue;
+                auto texture=(__bridge id<MTLTexture>)textures[index];
+                if(!TextureLineage::Candidate(texture))continue;
+                if(scheduler.HoldingPass()){trace.Gap("hoisted-storage-not-snapshotted",texture);continue;}
+                trace.Texture(phase,scheduler,dev.device,texture,nil,std::format(
+                    "{{\"shader\":{},\"slot\":{},\"msl_index\":{}}}",hash,index,binding.msl_index+e));
+            }
+        }
+    }catch(...){TextureLineage::Get().Gap("storage-context-unavailable",nil);}
     struct CopyWatchRecord {u64 sequence{},shader{};u32 reads{},writes{};};
     std::array<CopyWatchRecord,128> copy_watch_records{};
     size_t copy_watch_count{};
@@ -2196,6 +2212,7 @@ void Rasterizer::RecordDispatch(const VideoCore::PipelineBase* pipeline, const S
                                               compute.threads_per_group[1],
                                               compute.threads_per_group[2])];
         impl->recorded_dispatches.fetch_add(1, std::memory_order_relaxed);
+        impl->TraceStorage(scheduler,*compute.shader,cs.pgm_hash,"compute-write-result");
         MaybePrintStats();
     }
 }
@@ -2246,6 +2263,7 @@ void Rasterizer::RecordDispatchIndirect(const VideoCore::PipelineBase* pipeline,
             VideoCore::FrameCapture::NativeBufferUse(uintptr_t(args),uintptr_t(args->buffer.native),
                 args_offset,12,address,7,0,false,"indirect_dispatch_args");
         impl->recorded_dispatches.fetch_add(1, std::memory_order_relaxed);
+        impl->TraceStorage(scheduler,*compute.shader,pipeline->GetStage(Shader::SwStage::Compute).pgm_hash,"indirect-compute-write-result");
         MaybePrintStats();
     }
 }

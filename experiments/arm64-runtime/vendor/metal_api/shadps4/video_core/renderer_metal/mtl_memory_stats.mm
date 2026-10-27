@@ -136,6 +136,15 @@ ContentSnapshot ReadContent(const void* pointer) {
         return {i->second.content,i->second.content_us};
     return {};
 }
+ContentIdentity ReadIdentity(const void* pointer) {
+    if(!ContentEnabled() || !pointer)return {};
+    id<MTLTexture> texture=(__bridge id<MTLTexture>)pointer;
+    for(unsigned depth=0;depth<8 && texture.parentTexture;++depth)texture=texture.parentTexture;
+    auto& l=Get();std::scoped_lock lock{l.mutex};
+    if(auto i=l.entries.find((__bridge const void*)texture);i!=l.entries.end())
+        return {i->second.uid,i->second.born_us,i->second.guest.address,i->second.guest.generation};
+    return {};
+}
 void NoteContent(const void* pointer, Content event) {
     if(!ContentEnabled() || !pointer || unsigned(event)>=unsigned(Content::Count))return;
     // Native textures/views only; no pixels, command-buffer wait or retained history.

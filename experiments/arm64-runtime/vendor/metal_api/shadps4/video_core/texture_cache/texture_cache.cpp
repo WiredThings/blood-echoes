@@ -27,6 +27,7 @@
 #include "video_core/frame_capture.h"
 #ifdef __APPLE__
 #include "video_core/renderer_metal/mtl_memory_stats.h"
+#include "video_core/renderer_metal/mtl_texture_lineage_api.h"
 #endif
 #include "video_core/texture_cache/tile_manager.h"
 
@@ -1170,6 +1171,9 @@ void TextureCache::RefreshImage(Image& image) {
 
     WatchImage(image, image_copies.empty() ? "refresh: nothing to copy" : "refresh: uploading");
     if (image_copies.empty()) {
+#ifdef __APPLE__
+        Metal::TraceTextureRefreshDecision(image);
+#endif
         image.flags &= ~ImageFlagBits::Dirty;
         return;
     }
@@ -1178,7 +1182,13 @@ void TextureCache::RefreshImage(Image& image) {
 
     const auto [in_buffer, in_offset] =
         buffer_cache.ObtainBufferForImage(image.info.guest_address, image.info.guest_size);
+#ifdef __APPLE__
+    Metal::TraceTextureUploadBuffer(image,in_buffer,in_offset,"upload-input-before-detile");
+#endif
     const auto [buffer, offset] = tile_manager.DetileImage(in_buffer, in_offset, image.info);
+#ifdef __APPLE__
+    Metal::TraceTextureUploadBuffer(image,buffer,offset,"upload-input-after-detile");
+#endif
     for (auto& copy : image_copies) {
         copy.bufferOffset += offset;
     }

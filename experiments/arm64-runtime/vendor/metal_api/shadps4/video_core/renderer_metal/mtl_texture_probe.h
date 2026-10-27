@@ -18,6 +18,7 @@
 #include "video_core/renderer_metal/mtl_scheduler.h"
 #include "video_core/renderer_metal/mtl_scheduler_impl.h"
 #include "video_core/renderer_metal/mtl_shader.h"
+#include "video_core/renderer_metal/mtl_memory_stats.h"
 
 namespace Metal {
 template<class FC=VideoCore::FrameCapture> class BasicTextureProbe {
@@ -26,6 +27,7 @@ template<class FC=VideoCore::FrameCapture> class BasicTextureProbe {
         id<MTLBuffer> bytes=nil;
         uint64_t native{},tick{},size{};
         std::string file;
+        unsigned expected_levels=0,encoded_levels=0;
     };
     std::vector<Image> pending;
     std::set<uint64_t> seen;
@@ -66,9 +68,10 @@ template<class FC=VideoCore::FrameCapture> class BasicTextureProbe {
         }
         if(!ok){FC::Native("{\"op\":\"texture_probe_request\",\"accepted\":false}");close(dir);fragment.clear();indices.clear();return;}
         if(unlinkat(dir,"texel-request.json",0)){close(dir);fragment.clear();indices.clear();return;}
-        directory=dir;sequence=current;used=0;limited=false;seen.clear();
+        directory=dir;sequence=current;used=0;limited=false;seen.clear();pending.reserve(TextureProbePolicy::MaxImages);
         FC::Native("{\"op\":\"texture_probe_request\",\"accepted\":true,\"max_bytes\":16777216,\"max_images\":32,\"first_sample_only\":true,\"performance_sample\":false}");
     }
+public:
     static bool Format(MTLPixelFormat format,unsigned& block,unsigned& bytes) {
         block=1;bytes=4;
         switch(format) {
@@ -100,8 +103,9 @@ public:
                 auto parent=texture.parentTexture?texture.parentTexture:texture;
                 const uint64_t native=uintptr_t((__bridge void*)texture);
                 const auto sw=texture.swizzle;
-                FC::Native(std::format("{{\"op\":\"texture_sample_view\",\"vs\":{},\"ps\":{},\"indices\":{},\"slot\":{},\"msl_index\":{},\"native\":{},\"parent\":{},\"format\":{},\"parent_format\":{},\"type\":{},\"width\":{},\"height\":{},\"levels\":{},\"layers\":{},\"relative_level\":{},\"relative_slice\":{},\"usage\":{},\"storage\":{},\"swizzle\":[{},{},{},{}]}}",
-                    vs,ps,count,slot,binding.msl_index+e,native,uintptr_t((__bridge void*)parent),uint64_t(texture.pixelFormat),uint64_t(parent.pixelFormat),uint64_t(texture.textureType),texture.width,texture.height,texture.mipmapLevelCount,texture.arrayLength,texture.parentRelativeLevel,texture.parentRelativeSlice,uint64_t(texture.usage),uint64_t(texture.storageMode),uint64_t(sw.red),uint64_t(sw.green),uint64_t(sw.blue),uint64_t(sw.alpha)));
+                const auto identity=MemoryStats::ReadIdentity((__bridge const void*)texture);
+                FC::Native(std::format("{{\"op\":\"texture_sample_view\",\"vs\":{},\"ps\":{},\"indices\":{},\"slot\":{},\"msl_index\":{},\"native\":{},\"parent\":{},\"backing_uid\":{},\"backing_born_us\":{},\"owner_generation\":{},\"format\":{},\"parent_format\":{},\"type\":{},\"width\":{},\"height\":{},\"levels\":{},\"layers\":{},\"relative_level\":{},\"relative_slice\":{},\"usage\":{},\"storage\":{},\"swizzle\":[{},{},{},{}]}}",
+                    vs,ps,count,slot,binding.msl_index+e,native,uintptr_t((__bridge void*)parent),identity.uid,identity.born_us,identity.generation,uint64_t(texture.pixelFormat),uint64_t(parent.pixelFormat),uint64_t(texture.textureType),texture.width,texture.height,texture.mipmapLevelCount,texture.arrayLength,texture.parentRelativeLevel,texture.parentRelativeSlice,uint64_t(texture.usage),uint64_t(texture.storageMode),uint64_t(sw.red),uint64_t(sw.green),uint64_t(sw.blue),uint64_t(sw.alpha)));
                 if(seen.contains(native))continue;
                 if(seen.size()>=TextureProbePolicy::MaxImages){limited=true;continue;}
                 seen.insert(native);
@@ -119,19 +123,25 @@ public:
                 if(!buffer){FC::Native("{\"op\":\"texture_probe_skip\",\"reason\":\"allocation-failed\"}");continue;}
                 // Padding is diagnostic-owned, initialized for deterministic safe file output.
                 std::memset(buffer.contents,0,total);
+                const auto file=std::format("texels_{}_{}.raw",sequence,native);
+                // Reserve/retain before any unretained GPU reference is encoded.
+                pending.push_back({texture,buffer,native,scheduler.CurrentTick(),total,file,unsigned(planes.size()),0});
                 scheduler.BlitEncoder("bounded texture probe before sample");
                 encoded=true;
+                pending.back().tick=scheduler.CurrentTick();
+                // Finish waits for a GPU signal, not command-buffer retirement.
+                // Keep unretained command references alive through retirement too.
+                scheduler.DeferOperation([texture,buffer]{(void)texture;(void)buffer;});
                 auto encoder=scheduler.GetImpl().blit;
                 for(unsigned level=0;level<planes.size();++level) {
                     const auto& p=planes[level];
                     [encoder copyFromTexture:texture sourceSlice:0 sourceLevel:level sourceOrigin:MTLOriginMake(0,0,0)
                         sourceSize:MTLSizeMake(std::max<NSUInteger>(1,texture.width>>level),std::max<NSUInteger>(1,texture.height>>level),1)
                         toBuffer:buffer destinationOffset:p.offset destinationBytesPerRow:p.row destinationBytesPerImage:p.bytes];
+                    ++pending.back().encoded_levels;
                     FC::Native(std::format("{{\"op\":\"texture_probe_plane\",\"native\":{},\"level\":{},\"offset\":{},\"row\":{},\"rows\":{},\"block\":{},\"block_bytes\":{}}}",native,level,p.offset,p.row,p.rows,block,bytes));
                 }
                 used+=total;
-                const auto file=std::format("texels_{}_{}.raw",sequence,native);
-                pending.push_back({texture,buffer,native,scheduler.CurrentTick(),total,file});
                 FC::Native(std::format("{{\"op\":\"texture_probe_encoded\",\"native\":{},\"tick\":{},\"bytes\":{},\"file\":\"{}\",\"before_sample\":true}}",native,scheduler.CurrentTick(),total,file));
             }
         }
@@ -142,7 +152,7 @@ public:
         if(!pending.empty())scheduler.Finish();
         for(const auto& item:pending) {
             bool complete=scheduler.IsFreeKnown(item.tick),ok=false;
-            if(complete&&item.bytes.contents) {
+            if(complete&&item.bytes.contents&&item.encoded_levels==item.expected_levels) {
                 int fd=openat(directory,item.file.c_str(),O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
                 if(fd>=0){uint64_t done=0;while(done<item.size){ssize_t n=write(fd,static_cast<const char*>(item.bytes.contents)+done,item.size-done);if(n<=0)break;done+=n;}
                     ok=done==item.size;ok=(close(fd)==0)&&ok;if(!ok)unlinkat(directory,item.file.c_str(),0);}

@@ -1,4 +1,7 @@
 #include "bb_staging_recent.h"
+#include "common/scope_exit.h"
+#include "video_core/renderer_metal/mtl_texture_lineage.h"
+#include "video_core/renderer_metal/mtl_texture_lineage_api.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Metal::Runtime, the Metal implementation of VideoCore::CacheBackend (plan P2.4; design:
 // docs/metal/cache_backend_design.md and mtl_scheduler_design.md). Counterpart of
@@ -1842,6 +1845,8 @@ void Runtime::UploadImage(Image* dst, const Buffer* src,
                      dst->info.pixel_format, dst->backing->image.image_ci.format,
                      NativeBuffer(*src), upload_copies, __func__);
         if(!upload_copies.empty())MemoryStats::NoteContent((__bridge const void*)texture,MemoryStats::Content::Upload);
+        if(!upload_copies.empty()&&TextureLineage::Get().Armed())
+            TextureLineage::Get().Texture("upload-result",scheduler,device.GetImpl().device,texture,nil,TextureLineage::Info(*dst));
     }
 
     for (const auto& copy : upload_copies) {
@@ -1851,6 +1856,21 @@ void Runtime::UploadImage(Image* dst, const Buffer* src,
     }
 
     dst->flags &= ~ImageFlagBits::Dirty;
+}
+
+void TraceTextureUploadBuffer(const Image& image,const Buffer* buffer,u64 offset,const char* phase) {
+    if(!buffer||!image.backing||!image.backing->image.native||!buffer->buffer.native||
+       !image.backing->image.owner||image.backing->image.owner!=buffer->buffer.owner)return;
+    auto& trace=TextureLineage::Get();if(!trace.Armed())return;
+    // Only Metal populates these native fields; Vulkan keeps them null.
+    auto& runtime=*static_cast<Runtime*>(image.backing->image.owner);
+    trace.Buffer(phase,runtime.GetScheduler(),runtime.GetDevice().GetImpl().device,
+        NativeBuffer(*buffer),offset,NativeTexture(image),TextureLineage::Info(image));
+}
+void TraceTextureRefreshDecision(const Image& image) {
+    if(!image.backing||!image.backing->image.native)return;
+    auto& trace=TextureLineage::Get();if(trace.Armed())trace.Decision(
+        "refresh-no-upload",NativeTexture(image),TextureLineage::Info(image));
 }
 
 void Runtime::DownloadImage(Image* src, const Buffer* dst,
@@ -1921,6 +1941,12 @@ void Runtime::CopyImage(Image* src, Image* dst) {
         return;
     }
     MemoryStats::NoteContent(dst->backing->image.native,MemoryStats::Content::Copy);
+    const bool lineage=TextureLineage::Get().Armed()&&
+        (TextureLineage::Candidate(NativeTexture(*src))||TextureLineage::Candidate(NativeTexture(*dst)));
+    if(lineage)TextureLineage::Get().Texture("copy-image-entry",scheduler,device.GetImpl().device,
+        NativeTexture(*src),NativeTexture(*dst),TextureLineage::Info(*src),true);
+    SCOPE_EXIT {if(lineage)TextureLineage::Get().Texture("copy-image-return",scheduler,device.GetImpl().device,
+        NativeTexture(*dst),NativeTexture(*src),TextureLineage::Info(*dst),true);};
     const u32 num_mips = std::min(src->info.resources.levels, dst->info.resources.levels);
     // Opt-in diagnostic: identify real proxy-to-native copy round trips before optimizing.
     static const bool copy_audit=[] {const char* v=std::getenv("BB_MTL_COPY_AUDIT");return v&&v[0]=='1';}();
@@ -2059,6 +2085,12 @@ void Runtime::CopyImage(Image* src, Image* dst) {
 
 void Runtime::CopyImageWithBuffer(Image* src, Image* dst, const Buffer* buffer, u64 offset) {
     if(dst && dst->backing)MemoryStats::NoteContent(dst->backing->image.native,MemoryStats::Content::Copy);
+    const bool lineage=TextureLineage::Get().Armed()&&src&&dst&&src->backing&&dst->backing&&
+        (TextureLineage::Candidate(NativeTexture(*src))||TextureLineage::Candidate(NativeTexture(*dst)));
+    if(lineage)TextureLineage::Get().Texture("copy-buffer-entry",scheduler,device.GetImpl().device,
+        NativeTexture(*src),NativeTexture(*dst),TextureLineage::Info(*src),true);
+    SCOPE_EXIT {if(lineage)TextureLineage::Get().Texture("copy-buffer-return",scheduler,device.GetImpl().device,
+        NativeTexture(*dst),NativeTexture(*src),TextureLineage::Info(*dst),true);};
     if (!src->backing || !dst->backing) {
         return;
     }
@@ -2117,6 +2149,12 @@ void Runtime::CopyImageWithBuffer(Image* src, Image* dst, const Buffer* buffer, 
 
 void Runtime::CopyMip(Image* src, Image* dst, u32 mip, u32 slice) {
     if(dst && dst->backing)MemoryStats::NoteContent(dst->backing->image.native,MemoryStats::Content::Copy);
+    const bool lineage=TextureLineage::Get().Armed()&&src&&dst&&src->backing&&dst->backing&&
+        (TextureLineage::Candidate(NativeTexture(*src))||TextureLineage::Candidate(NativeTexture(*dst)));
+    if(lineage)TextureLineage::Get().Texture("copy-mip-entry",scheduler,device.GetImpl().device,
+        NativeTexture(*src),NativeTexture(*dst),TextureLineage::Info(*src),true);
+    SCOPE_EXIT {if(lineage)TextureLineage::Get().Texture("copy-mip-return",scheduler,device.GetImpl().device,
+        NativeTexture(*dst),NativeTexture(*src),TextureLineage::Info(*dst),true);};
     if (!src->backing || !dst->backing) {
         return;
     }
@@ -2367,6 +2405,9 @@ void Runtime::ClearImage(Image* dst, const SubresourceRange& range,
     @autoreleasepool {
         id<MTLTexture> texture = NativeTexture(*dst);
         MemoryStats::NoteContent((__bridge const void*)texture,MemoryStats::Content::Clear);
+        // The actual clear is encoded below; sample its result on scope exit.
+        SCOPE_EXIT {if(TextureLineage::Get().Armed())TextureLineage::Get().Texture(
+            "clear-return",scheduler,device.GetImpl().device,texture,nil,TextureLineage::Info(*dst));};
         const vk::Format format = dst->backing->image.image_ci.format;
         const bool is_3d = texture.textureType == MTLTextureType3D;
         const u32 levels = std::min<u32>(range.extent.levels, texture.mipmapLevelCount);
@@ -2669,10 +2710,16 @@ void Runtime::PromoteImageUsage(Image* image, ImageUsagePromotion usage) {
                 FlushBarriers();
             }
             scheduler.BlitEncoder(__func__);
+            const bool lineage=TextureLineage::Get().Armed()&&
+                TextureLineage::Candidate((__bridge id<MTLTexture>)old->image.native);
+            if(lineage)TextureLineage::Get().Texture("promotion-source",scheduler,device.GetImpl().device,
+                (__bridge id<MTLTexture>)old->image.native,(__bridge id<MTLTexture>)fresh.image.native,TextureLineage::Info(*image));
             id<MTLBlitCommandEncoder> blit = impl->sched.blit;
             [blit copyFromTexture:(__bridge id<MTLTexture>)old->image.native
                         toTexture:(__bridge id<MTLTexture>)fresh.image.native];
             MemoryStats::NoteContent(fresh.image.native,MemoryStats::Content::Copy);
+            if(lineage)TextureLineage::Get().Texture("promotion-result",scheduler,device.GetImpl().device,
+                (__bridge id<MTLTexture>)fresh.image.native,(__bridge id<MTLTexture>)old->image.native,TextureLineage::Info(*image));
             // What the copy leaves: all subresources written by a transfer.
             fresh.state.pl_stage = vk::PipelineStageFlagBits2::eCopy;
             fresh.state.access_mask = vk::AccessFlagBits2::eTransferWrite;

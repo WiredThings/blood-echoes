@@ -28,5 +28,8 @@ bool ContentEnabled();
 struct ContentSnapshot { std::array<std::uint64_t,unsigned(Content::Count)> counts{}; std::uint64_t last_us=0; };
 void NoteContent(const void* texture, Content event);
 ContentSnapshot ReadContent(const void* texture);
+// Separate return type preserves the existing ContentSnapshot ABI in other objects.
+struct ContentIdentity { std::uint64_t uid=0, born_us=0, guest=0, generation=0; };
+ContentIdentity ReadIdentity(const void* texture);
 void Report(const void* device, bool force = false);
 } // namespace Metal::MemoryStats

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "status": "synthetic-validated-live-provenance-pending",
+  "white_model_cause_confirmed": false,
+  "game_render_workaround_added": false,
+  "diagnostic_reader_lifetime_fix_verified": true,
+  "metal_validation_layer": true,
+  "actual_library_verified": true,
+  "real_cache_upload_promotion_copy_cases": 6,
+  "existing_texel_reader_cases": 10,
+  "python_tests": {
+    "lineage_analysis": 8,
+    "request_selector": 11,
+    "binding_analysis": 14
+  },
+  "old_backing_weak_reference_released": true,
+  "known_good_and_bad_input_patterns_verified": true,
+  "unchanged_cpu_reupload_suppression_preserved": true,
+  "diagnostic_log_full_keeps_clear_and_copy_pixels_correct": true,
+  "normal_disabled_path_creates_no_lineage_files": true,
+  "max_events_per_process": 4096,
+  "max_pending_staging_bytes": 393216,
+  "max_private_payload_bytes": 25165824,
+  "snapshots_are_partial": true,
+  "hoisted_render_and_raw_buffer_write_coverage_not_claimed": true,
+  "formal_data_modified": false,
+  "Release_updated": false,
+  "raw_game_content_included": false
+}

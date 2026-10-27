@@ -35,3 +35,25 @@
 `tests/metal/test_texture_probe.mm` 调用同一个 reader 模板及真实 Metal Scheduler，使用自制数据，不加载游戏或正式缓存：整数→UNORM view、相对 mip、swizzle 元数据、多 mip 原始块、后续 GPU 写入不改变先前快照、BC1/BC4/BC7 尾 mip（Metal 验证层），以及禁用／非捕获帧／无匹配／无效 schema／请求和输出链接反例。GPU 测试数据必须位于原运行时准入的 Shared 隔离 state 目录，不放宽原目录校验。
 
 所有游戏纹理、截图、捕获原始记录只留在私有诊断目录，不提交 GitHub、不进入 Release。真实游戏读回与白模归因尚待下一次现场验收。
+
+## 2026-10-28：上一代 backing 的生成和复制链
+
+已在用户确认故障仍存在时保存持武器村民的实际 view 和 44 个成功快照（两批，含重复 view）。一张 256×256、九层 mip 的共享材质纹理呈彩噪，两轮全部 mip 摘要稳定；view 范围、swizzle、用途标志暂未观察到准入异常。原因仍未确认。
+
+物理对象升级用途后会复制旧内容，并从新对象重新计数。因此当前对象 upload=0 / copy=1 **不能**证明整个生命周期从未上传或生成，也不能据此选定 ExpandImage 或 promotion 为根因。
+
+新的临时入口在明确启用的捕获目录内要求另一个当前用户 0600、空普通单链接文件 `lineage-enable`，启动时检查。仅针对已观察到的资源类别（256×256、单层、单采样、九个 mip 的 RGBA8 Uint/Unorm/sRGB），并记录必要的复制来源。正常游玩没有这个标记，入口不产生快照。
+
+记录复用现有 Scheduler、MemoryStats 和资源身份；物理 uid、出生时间、分配 generation 与游戏 image_uid 分开，进程 pid 加 epoch 避免 F3 后编号或指针复用混淆。原有 ContentSnapshot 返回类型保持不变，不引入 ABI、退出码或存档流程变化。
+
+覆盖上传 GPU 缓冲区在解平铺前／后各 128 字节、上传结果、用途提升的源／结果、CopyImage/CopyMip/经缓冲区复制的调用入口／返回、清除结果和可反射 storage texture 的计算写入结果。复制入口／返回不冒充某个 GPU 分支确实成功编码。实际 view 抓取同时携带物理 backing uid，供本次采样与历史关联。
+
+纹理历史只取 mip0 左上、中心、右下各 8×8 的原始块，非完整内容。每进程最多 4096 项、同时 64 个小 staging buffer（最多约 384 KiB），payload 上限约 24 MiB，JSONL 再有 8 MiB 限制；只写私有诊断文件。资源在编码 unretained GPU 命令前已有完成回调持有，GPU 退休后异步写出并释放，不保留旧纹理作历史，不增加等待或缓存容量。诊断分配失败会停用并标记缺口，不应把诊断异常变成游戏渲染改动。
+
+GPU 完成信号和 command-buffer retirement 是不同边界：定向测试等待后者并执行现有延迟回收，确认旧 backing 的 weak 引用最终归零，避免以零计数冒充已释放。上限、缺少源对象身份、不支持的来源或诊断失败均作为缺口报告。
+
+原完整读回也补上了退休引用租约：仅 `Finish()` 等到 GPU 信号还不能马上销毁 unretained 命令使用的对象。快照容器预留容量，资源先持有再编码，并核对全部 mip 已编码才准入文件。此为验证层捕获的诊断工具寿命问题的修正，不是游戏白模根因结论。日志达到上限的反例继续验证原清除与复制像素正确，诊断失败不会转成渲染修改。
+
+当前历史不穷举 render attachment 写入或 BDA/原始缓冲区写入。遇到 held/hoisted pass 的 storage 写入只报缺口，不能为了抓取改变 hoist 顺序。原始 CPU guest 内存不额外读取，CPU 摘要仅使用引擎已经计算的值。局部样本干净不等于整张纹理或全部 mip 正确；需结合现场完整读回确认。若抓取改变同步而使故障消失，只能记为同步敏感，不能当成修复。
+
+`run_texture_probe_test.py --lineage --compile-commands <renderer/compile_commands.json> --library <built-library>` 复用原测试入口。`test_texture_lineage.mm` 通过真实 TextureCache、上传、清除、promotion 和复制验证已知字节、父子身份和释放，包含坏输入、pending 上限、关闭和链接标记反例。`analyze_texture_lineage.py` 只接纳已完成且成功保存的样本，并保留缺口，不输出“根因已证实”。
