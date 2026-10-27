@@ -60,6 +60,8 @@ def prepare(*,mode='auto',gpu_root,cohort,engine,graphics,builder=None,toolchain
  if summary.get('requests',0)>0:
   if not HEX.fullmatch(summary.get('build_id','')):raise ValueError('invalid successful local build identity')
   env.update(BB_MTL_LOCAL_AOT_MODE='load',BB_MTL_LOCAL_AOT_BUILD_ID=summary['build_id'])
+  if HEX.fullmatch(summary.get('preparation_environment_identity','')):
+   env['BB_MTL_LOCAL_AOT_ENVIRONMENT_ID']=summary['preparation_environment_identity']
   report.update(status='prepared',effective='load',reason='prepared-partial'if partial else'prepared')
  else:report.update(status='record',effective='record',reason='no-complete-requests')
  return env,report

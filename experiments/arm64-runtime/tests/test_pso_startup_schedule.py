@@ -17,7 +17,7 @@ class Scheduling(unittest.TestCase):
   refs=[self.u['profile']['reference'],self.u['key']['reference'],self.u['stages'][0]['metadata'],self.u['stages'][0]['spirv']]
   for ref in refs:ref['path']=str(self.cache/ref['name']);Path(ref['path']).write_bytes(b'authored-input')
   self.u['execution_policy']['candidate_preparation']['frozen_input_set_identity']=digest(refs)
-  self.write();self.environment=dict(BB_MTL_LOCAL_AOT_MODE='load',BB_MTL_LOCAL_AOT_ROOT=str(self.local),BB_MTL_LOCAL_AOT_COHORT=self.cohort,BB_MTL_LOCAL_AOT_BUILD_ID=self.build);self.context={'worker':'a'*64,'options':'b'*64};self.code={'tool.py':'c'*64};self.full={'status':'completed','full_manifest_preparation_verified':True}
+  self.write();self.environment=dict(BB_MTL_LOCAL_AOT_MODE='load',BB_MTL_LOCAL_AOT_ROOT=str(self.local),BB_MTL_LOCAL_AOT_COHORT=self.cohort,BB_MTL_LOCAL_AOT_BUILD_ID=self.build,BB_MTL_LOCAL_AOT_ENVIRONMENT_ID='e'*64);self.context={'worker':'a'*64,'options':'b'*64};self.code={'tool.py':'c'*64};self.full={'status':'completed','full_manifest_preparation_verified':True}
  def write(self):self.manifest.write_text(json.dumps(self.u)+'\n')
  def schedule(self):return Schedule(self.manifest,context=self.context,environment=self.environment,gpu=self.gpu,artifact=self.artifact,progress=self.progress,code_identity=self.code,rows=rows,fingerprint=fingerprint,check=lambda:None)
  def seed(self):
@@ -33,6 +33,8 @@ class Scheduling(unittest.TestCase):
   self.seed();(self.artifact/'new.archive').write_bytes(b'new');self.assertIsNone(self.schedule().reuse());s=self.schedule();s.publish(self.full);(self.libraries/'new.metallib').write_bytes(b'new');self.assertIsNone(self.schedule().reuse())
  def test_current_code_options_and_manifest_changes_invalidate(self):
   self.seed();self.context={'worker':'d'*64};self.assertIsNone(self.schedule().reuse());self.context={'worker':'a'*64,'options':'b'*64};self.code={'tool.py':'d'*64};self.assertIsNone(self.schedule().reuse());self.code={'tool.py':'c'*64};self.u['classification']['family']='changed';self.write();self.assertIsNone(self.schedule().reuse())
+ def test_sdk_environment_identity_change_or_missing_cannot_reuse(self):
+  self.seed();self.environment['BB_MTL_LOCAL_AOT_ENVIRONMENT_ID']='f'*64;self.assertIsNone(self.schedule().reuse());del self.environment['BB_MTL_LOCAL_AOT_ENVIRONMENT_ID'];self.assertIsNone(self.schedule().path)
  def test_bad_hint_and_unavailable_journal_use_original_path(self):
   old=self.seed();old.path.write_text('bad');self.assertIsNone(self.schedule().reuse());s=self.schedule();s.publish(self.full)
   with patch('pso_startup_schedule.unchanged',return_value=False):self.assertIsNone(self.schedule().reuse())

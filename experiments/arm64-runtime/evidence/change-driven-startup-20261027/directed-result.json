@@ -1,84 +1,84 @@
 {
   "status": "passed",
-  "total_tests": 346,
+  "total_tests": 347,
   "suites": [
     {
       "suite": "test_incremental_file_hashes",
       "exit": 0,
       "tests": 17,
-      "seconds": 0.328
+      "seconds": 0.121
     },
     {
       "suite": "test_incremental_preparation",
       "exit": 0,
       "tests": 12,
-      "seconds": 3.648
+      "seconds": 1.93
     },
     {
       "suite": "test_launcher_source_view",
       "exit": 0,
       "tests": 26,
-      "seconds": 4.258
+      "seconds": 3.339
     },
     {
       "suite": "test_launcher_game_catalog",
       "exit": 0,
       "tests": 13,
-      "seconds": 1.416
+      "seconds": 1.529
     },
     {
       "suite": "test_source_code_closure",
       "exit": 0,
       "tests": 13,
-      "seconds": 0.539
+      "seconds": 0.619
     },
     {
       "suite": "test_launcher_runtime_scope",
       "exit": 0,
       "tests": 25,
-      "seconds": 0.093
+      "seconds": 0.085
     },
     {
       "suite": "test_launcher_runtime_scope_observer",
       "exit": 0,
       "tests": 18,
-      "seconds": 0.234
+      "seconds": 0.242
     },
     {
       "suite": "test_quick_restart_preparation",
       "exit": 0,
       "tests": 19,
-      "seconds": 0.209
+      "seconds": 0.211
     },
     {
       "suite": "test_launcher_local_aot",
       "exit": 0,
       "tests": 21,
-      "seconds": 2.203
+      "seconds": 2.136
     },
     {
       "suite": "test_launcher_game_pso_automatic",
       "exit": 0,
       "tests": 10,
-      "seconds": 0.109
+      "seconds": 0.106
     },
     {
       "suite": "test_launcher_game_modules",
       "exit": 0,
       "tests": 10,
-      "seconds": 0.135
+      "seconds": 0.134
     },
     {
       "suite": "test_qa_launch_clone",
       "exit": 0,
       "tests": 20,
-      "seconds": 0.651
+      "seconds": 0.636
     },
     {
       "suite": "test_qa_launch_conditions",
       "exit": 0,
       "tests": 34,
-      "seconds": 0.531
+      "seconds": 0.572
     },
     {
       "suite": "test_qa_memory_policy",
@@ -90,55 +90,55 @@
       "suite": "test_native_source_package",
       "exit": 0,
       "tests": 8,
-      "seconds": 0.128
+      "seconds": 0.133
     },
     {
       "suite": "test_normal_preparation_build_plan",
       "exit": 0,
       "tests": 9,
-      "seconds": 0.072
+      "seconds": 0.07
     },
     {
       "suite": "test_fixed_helper_failure_records",
       "exit": 0,
       "tests": 7,
-      "seconds": 0.041
+      "seconds": 0.042
     },
     {
       "suite": "test_startup_change_journal",
       "exit": 0,
       "tests": 9,
-      "seconds": 1.06
+      "seconds": 1.312
     },
     {
       "suite": "test_persistent_library_audit",
       "exit": 0,
       "tests": 5,
-      "seconds": 4.709
+      "seconds": 3.275
     },
     {
       "suite": "test_pso_startup_schedule",
       "exit": 0,
-      "tests": 7,
-      "seconds": 1.481
+      "tests": 8,
+      "seconds": 1.488
     },
     {
       "suite": "test_local_metal_builder",
       "exit": 0,
       "tests": 26,
-      "seconds": 1.603
+      "seconds": 2.204
     },
     {
       "suite": "test_preparation_session",
       "exit": 0,
       "tests": 18,
-      "seconds": 5.552
+      "seconds": 3.874
     },
     {
       "suite": "test_local_aot_policy",
       "exit": 0,
       "tests": 6,
-      "seconds": 0.065
+      "seconds": 0.062
     }
   ],
   "formal_data_modified": false,

@@ -391,6 +391,7 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
             else:
                 audit_binding=dict(schema=1,root=str(root),cohort=cohort,build_id=build_id,
                                    environment=environment,requests=index.request_count,deferred=index.deferred_count)
+                summary['preparation_environment_identity']=digest(canonical(environment))
                 try:
                     audit=json.loads(regular_bytes(audit_path,MAX_AUDIT_BYTES),object_pairs_hook=_pairs)
                     body=audit['body']

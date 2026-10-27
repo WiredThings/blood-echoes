@@ -21,6 +21,8 @@ class Schedule:
    if not artifact.is_relative_to(gpu)or not progress.is_relative_to(gpu):return
    local={k:v for k,v in environment.items()if k.startswith('BB_MTL_LOCAL_AOT_')}
    if local.get('BB_MTL_LOCAL_AOT_MODE')!='load':return
+   import re
+   if not re.fullmatch('[0-9a-f]{64}',local.get('BB_MTL_LOCAL_AOT_ENVIRONMENT_ID','')):return
    root=directory(local['BB_MTL_LOCAL_AOT_ROOT']);cohort=local['BB_MTL_LOCAL_AOT_COHORT'];build=local['BB_MTL_LOCAL_AOT_BUILD_ID']
    import re
    if root!=gpu/'local-metal'or not all(isinstance(x,str)and re.fullmatch('[0-9a-f]{64}',x)for x in(cohort,build)):return
