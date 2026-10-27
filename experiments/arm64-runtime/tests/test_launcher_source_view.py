@@ -110,6 +110,91 @@ class SourceView(unittest.TestCase):
             self.assertEqual(restored['game_root'],first['game_root'])
             self.assertEqual((restored['game_root']/'dvdroot_ps4/msg/text.bin').read_bytes(),b'a')
 
+    def test_new_mod_selection_keeps_complete_base_registration_without_walking_or_hashing_base(self):
+        a=self.mods/'a/dvdroot_ps4/shader';a.mkdir(parents=True);(a/'example.bin').write_bytes(b'a override')
+        with self.history():
+            first=self.prepare()
+            b=self.mods/'b/dvdroot_ps4/msg';b.mkdir(parents=True);(b/'text.bin').write_bytes(b'b added')
+            original_map=view.mapping;original_plain=view.plain_tree;original_hash=view.file_sha
+            def map_(root,*args):
+                self.assertNotEqual(Path(root),self.game,'base registration should survive a new Mod')
+                return original_map(root,*args)
+            def plain(root,*args):
+                self.assertNotEqual(Path(root),self.game,'base tree should not be walked for a Mod change')
+                return original_plain(root,*args)
+            def hash_(path,*args):
+                self.assertFalse(Path(path).is_relative_to(self.game),'base bytes should already be registered')
+                return original_hash(path,*args)
+            with patch.object(view,'mapping',side_effect=map_),patch.object(view,'plain_tree',side_effect=plain),patch.object(view,'file_sha',side_effect=hash_):
+                second=self.prepare()
+            self.assertTrue(second['report']['source_hashes']['base_inventory_reused'])
+            self.assertEqual(second['report']['source_hashes']['hashed_files'],1)
+            # Hidden vanilla is still registered even though neither view used
+            # it. Turning all Mods off selects the original without rereading.
+            self.env['BB_MODS_ENABLED']='0'
+            with patch.object(view,'mapping',side_effect=map_),patch.object(view,'plain_tree',side_effect=plain),patch.object(view,'file_sha',side_effect=hash_):
+                vanilla=self.prepare(self.game)
+            self.assertEqual(vanilla['report']['source_hashes']['hashed_files'],0)
+            self.assertEqual((vanilla['game_root']/'dvdroot_ps4/shader/example.bin').read_bytes(),b'authored base shader')
+            self.assertEqual((first['game_root']/'dvdroot_ps4/shader/example.bin').read_bytes(),b'a override')
+
+    def test_new_base_member_during_snapshot_is_not_hidden_by_registered_inventory(self):
+        with self.history():
+            self.prepare();mod=self.mods/'a/dvdroot_ps4/msg';mod.mkdir(parents=True);(mod/'text.bin').write_bytes(b'new')
+            changed=False
+            def mutate(source,target):
+                nonlocal changed
+                view.clone(source,target)
+                if not changed:(self.game/'new-file.bin').write_bytes(b'new base member');changed=True
+            with self.assertRaisesRegex(ValueError,'base file set changed'):
+                self.prepare(clone_file=mutate)
+
+    def test_registered_base_directory_replaced_by_mod_file_keeps_original_mapping(self):
+        with self.history():
+            self.prepare();mod=self.mods/'a/dvdroot_ps4';mod.mkdir(parents=True);(mod/'shader').write_bytes(b'directory replaced by selected leaf')
+            result=self.prepare()
+            self.assertEqual((result['game_root']/'dvdroot_ps4/shader').read_bytes(),b'directory replaced by selected leaf')
+            self.assertFalse((result['game_root']/'dvdroot_ps4/shader/example.bin').exists())
+
+    def test_real_kernel_clones_reuse_verified_readonly_bytes_and_only_hash_new_mod(self):
+        with self.history():
+            first=self.prepare(clone_file=view.KERNEL_CLONE)
+            mod=self.mods/'a/dvdroot_ps4/msg';mod.mkdir(parents=True);(mod/'text.bin').write_bytes(b'new selected resource')
+            second=self.prepare(clone_file=view.KERNEL_CLONE)
+            self.assertEqual(second['report']['sealed_kernel_clones'],2)
+            self.assertEqual(second['report']['snapshot_hashes']['hashed_files'],1)
+            self.assertEqual(second['report']['source_hashes']['hashed_files'],1)
+            for rel in('eboot.bin','dvdroot_ps4/shader/example.bin'):
+                a=first['game_root']/rel;b=second['game_root']/rel
+                self.assertEqual(a.read_bytes(),b.read_bytes());self.assertNotEqual(a.stat().st_ino,b.stat().st_ino)
+                self.assertEqual(b.stat().st_nlink,1);self.assertEqual(b.stat().st_mode&0o777,0o400)
+            self.assertEqual((second['game_root']/'dvdroot_ps4/msg/text.bin').read_bytes(),b'new selected resource')
+
+    def test_custom_clone_callbacks_never_gain_kernel_equality_authority(self):
+        with self.history():
+            self.prepare(clone_file=view.KERNEL_CLONE);mod=self.mods/'a/dvdroot_ps4/msg';mod.mkdir(parents=True);(mod/'text.bin').write_bytes(b'new')
+            def wrong(source,target):
+                view.clone(source,target)
+                if source.name=='eboot.bin':target.write_bytes(b'X'*target.stat().st_size)
+            with self.assertRaisesRegex(ValueError,'snapshot contents changed'):self.prepare(clone_file=wrong)
+
+    def test_lost_retained_snapshot_history_uses_original_byte_verification(self):
+        import startup_change_journal as journal
+        with self.history():
+            first=self.prepare(clone_file=view.KERNEL_CLONE)
+            mod=self.mods/'a/dvdroot_ps4/msg';mod.mkdir(parents=True);(mod/'text.bin').write_bytes(b'new')
+            with patch.object(journal,'unchanged',return_value=False):second=self.prepare(clone_file=view.KERNEL_CLONE)
+            self.assertEqual(second['report']['sealed_kernel_clones'],0);self.assertEqual(second['report']['snapshot_hashes']['hashed_files'],3)
+            self.assertTrue((first['game_root']/'eboot.bin').exists())
+
+    def test_sealed_source_pin_change_cannot_certify_a_clone(self):
+        from incremental_file_hashes import stat_stamp
+        with self.history():
+            first=self.prepare(clone_file=view.KERNEL_CLONE);source=first['game_root']/'eboot.bin';data=source.read_bytes()
+            entry=dict(stamp=stat_stamp(source.stat()),bytes=len(data),sha256=hashlib.sha256(data).hexdigest())
+            source.chmod(0o600);source.write_bytes(b'X'*len(data));source.chmod(0o400)
+            target=self.base/'must-not-exist';self.assertIsNone(view.sealed_clone(source,target,entry));self.assertFalse(target.exists())
+
     def test_registered_hint_missing_history_and_single_bad_receipt_fall_back_preserving_old(self):
         import startup_change_journal as journal
         with self.history():

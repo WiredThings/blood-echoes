@@ -38,20 +38,16 @@ def startup_preference(path,check):
  if actual!=expected or actual_size!=size:return None
  return dict(schema=1,preparation=prep,verified_artifact_preference=True)
 
-def content_proof(roots,check,*,module_products=False):
+def content_proof(roots,check):
  """Bounded streaming proof of logical bytes and security-relevant metadata.
 
  Timestamp/xattr-only changes are not byte changes. Enumerate the exact set,
  reject links/foreign nodes, and do not keep libraries in Python memory. The
  BEFORE and AFTER proofs must agree around an ACTUAL full native validation.
  """
- value=hashlib.sha256();total=0;count=0;proof_files=0;folders=0
+ value=hashlib.sha256();total=0;count=0;folders=0
  def append(row):value.update(json.dumps(row,sort_keys=True,separators=(',',':')).encode()+b'\n')
- def security(s):return [s.st_dev,s.st_mode,s.st_uid,s.st_gid,0 if module_products and stat.S_ISDIR(s.st_mode)else s.st_nlink]
- def administrative(relative,is_directory):
-  if not module_products or len(relative.parts)!=1:return False
-  name=relative.name
-  return bool(re.fullmatch(r'companion-inventory-[0-9a-f]{24}',name))if is_directory else(name=='report.json'or bool(re.fullmatch(r'(stage|recipe)-links-[0-9]+\.jsonl',name)))
+ def security(s):return [s.st_dev,s.st_mode,s.st_uid,s.st_gid,s.st_nlink]
  for raw in sorted(roots):
   root=directory(raw);s=root.stat();append(['root',str(root),s.st_dev,s.st_ino,security(s)])
   for base,dirs,names in os.walk(root,followlinks=False):
@@ -59,13 +55,9 @@ def content_proof(roots,check,*,module_products=False):
    if folders>MAX_PROOF_FILES or len(Path(base).relative_to(root).parts)>16:return None
    dirs.sort();names.sort();folder=directory(base);append(['dir',str(folder.relative_to(root)),security(folder.stat())])
    for name in dirs:directory(folder/name)
-   dirs[:]=[name for name in dirs if not administrative((folder/name).relative_to(root),True)]
    for name in names:
     check();p=folder/name;s=p.lstat();count+=1
     if count>MAX_PROOF_FILES or not stat.S_ISREG(s.st_mode)or s.st_uid!=os.getuid()or s.st_size<0 or total+s.st_size>MAX_PROOF_BYTES:return None
-    if module_products and s.st_nlink!=1:return None
-    if administrative(p.relative_to(root),False):continue
-    proof_files+=1
     sha,size=file_sha(p,check)
     preference=None
     if p.name=='startup-entry.json':
@@ -75,14 +67,12 @@ def content_proof(roots,check,*,module_products=False):
     stamp=lambda x:(x.st_dev,x.st_ino,x.st_mode,x.st_uid,x.st_gid,x.st_nlink,x.st_size,x.st_mtime_ns,x.st_ctime_ns)
     if stamp(s)!=stamp(after)or size!=s.st_size:return None
     total+=size;append(['file',str(p.relative_to(root)),security(s),size,preference if preference is not None else sha])
- result=dict(schema=1,sha256=value.hexdigest(),files=proof_files,bytes=total)
- if module_products:result['scope']='module-products-v1'
- return result
+ return dict(schema=1,sha256=value.hexdigest(),files=count,bytes=total)
 
 class Schedule:
- def __init__(self,manifest,*,context,environment,gpu,artifact,progress,code_identity,rows,fingerprint,check):
+ def __init__(self,manifest,*,context,environment,gpu,artifact,progress,code_identity,rows,fingerprint,check,selective=False):
   self.path=None;self.token=None;self.previous=None;self.roots=[];self.binding=None
-  self.check=check;self.before_proof=None;self.reuse_via=None
+  self.check=check;self.before_proof=None;self.reuse_via=None;self.selective=selective
   try:
    gpu=directory(gpu);artifact=directory(artifact);progress=directory(progress)
    if not artifact.is_relative_to(gpu)or not progress.is_relative_to(gpu):return
@@ -109,10 +99,12 @@ class Schedule:
    self.path=progress/('unchanged-schedule-'+digest(self.binding)+'.json')
    try:
     raw,_=checked_bytes(self.path,limit=MAX_MESSAGE);saved=json.loads(raw);body=saved['body']
-    if set(saved)=={'body','sha256'}and digest(body)==saved['sha256']and body['binding']==self.binding and body.get('actual_full_native_verification')is True:
+    previous_native=(body.get('actual_full_native_verification')is True or
+        (body.get('previous_full_native_recipe_proofs')is True and type(body.get('verified_required_recipes'))is int and body['verified_required_recipes']==n))
+    if set(saved)=={'body','sha256'}and digest(body)==saved['sha256']and body['binding']==self.binding and previous_native:
      if unchanged(body.get('journal'),self.roots):
       self.token=body['journal'];self.previous=body;self.reuse_via='journal'
-     elif body.get('content_proof') is not None:
+     elif not selective and body.get('content_proof') is not None:
       current=content_proof(self.roots,check)
       if current is not None and current==body['content_proof']:
        self.previous=body;self.before_proof=current;self.reuse_via='unchanged-logical-bytes'
@@ -120,7 +112,7 @@ class Schedule:
    except(OSError,ValueError,TypeError,KeyError):pass
    if self.previous is None:
     self.token=query(self.roots)
-    self.before_proof=content_proof(self.roots,check)
+    if not selective:self.before_proof=content_proof(self.roots,check)
   except(OSError,ValueError,TypeError,KeyError):self.path=None
  def reuse(self):
   self.check()
@@ -139,7 +131,7 @@ class Schedule:
  def publish(self,result):
   if self.path is None or result.get('status')!='completed'or result.get('full_manifest_preparation_verified')is not True:return False
   self.check()
-  after=content_proof(self.roots,self.check)
+  after=None if self.selective else content_proof(self.roots,self.check)
   stable=(self.before_proof is not None and after==self.before_proof)
   if not stable and self.token is None:return False
   body=dict(binding=self.binding,journal=self.token,actual_full_native_verification=True)
@@ -148,4 +140,21 @@ class Schedule:
   if len(json.dumps(saved,separators=(',',':')).encode())>MAX_MESSAGE or not replaceable(self.path):return False
   # Cursor precedes the native pass: new record/build outputs invalidate the
   # NEXT launch until they have themselves passed a stable full verification.
+  write_json(self.path,saved);return True
+
+ def publish_verified_recipes(self,result,verified_count):
+  """Aggregate already verified CURRENT recipes, without a new native pass.
+
+  Caller counts only the actual Recipes reuse/commits. The cursor precedes
+  those checks and must remain continuous through publication. New outputs
+  during preparation defer this shortcut until a stable subsequent start.
+  """
+  if self.path is None or self.token is None or result.get('status')!='completed'or result.get('required_preparation_complete')is not True:return False
+  if type(verified_count)is not int or verified_count!=self.binding['recipes']:return False
+  self.check()
+  if not unchanged(self.token,self.roots):return False
+  body=dict(binding=self.binding,journal=self.token,actual_full_native_verification=False,
+      previous_full_native_recipe_proofs=True,verified_required_recipes=verified_count)
+  saved=dict(body=body,sha256=digest(body))
+  if len(json.dumps(saved,separators=(',',':')).encode())>MAX_MESSAGE or not replaceable(self.path):return False
   write_json(self.path,saved);return True

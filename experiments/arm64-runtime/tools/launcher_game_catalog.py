@@ -16,7 +16,7 @@ TOOLS = Path(__file__).resolve().parent
 from incremental_file_hashes import Hashes,replaceable
 DEPENDENCIES = ('launcher_game_catalog.py', 'game_shader_catalog.py',
                 'gnm_shader_metadata.py', 'full_game_catalog.py',
-                'static_program_links.py', 'decode_shader_cache.py')
+                'static_program_links.py', 'decode_shader_cache.py', 'resource_parse_products.py')
 
 
 def need(value, message):
@@ -88,9 +88,9 @@ def source_inventory(game_root, check=lambda: None):
 def scanner_identity(source_root,runtime_profile=None):
     """Bind scanner/parser code, original SELF loader and native stage enum."""
     def code_hash(path):
-        if runtime_profile is None:return file_sha(path)[0]
         from launcher_runtime_profile import code_bytes
-        runtime_profile.code(path);return code_bytes(path,limit=4*1024*1024,content=False)[1]['sha256']
+        if runtime_profile is not None:runtime_profile.code(path)
+        return code_bytes(path,limit=4*1024*1024,content=False)[1]['sha256']
     files = {name: code_hash(TOOLS / name) for name in DEPENDENCIES}
     controller=(TOOLS/'launcher_game_catalog.py').read_bytes()
     need(hashlib.sha256(controller).hexdigest()==files['launcher_game_catalog.py'],'scanner controller changed')
@@ -107,7 +107,7 @@ def scanner_identity(source_root,runtime_profile=None):
 # still match, and a later parsing change disables this migration automatically.
 LEGACY_CONTROLLER_SHA='0299bbac7743ff75a5702a8e953ebc612ba55a6c3c90a92657a8d3a18ad69021'
 LEGACY_SCANNER_BODY='a21fb83f31fd5d369b98fee99fa66d7736c164ce5377e213d0830bfb0f8795bc'
-SCANNER_FUNCTIONS={'need','directory','file_sha','digest','write_json','source_inventory','output_receipt','read_ready','build_static'}
+SCANNER_FUNCTIONS={'need','directory','file_sha','digest','write_json','source_inventory','output_receipt','read_ready','build_static','_build_static'}
 
 SCANNER_CONSTANTS={'SCHEMA','MAX_FILES','MAX_METADATA','MAX_LINE'}
 
@@ -128,9 +128,9 @@ def scanner_body_digest(text):
 def legacy_scanners(source_root,runtime_profile=None):
     if scanner_body_digest(Path(__file__).read_text())!=LEGACY_SCANNER_BODY:return []
     def code_hash(path):
-        if runtime_profile is None:return file_sha(path)[0]
         from launcher_runtime_profile import code_bytes
-        runtime_profile.code(path);return code_bytes(path,limit=4*1024*1024,content=False)[1]['sha256']
+        if runtime_profile is not None:runtime_profile.code(path)
+        return code_bytes(path,limit=4*1024*1024,content=False)[1]['sha256']
     files={name:LEGACY_CONTROLLER_SHA if name=='launcher_game_catalog.py'else code_hash(TOOLS/name)for name in DEPENDENCIES}
     files['original-self-loader']=code_hash(TOOLS.parent/'vendor/blood_echoes/loader/prepare.py')
     files['native-runtime-info']=code_hash(Path(source_root)/'shader_recompiler/runtime_info.h')
@@ -149,6 +149,38 @@ def plain_files(root,check=lambda:None):
             need(len(files)<=MAX_FILES,'static input file-count budget')
     need(files,'empty game source inventory')
     return files
+
+
+def registered_snapshot_hashes(game,cache,check):
+    """Reuse the original snapshot's complete byte proof across catalogues.
+
+    A changed/lost history or any receipt mismatch returns to the existing
+    source inventory. This does not grant compiler/product admission.
+    """
+    try:
+        if game.name!='view' or game.parent.parent!=cache/'source-views':return None
+        raw,_=file_sha(game.parent/'READY.json',check)
+        need((game.parent/'READY.json').stat().st_size<=32*1024*1024,'snapshot receipt bound')
+        saved=json.loads((game.parent/'READY.json').read_text())
+        need(file_sha(game.parent/'READY.json',check)[0]==raw,'snapshot receipt changed')
+        identity=saved['identity'];proof=saved['proof']
+        need(type(saved['schema'])is int and saved['schema']==1 and identity==digest(proof),'snapshot proof identity')
+        need(game.parent.name==identity or game.parent.name.startswith(identity+'-retry-'),'snapshot generation identity')
+        rows=proof['files'];need(isinstance(rows,list)and 0<len(rows)<=MAX_FILES,'snapshot member count')
+        names=set()
+        for row in rows:
+            p=Path(row['path']);need(not p.is_absolute()and '..'not in p.parts and str(p)==row['path'] and str(p)not in names,'snapshot member path')
+            names.add(str(p))
+        hint=Hashes(cache/'source-views'/('snapshot-metadata-'+game.parent.name+'.json'),
+            digest(dict(schema=1,role='readonly-mod-view',identity=identity,view=str(game))),
+            hasher=file_sha,check=check,watch_roots=[game])
+        if not hint.journal_valid:return None
+        from launcher_source_view import verify_snapshot
+        verify_snapshot(game,rows,check,hint)
+        check();hint.verify()
+        if not hint.journal_valid:return None
+        return hint
+    except(OSError,ValueError,KeyError,TypeError):return None
 
 
 def output_receipt(root):
@@ -178,7 +210,27 @@ def read_ready(root, identity):
     return row
 
 
-def build_static(*, game_root, source_root, output, identity, source_files):
+def build_static(*, game_root, source_root, output, identity, source_files, source_journal=None):
+    """Verify the actual read set once, then reuse exact per-resource parsing."""
+    from startup_change_journal import query,unchanged
+    from resource_parse_products import Products
+    import sqlite3
+    root=directory(game_root);output=directory(output)
+    continuous=(not(root.stat().st_mode&0o222)and unchanged(source_journal,[root]))
+    if not continuous:
+        source_journal=query([root])
+        need(source_inventory(root)==source_files,'game inputs changed before static preparation')
+    products=None
+    try:
+        try:products=Products(output.parent/'resource-products',scanner_identity(source_root))
+        except(OSError,ValueError,sqlite3.DatabaseError):pass # Preserve bad DB; original readers remain available.
+        return _build_static(game_root=root,source_root=source_root,output=output,identity=identity,
+            source_files=source_files,source_journal=source_journal,products=products)
+    finally:
+        if products is not None:products.close()
+
+
+def _build_static(*, game_root, source_root, output, identity, source_files,source_journal,products):
     """One worker, existing decoders. Unknown fields remain explicit gaps."""
     import game_shader_catalog as catalog_reader
     import gnm_shader_metadata as gnm
@@ -186,19 +238,25 @@ def build_static(*, game_root, source_root, output, identity, source_files):
     from full_game_catalog import Scanner
     root = directory(game_root); output = directory(output)
     need(not any(output.iterdir()), 'fresh catalogue generation required')
-    catalog = catalog_reader.inventory(root)
+    catalog = catalog_reader.inventory(root,products=products,source_files=source_files)
     # The original inventory's SELF offsets and reconstructed ELF offsets are
     # different domains. Reuse the original bounded loader for embedded code.
     for package in catalog['packages']:
         if package['kind'] != 'embedded':
             continue
+        proof=dict(kind='embedded-reconstruction-v1',package_sha256=digest(package))
+        cached=products.get(proof)if products is not None else None
+        if cached is not None:
+            package.update(cached);continue
         path = root / package['path']; raw = path.read_bytes()
         need(hashlib.sha256(raw).hexdigest() == package['sha256'], 'embedded source changed')
         elf, _header, _ph, _segments, missing = gnm.checked_elf(raw, package['path'])
         scanned = catalog_reader.orb_metadata(elf)
-        package.update(binary_info=scanned['records'], rejected_signature_candidates=scanned['rejected'],
+        decoded=dict(binary_info=scanned['records'], rejected_signature_candidates=scanned['rejected'],
                        elf_sha256=hashlib.sha256(elf).hexdigest(), offset_domain='reconstructed-elf-bytes',
                        compressed_segments_not_decoded=False, missing_optional_program_headers=missing)
+        package.update(decoded)
+        if products is not None:products.put(proof,decoded)
         del raw, elf
     catalog['programs'] = [dict(package=p['path'], entry=e.get('name'), debug=p['debug'], **r)
                           for p in catalog['packages'] for e in
@@ -207,7 +265,7 @@ def build_static(*, game_root, source_root, output, identity, source_files):
     catalog['summary'] = dict(packages=len(catalog['packages']), program_records=len(catalog['programs']),
                             embedded_offset_domain='reconstructed-elf-bytes', complete_psos=0)
     catalog_path = output / 'catalog.json'; write_json(catalog_path, catalog)
-    gnm.census(root, catalog_path, output / 'gnm')
+    gnm.census(root, catalog_path, output / 'gnm',products=products,source_files=source_files)
     gap_path = output / 'gaps.jsonl'
     accepted = output / 'accepted-headers.jsonl'
     with accepted.open('x') as good, gap_path.open('x') as gaps:
@@ -225,7 +283,7 @@ def build_static(*, game_root, source_root, output, identity, source_files):
                     missing=['draw-adjusted-runtime-info', 'resource-specializations', 'complete-pipeline-state'],
                     capture='normal-runtime-owned-input', inferred=False))
     full = output / 'resources'; full.mkdir(mode=0o700)
-    scanner = Scanner(root, catalog_path, full, TOOLS.parent)
+    scanner = Scanner(root, catalog_path, full, TOOLS.parent,products=products,source_files=source_files)
     try:
         resource_summary = scanner.run()
     finally:
@@ -233,9 +291,12 @@ def build_static(*, game_root, source_root, output, identity, source_files):
             if not stream.closed:
                 stream.close()
     # Do not commit a generation if any input was changed while decoding.
-    need(source_inventory(root) == source_files, 'game inputs changed during static preparation')
+    from startup_change_journal import unchanged
+    if not unchanged(source_journal,[root]):
+        need(source_inventory(root) == source_files, 'game inputs changed during static preparation')
     receipt = dict(schema=SCHEMA, identity=identity, status='indexed',
                    static=summary, resources=resource_summary, files=output_receipt(output),
+                   resource_products=products.report()if products is not None else dict(status='unavailable',artifact_authority=False),
                    complete_pso_claim=False, game_started=False, formal_data_modified=False)
     write_json(output / 'READY.json', receipt)
     return receipt
@@ -254,6 +315,9 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
     cache = gpu / 'automatic-game-inputs'; cache.mkdir(mode=0o700, exist_ok=True); directory(cache)
     hashes=Hashes(cache/('catalogue-source-metadata-'+digest(str(game))+'.json'),
         digest(dict(schema=1,role='static-source-inventory',root=str(game))),hasher=file_sha,check=check,watch_roots=[game])
+    if not hashes.journal_valid:
+        registered=registered_snapshot_hashes(game,cache,check)
+        if registered is not None:hashes=registered
     if hashes.journal_valid:
         selected_files={str(Path(name).relative_to(game)):Path(name)for name in hashes.previous}
         need(selected_files,'empty game source inventory')
@@ -295,7 +359,7 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
         generation.mkdir(mode=0o700)
         request = state / ('catalogue-request-' + str(time.time_ns()) + '.json')
         write_json(request, dict(game_root=str(game), source_root=str(source_root), output=str(generation),
-                                 identity=identity, source_files=sources))
+                                 identity=identity, source_files=sources,source_journal=hashes.journal_token))
         if runner is not None:
             runner(request, check)
         else:

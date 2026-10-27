@@ -26,6 +26,22 @@ class NativeModuleRejected(ValueError):
   return str(self)in('owned companion runtime-after differs','owned companion complete canonical specialization differs','owned companion regenerated SPIR-V differs','actual cache target complete canonical specialization differs','retranslated specialization differs from captured state','retranslated SPIR-V differs from observed module')
 
 def _ref_identity(ref):return dict(sha256=ref['sha256'],bytes=ref['bytes'])
+def compiler_identity(component,library_sha256,layout,cohort):
+ # Source catalogues select required inputs; they do not change this compiler.
+ # Every module still carries its complete source/metadata/profile/spec identity.
+ return digest(dict(schema=2,recipe='module-compilation-compatibility',
+  consumer=component['module_consumer_sha256'],library=library_sha256,
+  layout=layout_abi_identity(layout),cohort=cohort))
+
+def geometry_recipe_identity(unit,input_ids,compiler,module_index):
+ # A repaired module may have a new proved packet/receipt under the same
+ # semantic source ID. Invalidate only recipes that actually depend on it.
+ products=[]
+ for uid in input_ids:
+  entry=module_index.get(uid)
+  if entry is None:return None
+  products.append(dict(input_id=uid,**{k:entry[k]for k in('packet_sha256','receipt_sha256','spirv_sha256')}))
+ return digest(dict(schema=2,recipe=unit['recipe_blob_identity'],inputs=input_ids,compiler=compiler,module_products=products))
 def module_input_identity(unit,stage,static_identity,layout,game_identity,projection_proof=None):
  """Entire observed source identity; deliberately different from runtime perm_hash."""
  return digest(dict(schema=1,recipe='automatic-owned-module-v1',game=game_identity,
@@ -191,27 +207,41 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
  need(len(cohort)==64 and all(x in'0123456789abcdef'for x in cohort),'compiler cohort identity')
  layout=component['native_layout'];catalog=json.loads(checked_bytes(Path(static_context['catalog']),limit=32*1024*1024)[0]);need(Path(catalog['game_root'])==Path(static_context['game_root']),'actual final game source root')
  table=lookup_table(list(rows(Path(static_context['index']))));need(len(caches)<=128,'selected cache count budget')
- compiler=digest(dict(consumer=component['module_consumer_sha256'],library=identity['library_sha256'],layout=layout_abi_identity(layout),cohort=cohort,catalog=static_context['identity']))
+ compiler=compiler_identity(component,identity['library_sha256'],layout,cohort)
  auto=gpu/'automatic-game-inputs';auto.mkdir(mode=0o700,exist_ok=True);directory(auto);root=auto/compiler;root.mkdir(mode=0o700,exist_ok=True);directory(root)
  nonce_path=root/'nonce';
  if not nonce_path.exists():nonce_path.write_text(secrets.token_hex(32))
  nonce=checked_bytes(nonce_path,limit=64)[0].decode();need(len(nonce)==64 and all(x in'0123456789abcdef'for x in nonce),'owned preparation nonce')
  index_path=root/'index.json';index=json.loads(checked_bytes(index_path,limit=32*1024*1024)[0])if index_path.exists()else dict(schema=1,compiler_identity=compiler,modules={},geometry={},rejected={})
  need(index.get('schema')==1 and index.get('compiler_identity')==compiler,'same complete producer identity')
+ provenance=dict(schema=1,source_identity=static_context['identity'],game_root=str(static_context['game_root']),
+  catalog=dict(path=str(static_context['catalog']),sha256=file_sha(static_context['catalog'])),
+  index=dict(path=str(static_context['index']),sha256=file_sha(static_context['index'])))
+ source_record=root/('source-selection-'+digest(provenance)+'.json')
+ encoded=json.dumps(provenance,sort_keys=True,separators=(',',':')).encode()+b'\n'
+ try:checked_bytes(source_record,limit=16384,expected=hashlib.sha256(encoded).hexdigest())
+ except(OSError,ValueError,TypeError):
+  if os.path.lexists(source_record):source_record=root/(source_record.stem+'-retry-'+secrets.token_hex(8)+'.json')
+  from prepare_game_psos import new_bytes
+  new_bytes(root,source_record.name,encoded)
  from module_product_schedule import ModuleProducts
  products=ModuleProducts(root=root,source=static_context['game_root'],compiler=compiler,catalog=static_context['catalog'],check=check)
  counts=collections.Counter();gaps=collections.Counter();start=time.monotonic();admitted={};visited=set();observed_static=set()
  typed_ready={};typed_report=dict(status='unavailable',reason='normal-path companion capture not configured')
  if static_context.get('capture_root')is not None:
   from game_companion_modules import prepare as prepare_companions,stage_key
-  profiles={};targets=collections.defaultdict(dict)
+  profiles={};targets=collections.defaultdict(dict);required_code={};observed_modules={}
   for cache in caches:
    path=Path(cache)/'profile.bin';_,ref=checked_bytes(path);profiles[ref['sha256']]=ref
   for unit in selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest):
    if unit['record_type']!='offline-pso-input':continue
    for stage in unit['stages']:
-    if stage['logical_stage']=='vertex'and stage['hardware_stage']in('vertex','export','local'):targets[stage_key(unit,stage)][stage['serialized_spec_sha256']]=stage['metadata']
-  typed_report,typed_ready=prepare_companions(context=static_context,gpu=gpu,root=root,component={**component,'library':identity['library']},identity=identity,catalog=catalog,cohort=cohort,nonce=nonce,profiles=profiles,targets=targets,index=index,index_path=index_path,check=check,deadline=start+seconds,native_runner=native_runner)
+    if stage['logical_stage']=='vertex'and stage['hardware_stage']in('vertex','export','local'):
+     target_key=stage_key(unit,stage);targets[target_key][stage['serialized_spec_sha256']]=stage['metadata'];observed_modules[target_key]=stage['spirv']
+     matches=table.get((stage['program_hash'],stage['hardware_stage']),[])
+     if len(matches)==1:required_code[target_key]=matches[0]['identity']['code_sha256']
+  typed_report,typed_ready=prepare_companions(context=static_context,gpu=gpu,root=root,component={**component,'library':identity['library']},identity=identity,catalog=catalog,cohort=cohort,nonce=nonce,profiles=profiles,targets=targets,index=index,index_path=index_path,check=check,deadline=start+seconds,native_runner=native_runner,
+      required_only=True,required_code=required_code,observed_modules=observed_modules)
  links_path=root/('stage-links-'+str(time.time_ns())+'.jsonl');recipes_path=root/('recipe-links-'+str(time.time_ns())+'.jsonl');link_bytes=0
  def emit(stream,value):
   nonlocal link_bytes
@@ -241,7 +271,7 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
      if uid in admitted:stage_results[stage['logical_stage']]=admitted[uid]
      continue
     visited.add(uid)
-    existing=index['modules'].get(uid)
+    existing=index['modules'].get(uid);repairing=False
     if existing is not None:
      try:
       from complete_geometry_psos import verify_receipt
@@ -254,8 +284,20 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
       receipt=json.loads(checked_bytes(Path(existing['receipt']),limit=256*1024,expected=existing['receipt_sha256'])[0]);need(file_sha(existing['packet'])==existing['packet_sha256'],'indexed exact packet SHA');validate_call(0,receipt,Path(existing['spirv']).parent,p);verify_receipt(p,receipt,existing['packet_sha256']);need(p.get('automatic_preparation')==dict(schema=1,nonce=nonce,cohort=cohort),'indexed automatic admission')
       if stage['hardware_stage']!='geometry':products.record(uid,existing)
       stage_results[stage['logical_stage']]=admitted[uid]=existing;counts['verified_existing']+=1;continue
-     except(ValueError,OSError,KeyError,TypeError):gaps['invalid-indexed-module']+=1;continue
-    if uid in index.get('rejected',{}):gaps['same-producer-rejected-input']+=1;continue
+     except(ValueError,OSError,KeyError,TypeError)as error:
+      # Preserve the previous index entry AND its untouched case directory.
+      # Repair this exact required input through the original freezer/native
+      # verifier; a bad old output is not a permanently rejected game input.
+      repairing=True;counts['invalid_existing']+=1
+      retained=dict(schema=1,input_id=uid,entry=existing,reason=str(error)[:1024])
+      raw=json.dumps(retained,sort_keys=True,separators=(',',':')).encode()+b'\n'
+      previous=root/('retained-module-'+uid+'-'+digest(retained)+'.json')
+      try:checked_bytes(previous,limit=256*1024,expected=hashlib.sha256(raw).hexdigest())
+      except(OSError,ValueError,TypeError):
+       if os.path.lexists(previous):previous=root/(previous.stem+'-retry-'+secrets.token_hex(8)+'.json')
+       from prepare_game_psos import new_bytes
+       new_bytes(root,previous.name,raw)
+    if uid in index.get('rejected',{})and not repairing:gaps['same-producer-rejected-input']+=1;continue
     if time.monotonic()-start>=seconds:gaps['bounded-total-budget-pending']+=1;continue
     if counts['native_attempts']%page_size==0:
      check();atomic_json(index_path,index);counts['pages']+=1
@@ -269,12 +311,17 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
      verify_receipt(packet,result,file_sha(path))
      receipt=case/'output/result.json';spirv=case/'output/module.spv';item=dict(link,packet=str(path),packet_sha256=file_sha(path),receipt=str(receipt),receipt_sha256=file_sha(receipt),spirv=str(spirv),spirv_sha256=file_sha(spirv))
      admitted[uid]=item;index['modules'][uid]=item;stage_results[stage['logical_stage']]=item;counts['native_completed']+=1;atomic_json(index_path,index)
+     if repairing:counts['repaired_existing']+=1
+     if stage['hardware_stage']!='geometry':products.record(uid,item)
     except(ValueError,OSError,KeyError)as error:
-     gaps[str(error)]+=1;index.setdefault('rejected',{})[uid]=dict(reason=str(error),compiler_identity=compiler);atomic_json(index_path,index)
+     gaps[str(error)]+=1
+     if not repairing:index.setdefault('rejected',{})[uid]=dict(reason=str(error),compiler_identity=compiler)
+     atomic_json(index_path,index)
    emit(recipes_stream,dict(recipe_blob_identity=unit['recipe_blob_identity'],module_input_ids=input_ids,all_stages_verified=len(stage_results)==len(unit['stages'])))
    if any(s['logical_stage']=='geometry'for s in unit['stages'])and len(stage_results)==len(unit['stages']):
     from game_pso_geometry_adapter import freeze_recipe
-    rid=digest(dict(recipe=unit['recipe_blob_identity'],inputs=input_ids,compiler=compiler));destination=root/('recipe-'+rid)
+    rid=geometry_recipe_identity(unit,input_ids,compiler,index['modules']);need(rid is not None,'verified geometry module dependency set')
+    destination=root/('recipe-'+rid)
     if rid not in index['geometry']:
      artifact=gpu/'cache'/catalog['game_identity']['TITLE_ID']/'metal'
      artifact.mkdir(parents=True,exist_ok=True);directory(artifact)
@@ -290,10 +337,11 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
    if len(matches)!=1:return None
    try:ids.append(stage_input_identity(unit,stage,matches[0]['identity'],layout,catalog['game_identity']))
    except(ValueError,KeyError):return None
-  return index['geometry'].get(digest(dict(recipe=unit['recipe_blob_identity'],inputs=ids,compiler=compiler)))
+  return index['geometry'].get(geometry_recipe_identity(unit,ids,compiler,index['modules']))
  report=dict(schema=1,status='prepared'if not gaps else'partial',counts=dict(counts),gaps=dict(gaps),typed_companions=typed_report,compiler_identity=compiler,module_index=str(index_path),stage_links=dict(path=str(links_path),sha256=file_sha(links_path)),recipe_links=dict(path=str(recipes_path),sha256=file_sha(recipes_path)),static_identities=sum(map(len,table.values())),observed_static_identities=len(observed_static),static_without_observed_inputs=sum(map(len,table.values()))-len(observed_static),full_final_PSO_ready=False,runtime_cache_import_allowed=False,game_started=False,GPU_started=False)
  atomic_json(index_path,index)
  report['source_validated_module_reuses']=products.hits
  report['module_product_schedule_published']=products.publish()
+ report['source_selection_record']=str(source_record)
  atomic_json(root/'report.json',report)
  return dict(report,geometry_resolver=geometry_resolver,cache_root=root,report_path=str(root/'report.json'))

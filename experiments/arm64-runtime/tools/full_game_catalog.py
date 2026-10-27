@@ -4,6 +4,7 @@ Imports the existing verified DCX/BND4/OrbShdr readers and original SELF loader.
 """
 from pathlib import Path
 import argparse,collections,hashlib,json,os,struct,sys,time,zlib,resource,importlib.util
+from resource_parse_products import identity as metadata_identity
 LIMIT=128*1024*1024
 class ScanError(ValueError):pass
 class MetadataBudgetError(ScanError):
@@ -55,7 +56,7 @@ def digest_path(p):
  with p.open('rb')as s:
   for b in iter(lambda:s.read(1024*1024),b''):h.update(b)
  return h.hexdigest()
-def stable_stat(s):return(s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns)
+def stable_stat(s):return(s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
 def ids(d,o,n,maxn):
  need(0<=n<=maxn,'index count');return list(u('<'+'i'*n,d,o))if n else[]
 TYPE_SIZE={0:4,1:8,2:12,3:16,16:4,17:4,18:4,19:4,20:4,21:4,22:8,23:4,24:8,26:8,45:4,46:8,47:4,240:1}
@@ -158,7 +159,7 @@ def dispatch_payload(scanner,path,where):
  return scanner.payload(where,path.read_bytes())
 
 class Scanner:
- def __init__(self,root,prior,out,p=None):
+ def __init__(self,root,prior,out,p=None,*,products=None,source_files=None):
   p=project_root(p)
   need(out.is_dir()and not any(out.iterdir()),'fresh empty output directory required')
   tool_root=next(p/name for name in('native-runtime-tools','tools')if(p/name/'game_shader_catalog.py').is_file())
@@ -169,7 +170,15 @@ class Scanner:
   self.known={x['path']:x for x in self.prior['packages']};self.count=collections.Counter();self.stages=collections.Counter();self.programs=set();self.codes=set();self.errors=[];self.gaps=[];self.layouts={};self.materials=set();self.partials={};self.raw_signatures=0
   self.streams={x:(out/(x+'.jsonl')).open('w')for x in ['files','resources','programs','models','partial-pipelines','errors','gaps']}
   self.exts=collections.Counter();self.bytes=0;self.reuse=0
+  self.products=products;self.source_files=source_files;self._recording=None;self._recording_bytes=0;self._emitted_partials=set()
  def emit(self,kind,row):
+  if self._recording is not None:
+   self._recording_bytes+=len(json.dumps(row,ensure_ascii=False,separators=(',',':')).encode())+len(kind)+16
+   if self._recording_bytes<=3*1024*1024:self._recording.append([kind,row])
+   else:self._recording=None
+  if kind=='partial-pipelines':
+   if row['id']in self._emitted_partials:return
+   self._emitted_partials.add(row['id'])
   # Iterencode avoids constructing an extra expanded model-sized JSON string.
   encoder=json.JSONEncoder(ensure_ascii=False,separators=(',',':'))
   for piece in encoder.iterencode(row):self.streams[kind].write(piece)
@@ -244,31 +253,90 @@ class Scanner:
     except (ValueError,UnicodeError,struct.error)as error:self.error(child,error)
     self.count['split_entries']+=1;del raw,d
   need(stable_stat(body_before)==stable_stat(body.stat()),'split body changed during scan')
+
+ def file_state(self):
+  return dict(count=dict(self.count),stages=dict(self.stages),programs=sorted(self.programs),codes=sorted(self.codes),
+   materials=sorted(self.materials),partials=self.partials,errors=self.errors,gaps=self.gaps,
+   raw_signatures=self.raw_signatures,reuse=self.reuse)
+
+ def merge_file(self,state):
+  need(set(state)=={'count','stages','programs','codes','materials','partials','errors','gaps','raw_signatures','reuse'},'file metadata state fields')
+  self.count.update(state['count']);self.stages.update(state['stages']);self.programs.update(state['programs']);self.codes.update(state['codes']);self.materials.update(state['materials'])
+  for ident,count in state['partials'].items():self.partials[ident]=self.partials.get(ident,0)+count
+  self.errors.extend(state['errors']);self.gaps.extend(state['gaps']);self.raw_signatures+=state['raw_signatures'];self.reuse+=state['reuse']
+
+ def parse_file(self,path,where,digest,size):
+  mode='';known=self.known.get(where)
+  try:
+   if known and known['sha256']==digest and known['kind']in('shader','material'):
+    self.reuse+=1;mode='verified-prior-binder-metadata'
+    self.count['reused_shader_entries']+=known['entry_count']if known['kind']=='shader'else 0
+    for e in known['entries']:
+     if 'binary_info'in e:self.records(where+'::'+e['name'],dict(records=e['binary_info'],rejected=e.get('rejected_signature_candidates',[])),known['debug'])
+   elif split_header_name(path.name):mode='split-BXF';self.split(path,where)
+   elif path.name.endswith(('tpfbdt','hkxbdt','bdt.patch')):mode='split-body-covered-via-header'
+   elif size<=LIMIT:
+    mode='bounded-payload-scan';d=path.read_bytes();self.payload(where,d);del d
+   else:mode='streaming-raw-signature-scan';self.raw_scan(path,where)
+  except (ValueError,UnicodeError,struct.error)as error:self.error(where,error)
+  self.emit('files',dict(path=where,bytes=size,sha256=digest,scan=mode))
+
  def run(self):
   start=time.monotonic();files=[]
-  for base,dirs,names in os.walk(self.root,followlinks=False):
-   for n in names:files.append(Path(base)/n)
+  selected={}
+  if self.source_files is not None:
+   for row in self.source_files:
+    relative=Path(row['path']);need(not relative.is_absolute()and '..'not in relative.parts and str(relative)==row['path'] and row['path']not in selected,'registered scanner source path')
+    selected[row['path']]=row;files.append(self.root/relative)
+  else:
+   for base,dirs,names in os.walk(self.root,followlinks=False):
+    for n in names:files.append(Path(base)/n)
   for i,path in enumerate(sorted(files)):
-   where=str(path.relative_to(self.root));before=path.stat(follow_symlinks=False)
-   if path.is_symlink():self.error(where,'symlink input refused');continue
-   suffix=''.join(path.suffixes[-2:])or'<none>';self.exts[suffix]+=1;self.bytes+=before.st_size
-   digest=digest_path(path);mode='';known=self.known.get(where)
-   try:
-    if known and known['sha256']==digest and known['kind']in('shader','material'):
-     self.reuse+=1;mode='verified-prior-binder-metadata'
-     self.count['reused_shader_entries']+=known['entry_count']if known['kind']=='shader'else 0
-     for e in known['entries']:
-      if 'binary_info'in e:self.records(where+'::'+e['name'],dict(records=e['binary_info'],rejected=e.get('rejected_signature_candidates',[])),known['debug'])
-    elif split_header_name(path.name):
-     mode='split-BXF';self.split(path,where)
-    elif path.name.endswith(('tpfbdt','hkxbdt','bdt.patch')):mode='split-body-covered-via-header'
-    elif before.st_size<=LIMIT:
-     mode='bounded-payload-scan';d=path.read_bytes();self.payload(where,d);del d
-    else:
-     mode='streaming-raw-signature-scan';self.raw_scan(path,where)
-   except (ValueError,UnicodeError,struct.error)as error:self.error(where,error)
-   after=path.stat(follow_symlinks=False);need(stable_stat(before)==stable_stat(after),'file changed during scan: '+where)
-   self.emit('files',dict(path=where,bytes=before.st_size,sha256=digest,scan=mode))
+   where=str(path.relative_to(self.root));registered=selected.get(where)
+   if registered is None:
+    before=path.stat(follow_symlinks=False)
+    if path.is_symlink():self.error(where,'symlink input refused');continue
+    digest=digest_path(path);size=before.st_size
+   else:digest=registered['sha256'];size=registered['bytes']
+   suffix=''.join(path.suffixes[-2:])or'<none>';self.exts[suffix]+=1;self.bytes+=size
+   dependencies=[]
+   if split_header_name(path.name):
+    body=path.with_name(path.name.replace('bhd','bdt'));name=str(body.relative_to(self.root))
+    if name in selected:dependencies.append(selected[name])
+    elif body.is_file()and not body.is_symlink():dependencies.append(dict(path=name,sha256=digest_path(body),bytes=body.stat().st_size))
+    else:dependencies.append(dict(path=name,missing=True))
+   inputs=dict(kind='full-resource-file-v1',path=where,sha256=digest,bytes=size,dependencies=dependencies,
+     prior_package_sha256=metadata_identity(self.known.get(where)))
+   saved=self.products.get(inputs)if self.products is not None else None
+   if saved is not None:
+    need(set(saved)=={'state','rows'},'cached resource metadata fields')
+    for kind,row in saved['rows']:
+     need(kind in self.streams,'cached resource stream');self.emit(kind,row)
+    self.merge_file(saved['state'])
+   else:
+    # Run the SAME reader methods with file-local accounting. This makes each
+    # product independent of which previous files emitted identical model keys.
+    local=object.__new__(Scanner);local.__dict__=dict(self.__dict__)
+    local.count=collections.Counter();local.stages=collections.Counter();local.programs=set();local.codes=set();local.materials=set();local.partials={};local.errors=[];local.gaps=[];local.raw_signatures=0;local.reuse=0
+    local._recording=[]if self.products is not None else None;local._recording_bytes=0
+    before=path.stat(follow_symlinks=False)
+    need(not path.is_symlink()and before.st_size==size,'registered resource changed before parse')
+    need(digest_path(path)==digest,'registered resource content changed before parse')
+    dep_pins=[]
+    for dep in dependencies:
+     dep_path=self.root/dep['path']
+     if dep.get('missing'):
+      need(not os.path.lexists(dep_path),'registered missing split dependency appeared');dep_pins.append((dep_path,None))
+     else:
+      pin=dep_path.stat(follow_symlinks=False)
+      need(not dep_path.is_symlink()and pin.st_size==dep['bytes']and digest_path(dep_path)==dep['sha256'],'registered split dependency content changed')
+      dep_pins.append((dep_path,stable_stat(pin)))
+    local.parse_file(path,where,digest,size)
+    need(stable_stat(before)==stable_stat(path.stat(follow_symlinks=False)),'file changed during scan: '+where)
+    for dep_path,pin in dep_pins:
+     need(not os.path.lexists(dep_path)if pin is None else stable_stat(dep_path.stat(follow_symlinks=False))==pin,'split dependency changed during scan')
+    state=local.file_state();self.merge_file(state)
+    if self.products is not None and local._recording is not None:self.products.put(inputs,dict(state=state,rows=local._recording))
    if i%1000==0:
     print(json.dumps(dict(progress=i,total=len(files),seconds=round(time.monotonic()-start,1),errors=len(self.errors),models=self.count['flver_parsed'])),flush=True)
   summary=dict(full_pso_recipes_from_static_scan=0,metadata_budget_policy=dict(flver=MODEL_LIMITS,bhf=BHF_LIMITS),files=len(files),bytes=self.bytes,suffix_counts=dict(self.exts),counts=dict(self.count),reused_prior_packages=self.reuse,unique_nondebug_program_hashes=len(self.programs),unique_nondebug_code_sha256=len(self.codes),binary_info_type_counts=dict(self.stages),distinct_referenced_materials=len(self.materials),material_names=sorted(self.materials),distinct_partial_pipeline_signatures=len(self.partials),partial_pipeline_occurrences=sum(self.partials.values()),errors=len(self.errors),gaps=len(self.gaps),elapsed_seconds=time.monotonic()-start,peak_rss_native_units=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)

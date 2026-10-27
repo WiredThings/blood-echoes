@@ -50,10 +50,14 @@ def prepare_startup_archive_policy(*,enabled,engine,selected_executable,backend_
                                    game_artifacts=game_artifacts,options=options,profile=profile)
     identity=dict(mode='arm64-v3',namespaced=True,manifest_created=True,
                   token=token,manifest=manifest,selected_gpu=selected)
-    # Separate the domains in the ACTUAL existing producer. Keep the current
-    # native namespace until retained-product migration is wired and verified;
-    # a new digest alone must not silently strand all existing artifacts.
+    # Actual per-source/full-state keys still own products. Resource selection
+    # is retained as provenance; it is not a reason to replace the compiler's
+    # whole namespace. Old namespaces remain on disk. SDK-qualified identical
+    # library products can be adopted through the original builder's full proof.
     if isinstance(manifest,dict)and manifest.get('schema')==1 and set(manifest)=={'schema','translator','game','options','profile'}:
         from compilation_domains import split_manifest
         identity['domains']=split_manifest(manifest)
-    return {'BB_MTL_ARCHIVE_COMPATIBILITY_ID':token},identity
+        identity['legacy_selection_token']=token
+        identity['token']=identity['domains']['compilation_token']
+        identity['compilation_identity_active']=True
+    return {'BB_MTL_ARCHIVE_COMPATIBILITY_ID':identity['token']},identity

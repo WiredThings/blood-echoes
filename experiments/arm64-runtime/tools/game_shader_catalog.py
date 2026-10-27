@@ -108,37 +108,53 @@ def game_identity(data):
  require(result.get('TITLE_ID','').startswith('CUSA')and result.get('APP_VER')=='01.09','fixed 1.09 identity required')
  return dict(result,sfo_sha256=hashlib.sha256(data).hexdigest())
 
-def inventory(root):
+def read_package(root,path,embedded=False):
+ """Original package reader; metadata caching never supplies synthetic inputs."""
+ if embedded:return read_embedded(root,path)
+ require(path.stat().st_size<=LIMIT,'compressed input budget')
+ compressed=path.read_bytes();data=dcx(compressed);binder=bnd4(data);before=hashlib.sha256(compressed).hexdigest();debug='shaderbnddebug'in path.name;is_shader=path.parent==root/'dvdroot_ps4/shader'
+ package=dict(path=str(path.relative_to(root)),sha256=before,compressed_bytes=len(compressed),uncompressed_bytes=len(data),entry_count=binder['count'],version=binder['version'],debug=debug,kind='shader'if is_shader else'material',suffixes=dict(collections.Counter(Path(x['name']).suffix for x in binder['entries'])),entries=[])
+ for entry in binder['entries']:
+  payload=entry_data(data,entry);meta=dict(entry,sha256=hashlib.sha256(payload).hexdigest());meta.pop('offset')
+  if is_shader:
+   scanned=orb_metadata(payload);meta['binary_info']=scanned['records'];meta['rejected_signature_candidates']=scanned['rejected']
+  package['entries'].append(meta)
+  del payload  # Do not keep the previous large decompressed binder alive.
+ require(hashlib.sha256(path.read_bytes()).hexdigest()==before,'input changed during read')
+ return package
+
+def read_embedded(root,path):
+ require(0<path.stat().st_size<=LIMIT,'embedded input budget')
+ with path.open('rb')as stream,mmap.mmap(stream.fileno(),0,access=mmap.ACCESS_READ)as data:
+  magic=data[:4];require(magic in(b'\x7fELF',b'O\x15=\x1d'),'unsupported executable/module container')
+  before=hashlib.sha256(data).hexdigest();scanned=orb_metadata(data)
+  package=dict(path=str(path.relative_to(root)),sha256=before,kind='embedded',debug=False,stored_bytes=len(data),entry_count=0,entries=[],binary_info=scanned['records'],rejected_signature_candidates=scanned['rejected'],container='ELF'if magic==b'\x7fELF'else'SELF',compressed_segments_not_decoded=True)
+  require(hashlib.sha256(data).hexdigest()==before,'embedded input changed during read')
+ return package
+
+def inventory(root,*,products=None,source_files=None):
  root=Path(root);require(root.is_absolute()and root==root.resolve()and root.is_dir(),'absolute non-symlink game root required')
  sfo=root/'sce_sys/param.sfo';require(sfo.is_file()and not sfo.is_symlink()and sfo.stat().st_size<=65536,'SFO identity required');identity=game_identity(sfo.read_bytes())
  shader=root/'dvdroot_ps4/shader';material=root/'dvdroot_ps4/mtd/allmaterialbnd.mtdbnd.dcx'
  paths=sorted(shader.glob('*.shaderbnd*.dcx'))+[material];require(len(paths)>1,'shader bundles missing')
+ selected={row['path']:row for row in source_files}if source_files is not None else{}
  packages=[];programs=[]
- for path in paths:
+ for path in paths+[root/'eboot.bin',*sorted((root/'sce_module').glob('*.prx'))]:
+  relative=str(path.relative_to(root));registered=selected.get(relative);embedded=path not in paths
   require(path.is_file()and not path.is_symlink()and path.resolve().is_relative_to(root),'unsafe/missing package')
-  require(path.stat().st_size<=LIMIT,'compressed input budget')
-  compressed=path.read_bytes();data=dcx(compressed);binder=bnd4(data);before=hashlib.sha256(compressed).hexdigest();debug='shaderbnddebug'in path.name;is_shader=path.parent==shader
-  package=dict(path=str(path.relative_to(root)),sha256=before,compressed_bytes=len(compressed),uncompressed_bytes=len(data),entry_count=binder['count'],version=binder['version'],debug=debug,kind='shader'if is_shader else'material',suffixes=dict(collections.Counter(Path(x['name']).suffix for x in binder['entries'])),entries=[])
-  for entry in binder['entries']:
-   payload=entry_data(data,entry);meta=dict(entry,sha256=hashlib.sha256(payload).hexdigest());meta.pop('offset')
-   if is_shader:
-    scanned=orb_metadata(payload);meta['binary_info']=scanned['records'];meta['rejected_signature_candidates']=scanned['rejected']
-    for record in meta['binary_info']:programs.append(dict(package=package['path'],entry=entry['name'],entry_sha256=meta['sha256'],debug=debug,**record))
-   package['entries'].append(meta)
-   del payload  # Do not keep the previous large decompressed binder alive.
-  require(hashlib.sha256(path.read_bytes()).hexdigest()==before,'input changed during read')
-  packages.append(package);del data,compressed,binder
- # Executable/module embedded programs are part of this fixed title too.
- for path in [root/'eboot.bin',*sorted((root/'sce_module').glob('*.prx'))]:
-  require(path.is_file()and not path.is_symlink()and path.resolve().is_relative_to(root),'unsafe embedded input')
-  require(0<path.stat().st_size<=LIMIT,'embedded input budget')
-  with path.open('rb')as stream,mmap.mmap(stream.fileno(),0,access=mmap.ACCESS_READ)as data:
-   magic=data[:4];require(magic in(b'\x7fELF',b'O\x15=\x1d'),'unsupported executable/module container')
-   before=hashlib.sha256(data).hexdigest();scanned=orb_metadata(data)
-   package=dict(path=str(path.relative_to(root)),sha256=before,kind='embedded',debug=False,stored_bytes=len(data),entry_count=0,entries=[],binary_info=scanned['records'],rejected_signature_candidates=scanned['rejected'],container='ELF'if magic==b'\x7fELF'else'SELF',compressed_segments_not_decoded=True)
-   for record in scanned['records']:programs.append(dict(package=package['path'],entry=None,debug=False,**record))
-   require(hashlib.sha256(data).hexdigest()==before,'embedded input changed during read')
+  require(0<path.stat().st_size<=LIMIT,'package byte budget')
+  source=registered or dict(path=relative,sha256=hashlib.sha256(path.read_bytes()).hexdigest(),bytes=path.stat().st_size)
+  proof=dict(kind='package-metadata-v1',source=source,embedded=embedded)
+  package=products.get(proof)if products is not None else None
+  if package is None:
+   package=read_package(root,path,embedded)
+   require(package['sha256']==source['sha256'],'registered package content changed')
+   if products is not None:products.put(proof,package)
   packages.append(package)
+  for entry in package['entries']if package['kind']=='shader'else[package]if embedded else[]:
+   for record in entry.get('binary_info',[]):
+    extra={'entry_sha256':entry['sha256']}if not embedded else{}
+    programs.append(dict(package=relative,entry=entry.get('name'),debug=package['debug'],**extra,**record))
  nondebug=[x for x in programs if not x['debug']];groups=collections.defaultdict(list)
  for x in nondebug:groups[x['program_hash']].append(x)
  return dict(schema=1,game_root=str(root),game_identity=identity,packages=packages,programs=programs,summary=dict(packages=len(packages),shader_packages=sum(x['kind']=='shader'for x in packages),material_packages=sum(x['kind']=='material'for x in packages),shader_entries=sum(x['entry_count']for x in packages if x['kind']=='shader'and not x['debug']),debug_entries=sum(x['entry_count']for x in packages if x['debug']),material_entries=sum(x['entry_count']for x in packages if x['kind']=='material'),nondebug_binary_info_records=len(nondebug),unique_program_hashes=len(groups),multiple_entries_per_hash=sum(len(v)>1 for v in groups.values()),hashes_with_distinct_verified_code=sum(len({x.get('code_sha256')for x in v if x['code_prefix_verified']})>1 for v in groups.values()),verified_code_records=sum(x['code_prefix_verified']for x in nondebug),unique_verified_code_sha256=len({x['code_sha256']for x in nondebug if x['code_prefix_verified']}),unverified_binary_info_records=sum(not x['code_prefix_verified']for x in nondebug),entries_without_binary_info=sum(not x.get('binary_info')for p in packages if p['kind']=='shader'and not p['debug']for x in p['entries'])),qualification='Local metadata only. Verified prefixes/code digests identify stored code, not complete runtime specialization or pipeline compatibility. Executable SELF compressed segments are not decoded; no whole-game completeness claim. Debug packages separate; no payloads extracted. No compilation or game/cache modifications.')

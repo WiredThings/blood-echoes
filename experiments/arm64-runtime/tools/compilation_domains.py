@@ -1,7 +1,7 @@
 """Compile identity vs launch provenance. Digests are NOT artifact admission.
 
-This is shared by the existing manifest/builder paths; legacy native keys remain
-intact until retained-artifact migration and native adoption are integrated.
+This is shared by the actual manifest/builder paths; native per-input keys remain
+intact. Retained library adoption validates the original full native request.
 Unknown options remain in compatibility, explicitly marked for field audit.
 """
 import hashlib,json,re
@@ -14,7 +14,8 @@ HEX=re.compile(r'[0-9a-f]{64}')
 PSO_SCHEDULE_PROTOCOLS=frozenset(('prepare_game_psos.py','game_pso_queue.py',
  'game_pso_progress_identity.py','game_pso_owned_audit.py','decode_shader_cache.py',
  'pso_startup_schedule.py','startup_change_journal.py','incremental_file_hashes.py',
- 'launcher_game_catalog.py'))
+ 'launcher_game_catalog.py','recipe_preparation_schedule.py','resource_parse_products.py',
+ 'local_metal_builder.py'))
 
 def pso_schedule_identity(admitted_tools):
  if not isinstance(admitted_tools,dict)or not PSO_SCHEDULE_PROTOCOLS<=set(admitted_tools):raise ValueError('complete admitted PSO protocols required')
@@ -25,12 +26,17 @@ def pso_schedule_identity(admitted_tools):
 # Audited execution-only consumers: mtl_scheduler.mm, mtl_render_list.mm,
 # mtl_runtime.mm. These affect residency/fences/staging, not source generation.
 EXECUTION_OPTIONS=frozenset(('BB_MTL_PRECISE_RESIDENCY','BB_MTL_COALESCE_BARRIERS',
- 'BB_MTL_HOT_STAGING_REUSE','BB_MTL_GPU_TIMING'))
+ 'BB_MTL_HOT_STAGING_REUSE','BB_MTL_GPU_TIMING',
+ # mtl_pso_cache.mm persist_enabled changes serialization only; the concrete
+ # compile options/descriptor are separately keyed. FinishMainPreparation only
+ # flushes/releases archive objects. ShaderCompiler's LibraryMemo retains live
+ # functions, without changing their actual MSL, options or native identity.
+ 'BB_MTL_PERSIST_WARM_ARCHIVE','BB_MTL_RELEASE_WARM_ARCHIVE','BB_MTL_LIBRARY_REUSE'))
 # Actual source/function compilation controls read by mtl_shader.mm and
 # PsoCache's native compatibility options. Keep concrete values, including unset
 # vs explicitly supplied values; unknown future controls are never dropped.
 COMPILE_OPTIONS=frozenset(('BB_MTL_STRICT_FLOAT','BB_MTL_RELAXED_MATH',
- 'BB_MTL_VERTEX_MATH','BB_MTL_FRAGMENT_UNIFORMS','BB_MTL_COPY_PAIR','BB_GS_DEBUG',
+ 'BB_MTL_VERTEX_MATH','BB_MTL_FRAGMENT_UNIFORMS','BB_MTL_COPY_PAIR','BB_GS_DEBUG','BB_MTL_TWO_LEVEL_BDA',
  'MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES',
  'MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER'))
 

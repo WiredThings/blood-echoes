@@ -114,11 +114,25 @@ class Restart(unittest.TestCase):
    if value is not None:env['BB_QUICKLOAD_PENDING']=value
    self.assertIsNone(self.resume(environment=env))
   self.assertEqual(self.calls,[])
- def test_unsupervised_online_or_missing_nonce_does_not_form_binding(self):
+ def test_unsupervised_unknown_mode_or_missing_nonce_does_not_form_binding(self):
   self.assertTrue(self.publish());bound=self.bound()
-  for name,value in [('BB_ONLINE','1'),('BB_RESTART_SUPERVISED','0'),('BB_ARM_SESSION_NONCE',''),('BB_ARM_RESTART_NONCE','x'*32)]:
+  for name,value in [('BB_ONLINE','unknown'),('BB_RESTART_SUPERVISED','0'),('BB_ARM_SESSION_NONCE',''),('BB_ARM_RESTART_NONCE','x'*32)]:
    self.assertIsNone(self.bound(environment={**self.env,name:value}))
    self.assertIsNone(self.resume(bound=bound,environment={**self.env,'BB_QUICKLOAD_PENDING':'1',name:value}))
+ def test_online_preparation_can_feed_offline_f3_without_restoring_account_or_weakening_inputs(self):
+  import startup_change_journal as journal
+  local=self.local_env();online={**self.env,'BB_ONLINE':'1','BB_THD_TOKEN':'private-not-in-proof'}
+  bound=self.bound(environment=online)
+  self.assertEqual(bound,self.bound());self.assertNotIn('private-not-in-proof',json.dumps(bound))
+  with patch.object(journal,'query',return_value=dict(author='journal')):
+   self.assertTrue(self.publish(bound=bound,local_environment={**local,**online}))
+  with patch.object(journal,'unchanged',return_value=True):
+   self.assertEqual(self.early(),local)
+   self.assertIsNone(self.early(environment={**online,'BB_QUICKLOAD_PENDING':'1'}))
+  self.assertEqual(self.resume()['status'],'same-supervisor-f3-schedule-reused')
+  self.assertIsNone(self.resume(environment={**online,'BB_QUICKLOAD_PENDING':'1'}))
+  changed=copy.deepcopy(self.archive);changed['manifest']['game']['patches']['sha256']='0'*64
+  self.assertIsNone(self.resume(bound=self.bound(archive_identity=changed)))
  def test_new_supervisor_start_or_nonce_cannot_reuse(self):
   self.assertTrue(self.publish())
   self.owner['start']='Tue Oct 27 02:02:03 2026';self.assertIsNone(self.resume())

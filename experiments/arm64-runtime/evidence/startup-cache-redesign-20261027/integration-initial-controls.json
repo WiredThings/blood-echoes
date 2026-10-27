@@ -1,0 +1,265 @@
+{
+  "status": "failed",
+  "total_tests": 654,
+  "suites": [
+    {
+      "suite": "test_incremental_file_hashes",
+      "exit": 0,
+      "tests": 17,
+      "seconds": 0.154
+    },
+    {
+      "suite": "test_incremental_preparation",
+      "exit": 1,
+      "tests": 12,
+      "seconds": 2.923
+    },
+    {
+      "suite": "test_launcher_source_view",
+      "exit": 0,
+      "tests": 33,
+      "seconds": 5.776
+    },
+    {
+      "suite": "test_launcher_game_catalog",
+      "exit": 0,
+      "tests": 15,
+      "seconds": 1.747
+    },
+    {
+      "suite": "test_source_code_closure",
+      "exit": 0,
+      "tests": 13,
+      "seconds": 0.676
+    },
+    {
+      "suite": "test_launcher_runtime_scope",
+      "exit": 0,
+      "tests": 25,
+      "seconds": 0.1
+    },
+    {
+      "suite": "test_launcher_runtime_scope_observer",
+      "exit": 0,
+      "tests": 18,
+      "seconds": 0.27
+    },
+    {
+      "suite": "test_quick_restart_preparation",
+      "exit": 0,
+      "tests": 25,
+      "seconds": 0.269
+    },
+    {
+      "suite": "test_launcher_local_aot",
+      "exit": 0,
+      "tests": 21,
+      "seconds": 2.256
+    },
+    {
+      "suite": "test_launcher_game_pso_automatic",
+      "exit": 0,
+      "tests": 10,
+      "seconds": 0.124
+    },
+    {
+      "suite": "test_launcher_game_modules",
+      "exit": 0,
+      "tests": 14,
+      "seconds": 0.85
+    },
+    {
+      "suite": "test_qa_launch_clone",
+      "exit": 0,
+      "tests": 20,
+      "seconds": 0.619
+    },
+    {
+      "suite": "test_qa_launch_conditions",
+      "exit": 0,
+      "tests": 34,
+      "seconds": 0.501
+    },
+    {
+      "suite": "test_qa_memory_policy",
+      "exit": 0,
+      "tests": 13,
+      "seconds": 0.065
+    },
+    {
+      "suite": "test_native_source_package",
+      "exit": 0,
+      "tests": 8,
+      "seconds": 0.137
+    },
+    {
+      "suite": "test_normal_preparation_build_plan",
+      "exit": 0,
+      "tests": 9,
+      "seconds": 0.07
+    },
+    {
+      "suite": "test_fixed_helper_failure_records",
+      "exit": 0,
+      "tests": 7,
+      "seconds": 0.041
+    },
+    {
+      "suite": "test_startup_change_journal",
+      "exit": 0,
+      "tests": 9,
+      "seconds": 0.799
+    },
+    {
+      "suite": "test_persistent_library_audit",
+      "exit": 0,
+      "tests": 5,
+      "seconds": 4.127
+    },
+    {
+      "suite": "test_pso_startup_schedule",
+      "exit": 0,
+      "tests": 17,
+      "seconds": 3.04
+    },
+    {
+      "suite": "test_local_metal_builder",
+      "exit": 0,
+      "tests": 39,
+      "seconds": 4.638
+    },
+    {
+      "suite": "test_preparation_session",
+      "exit": 0,
+      "tests": 18,
+      "seconds": 5.301
+    },
+    {
+      "suite": "test_local_aot_policy",
+      "exit": 0,
+      "tests": 6,
+      "seconds": 0.064
+    },
+    {
+      "suite": "test_game_companion_modules",
+      "exit": 0,
+      "tests": 21,
+      "seconds": 0.186
+    },
+    {
+      "suite": "test_texture_binding_request",
+      "exit": 0,
+      "tests": 11,
+      "seconds": 0.074
+    },
+    {
+      "suite": "test_prepare_local_aot_stage",
+      "exit": 0,
+      "tests": 15,
+      "seconds": 0.696
+    },
+    {
+      "suite": "test_compilation_domains",
+      "exit": 0,
+      "tests": 9,
+      "seconds": 0.048
+    },
+    {
+      "suite": "test_module_product_schedule",
+      "exit": 0,
+      "tests": 10,
+      "seconds": 0.16
+    },
+    {
+      "suite": "test_resource_parse_products",
+      "exit": 0,
+      "tests": 13,
+      "seconds": 0.273
+    },
+    {
+      "suite": "test_recipe_preparation_schedule",
+      "exit": 0,
+      "tests": 13,
+      "seconds": 0.249
+    },
+    {
+      "suite": "test_game_shader_catalog",
+      "exit": 0,
+      "tests": 20,
+      "seconds": 0.08
+    },
+    {
+      "suite": "test_gnm_shader_metadata",
+      "exit": 0,
+      "tests": 14,
+      "seconds": 0.053
+    },
+    {
+      "suite": "test_full_game_catalog",
+      "exit": 0,
+      "tests": 23,
+      "seconds": 0.263
+    },
+    {
+      "suite": "test_game_pso_queue",
+      "exit": 0,
+      "tests": 19,
+      "seconds": 22.763
+    },
+    {
+      "suite": "test_game_pso_batch",
+      "exit": 0,
+      "tests": 31,
+      "seconds": 0.129
+    },
+    {
+      "suite": "test_game_pso_collect_pages",
+      "exit": 0,
+      "tests": 8,
+      "seconds": 1.262
+    },
+    {
+      "suite": "test_game_pso_strict_first",
+      "exit": 0,
+      "tests": 16,
+      "seconds": 0.222
+    },
+    {
+      "suite": "test_game_pso_process_resume",
+      "exit": 0,
+      "tests": 3,
+      "seconds": 0.768
+    },
+    {
+      "suite": "test_game_pso_incremental_progress",
+      "exit": 0,
+      "tests": 11,
+      "seconds": 0.168
+    },
+    {
+      "suite": "test_game_pso_cross_page",
+      "exit": 0,
+      "tests": 15,
+      "seconds": 0.471
+    },
+    {
+      "suite": "test_game_pso_readiness",
+      "exit": 0,
+      "tests": 5,
+      "seconds": 0.05
+    },
+    {
+      "suite": "test_game_pso_geometry_adapter",
+      "exit": 0,
+      "tests": 9,
+      "seconds": 0.12
+    },
+    {
+      "suite": "test_game_pso_worker_wait",
+      "exit": 5,
+      "tests": 0,
+      "seconds": 0.051
+    }
+  ],
+  "qualification": "directed authored inputs and real filesystem journals; no compiler, native GPU worker, game, GUI or formal data use"
+}

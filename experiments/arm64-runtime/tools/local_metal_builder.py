@@ -6,7 +6,7 @@ runner/fingerprint injection exists solely for authored tests; no compiler/flag 
 accepted from CLI or request JSON. Nothing uploads source, libraries, receipts or caches.
 """
 from pathlib import Path
-import argparse,fcntl,hashlib,json,os,re,signal,sqlite3,stat,subprocess,tempfile,time
+import argparse,fcntl,hashlib,json,os,re,signal,sqlite3,stat,subprocess,sys,tempfile,time
 
 PROJECT=Path(__file__).resolve().parents[1]
 RECIPE='bb-metal-local-aot-v1'
@@ -249,6 +249,68 @@ def remember_product(root,request,build_id,manifest):
     path=group/(digest(canonical(row))+'.json')
     if os.path.lexists(path):return read_json(path)==row
     write_new(path,canonical(row)+b'\n');return True
+
+def adoption_provenance(root,request,build_id,proof):
+    # Provenance is kept separately from inputs read by the native factory and
+    # its startup proofs. It never claims that an entry/PSO has been admitted.
+    parent=child_directory(root,'.product-adoptions-v1',create=True)
+    for name in(request['cohort'],build_id):parent=child_directory(parent,name,create=True)
+    proof=dict(proof,native_entry_admitted=False,pipeline_ready=False)
+    path=parent/(request['key']+'-'+digest(canonical(proof))+'.json')
+    if os.path.lexists(path):
+        if read_json(path)!=proof:raise Refused('existing adoption provenance differs')
+    else:write_new(path,canonical(proof)+b'\n')
+    return path
+
+def publish_new_file(source,target):
+    """Complete candidate, atomic NO-REPLACE publication on macOS."""
+    if sys.platform=='darwin':
+        import ctypes
+        api=ctypes.CDLL('/usr/lib/libSystem.B.dylib',use_errno=True).renamex_np
+        api.argtypes=(ctypes.c_char_p,ctypes.c_char_p,ctypes.c_uint);api.restype=ctypes.c_int
+        # SDK sys/stdio.h: RENAME_EXCL, available since macOS 10.12.
+        if api(os.fsencode(source),os.fsencode(target),0x00000004):
+            code=ctypes.get_errno();raise OSError(code,os.strerror(code),str(target))
+    else:
+        # Author-only non-Metal platforms. Receipt publication follows unlink;
+        # the real native reader never accepts an unaccounted hardlinked file.
+        os.link(source,target,follow_symlinks=False);os.unlink(source)
+
+def pair_pins(folder,key):
+    result={}
+    for suffix,limit in(('.metallib',LIBRARY_MAX),('.json',JSON_MAX),('.adoption.json',JSON_MAX)):
+        path=folder/(key+suffix)
+        if not os.path.lexists(path):continue
+        info=path.lstat()
+        if not stat.S_ISREG(info.st_mode)or info.st_uid!=os.getuid()or info.st_nlink!=1 or info.st_mode&0o022 or not 0<=info.st_size<=limit:
+            raise Refused('unsafe current artifact node cannot be moved for repair')
+        result[suffix]=_session_stat(info)
+    return result
+
+def retain_invalid_pair(root,cohort,build_id,key,folder,pins,guard):
+    """Only after a valid replacement exists; keep every previous byte.
+
+    History is outside active product/import proofs, so unrelated retained
+    generations cannot invalidate warm startup or enlarge native residency.
+    """
+    guard.check(preflight=True)
+    if pair_pins(folder,key)!=pins:raise Refused('current artifact changed during repair')
+    parent=child_directory(root,'.retained-invalid-v1',create=True)
+    for name in(cohort,build_id,key):parent=child_directory(parent,name,create=True)
+    history=Path(tempfile.mkdtemp(prefix='repair-',dir=parent));files=[]
+    for suffix in pins:
+        path=folder/(key+suffix);limit=LIBRARY_MAX if suffix=='.metallib'else JSON_MAX
+        blob=regular_bytes(path,limit);files.append(dict(name=path.name,sha256=digest(blob),bytes=len(blob),stamp=pins[suffix]));del blob
+    write_new(history/'MANIFEST.json',canonical(dict(schema=1,kind='retained-invalid-native-library-pair',cohort=cohort,build_id=build_id,key=key,files=files))+b'\n')
+    for row in files:
+        guard.check(preflight=True);path=folder/row['name']
+        if _session_stat(path.lstat())!=row['stamp']:raise Refused('current artifact changed before retention')
+        publish_new_file(path,history/path.name)
+        limit=LIBRARY_MAX if path.suffix=='.metallib'else JSON_MAX
+        blob=regular_bytes(history/path.name,limit)
+        if digest(blob)!=row['sha256']or len(blob)!=row['bytes']:raise Refused('retained artifact changed')
+        del blob
+    return history
 
 class Safety:
     def __init__(self,observer,require_no_games,policy_factory,clock=time.monotonic):
@@ -505,43 +567,49 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
             request,source=index.load_owned(key,cohort)
             from compilation_domains import library_product_key
             product_key=library_product_key(request,build_id)
-            if already_succeeded(artifacts,request,build_id):
+            try:complete=already_succeeded(artifacts,request,build_id)
+            except (OSError,ValueError,TypeError,Refused)as error:
+                if isinstance(error,Stopped):raise
+                complete=False
+            if complete:
                 try:remember_product(root,request,build_id,manifest)
                 except(OSError,ValueError,TypeError,KeyError,Refused):pass
                 summary['skipped']+=1;record_result(dict(key=key,status='skipped-verified',compile_product_id=product_key));continue
+            previous=pair_pins(artifacts,key)
             with tempfile.TemporaryDirectory(prefix=key+'-',dir=private_tmp)as scratch:
                 scratch=Path(scratch);snapshot=scratch/'source.metal';air=scratch/'output.air';library=scratch/'output.metallib'
                 write_new(snapshot,source);del source
                 adopted=retained_product(root,request,regular_bytes(snapshot,SOURCE_MAX),build_id,manifest,guard)
-                reused=adopted is not None
+                reused=adopted is not None;provenance=None
                 # The current native request/key remains untouched. The adopted
                 # binary gets its own ordinary receipt plus explicit provenance.
                 if adopted is None:toolchain.compile(snapshot,air,library,request,guard)
                 else:
                     toolchain.unchanged(guard);write_new(library,adopted[0])
-                    write_new(scratch/'adoption.json',canonical(adopted[1])+b'\n');del adopted
+                    provenance=adoption_provenance(root,request,build_id,adopted[1]);del adopted
                 blob=regular_bytes(library,LIBRARY_MAX)
                 if not blob:raise Refused('empty metallib output')
                 receipt=expected_receipt(request,build_id,blob);del blob
                 staged_receipt=scratch/'receipt.json';write_new(staged_receipt,canonical(receipt)+b'\n')
-                # No successful pair is ever overwritten: verified pairs already skipped;
-                # mismatched pairs refused. A crash between these renames leaves only an
-                # untrusted orphan library, never a receipt authorizing unknown bytes.
-                if already_succeeded(artifacts,request,build_id):raise Refused('artifact appeared during serial build')
+                # Valid pairs skipped above. Broken/orphan pairs are retained
+                # only after a fully built/adopted replacement is available.
+                history=None
+                if previous:history=retain_invalid_pair(root,cohort,build_id,key,artifacts,previous,guard)
+                elif pair_pins(artifacts,key):raise Refused('artifact appeared during serial build')
                 guard.check(preflight=True)
-                os.replace(library,artifacts/(key+'.metallib'))
-                os.replace(staged_receipt,artifacts/(key+'.json'))
-                if(scratch/'adoption.json').exists():
-                    proof=artifacts/(key+'.adoption.json')
-                    if not os.path.lexists(proof):os.rename(scratch/'adoption.json',proof)
+                publish_new_file(library,artifacts/(key+'.metallib'))
+                publish_new_file(staged_receipt,artifacts/(key+'.json'))
                 fd=os.open(artifacts,os.O_RDONLY|os.O_DIRECTORY)
                 try:os.fsync(fd)
                 finally:os.close(fd)
             if reused:summary['reused_products']=summary.get('reused_products',0)+1
             else:summary['built']+=1
+            if history is not None:summary['repaired_products']=summary.get('repaired_products',0)+1
             try:remember_product(root,request,build_id,manifest)
             except(OSError,ValueError,TypeError,KeyError,Refused):pass
-            record_result(dict(key=key,status='reused-verified-product'if reused else'built',compile_product_id=product_key))
+            record_result(dict(key=key,status='reused-verified-product'if reused else'built',compile_product_id=product_key,
+                               repaired=history is not None,retained_previous=str(history)if history is not None else None,
+                               adoption_provenance=str(provenance)if provenance is not None else None))
         summary['status']='partial'if index.deferred_count else'passed'
         summary['request_window']=dict(max_batch=index.max_batch_len,max_final_pins=index.max_pin_count)
         if summary['status']=='passed' and audit_binding is not None and audit_token is not None:
@@ -692,7 +760,7 @@ class PreparationSession:
                     fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
                     if self._tools_unchanged(self.toolchain,guard)and self.toolchain.preparation_environment(guard)==self.environment and self.snapshot.unchanged(guard):
                         self.stats['reuses']+=1;self.stats['reuse_validation_seconds']+=self.clock()-started
-                        return dict(self.summary,built=0,reused_products=0,skipped=self.summary['requests'],results=[],session_reused=True,
+                        return dict(self.summary,built=0,reused_products=0,repaired_products=0,skipped=self.summary['requests'],results=[],session_reused=True,
                                     session_verification='same-call-current-tools-sdk-os-and-authenticated-stat-pins')
                 except (OSError,ValueError,Refused)as error:
                     if isinstance(error,Stopped):raise

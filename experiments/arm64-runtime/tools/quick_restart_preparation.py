@@ -61,7 +61,11 @@ def supervisor(stage,probe=process,cwd_probe=process_cwd,*,expected_parity_sha=N
 
 def binding(*,executable,arguments,environment,cohort,stage,archive_identity,probe=process,cwd_probe=process_cwd,runtime_profile=None):
     """Full current launch identity, computed again; no receipt supplies identity."""
-    if stage is None or environment.get('BB_RESTART_SUPERVISED')!='1' or environment.get('BB_ARM_LAUNCHER_COMPAT')!='1' or environment.get('BB_ONLINE')!='0':return None
+    # Online may REGISTER completed GPU preparation. Only the original
+    # supervisor's offline F3 child may RESUME it (checked again below). Online
+    # credentials/mode are never restored; full actual boot/patch/settings and
+    # compile identities still have to match, otherwise use normal preparation.
+    if stage is None or environment.get('BB_RESTART_SUPERVISED')!='1' or environment.get('BB_ARM_LAUNCHER_COMPAT')!='1' or environment.get('BB_ONLINE')not in('0','1'):return None
     nonces=[environment.get(k,'')for k in('BB_ARM_SESSION_NONCE','BB_ARM_RESTART_NONCE')]
     if not all(HEX32.fullmatch(n)for n in nonces):return None
     try:

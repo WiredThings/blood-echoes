@@ -75,7 +75,8 @@ class BuilderTests(unittest.TestCase):
   self.assertEqual(second['built'],0);self.assertEqual(second['reused_products'],1);self.assertEqual(len(self.runner.compiles()),compiles)
   self.assertEqual(self.artifact(second,newkey,'.metallib').read_bytes(),old)
   self.assertTrue(builder.already_succeeded(self.folder/'artifacts'/second['build_id'],newrequest,second['build_id']))
-  adoption=json.loads(self.artifact(second,newkey,'.adoption.json').read_bytes());self.assertEqual(adoption['original_request'],request);self.assertEqual(adoption['current_request'],newrequest)
+  adoption=json.loads(Path(second['results'][0]['adoption_provenance']).read_bytes());self.assertEqual(adoption['original_request'],request);self.assertEqual(adoption['current_request'],newrequest)
+  self.assertFalse(adoption['native_entry_admitted']);self.assertFalse(adoption['pipeline_ready'])
   self.assertEqual(receipt.read_bytes(),old_receipt);self.assertEqual(previous.read_bytes(),old)
   self.select_cohort('a'*64);third=self.run_builder();self.assertEqual(third['built'],0);self.assertEqual(len(self.runner.compiles()),compiles)
  def test_real_source_entry_math_or_sdk_change_cannot_alias_retained_product(self):
@@ -168,24 +169,53 @@ class BuilderTests(unittest.TestCase):
   with patch.dict(os.environ,{'BB_GPU_USER_DIR':str(self.root)}):self.assertEqual(self.run_builder()['status'],'refused')
   link=self.case/'linked-root';link.symlink_to(self.root)
   result=builder.build(link,self.cohort,enabled=True,guard=self.guard,toolchain=builder.NativeToolchain(self.runner,fingerprint=self.runner.fingerprint));self.assertEqual(result['status'],'refused')
- def test_corrupt_success_is_refused_and_never_replaced(self):
+ def test_corrupt_success_is_retained_then_only_current_pair_repaired(self):
   key,_=self.export();result=self.run_builder();library=self.artifact(result,key,'.metallib');library.write_bytes(b'corrupt existing library');count=len(self.runner.compiles())
-  result=self.run_builder();self.assertEqual(result['status'],'refused');self.assertEqual(library.read_bytes(),b'corrupt existing library');self.assertEqual(len(self.runner.compiles()),count)
+  result=self.run_builder();self.assertEqual(result['status'],'passed',result);self.assertEqual(result['repaired_products'],1)
+  retained=Path(result['results'][0]['retained_previous']);self.assertEqual((retained/library.name).read_bytes(),b'corrupt existing library')
+  self.assertNotEqual(library.read_bytes(),b'corrupt existing library');self.assertEqual(len(self.runner.compiles()),count+1)
+ def test_corrupt_pair_repaired_from_compatible_other_cohort_without_compile_or_touching_healthy_pair(self):
+  key,_=self.export();first=self.run_builder();bad=self.artifact(first,key,'.metallib')
+  self.select_cohort('b'*64);otherkey,_=self.export();second=self.run_builder()
+  healthy=self.artifact(second,otherkey,'.metallib');healthy_receipt=self.artifact(second,otherkey,'.json')
+  old=(healthy.read_bytes(),healthy_receipt.read_bytes());count=len(self.runner.compiles())
+  self.select_cohort('a'*64);bad.write_bytes(b'corrupt current generation')
+  repaired=self.run_builder();self.assertEqual(repaired['status'],'passed',repaired)
+  self.assertEqual(repaired['repaired_products'],1);self.assertEqual(repaired['reused_products'],1);self.assertEqual(repaired['built'],0)
+  self.assertEqual(len(self.runner.compiles()),count);self.assertEqual(bad.read_bytes(),old[0])
+  self.assertEqual((healthy.read_bytes(),healthy_receipt.read_bytes()),old)
+  self.assertEqual((Path(repaired['results'][0]['retained_previous'])/bad.name).read_bytes(),b'corrupt current generation')
  def test_receipt_boolean_schema_is_not_integer_match(self):
   key,_=self.export();result=self.run_builder();path=self.artifact(result,key,'.json');receipt=json.loads(path.read_text());receipt['schema']=True;path.write_bytes(builder.canonical(receipt))
-  self.assertEqual(self.run_builder()['status'],'refused')
+  result=self.run_builder();self.assertEqual(result['status'],'passed',result);self.assertEqual(result['repaired_products'],1)
+  self.assertIs(type(json.loads(path.read_bytes())['schema']),int)
+  retained=Path(result['results'][0]['retained_previous']);self.assertIs(json.loads((retained/path.name).read_bytes())['schema'],True)
  def test_compiler_failure_preserves_existing_success(self):
   key,_=self.export();result=self.run_builder();old=[self.artifact(result,key,suffix).read_bytes()for suffix in('.metallib','.json')]
   self.export(b'kernel void other() {}\n');self.runner.fail='metallib';failed=self.run_builder();self.assertEqual(failed['status'],'refused')
   self.assertEqual(old,[self.artifact(result,key,suffix).read_bytes()for suffix in('.metallib','.json')])
  def test_receipt_publish_failure_leaves_untrusted_orphan_and_retry_recovers(self):
-  key,_=self.export();real_replace=builder.os.replace
+  key,_=self.export();real_replace=builder.publish_new_file
   def replace(source,target):
    if Path(target).name==key+'.json':raise OSError('authored receipt publish failure')
    return real_replace(source,target)
-  with patch.object(builder.os,'replace',side_effect=replace):failed=self.run_builder()
+  with patch.object(builder,'publish_new_file',side_effect=replace):failed=self.run_builder()
   self.assertEqual(failed['status'],'refused');self.assertTrue(self.artifact(failed,key,'.metallib').exists());self.assertFalse(self.artifact(failed,key,'.json').exists())
   retried=self.run_builder();self.assertEqual(retried['status'],'passed');self.assertEqual(retried['built'],1)
+  self.assertEqual(retried['repaired_products'],1)
+ def test_failed_repair_leaves_current_pair_in_place(self):
+  key,_=self.export();first=self.run_builder();path=self.artifact(first,key,'.metallib');path.write_bytes(b'bad current bytes')
+  old=[self.artifact(first,key,s).read_bytes()for s in('.metallib','.json')];self.runner.fail='metal';failed=self.run_builder()
+  self.assertEqual(failed['status'],'refused');self.assertEqual(old,[self.artifact(first,key,s).read_bytes()for s in('.metallib','.json')])
+  self.assertFalse((self.root/'.retained-invalid-v1').exists())
+ def test_unsafe_current_artifact_link_is_never_moved_for_repair(self):
+  key,_=self.export();first=self.run_builder();path=self.artifact(first,key,'.metallib');outside=self.case/'outside';outside.write_bytes(b'not a cache node')
+  path.unlink();path.symlink_to(outside);failed=self.run_builder();self.assertEqual(failed['status'],'refused')
+  self.assertTrue(path.is_symlink());self.assertEqual(outside.read_bytes(),b'not a cache node');self.assertFalse((self.root/'.retained-invalid-v1').exists())
+ def test_immutable_publication_does_not_overwrite_an_existing_file(self):
+  source=self.case/'candidate';target=self.case/'existing';source.write_bytes(b'new');target.write_bytes(b'old')
+  with self.assertRaises(OSError):builder.publish_new_file(source,target)
+  self.assertEqual(source.read_bytes(),b'new');self.assertEqual(target.read_bytes(),b'old')
  def test_tool_binary_change_changes_build_id_and_midbuild_change_refuses(self):
   self.export();before=self.run_builder();self.runner.tools['metal'].write_bytes(b'new authored tool binary')
   after=self.run_builder();self.assertEqual(after['status'],'passed');self.assertNotEqual(before['build_id'],after['build_id'])

@@ -162,7 +162,13 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  actual_verified=report.get('status')=='completed' and report.get('full_manifest_preparation_verified')is True
  unchanged_schedule=(report.get('status')=='unchanged-schedule-reused' and report.get('persistent_schedule_reused')is True
                      and report.get('previous_actual_native_verification')is True and report.get('runtime_full_key_and_artifact_checks_retained')is True)
- if restart_binding is not None and (actual_verified or unchanged_schedule) and capture_environment:
+ recipe_schedule=report.get('recipe_schedule',{})
+ required_count=report.get('unique_units')
+ required_schedule=(report.get('status')=='completed'and report.get('required_preparation_complete')is True
+     and type(required_count)is int and required_count>0
+     and all(type(recipe_schedule.get(k))is int and recipe_schedule[k]>=0 for k in('reused','published'))
+     and recipe_schedule['reused']+recipe_schedule['published']==required_count)
+ if restart_binding is not None and (actual_verified or unchanged_schedule or required_schedule) and capture_environment:
   from quick_restart_preparation import pending
   try:result['_restart_context']=pending(prepared_inputs)
   except(ValueError,OSError,KeyError,TypeError):pass

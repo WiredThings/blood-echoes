@@ -44,7 +44,7 @@ def prepare(*,mode='auto',gpu_root,cohort,engine,graphics,builder=None,toolchain
   if old is None:os.environ.pop('BB_GPU_USER_DIR',None)
   else:os.environ['BB_GPU_USER_DIR']=old
  report.update(status=summary['status'],preparation_status=summary['status'],builder_invoked=True,
-  build_id=summary.get('build_id'),built=summary.get('built',0),skipped=summary.get('skipped',0),reused_products=summary.get('reused_products',0),
+  build_id=summary.get('build_id'),built=summary.get('built',0),skipped=summary.get('skipped',0),reused_products=summary.get('reused_products',0),repaired_products=summary.get('repaired_products',0),
   requests=summary.get('requests',0),summary=str(root/cohort/'artifacts/builder-summary.json'))
  if type(summary.get('persistent_audit_reused'))is bool:report['persistent_audit_reused']=summary['persistent_audit_reused']
  # Stop/lock/memory safeguards are not source-fallback conditions.

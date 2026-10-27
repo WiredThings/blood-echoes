@@ -27,7 +27,7 @@ class Views(unittest.TestCase):
   with patch.object(view,'file_sha',side_effect=count):second=self.prepare()
   self.assertEqual(calls,[p]);self.assertNotEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['source_hashes']['hashed_files'],1)
  def test_corrupt_source_hint_falls_back_but_keeps_valid_snapshot(self):
-  first=self.prepare();self.remove_registered_hint();hint=next((self.gpu/'automatic-game-inputs/source-views').glob('source-metadata-*.json'));hint.write_text('broken');hint.chmod(0o600);second=self.prepare();self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['source_hashes']['receipt'],'invalid');self.assertEqual(second['report']['source_hashes']['hashed_files'],2)
+  first=self.prepare();self.remove_registered_hint();hint=next((self.gpu/'automatic-game-inputs/source-views').glob('origin-metadata-*.json'));hint.write_text('broken');hint.chmod(0o600);second=self.prepare();self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['source_hashes']['base_receipt'],'invalid');self.assertEqual(second['report']['source_hashes']['hashed_files'],2)
  def test_corrupt_snapshot_hint_full_validates_snapshot(self):
   first=self.prepare();self.remove_registered_hint();hint=next((self.gpu/'automatic-game-inputs/source-views').glob('snapshot-metadata-*.json'));hint.write_text('broken');hint.chmod(0o600);second=self.prepare();self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(second['report']['snapshot_hashes']['hashed_files'],2);self.assertEqual(second['report']['source_hashes']['hashed_files'],0)
  def test_legacy_snapshot_without_hints_enrolls_without_reclone(self):
@@ -56,11 +56,19 @@ class Catalogues(unittest.TestCase):
   def change(*a,**kw):
    r=original(*a,**kw);p.write_bytes(b'changed late');return r
   with patch.object(catalog,'read_ready',side_effect=change),self.assertRaisesRegex(ValueError,'source contents changed'):self.prepare()
- def test_known_old_scheduler_is_reused_with_exact_parser_identity(self):
-  native=Path(catalog.__file__).parents[1]/'vendor/metal_api/shadps4';legacy=catalog.legacy_scanners(native);self.assertEqual(len(legacy),1)
-  with patch.object(catalog,'scanner_identity',return_value=legacy[0]):first=catalog.prepare(project=self.project,gpu_root=self.gpu,game_root=self.game,source_root=native,cohort='a'*64,runner=self.runner)
-  before=(first['generation']/'READY.json').read_bytes()
-  second=catalog.prepare(project=self.project,gpu_root=self.gpu,game_root=self.game,source_root=native,cohort='a'*64,runner=self.runner)
+ def test_historical_parser_is_not_silently_declared_equal_after_incremental_reader_changes(self):
+  native=Path(catalog.__file__).parents[1]/'vendor/metal_api/shadps4'
+  self.assertEqual(catalog.legacy_scanners(native),[])
+ def test_authored_pinned_same_parser_migration_keeps_existing_generation(self):
+  # Exercise the migration protocol with an explicitly authored pin. This does
+  # NOT change the production historical pin or claim the new parser is old.
+  native=Path(catalog.__file__).parents[1]/'vendor/metal_api/shadps4'
+  body=catalog.scanner_body_digest(Path(catalog.__file__).read_text())
+  with patch.object(catalog,'LEGACY_SCANNER_BODY',body):
+   legacy=catalog.legacy_scanners(native);self.assertEqual(len(legacy),1)
+   with patch.object(catalog,'scanner_identity',return_value=legacy[0]):first=catalog.prepare(project=self.project,gpu_root=self.gpu,game_root=self.game,source_root=native,cohort='a'*64,runner=self.runner)
+   before=(first['generation']/'READY.json').read_bytes()
+   second=catalog.prepare(project=self.project,gpu_root=self.gpu,game_root=self.game,source_root=native,cohort='a'*64,runner=self.runner)
   self.assertEqual(second['generation'],first['generation']);self.assertEqual(len(self.calls),1);self.assertEqual(second['report']['scanner_identity'],legacy[0]);self.assertNotEqual(second['report']['scheduler_identity'],legacy[0]);self.assertEqual((first['generation']/'READY.json').read_bytes(),before)
  def test_actual_parser_body_change_disables_legacy(self):
   import ast
@@ -70,8 +78,7 @@ class Catalogues(unittest.TestCase):
  def test_changed_runtime_enum_bytes_cannot_reuse_old_index(self):
   native=Path(catalog.__file__).parents[1]/'vendor/metal_api/shadps4'
   enum=self.source/'shader_recompiler/runtime_info.h';enum.parent.mkdir();enum.write_bytes((native/'shader_recompiler/runtime_info.h').read_bytes())
-  legacy=catalog.legacy_scanners(self.source)[0]
-  with patch.object(catalog,'scanner_identity',return_value=legacy):first=catalog.prepare(project=self.project,gpu_root=self.gpu,game_root=self.game,source_root=self.source,cohort='a'*64,runner=self.runner)
+  first=catalog.prepare(project=self.project,gpu_root=self.gpu,game_root=self.game,source_root=self.source,cohort='a'*64,runner=self.runner)
   enum.write_bytes(enum.read_bytes()+b'\n// authored changed enum input\n')
   second=catalog.prepare(project=self.project,gpu_root=self.gpu,game_root=self.game,source_root=self.source,cohort='a'*64,runner=self.runner)
   self.assertNotEqual(first['generation'],second['generation']);self.assertEqual(len(self.calls),2);self.assertTrue(first['index'].exists())

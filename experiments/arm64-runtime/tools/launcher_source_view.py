@@ -8,7 +8,8 @@ file, replace a mod, or change the actual exec arguments.
 from pathlib import Path
 import contextlib, ctypes, errno, hashlib, importlib.util, io, json, os, shutil, stat, sys, tempfile, time
 from launcher_game_catalog import directory, file_sha, digest, write_json
-from incremental_file_hashes import Hashes,replaceable
+from incremental_file_hashes import Hashes,replaceable,stat_stamp
+from bisect import bisect_left
 
 MAX_FILES=100000
 MAX_BYTES=128*1024*1024*1024
@@ -42,6 +43,77 @@ def clone(source,target):
     if api(os.fsencode(source),os.fsencode(target),0):
         code=ctypes.get_errno()
         raise SnapshotUnavailable(code,'APFS source snapshot unavailable: '+os.strerror(code))
+
+# Only this real kernel-backed function enables the sealed-source optimization.
+# Custom/injected clone callbacks retain full destination byte verification.
+KERNEL_CLONE=clone
+
+
+def previous_snapshot(views,check):
+    """A retained fully verified readonly view, never a guessed file digest."""
+    from game_pso_owned_audit import checked_bytes
+    try:
+        saved=json.loads(checked_bytes(views/'last-verified-view.json',limit=4096)[0])
+        need(type(saved['schema'])is int and saved['schema']==1,'retained view schema')
+        name=saved['generation'];identity=saved['identity']
+        need(isinstance(identity,str)and len(identity)==64 and all(c in '0123456789abcdef'for c in identity),'retained view identity')
+        need(isinstance(name,str)and Path(name).name==name and(name==identity or name.startswith(identity+'-retry-')),'retained view generation')
+        generation=directory(views/name);view=directory(generation/'view')
+        raw,_=checked_bytes(generation/'READY.json',limit=32*1024*1024,expected=saved['ready_sha256']);ready=json.loads(raw)
+        need(type(ready['schema'])is int and ready['schema']==1 and ready['identity']==identity and digest(ready['proof'])==identity,'retained complete source proof')
+        records=ready['proof']['files'];need(isinstance(records,list)and 0<len(records)<=MAX_FILES,'retained source count')
+        for row in records:
+            relative=Path(row['path']);need(not relative.is_absolute()and '..'not in relative.parts and str(relative)==row['path'],'retained source relative path')
+        hashes=Hashes(views/('snapshot-metadata-'+name+'.json'),
+            digest(dict(schema=1,role='readonly-mod-view',identity=identity,view=str(view))),
+            hasher=file_sha,check=check,watch_roots=[view])
+        if not hashes.journal_valid:return None
+        verify_snapshot(view,records,check,hashes)
+        hashes.verify()
+        if not hashes.journal_valid:return None
+        rows={}
+        for row in records:
+            source=view/row['path'];entry=hashes.seen[str(source)]
+            rows[(row['source'],row['sha256'],row['bytes'])]=(source,entry)
+        return dict(view=view,rows=rows)
+    except(OSError,ValueError,KeyError,TypeError):return None
+
+
+def sealed_clone(source,target,entry):
+    """Copy the exact already verified inode with fclonefileat, no byte reread.
+
+    Darwin guarantees atomic CoW data equality for a successful clone (clonefile
+    system manual). Its source is a pinned 0400 owned snapshot, not a mutable
+    game file or untrusted copy program. Final target membership, readonly mode,
+    metadata and live selection checks still run. Never labels copied bytes as
+    newly hashed, or grants any shader/function/pipeline admission.
+    """
+    source=Path(source);target=Path(target)
+    need(source==source.resolve(strict=True)and target.parent==target.parent.resolve(strict=True),'canonical sealed clone paths')
+    fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC);parent=None
+    try:
+        parent=os.open(target.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC)
+        before=os.fstat(fd)
+        if stat_stamp(before)!=entry['stamp']or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1:return None
+        need(stat.S_ISREG(before.st_mode)and before.st_uid==os.getuid(),'owned sealed clone source')
+        api=ctypes.CDLL('/usr/lib/libSystem.B.dylib',use_errno=True).fclonefileat
+        api.argtypes=(ctypes.c_int,ctypes.c_int,ctypes.c_char_p,ctypes.c_int);api.restype=ctypes.c_int
+        if api(fd,parent,os.fsencode(target.name),0):
+            code=ctypes.get_errno();raise SnapshotUnavailable(code,'sealed APFS clone failed: '+os.strerror(code))
+        need(stat_stamp(os.fstat(fd))==entry['stamp'],'sealed source changed during kernel clone')
+        dest=clone_metadata(target,entry['bytes'])
+        need(dest.st_nlink==1 and(dest.st_dev,dest.st_ino)!=(before.st_dev,before.st_ino)
+             and stat.S_IMODE(dest.st_mode)==0o400 and dest.st_mtime_ns==before.st_mtime_ns,'sealed clone inode/attributes differ')
+        return dict(stamp=stat_stamp(dest),sha256=entry['sha256'],bytes=entry['bytes'])
+    finally:
+        if parent is not None:os.close(parent)
+        os.close(fd)
+
+
+def remember_snapshot(views,view,identity,check):
+    path=views/'last-verified-view.json'
+    if replaceable(path):write_json(path,dict(schema=1,generation=view.parent.name,identity=identity,
+        ready_sha256=file_sha(view.parent/'READY.json',check)[0]))
 
 
 def absolute(value,stage):
@@ -98,6 +170,100 @@ def mapping(root,origins,check):
             relative=str(p.relative_to(root));need(relative not in files,'duplicate virtual source path')
             files[relative]=source;need(len(files)<=MAX_FILES,'source-view file-count budget')
     return files
+
+
+class RegisteredSources:
+    """Keep the base inventory independent of the selected Mod combination.
+
+    An unchanged base journal admits its previously complete file set, including
+    files hidden by Mods. A lost journal returns to the original complete base
+    check. Each Mod has its own hash history; original mods.py still decides
+    membership, precedence and case. These hints never admit a Metal product.
+    """
+    def __init__(self,views,base,origins,algorithm,check):
+        self.base=base;self.check=check;self.hashes={}
+        for root in dict.fromkeys([base,*origins]):
+            identity=digest(dict(schema=1,role='independent-source-origin',root=str(root),algorithm=algorithm))
+            self.hashes[root]=Hashes(views/('origin-metadata-'+identity+'.json'),identity,
+                hasher=file_sha,check=check,watch_roots=[root])
+        hashes=self.hashes[base];self.base_registered=hashes.journal_valid
+        if self.base_registered:
+            files={}
+            for name in hashes.previous:
+                p=Path(name);need(p.is_relative_to(base)and p!=base,'registered base inventory escape')
+                relative=p.relative_to(base)
+                need('..'not in relative.parts and '.'not in relative.parts,'registered base inventory path')
+                files[str(relative)]=p
+            need(0<len(files)<=MAX_FILES,'registered base inventory size')
+        else:
+            plain_tree(base,check);files=mapping(base,[base],check)
+        self.files=files;self.paths=sorted(files)
+        # Preserve ALL base entries, even when currently covered by a Mod.
+        for p in files.values():hashes.get(p,check)
+        for root,hint in self.hashes.items():
+            if root!=base and hint.journal_valid:
+                for name in hint.previous:
+                    need(Path(name).is_relative_to(root),'registered Mod hash escape')
+                    hint.get(name,check)
+
+    def selected(self,root,shape,origins):
+        if root==self.base:return dict(self.files)
+        result={}
+        def add(relative,source):
+            need(relative not in result,'duplicate virtual source path')
+            result[relative]=source;need(len(result)<=MAX_FILES,'source-view file-count budget')
+        for row in shape:
+            self.check()
+            if row[1]!='link':continue
+            relative,target=row[0],Path(row[2])
+            if target.is_relative_to(self.base):
+                key=str(target.relative_to(self.base))
+                if key in self.files:add(relative,target);continue
+                # Only a base directory may be expanded from the registered
+                # complete base inventory. Unknown targets use the original
+                # strict mapper; no guessed descriptor or fabricated member.
+                prefix=key+'/' if key!='.'else ''
+                start=bisect_left(self.paths,prefix);found=False
+                for name in self.paths[start:]:
+                    if not name.startswith(prefix):break
+                    found=True;add(str(Path(relative)/name[len(prefix):]),self.files[name])
+                if found:continue
+                # An empty directory contributes no leaves. Verify its kind.
+                if target.is_dir():continue
+                raise ValueError('registered base target missing')
+            info=target.lstat()
+            if not stat.S_ISREG(info.st_mode):return mapping(root,origins,self.check)
+            need(info.st_uid==os.getuid(),'owned regular Mod source required')
+            add(relative,target)
+        return result
+
+    def get(self,path,check):
+        # Most specific origin prevents nested Mod roots from borrowing a
+        # broader root's incomplete journal/hash registration.
+        roots=[p for p in self.hashes if path.is_relative_to(p)]
+        need(bool(roots),'selected source has no registered origin')
+        return self.hashes[max(roots,key=lambda p:len(p.parts))].get(path,check)
+
+    def verify(self):
+        for hint in self.hashes.values():hint.verify()
+        if not self.hashes[self.base].journal_valid:
+            # Stamp equality on known leaves cannot detect an added/renamed
+            # file. When history cannot prove membership, retain the original
+            # complete plain-tree and mapping checks as well.
+            plain_tree(self.base,self.check)
+            need(mapping(self.base,[self.base],self.check)==self.files,
+                 'selected source contents changed: base file set changed')
+
+    def publish(self):
+        self.verify()
+        for hint in self.hashes.values():hint.publish()
+
+    def report(self):
+        reports=[h.report()for h in self.hashes.values()]
+        return dict(receipt='independent-origins',base_receipt=self.hashes[self.base].receipt_status,base_inventory_reused=self.base_registered,
+            hashed_files=sum(r['hashed_files']for r in reports),hashed_bytes=sum(r['hashed_bytes']for r in reports),
+            reused_files=sum(r['reused_files']for r in reports),metadata_only=all(r['metadata_only']for r in reports),
+            journal_reused=all(r['journal_reused']for r in reports))
 
 
 def overlay_shape(root,base,origins,check):
@@ -209,6 +375,7 @@ def verify_snapshot(view,records,check,hashes=None):
         need(not(view.stat().st_mode&0o222),'source snapshot directory must remain readonly')
         need(set(hashes.previous)=={str(view/row['path'])for row in records},'source snapshot file set changed')
         for row in records:
+            need(hashes.previous[str(view/row['path'])]['stamp'][5]==1,'source snapshot file has an alias')
             need(hashes.get(view/row['path'],check)==(row['sha256'],row['bytes']),'source snapshot contents changed')
         hashes.verify()
         return
@@ -217,14 +384,26 @@ def verify_snapshot(view,records,check,hashes=None):
     need(set(actual)=={row['path']for row in records},'source snapshot file set changed')
     for parent,dirs,files in os.walk(view):
         need(not(Path(parent).stat().st_mode&0o222),'source snapshot directory must remain readonly')
-        for name in files:need(not((Path(parent)/name).stat().st_mode&0o222),'source snapshot file must remain readonly')
+        for name in files:
+            info=(Path(parent)/name).stat()
+            need(not(info.st_mode&0o222),'source snapshot file must remain readonly')
+            need(info.st_nlink==1,'source snapshot file has an alias')
     for row in records:
         need((hashes.get(actual[row['path']],check)if hashes is not None else file_sha(actual[row['path']],check))==(row['sha256'],row['bytes']),
              'source snapshot contents changed')
+    if hashes is not None:
+        # One complete real membership/byte-or-kernel-clone validation is
+        # sufficient. Keep its BEFORE cursor; do not repeat the same full tree
+        # in later publication helpers when history remained continuous.
+        hashes.verify()
+        from startup_change_journal import unchanged
+        if hashes.journal_token is not None and unchanged(hashes.journal_token,[view]):
+            hashes.previous=dict(hashes.seen);hashes.journal_valid=True
 
 
-def verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile=None,hashes=None):
-    need(mapping(actual,origins,check)==observed,'final app0 mapping changed while snapshotting')
+def verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile=None,hashes=None,mapping_fn=None):
+    current=lambda:mapping(actual,origins,check)if mapping_fn is None else mapping_fn()
+    need(current()==observed,'final app0 mapping changed while snapshotting')
     need(recipe(stage,environment,runtime_profile)==selection,'original mod selection changed while snapshotting')
     # Comparing mappings alone does not catch an earlier file changing after its
     # clone has completed. Revalidate the whole source read-set before adoption.
@@ -234,7 +413,7 @@ def verify_live_selection(actual,origins,observed,records,stage,environment,sele
             check()
             need(file_sha(Path(row['source']),check)==(row['sha256'],row['bytes']),
                  'selected source contents changed while snapshotting')
-    need(mapping(actual,origins,check)==observed,'final app0 mapping changed during source validation')
+    need(current()==observed,'final app0 mapping changed during source validation')
     need(recipe(stage,environment,runtime_profile)==selection,'original mod selection changed during source validation')
 
 
@@ -278,14 +457,15 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
             need(overlay_shape(actual,selection['base'],origins,check)==actual_shape,'final app0 shape changed during registered reuse')
         reused=reuse_selection(views,bound,origins,check,verify_current)
         if reused is not None:
+            remember_snapshot(views,reused['game_root'],reused['report']['source_identity'],check)
             return reused
-        wanted=mapping(expected,origins,check)
-        observed=mapping(actual,origins,check)
+        live_hashes=RegisteredSources(views,selection['base'],origins,algorithm,check)
+        def selected_mapping():
+            shape=overlay_shape(actual,selection['base'],origins,check)
+            return live_hashes.selected(actual,shape,origins)
+        wanted=live_hashes.selected(expected,expected_shape,origins)
+        observed=selected_mapping()
         need(wanted==observed,'final app0 differs from original selected mod view')
-        selection_identity=digest(dict(schema=1,role='selected-file-content',algorithm=algorithm,base=str(selection['base'])))
-        live_roots=list(dict.fromkeys(origins))
-        live_hashes=Hashes(views/('source-metadata-'+selection_identity+'.json'),selection_identity,hasher=file_sha,check=check,watch_roots=live_roots)
-        if not live_hashes.journal_valid:plain_tree(selection['base'],check)
         total=0;records=[]
         for relative,path in sorted(wanted.items()):
             check();value,size=live_hashes.get(path,check);total+=size
@@ -314,18 +494,27 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
                 verify_snapshot(view,records,check,snapshot_hashes)
             except(OSError,ValueError,KeyError,TypeError):cache_problem='source-snapshot-invalid'
             else:
-                verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes)
+                verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes,selected_mapping)
                 snapshot_hashes.verify();live_hashes.publish();snapshot_hashes.publish()
                 def verify_registered():
                     verify_snapshot(view,records,check,snapshot_hashes)
-                    verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes)
+                    verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes,selected_mapping)
                 publish_selection(views,bound,origins,view,identity,records,total,check,verify_registered)
+                remember_snapshot(views,view,identity,check)
                 return dict(game_root=view,report=dict(status='reused',source_identity=identity,files=len(records),logical_bytes=total,CoW=True,original_app0_preserved=True,
                     source_hashes=live_hashes.report(),snapshot_hashes=snapshot_hashes.report()))
         if generation.exists()or generation.is_symlink():generation=views/(identity+'-retry-'+str(time.time_ns()))
+        retained=previous_snapshot(views,check)if clone_file is KERNEL_CLONE else None
         generation.mkdir(mode=0o700);view=generation/'view';view.mkdir(mode=0o700)
+        cloned_proofs={}
         for row in records:
             check();source=Path(row['source']);destination=view/row['path'];destination.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+            previous=retained['rows'].get((row['source'],row['sha256'],row['bytes']))if retained is not None else None
+            if previous is not None:
+                copied=sealed_clone(previous[0],destination,previous[1])
+                if copied is not None:
+                    cloned_proofs[str(destination)]=copied
+                    continue
             before=clone_metadata(source,row['bytes'])
             clone_file(source,destination)
             target=clone_metadata(destination,row['bytes']);after=clone_metadata(source,row['bytes'])
@@ -336,16 +525,24 @@ def prepare(*,project,gpu_root,stage,arguments,environment,check=lambda:None,clo
         for root,dirs,files in os.walk(view,topdown=False):Path(root).chmod(0o500)
         snapshot_hashes=Hashes(views/('snapshot-metadata-'+generation.name+'.json'),
             digest(dict(schema=1,role='readonly-mod-view',identity=identity,view=str(view))),hasher=file_sha,check=check,watch_roots=[view])
+        # A successful fclonefileat proves data equality with its exact pinned,
+        # previously hashed readonly inode. Carry that real byte proof, not a
+        # newly claimed hash. get()/verify() still reject later target mutation;
+        # custom clone callbacks above cannot produce these certificates.
+        snapshot_hashes.seen.update(cloned_proofs);snapshot_hashes.reused_files+=len(cloned_proofs)
         verify_snapshot(view,records,check,snapshot_hashes)
-        verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes)
+        verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes,selected_mapping)
         live_hashes.publish();snapshot_hashes.publish()
-        write_json(generation/'READY.json',dict(schema=1,identity=identity,proof=proof))
+        write_json(generation/'READY.json',dict(schema=1,identity=identity,proof=proof,
+            construction=dict(sealed_kernel_clones=len(cloned_proofs),kernel='fclonefileat'if cloned_proofs else None)))
         # Existing invalid links/foreign nodes are retained; never follow or
         # delete them to publish a speed hint. A future launch rechecks safely.
         if replaceable(pointer):write_json(pointer,dict(generation=generation.name))
         def verify_registered():
             verify_snapshot(view,records,check,snapshot_hashes)
-            verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes)
+            verify_live_selection(actual,origins,observed,records,stage,environment,selection,check,runtime_profile,live_hashes,selected_mapping)
         publish_selection(views,bound,origins,view,identity,records,total,check,verify_registered)
+        remember_snapshot(views,view,identity,check)
         return dict(game_root=view,report=dict(status='snapshotted',source_identity=identity,files=len(records),logical_bytes=total,CoW=True,original_app0_preserved=True,
-            source_hashes=live_hashes.report(),snapshot_hashes=snapshot_hashes.report(),cache_recovery=cache_problem))
+            source_hashes=live_hashes.report(),snapshot_hashes=snapshot_hashes.report(),cache_recovery=cache_problem,
+            sealed_kernel_clones=len(cloned_proofs)))

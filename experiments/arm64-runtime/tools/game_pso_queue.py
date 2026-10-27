@@ -198,7 +198,7 @@ class Queue:
   if kind=='collect':
    where='(p.cycle IS NULL OR p.cycle!=?)';args=[cycle['id']]
   elif kind=='prepare':
-   where="p.cycle=? AND p.state!='rejected' AND p.final_run!=?";args=[cycle['id'],run]
+   where="p.cycle=? AND p.state NOT IN('rejected','scheduled') AND p.final_run!=?";args=[cycle['id'],run]
   elif kind=='commit':
    where="p.cycle=? AND p.final_run=? AND p.final_state IN('ready-hit','ready-built') AND u.run_mark!=?";args=[cycle['id'],run,run]
   elif kind=='warm':
@@ -211,10 +211,10 @@ class Queue:
    result.append(dict(id=uid,unit=u,ready_hint=bool(rh),recorded_hint=bool(rec),collection_state=state,collection_outcome_sha=outcome,native_hit=final_state=='ready-hit'))
   return result
  def collect(self,item,cycle,state,row=None):
-  need(state in('provisional','local-inputs','recorded','unavailable','rejected'),'collection state')
+  need(state in('provisional','local-inputs','recorded','unavailable','rejected','scheduled'),'collection state')
   self._sql('INSERT OR REPLACE INTO phase_units(id,cycle,state,outcome_sha) VALUES(?,?,?,?)',(item['id'],cycle['id'],state,digest(row)if row else''))
   seq=self.get('visit_sequence')+1;self.put('visit_sequence',seq)
-  self._sql('UPDATE units SET last_visit=?,recorded_hint=? WHERE id=?',(seq,int(state in('provisional','local-inputs','recorded')),item['id']));self.db.commit()
+  self._sql('UPDATE units SET last_visit=?,recorded_hint=? WHERE id=?',(seq,int(state in('provisional','local-inputs','recorded','scheduled')),item['id']));self.db.commit()
  def provisional_final(self,item,cycle,run,row):
   self._sql("UPDATE phase_units SET final_run=?,final_state=?,outcome_sha=? WHERE id=? AND cycle=?",(run,'ready-hit'if row['worker']['artifact_counts'].get('built',0)==0 else'ready-built',digest(row),item['id'],cycle['id']))
   seq=self.get('visit_sequence')+1;self.put('visit_sequence',seq);self._sql('UPDATE units SET last_visit=? WHERE id=?',(seq,item['id']));self.db.commit()
@@ -227,7 +227,7 @@ class Queue:
   if self.lock is not None:os.close(self.lock);self.lock=None
 
 def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,ready,phase='all',page_size=16,max_recipes=None,
-                 seconds=600,clock=time.monotonic,event_sink=None):
+                 seconds=600,clock=time.monotonic,event_sink=None,reuse_unit=None,commit_unit=None):
  """Disk-backed collect -> one final build -> native prepare. No module batches.
 
  Internal prepare_phase also supports snapshot/verify for a real same-session
@@ -242,7 +242,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
  report=dict(schema=1,progress_schema=2,orchestration_schema=1,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,
    verified_artifact_hits=0,collection_strict_hits=0,strict_lookup_attempts=0,visited=0,work_units=0,collected=0,provisional_native=0,provisional_artifact_hits=0,source_late_deferred=0,
    events_preview=[],event_count=0,max_page_items=0,initial_local_calls=0,final_local_calls=0,warm_fast_path=False,
-   full_manifest_preparation_verified=False,state_is_artifact_authority=False)
+   full_manifest_preparation_verified=False,required_preparation_complete=False,state_is_artifact_authority=False,scheduled_reused=0)
  def guard():
   check()
   if clock()-start>=seconds:raise Deferred('preparation time budget')
@@ -276,6 +276,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
    if not page:break
    for item in page:
     finish(item,'completed',recorded=True)
+    if commit_unit is not None:commit_unit(item['unit'])
     if kind=='commit':
      report['provisional_native']-=1
      if item['native_hit']:report['verified_artifact_hits']+=1;report['provisional_artifact_hits']-=1
@@ -285,9 +286,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
   initial={};initial_anchor={};record_open=False
   if queue.total()==0:queue.set_stage(cycle,'done')
   if cycle['stage']=='collect':
-   if phase!='record':
-    report['initial_local_calls']+=1;initial=local('prepare');report['initial_local']=initial
-    if initial.get('status')=='prepared':initial_anchor=local('snapshot')
+   initial_started=False
    def collected(item,state,row=None):
     queue.collect(item,cycle,state,row);report['collected']+=1
     if state=='provisional':report['collection_strict_hits']+=1
@@ -304,6 +303,15 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
     report['max_page_items']=max(report['max_page_items'],len(page))
     pending_record=[]  # References to this <=16-item page only, never owned bytes.
     for item in page:
+     if phase=='all'and reuse_unit is not None:
+      guard();reused=reuse_unit(item['unit'])
+      if isinstance(reused,dict)and reused.get('status')=='required-recipe-schedule-reused'and reused.get('previous_native_verification')is True and reused.get('native_worker_invoked')is False and reused.get('runtime_artifact_authority')is False:
+       queue.collect(item,cycle,'scheduled',reused);report['scheduled_reused']+=1
+       finish(item,'completed',recorded=True);event(item,'previous-native-schedule-reused')
+       continue
+     if phase!='record'and not initial_started:
+      report['initial_local_calls']+=1;initial=local('prepare');report['initial_local']=initial;initial_started=True
+      if initial.get('status')=='prepared':initial_anchor=local('snapshot')
      work_guard();report['work_units']+=1;active=item;state=None;row=None
      if phase!='record'and initial.get('status')=='prepared':
       try:
@@ -329,11 +337,13 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
      collected(item,state,row)
    if phase=='record':queue.set_stage(cycle,'done')
    else:
-    all_strict=queue.phase_count(cycle,'provisional')==queue.total()and queue.total()>0
+    scheduled=queue.phase_count(cycle,'scheduled')
+    if scheduled==queue.total()and scheduled>0:queue.set_stage(cycle,'done')
+    all_strict=queue.phase_count(cycle,'provisional')+scheduled==queue.total()and queue.total()>0
     if fresh and all_strict and not record_open and initial_anchor.get('status')=='environment-captured':
      proof=local('verify');report['warm_environment_verification']=proof
      if proof.get('status')=='environment-verified'and proof.get('environment_identity')==initial_anchor.get('environment_identity'):
-      report['warm_fast_path']=True;commit('warm');report['verified_artifact_hits']=report['completed'];queue.set_stage(cycle,'done')
+      report['warm_fast_path']=True;commit('warm');report['verified_artifact_hits']=report['completed']-report['scheduled_reused'];queue.set_stage(cycle,'done')
     if cycle['stage']!='done':queue.set_stage(cycle,'build')
   if cycle['stage']in('build','prepare'):
    # Exactly one post-collection builder call per invocation, never per page.
@@ -369,7 +379,8 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
     commit('commit');queue.set_stage(cycle,'done')
    else:raise Pending('final environment changed/unverified; native outcomes remain provisional')
   report['status']='no-candidates'if queue.total()==0 else'completed'if phase!='record'and report['visited']==queue.total()and report['deferred']==report['rejected']==0 and queue.phase_count(cycle,'rejected')==0 else'partial'
-  report['full_manifest_preparation_verified']=report['status']=='completed'and report.get('index_rejected',0)==0
+  report['required_preparation_complete']=report['status']=='completed'and report.get('index_rejected',0)==0
+  report['full_manifest_preparation_verified']=report['required_preparation_complete']and report['scheduled_reused']==0
  except Pending as error:report.update(status='partial',pending_preparation=True,error=str(error))
  except Deferred as error:report.update(status='partial',budget_deferred=True,error=str(error))
  except (Stopped,KeyboardInterrupt)as error:

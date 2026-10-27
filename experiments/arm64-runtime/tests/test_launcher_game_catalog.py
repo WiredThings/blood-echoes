@@ -42,6 +42,33 @@ class AutomaticCatalogue(unittest.TestCase):
         self.assertTrue(result['report']['default_enabled'])
         self.assertFalse(result['report']['full_pso_claim'])
 
+    def test_new_catalogue_reuses_original_snapshot_byte_proof_without_rereading_game(self):
+        from test_launcher_source_view import SourceView
+        authored=SourceView();authored.setUp();self.addCleanup(authored.tearDown)
+        with authored.history():
+            selected=authored.prepare();game=selected['game_root'];original=catalog.file_sha
+            def no_source_read(path,*args):
+                self.assertFalse(Path(path).is_relative_to(game),'verified snapshot reread by catalogue')
+                return original(path,*args)
+            with patch.object(catalog,'scanner_identity',return_value='b'*64),patch.object(catalog,'file_sha',side_effect=no_source_read):
+                result=catalog.prepare(project=authored.project,gpu_root=authored.gpu,game_root=game,
+                    source_root=self.source,cohort='a'*64,runner=self.runner)
+            self.assertEqual(result['report']['source_hashes']['hashed_files'],0)
+            self.assertTrue(result['report']['source_hashes']['journal_reused'])
+            self.assertEqual(len(self.calls),1)
+
+    def test_registered_snapshot_bad_proof_or_lost_history_cannot_authorize_inventory(self):
+        from test_launcher_source_view import SourceView
+        authored=SourceView();authored.setUp();self.addCleanup(authored.tearDown)
+        import startup_change_journal as journal
+        with authored.history():
+            selected=authored.prepare();game=selected['game_root'];cache=authored.gpu/'automatic-game-inputs'
+            self.assertIsNotNone(catalog.registered_snapshot_hashes(game,cache,lambda:None))
+            with patch.object(journal,'unchanged',return_value=False):
+                self.assertIsNone(catalog.registered_snapshot_hashes(game,cache,lambda:None))
+            ready=game.parent/'READY.json';old=ready.read_bytes();value=json.loads(old);value['proof']['files'][0]['sha256']='0'*64;ready.write_text(json.dumps(value))
+            self.assertIsNone(catalog.registered_snapshot_hashes(game,cache,lambda:None));self.assertNotEqual(old,ready.read_bytes())
+
     def test_warm_start_revalidates_outputs_and_skips_decoder(self):
         first = self.prepare(); second = self.prepare()
         self.assertEqual(len(self.calls), 1)

@@ -5,7 +5,7 @@ Phases: record exact successful effective-source requests -> existing local
 builder -> prepare using the resulting local libraries. Never starts a game.
 """
 from pathlib import Path
-import argparse,hashlib,json,os,re,signal,stat,subprocess,sys,time
+import argparse,hashlib,json,os,re,signal,stat,subprocess,sys,time,sqlite3
 from game_pso_queue import Deferred,Stopped
 
 MAX_BLOB=1024*1024;MAX_TOTAL=8*MAX_BLOB;MAX_LINE=256*1024
@@ -223,10 +223,13 @@ def prepare(config,*,services=None):
  provided=dict(os.environ if a.environment is None else a.environment)
  options=compile_environment(provided)
  effective_options=dict(options,BB_MTL_PERSIST_WARM_ARCHIVE='0',BB_MTL_RELEASE_WARM_ARCHIVE='1')
+ from compilation_domains import EXECUTION_OPTIONS
+ compiler_options={k:v for k,v in effective_options.items()if k not in EXECUTION_OPTIONS}
  context=dict(worker_sha256=worker_sha,library_sha256=a.library_sha256,layout_sha256=a.layout_sha256,
-              cohort=a.cohort,options_identity=digest(effective_options),artifact_cache_dir=str(artifact),
+              cohort=a.cohort,options_identity=digest(compiler_options),artifact_cache_dir=str(artifact),
               runner_sha256=sha(Path(__file__).read_bytes()))
- if getattr(a,'options_identity',None):need(HEX.fullmatch(a.options_identity),'declared options identity');context['declared_options_identity']=a.options_identity
+ if getattr(a,'options_identity',None):need(HEX.fullmatch(a.options_identity),'declared options identity')
+ selection_provenance=dict(effective_options=effective_options,declared_options_identity=getattr(a,'options_identity',None))
  observer=services.get('observer') or services['observer_factory']()
  before=observer.system()
  if before['locked']or before['pressure']==4:
@@ -238,7 +241,7 @@ def prepare(config,*,services=None):
  builder_tmp=fresh(run,'local-builder-tmp');result={}
  session_factory=services.get('builder_session_factory');builder_session=session_factory(builder_tmp,**kw(runtime_profile))if session_factory else None
  validation_anchor=None;validation_environment=None
- batch_worker=None;batch_scope=None;batch_api=None;batch_enabled=False
+ batch_worker=None;batch_scope=None;batch_api=None;batch_enabled=False;recipe_schedules=None
  batch_stats=dict(capability_schema=0,processes=0,recipes=0,failed_recipes=0,max_recipes=16,legacy_fallback=True)
  def check():
   nonlocal sample_count
@@ -351,6 +354,12 @@ def prepare(config,*,services=None):
   row=dict(phase=phase,ordinal=ordinal,pid=pid,exit=code,recipe=unit['recipe_blob_identity'],worker=workers[0]if len(workers)==1 else None,
            artifact_events=events,log=str(log),loaded_gpu_identity=loaded_identity,runtime_cache_import_allowed=False,actual_final_read_admission=False)
   if batch_proof is not None:row['native_batch']=batch_proof
+  if recipe_schedules is not None and phase=='prepare':
+   local_keys=[]
+   for line in lines:
+    hit=re.fullmatch(r'Metal local AOT: hit key=([0-9a-f]{64}) recorded=0',line.strip())
+    if hit and hit[1]not in local_keys:local_keys.append(hit[1])
+   recipe_schedules.observe(unit,row,local_keys)
   (case/'result.json').write_text(json.dumps(row,indent=2)+'\n');outcome_count+=1
   if len(outcomes)<64:outcomes.append(row)
   with outcomes_path.open('a')as stream:stream.write(json.dumps(row,separators=(',',':'))+'\n')
@@ -360,7 +369,7 @@ def prepare(config,*,services=None):
   return row
  def event(value):
   with events_path.open('a')as stream:stream.write(json.dumps(value,separators=(',',':'))+'\n')
- schedule=None
+ schedule=None;code_identity=None
  try:
   if native_services and a.phase=='all' and a.max_recipes is None:
    from pso_startup_schedule import Schedule
@@ -369,14 +378,24 @@ def prepare(config,*,services=None):
    code_identity=pso_schedule_identity(runtime_profile.bundle.local['runtime_tools'])if runtime_profile is not None else None
    if code_identity is not None:
     schedule=Schedule(a.manifest,context=context,environment=provided,gpu=gpu,artifact=artifact,progress=progress,
-        code_identity=code_identity,rows=rows,fingerprint=fingerprint,check=check)
+        code_identity=code_identity,rows=rows,fingerprint=fingerprint,check=check,selective=True)
   result=schedule.reuse()if schedule is not None else None
   if result is None:
+   if native_services and a.phase=='all'and a.max_recipes is None and code_identity is not None:
+    try:
+     from recipe_preparation_schedule import Recipes
+     recipe_schedules=Recipes(context=context,environment=provided,gpu=gpu,artifact=artifact,progress=progress,code_identity=code_identity,check=check)
+    except(OSError,ValueError,KeyError,TypeError,sqlite3.DatabaseError):pass # Optional schedule; existing native queue remains authoritative.
    discover_batch()
    result=run_manifest(a.manifest,progress_root=progress,context=context,execute=execute,prepare_phase=prep_phase,check=check,
-       ready=preparation_ready,phase=a.phase,page_size=a.page_size,max_recipes=a.max_recipes,seconds=a.seconds,clock=clock,event_sink=event)
+       ready=preparation_ready,phase=a.phase,page_size=a.page_size,max_recipes=a.max_recipes,seconds=a.seconds,clock=clock,event_sink=event,
+       reuse_unit=recipe_schedules.reuse if recipe_schedules is not None else None,
+       commit_unit=recipe_schedules.commit if recipe_schedules is not None else None)
   if schedule is not None:
-   try:schedule.publish(result)
+   try:
+    if recipe_schedules is not None:
+     schedule.publish_verified_recipes(result,recipe_schedules.stats['reused']+recipe_schedules.stats['published'])
+    else:schedule.publish(result)
    except(OSError,ValueError,KeyError,TypeError):pass # Optional scheduling cannot replace the native result.
  except (Stopped,KeyboardInterrupt)as error:
   result=dict(status='stopped',error=str(error)or'interrupted',completed=0,protection_stops=1,full_manifest_preparation_verified=False)
@@ -388,9 +407,11 @@ def prepare(config,*,services=None):
   if validation_anchor is not None:validation_anchor.close()
   if builder_session is not None:
    builder_session.close();result['builder_session']=dict(builder_session.stats)
+  if recipe_schedules is not None:
+   result['recipe_schedule']=dict(recipe_schedules.stats);recipe_schedules.close()
   result.update(before=before,after=observer.system(),samples_preview=samples,sample_count=sample_count,samples_jsonl=str(samples_path),
     memory_policy=policy_type.MANIFEST,wall_seconds=clock()-start,outcomes_preview=outcomes,outcome_count=outcome_count,
-    outcomes_jsonl=str(outcomes_path),events_jsonl=str(events_path),worker_identity=identity,current_context=context,
+    outcomes_jsonl=str(outcomes_path),events_jsonl=str(events_path),worker_identity=identity,current_context=context,selection_provenance=selection_provenance,
     runtime_cache_import_allowed=False,actual_final_read_admission=False,game_started=False)
   (run/'result.json').write_text(json.dumps(result,indent=2)+'\n');observer.close()
  return result

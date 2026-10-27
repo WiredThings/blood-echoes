@@ -42,11 +42,11 @@ class Domains(unittest.TestCase):
  def test_bad_original_key_extra_fields_and_unsupported_schema_rejected(self):
   for change in [dict(key='0'*64),dict(extra_flag='unsafe'),dict(schema=True),dict(recipe='invented')]:
    with self.assertRaises(ValueError):library_product_key(dict(self.request(),**change),'d'*64)
- def test_actual_existing_manifest_producer_exposes_both_domains_without_switching_legacy_namespace(self):
+ def test_actual_existing_producer_uses_compile_domain_and_retains_full_legacy_selection(self):
   with tempfile.TemporaryDirectory()as tmp:
    root=Path(tmp);lib=root/'gpu';game=root/'boot';lib.write_bytes(b'author compiler');game.write_bytes(b'author game')
    def resolve(*args):return dict(library=str(lib))
    args=dict(enabled=True,engine='arm64',selected_executable=lib,backend_root=root,game_artifacts={'boot':game},options={},profile={'abi':'author'},resolver=resolve)
-   env,report=prepare_startup_archive_policy(**args);self.assertIn('domains',report);self.assertEqual(env['BB_MTL_ARCHIVE_COMPATIBILITY_ID'],report['token']);self.assertNotEqual(report['token'],report['domains']['compilation_token']);before=report['domains']['compilation_token'];game.write_bytes(b'author mod');_,changed=prepare_startup_archive_policy(**args);self.assertEqual(before,changed['domains']['compilation_token']);self.assertNotEqual(report['token'],changed['token'])
+   env,report=prepare_startup_archive_policy(**args);self.assertIn('domains',report);self.assertEqual(env['BB_MTL_ARCHIVE_COMPATIBILITY_ID'],report['token']);self.assertEqual(report['token'],report['domains']['compilation_token']);before=report['token'];game.write_bytes(b'author mod');newenv,changed=prepare_startup_archive_policy(**args);self.assertEqual(before,changed['token']);self.assertNotEqual(report['legacy_selection_token'],changed['legacy_selection_token']);self.assertEqual(env,newenv);self.assertTrue(report['compilation_identity_active'])
 
 if __name__=='__main__':unittest.main(verbosity=2)

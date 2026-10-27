@@ -63,8 +63,11 @@ class Controls(unittest.TestCase):
    p=next(p for p in folder.glob('*.'+suffix)if p.name!='build.json');tmp=p.with_name('replacement');tmp.write_bytes(p.read_bytes());os.replace(tmp,p);self.assertFalse(self.call()['session_reused']);self.assertTrue(self.call()['session_reused'])
  def test_bad_source_refused_and_failure_not_cached(self):
   self.settled();p=next(self.requests.glob('*.metal'));p.write_bytes(b'BAD');r=self.call();self.assertEqual(r['status'],'refused');self.assertIsNone(self.session.summary);before=self.factories;r=self.call();self.assertEqual(r['status'],'refused');self.assertGreater(self.factories,before)
- def test_bad_library_receipt_pair_refused_not_memoized(self):
-  self.settled();folder=self.base/'artifacts'/self.session.summary['build_id'];next(folder.glob('*.metallib')).write_bytes(b'BAD');self.assertEqual(self.call()['status'],'refused');self.assertIsNone(self.session.summary)
+ def test_bad_library_pair_repaired_only_then_stable_audit_can_memoize(self):
+  self.settled();folder=self.base/'artifacts'/self.session.summary['build_id'];old=next(folder.glob('*.metallib'));old.write_bytes(b'BAD')
+  result=self.call();self.assertEqual(result['status'],'passed',result);self.assertEqual(result['repaired_products'],1);self.assertIsNone(self.session.summary)
+  self.assertEqual((Path(result['results'][0]['retained_previous'])/old.name).read_bytes(),b'BAD')
+  self.assertFalse(self.call()['session_reused']);self.assertTrue(self.call()['session_reused'])
  def test_tool_binary_change_new_identity_and_no_reuse(self):
   first=self.settled();self.tools['metal'].write_bytes(b'CHANGED-AUTHOR-TOOL');second=self.call();self.assertFalse(second['session_reused']);self.assertNotEqual(first['build_id'],second['build_id']);self.assertGreater(second['built'],0)
  def test_selected_tool_path_change_invalidates(self):

@@ -280,7 +280,7 @@ def write_row(stream, row):
     stream.write("\n")
 
 
-def census(root, prior, output):
+def census(root, prior, output, *, products=None, source_files=None):
     started = time.monotonic()
     require(root.is_absolute() and root == root.resolve(), "canonical absolute game root")
     known = json.loads(prior.read_text())
@@ -299,13 +299,37 @@ def census(root, prior, output):
             path = root / relative
             require(not path.is_symlink() and path.resolve().is_relative_to(root), "package symlink")
             require(path.stat().st_size <= catalog.LIMIT, "package byte budget")
+            from resource_parse_products import identity as metadata_identity
+            proof = dict(kind='gnm-package-headers-v1', package_metadata_sha256=metadata_identity(package))
+            if source_files is None:
+                require(catalog_identity(root/package['path'])==package['sha256'], 'package changed before metadata reuse')
+            cached = products.get(proof) if products is not None else None
+            if cached is not None:
+                require(set(cached)=={'rows','counts','stages','tails','missing','receipt'}, 'GNM product fields')
+                for row in cached['rows']:write_row(stream,row)
+                for target,name in [(counts,'counts'),(stages,'stages'),(tails,'tails'),(missing,'missing')]:target.update(cached[name])
+                package_receipts.append(cached['receipt'])
+                continue
+            old_counts=[x.copy() for x in (counts,stages,tails,missing)]
+            captured=[];captured_bytes=0
+            def emit(row):
+                nonlocal captured,captured_bytes
+                write_row(stream,row)
+                if captured is not None:
+                    captured_bytes+=len(json.dumps(row,separators=(',',':')).encode())
+                    if captured_bytes<=3*1024*1024:captured.append(row)
+                    else:captured=None
+            def remember():
+                if products is None or captured is None:return
+                deltas=[dict(now-old) for now,old in zip((counts,stages,tails,missing),old_counts)]
+                products.put(proof,dict(rows=captured,counts=deltas[0],stages=deltas[1],tails=deltas[2],missing=deltas[3],receipt=package_receipts[-1]))
             raw = path.read_bytes()
             require(hashlib.sha256(raw).hexdigest() == package["sha256"], "package changed")
             if package["kind"] == "embedded":
                 data, _header, _ph, _segments, absent = checked_elf(raw, str(relative))
                 del raw
                 result = shader_headers(data, embedded=True)
-                write_row(stream, dict(package=str(relative), entry=None,
+                emit(dict(package=str(relative), entry=None,
                     elf_sha256=hashlib.sha256(data).hexdigest(), **result))
                 counts["embedded_modules"] += 1
                 counts["accepted_headers"] += len(result["headers"])
@@ -318,6 +342,7 @@ def census(root, prior, output):
                 package_receipts.append(dict(path=str(relative), sha256=package["sha256"],
                                              missing_optional_program_headers=absent))
                 del data, result
+                remember()
                 continue
             data = catalog.dcx(raw)
             del raw
@@ -326,7 +351,7 @@ def census(root, prior, output):
             for entry in binder["entries"]:
                 payload = catalog.entry_data(data, entry)
                 result = shader_headers(payload)
-                write_row(stream, dict(package=str(relative), entry=entry["name"],
+                emit(dict(package=str(relative), entry=entry["name"],
                     entry_sha256=hashlib.sha256(payload).hexdigest(), **result))
                 counts["entries"] += 1
                 counts["accepted_headers"] += len(result["headers"])
@@ -341,6 +366,7 @@ def census(root, prior, output):
             require(catalog_identity(path) == package["sha256"], "package changed during scan")
             package_receipts.append(dict(path=str(relative), sha256=package["sha256"]))
             del data, binder
+            remember()
     summary = dict(schema=1, counts=dict(counts), stages=dict(stages),
                    unparsed_tail_sizes=dict(tails), entries_without_header=dict(missing),
                    package_receipts=package_receipts,

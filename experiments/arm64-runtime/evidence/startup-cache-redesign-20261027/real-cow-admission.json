@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "real_fsevents": true,
+  "real_fclonefileat": true,
+  "source_hashed_files": 1,
+  "destination_hashed_files": 1,
+  "verified_readonly_clones": 2,
+  "source_and_destination_bytes_independently_compared": true,
+  "game_compiler_gpu_started": false,
+  "formal_data_modified": false
+}

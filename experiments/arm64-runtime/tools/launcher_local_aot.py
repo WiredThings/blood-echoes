@@ -305,12 +305,14 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
             if type(value.get('journal_reused'))is bool:counts[name]['journal_reused']=value['journal_reused']
     if counts:visible['incremental_inputs']=counts
     local=report.get('local',{})
-    visible_local={k:local[k]for k in('built','skipped','reused_products','requests')if type(local.get(k))is int and local[k]>=0}
+    visible_local={k:local[k]for k in('built','skipped','reused_products','repaired_products','requests')if type(local.get(k))is int and local[k]>=0}
     if type(local.get('persistent_audit_reused'))is bool:visible_local['persistent_audit_reused']=local['persistent_audit_reused']
+    if local.get('same_supervisor_reused')is True:visible_local['same_supervisor_reused']=True
     if visible_local:visible['local_libraries']=visible_local
     modules=report.get('game_pso',{}).get('scan',{}).get('automatic_modules',{})
     typed=modules.get('typed_companions',{}).get('counts',{})
-    module_counts={k:typed[k]for k in('inventory_records','native_attempts','native_completed','verified_target_products','verified_target_reuses','verified_existing')if type(typed.get(k))is int and typed[k]>=0}
+    module_counts={k:typed[k]for k in('inventory_records','native_attempts','native_completed','verified_target_products','verified_target_reuses','verified_existing','required_target_keys','verified_required_products')if type(typed.get(k))is int and typed[k]>=0}
+    if modules.get('typed_companions',{}).get('historical_capture_inventory_skipped')is True:module_counts['historical_capture_inventory_skipped']=True
     if module_counts:visible['typed_modules']=module_counts
     print('Metal local preparation: '+json.dumps(visible,sort_keys=True),flush=True)
     if runtime_profile is not None:

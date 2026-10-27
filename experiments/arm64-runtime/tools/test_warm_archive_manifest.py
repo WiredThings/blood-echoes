@@ -46,10 +46,10 @@ class ProducerBranchTests(unittest.TestCase):
   resolver.assert_not_called();builder.assert_not_called()
  def test_actual_translator_artifact_change_changes_token(self):
   before=self.produce()[0];self.library.write_bytes(b'authored translator changed\n');self.assertNotEqual(before,self.produce()[0])
- def test_actual_game_and_patch_changes_change_token(self):
-  before=self.produce()[0]
+ def test_actual_game_and_patch_changes_only_selection_not_compiler_token(self):
+  before,original=self.produce()
   for file in [self.boot,self.patch]:
-   saved=file.read_bytes();file.write_bytes(saved+b'changed\n');self.assertNotEqual(before,self.produce()[0]);file.write_bytes(saved)
+   saved=file.read_bytes();file.write_bytes(saved+b'changed\n');after,changed=self.produce();self.assertEqual(before,after);self.assertNotEqual(original['legacy_selection_token'],changed['legacy_selection_token']);file.write_bytes(saved)
  def test_options_and_profile_changes_change_token(self):
   before=self.produce()[0];self.assertNotEqual(before,self.produce(options={'math':'Relaxed','language':'3.1'})[0])
   self.assertNotEqual(before,self.produce(profile={'abi':'different-profile'})[0])

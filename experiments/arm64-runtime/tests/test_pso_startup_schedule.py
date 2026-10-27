@@ -19,7 +19,7 @@ class Scheduling(unittest.TestCase):
   self.u['execution_policy']['candidate_preparation']['frozen_input_set_identity']=digest(refs)
   self.write();self.environment=dict(BB_MTL_LOCAL_AOT_MODE='load',BB_MTL_LOCAL_AOT_ROOT=str(self.local),BB_MTL_LOCAL_AOT_COHORT=self.cohort,BB_MTL_LOCAL_AOT_BUILD_ID=self.build,BB_MTL_LOCAL_AOT_ENVIRONMENT_ID='e'*64);self.context={'worker':'a'*64,'options':'b'*64};self.code={'tool.py':'c'*64};self.full={'status':'completed','full_manifest_preparation_verified':True}
  def write(self):self.manifest.write_text(json.dumps(self.u)+'\n')
- def schedule(self):return Schedule(self.manifest,context=self.context,environment=self.environment,gpu=self.gpu,artifact=self.artifact,progress=self.progress,code_identity=self.code,rows=rows,fingerprint=fingerprint,check=lambda:None)
+ def schedule(self,**kw):return Schedule(self.manifest,context=self.context,environment=self.environment,gpu=self.gpu,artifact=self.artifact,progress=self.progress,code_identity=self.code,rows=rows,fingerprint=fingerprint,check=lambda:None,**kw)
  def seed(self):
   s=self.schedule();self.assertIsNone(s.reuse());self.assertIsNotNone(s.token);self.assertTrue(s.publish(self.full));return s
  def test_verified_unchanged_work_is_only_a_scheduling_hit(self):
@@ -54,6 +54,21 @@ class Scheduling(unittest.TestCase):
   with patch('pso_startup_schedule.unchanged',return_value=False):self.assertIsNone(self.schedule().reuse())
  def test_geometry_and_unknown_protocol_cannot_shortcut(self):
   self.u['owned_geometry_pso']={};self.write();self.assertIsNone(self.schedule().path);del self.u['owned_geometry_pso'];self.u['record_type']='unknown';self.write();self.assertIsNone(self.schedule().path)
+ def test_selective_mode_aggregates_real_prior_recipe_proofs_without_whole_tree_hashing(self):
+  with patch('pso_startup_schedule.content_proof',side_effect=AssertionError('unrelated whole cache rehashed')):
+   s=self.schedule(selective=True);self.assertIsNone(s.reuse())
+   result=dict(status='completed',required_preparation_complete=True)
+   self.assertFalse(s.publish_verified_recipes(result,0));self.assertFalse(s.publish_verified_recipes(result,True))
+   self.assertTrue(s.publish_verified_recipes(result,1))
+   body=json.loads(s.path.read_text())['body'];self.assertFalse(body['actual_full_native_verification']);self.assertTrue(body['previous_full_native_recipe_proofs'])
+   reused=self.schedule(selective=True).reuse();self.assertIsNotNone(reused)
+   self.assertFalse(reused['native_verification_invoked_this_call']);self.assertFalse(reused['full_manifest_preparation_verified'])
+ def test_selective_aggregate_does_not_publish_over_new_or_unobservable_changes(self):
+  s=self.schedule(selective=True);(self.artifact/'new.archive').write_bytes(b'new')
+  self.assertFalse(s.publish_verified_recipes(dict(status='completed',required_preparation_complete=True),1))
+  s=self.schedule(selective=True)
+  with patch('pso_startup_schedule.unchanged',return_value=False):
+   self.assertFalse(s.publish_verified_recipes(dict(status='completed',required_preparation_complete=True),1))
 
 class PreferenceProof(unittest.TestCase):
  def setup_artifacts(self,root):

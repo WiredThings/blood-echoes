@@ -22,8 +22,10 @@ class PersistentAudit(unittest.TestCase):
   self.settle()
   with patch.object(authored.builder,'load_request',side_effect=AssertionError('unchanged request reread')),patch.object(authored.builder,'already_succeeded',side_effect=AssertionError('unchanged library reread')):
    r=self.f.run_builder();self.assertEqual(r['status'],'passed',r);self.assertTrue(r['persistent_audit_reused']);self.assertEqual(r['built'],0)
- def test_bad_library_is_rejected_without_replacement(self):
-  r=self.settle();lib=self.f.artifact(r,self.key,'.metallib');lib.write_bytes(b'CORRUPTED');before=lib.read_bytes();r=self.f.run_builder();self.assertEqual(r['status'],'refused',r);self.assertEqual(lib.read_bytes(),before)
+ def test_bad_library_is_retained_and_repaired_without_reusing_bad_audit(self):
+  r=self.settle();lib=self.f.artifact(r,self.key,'.metallib');lib.write_bytes(b'CORRUPTED');before=lib.read_bytes();r=self.f.run_builder();self.assertEqual(r['status'],'passed',r)
+  self.assertEqual(r['repaired_products'],1);self.assertNotIn('persistent_audit_reused',r)
+  self.assertEqual((Path(r['results'][0]['retained_previous'])/lib.name).read_bytes(),before)
  def test_same_size_source_rewrite_with_restored_mtime_not_reused(self):
   self.settle();p=self.f.requests/(self.key+'.metal');s=p.stat();p.write_bytes(b'X'*s.st_size);os.utime(p,ns=(s.st_atime_ns,s.st_mtime_ns));r=self.f.run_builder();self.assertEqual(r['status'],'refused',r);self.assertNotIn('persistent_audit_reused',r)
  def test_added_request_and_sdk_change_reenter_full_audit(self):

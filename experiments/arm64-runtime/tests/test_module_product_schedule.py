@@ -39,10 +39,20 @@ class Products(unittest.TestCase):
         (self.root/'stage-links-123.jsonl').write_text('new links');(self.root/'recipe-links-123.jsonl').write_text('new recipes');(self.root/'report.json').write_text('new report')
         resumed=self.create();self.assertIsNotNone(resumed.packet(self.uid,self.entry))
         self.assertIsNone(resumed.packet('e'*64,self.entry))
-    def test_actual_packet_frozen_output_catalog_or_validator_change_cannot_reuse(self):
-        for path in (self.packet,self.case/'input/code.bin',self.case/'output/module.spv',self.catalog):
+    def test_actual_packet_or_frozen_input_change_is_rejected_per_product(self):
+        for path in (self.packet,self.case/'input/code.bin'):
             self.registered();old=path.read_bytes();path.write_bytes(b'changed')
-            self.assertIsNone(self.create().packet(self.uid,self.entry));path.write_bytes(old)
+            with self.assertRaises(ValueError):self.create().packet(self.uid,self.entry)
+            path.write_bytes(old)
+    def test_catalog_change_refuses_prior_source_proof(self):
+        self.registered();self.catalog.write_bytes(b'changed catalog')
+        self.assertIsNone(self.create().packet(self.uid,self.entry))
+    def test_unrelated_product_or_report_does_not_require_a_whole_cache_pass(self):
+        self.registered();other=self.root/('module-'+'d'*64+'-'+'e'*16);other.mkdir()
+        (other/'unrelated-broken-product').write_bytes(b'bad unrelated data')
+        with patch('os.walk',side_effect=AssertionError('whole cache enumeration')):
+            next=self.create();self.assertIsNotNone(next.packet(self.uid,self.entry))
+            next.record(self.uid,self.entry);self.assertTrue(next.publish())
     def test_history_loss_or_writable_source_does_not_authorize_shortcut(self):
         self.registered();self.history=False;self.assertIsNone(self.create().packet(self.uid,self.entry))
         self.history=True;self.source.chmod(0o700);self.assertIsNone(self.create().packet(self.uid,self.entry))
@@ -60,8 +70,8 @@ class Products(unittest.TestCase):
     def test_symlink_or_hardlink_in_product_set_never_grants_byte_proof(self):
         self.registered();p=self.case/'input/code.bin';old=p.read_bytes();outside=self.base/'outside';outside.write_bytes(old)
         p.unlink();p.symlink_to(outside)
-        self.assertIsNone(self.create().packet(self.uid,self.entry))
+        with self.assertRaises(ValueError):self.create().packet(self.uid,self.entry)
         p.unlink();p.write_bytes(old);os.link(p,self.base/'extra-link')
-        self.assertIsNone(self.create().packet(self.uid,self.entry))
+        with self.assertRaises(ValueError):self.create().packet(self.uid,self.entry)
 
 if __name__=='__main__':unittest.main(verbosity=2)
