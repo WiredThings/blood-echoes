@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "status": "installed-synthetic-passed-live-white-model-pending",
+  "code_revision": "d25b91b390690153e7669b4a6e69e97c8f746739",
+  "version": "0.2.57",
+  "diagnostic_only": true,
+  "root_cause_confirmed": false,
+  "game_visual_regression_completed": false,
+  "synthetic_metal_cases": [
+    "pixels-before-later-write",
+    "BC1-tail-mips",
+    "BC4-tail-mips",
+    "BC7-tail-mips",
+    "invalid-schema",
+    "request-symlink",
+    "disabled",
+    "not-recording",
+    "no-match",
+    "output-symlink"
+  ],
+  "metal_validation_layer": true,
+  "actual_test_library_verified": true,
+  "python_regressions": {
+    "request_selector": 11,
+    "binding_analyzer": 14
+  },
+  "packaged_component_admitted": true,
+  "whole_app_deep_strict_signature": true,
+  "formal_data_modified": false,
+  "existing_cache_cleared_or_overwritten": false,
+  "Release_updated": false,
+  "raw_game_content_included": false
+}
