@@ -52,7 +52,7 @@
     {
       "suite": "test_launcher_local_aot",
       "exit": 0,
-      "tests": 20,
+      "tests": 21,
       "seconds": 2.132
     },
     {
@@ -104,7 +104,7 @@
       "seconds": 0.037
     }
   ],
-  "total_tests": 271,
+  "total_tests": 272,
   "formal_data_modified": false,
   "game_started": false
 }

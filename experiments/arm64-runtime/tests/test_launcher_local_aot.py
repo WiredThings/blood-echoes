@@ -219,4 +219,25 @@ class Startup(unittest.TestCase):
         self.assertEqual(self.calls,[])
 
 
+    def test_main_reports_only_actual_nonsecret_incremental_counters(self):
+        import contextlib,io
+        from unittest.mock import patch
+        import launcher_local_aot as h
+        for present in (False,True):
+            report=dict(status='prepared')
+            if present:
+                counts=dict(hashed_files=0,hashed_bytes=0,reused_files=123,token='must-not-log',negative=-1)
+                report['game_pso']=dict(status='completed',scan=dict(automatic_static_inputs=dict(
+                    source_hashes=counts,source_view=dict(source_hashes=counts,snapshot_hashes=counts))))
+            output=io.StringIO()
+            with patch.object(h,'prepare_launch',return_value=({'SECRET_TOKEN':'must-not-log'},report)),patch.object(h.os,'execve',side_effect=RuntimeError('author exec boundary')),contextlib.redirect_stdout(output):
+                with self.assertRaisesRegex(RuntimeError,'author exec boundary'):h.main(['author-native','author-boot'])
+            text=output.getvalue();self.assertNotIn('must-not-log',text)
+            visible=json.loads(text.split('Metal local preparation: ',1)[1])
+            if present:
+                self.assertEqual(set(visible['incremental_inputs']),{'source','snapshot','catalogue'})
+                for row in visible['incremental_inputs'].values():self.assertEqual(row,dict(hashed_files=0,hashed_bytes=0,reused_files=123))
+            else:self.assertNotIn('incremental_inputs',visible)
+
+
 if __name__=='__main__':unittest.main()

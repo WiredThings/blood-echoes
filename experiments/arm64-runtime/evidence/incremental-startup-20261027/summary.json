@@ -12,5 +12,6 @@
   "formal_data_modified": false,
   "existing_cache_cleared": false,
   "release_updated": false,
-  "directed_tests": 271
+  "directed_tests": 272,
+  "visible_metrics": "Existing completion log includes only actual nonnegative integer source/snapshot/catalogue read counters; no environment/path/credentials."
 }

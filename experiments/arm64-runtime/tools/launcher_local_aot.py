@@ -254,6 +254,13 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     if report.get('local',{}).get('reason'):visible['reason']=report['local']['reason']
     if 'game_pso'in report:visible['game_pso']=report['game_pso'].get('status')
     if 'fixed_helpers'in report:visible['fixed_helpers']=report['fixed_helpers'].get('status')
+    static=report.get('game_pso',{}).get('scan',{}).get('automatic_static_inputs',{})
+    view=static.get('source_view',{})
+    counts={}
+    for name,value in (('source',view.get('source_hashes')),('snapshot',view.get('snapshot_hashes')),('catalogue',static.get('source_hashes'))):
+        if isinstance(value,dict):
+            counts[name]={k:value[k]for k in('hashed_files','hashed_bytes','reused_files')if type(value.get(k))is int and value[k]>=0}
+    if counts:visible['incremental_inputs']=counts
     print('Metal local preparation: '+json.dumps(visible,sort_keys=True),flush=True)
     os.execve(executable, [executable, *arguments], env)
 
