@@ -7,7 +7,7 @@
     "selected source and readonly snapshot digest reuse",
     "static catalogue inventory digest reuse"
   ],
-  "known_old_parser_migration": "Only old controller SHA 0299bbac with exact eight-function semantic AST and all other parser/enum hashes unchanged",
+  "known_old_parser_migration": "Only old controller SHA 0299bbac with exact nine-function and bounds semantic AST and all other parser/enum hashes unchanged",
   "source_and_cache_tamper_recovery": "Keep old invalid generation, validate current sources, publish a separate retry generation",
   "formal_data_modified": false,
   "existing_cache_cleared": false,

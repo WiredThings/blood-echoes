@@ -102,12 +102,14 @@ def scanner_identity(source_root,runtime_profile=None):
 
 
 # The previous scheduler hashed this whole module into scanner identity. Its
-# eight parsing/publication function bodies are unchanged: permit only that one
+# parsing/publication function bodies and bounds are unchanged: permit only that one
 # known identity to reuse validated old indices. Other parsers/enum bytes must
 # still match, and a later parsing change disables this migration automatically.
 LEGACY_CONTROLLER_SHA='0299bbac7743ff75a5702a8e953ebc612ba55a6c3c90a92657a8d3a18ad69021'
-LEGACY_SCANNER_BODY='59aa3212068873a18f3bb7b163c2440272de9f18d99a25ebccb8c6db41546cf8'
-SCANNER_FUNCTIONS={'directory','file_sha','digest','write_json','source_inventory','output_receipt','read_ready','build_static'}
+LEGACY_SCANNER_BODY='a21fb83f31fd5d369b98fee99fa66d7736c164ce5377e213d0830bfb0f8795bc'
+SCANNER_FUNCTIONS={'need','directory','file_sha','digest','write_json','source_inventory','output_receipt','read_ready','build_static'}
+
+SCANNER_CONSTANTS={'SCHEMA','MAX_FILES','MAX_METADATA','MAX_LINE'}
 
 def scanner_body_digest(text):
     # ast.dump's empty-field rendering differs between Python 3.11 and 3.14.
@@ -119,7 +121,9 @@ def scanner_body_digest(text):
         if isinstance(value,bytes):return dict(bytes_hex=value.hex())
         return value
     tree=ast.parse(text)
-    return digest([canonical(n)for n in tree.body if isinstance(n,ast.FunctionDef)and n.name in SCANNER_FUNCTIONS])
+    def selected(n):
+        return (isinstance(n,ast.FunctionDef)and n.name in SCANNER_FUNCTIONS)or(isinstance(n,ast.Assign)and any(isinstance(t,ast.Name)and t.id in SCANNER_CONSTANTS for t in n.targets))
+    return digest([canonical(n)for n in tree.body if selected(n)])
 
 def legacy_scanners(source_root,runtime_profile=None):
     if scanner_body_digest(Path(__file__).read_text())!=LEGACY_SCANNER_BODY:return []
