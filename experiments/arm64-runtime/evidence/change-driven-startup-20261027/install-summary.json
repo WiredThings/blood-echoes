@@ -1,0 +1,15 @@
+{
+  "status": "installed-verified",
+  "version": "0.2.55",
+  "source_revision": "579df61dedc4f2f24d003a564ccb1708be77a6ef",
+  "previous_source_revision": "780afcd07133d2dbd062759463c2cda046806487",
+  "app": "/Applications/Blood Echoes.app",
+  "atomic_exchange": true,
+  "files": 985,
+  "whole_app_deep_strict_seal": true,
+  "formal_data_modified": false,
+  "formal_GUI_started": false,
+  "game_started": false,
+  "release_updated": false,
+  "old_application_code_retained": true
+}

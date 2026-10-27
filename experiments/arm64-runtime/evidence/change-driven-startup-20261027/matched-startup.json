@@ -1,0 +1,945 @@
+{
+  "status": "isolated-cold-warm-verified-install-pending",
+  "source_revision": "579df61dedc4f2f24d003a564ccb1708be77a6ef",
+  "version": "0.2.55",
+  "total_scene_runs": 10,
+  "directed_tests": 351,
+  "formal_data_modified": false,
+  "release_updated": false,
+  "all_runs_silent": true,
+  "screen_capture": false,
+  "Cua": false,
+  "new_game_tests_planned": false,
+  "baseline_stable_seconds": 193.83184916700702,
+  "final_stable_seconds": [
+    84.00571079202928,
+    79.20362408307847
+  ],
+  "final_stable_mean_seconds": 81.60466743755387,
+  "stable_startup_reduction_percent": 57.89924731758471,
+  "baseline_scene_footprint_mib": 5907.731544494629,
+  "final_mean_scene_footprint_mib": 5915.278293609619,
+  "continuous_in_game_tasks_added": false,
+  "observed_scene_memory_claim": "No material sustained increase in these short matched samples; no claim for long exploration.",
+  "FPS_claim": "Essentially unchanged; no frame-rate optimization claim.",
+  "PSO_schedule_reuse_observed": false,
+  "PSO_remaining_reason": "Actual native full verification changes startup-entry.json bytes; strict byte proof is not published. Conservative original verification remains.",
+  "module_remaining": "Typed companion inventory still grows for equivalent observed outputs with different provenance/integrity fields. No input-key weakening or unproven deduplication.",
+  "code_identity_supplement": {
+    "candidate": {
+      "source_revision": "579df61dedc4f2f24d003a564ccb1708be77a6ef",
+      "version": "0.2.55",
+      "native_manifest_sha256": "023a02eee230ebf1ac8d013dcf53aa528c47ef2ccf26eab601d958098a618ad6"
+    },
+    "executed": {
+      "source_revision": "579df61dedc4f2f24d003a564ccb1708be77a6ef",
+      "version": "0.2.55",
+      "native_manifest_sha256": "023a02eee230ebf1ac8d013dcf53aa528c47ef2ccf26eab601d958098a618ad6"
+    }
+  },
+  "raw_metadata_caveat": "Additional reports carry copied source-QA native_identity and some pre-byteproof static identity fields. Actual formal admission ran on current staged code before each sample, and whole-app seals passed before and after. Separate staged-code replacement receipt proves identical eight native roles and scripts. Raw reports are not rewritten.",
+  "candidate_build": {
+    "status": "candidate-built",
+    "version": "0.2.55",
+    "source_revision": "579df61dedc4f2f24d003a564ccb1708be77a6ef",
+    "formal_data_modified": false,
+    "game_started": false,
+    "backend_rebuilt": false,
+    "native_source_identity": {
+      "files": 9463,
+      "sha256": "b198c713a4cfa61f643f5bff01fb360ce329b4d2f7f1b83646b39824f1515ee1"
+    },
+    "native_products_unchanged": true,
+    "seconds": 82.50376012502238,
+    "before": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9166.8125
+    },
+    "after": {
+      "pressure": 1,
+      "locked": false,
+      "swap_mib": 9166.8125
+    }
+  },
+  "runs": [
+    {
+      "kind": "before",
+      "source_revision": "780afcd0",
+      "run": 1,
+      "phase": "initial",
+      "to_scene_seconds": 457.14181095792446,
+      "scene": {
+        "frames": 1465,
+        "fps": 48.8264650772458,
+        "p95_ms": 21.79,
+        "p99_ms": 22.9,
+        "gpu_ms": 19.259037542662117,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6004.16911315918
+      },
+      "phases_seconds": {
+        "archive-policy": 0.131997,
+        "local-libraries": 0.000168,
+        "fixed-helpers": 10.677199,
+        "source-view": 143.53077,
+        "static-catalog": 280.3427,
+        "capture-receipt": 0.236718,
+        "candidate-scan": 0.000329,
+        "module-inputs": 0.780564,
+        "geometry-inputs": 0.000462,
+        "game-preparation": 425.248274
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "empty",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 31441421851,
+            "hashed_files": 28852,
+            "reused_files": 0
+          },
+          "snapshot": {
+            "hashed_bytes": 31441421851,
+            "hashed_files": 28852,
+            "reused_files": 0
+          },
+          "source": {
+            "hashed_bytes": 31441421851,
+            "hashed_files": 28852,
+            "reused_files": 0
+          }
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 8191.6875
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9134.375
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 6013.57536315918,
+      "raw_result_sha256": "22a90c016ae5bf9f529732dccced7c949b305085206fb234f78d565d745c6e5a",
+      "raw_console_sha256": "fcfde7364599230e1d966914b2559dc160df0a2a81e44c6a097c0c3752b1250b",
+      "raw_samples_sha256": "7147d6c871d31190cf31ef60a3650589dc2e024f0f047b7f55b44e86298416e8",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "before",
+      "source_revision": "780afcd0",
+      "run": 2,
+      "phase": "warm",
+      "to_scene_seconds": 289.2058714579325,
+      "scene": {
+        "frames": 1461,
+        "fps": 48.69857150856908,
+        "p95_ms": 21.43,
+        "p99_ms": 22.26,
+        "gpu_ms": 19.443264887063656,
+        "draws_median": 1366,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6156.293975830078
+      },
+      "phases_seconds": {
+        "archive-policy": 0.19547,
+        "local-libraries": 62.999495,
+        "fixed-helpers": 0.568837,
+        "source-view": 71.21103,
+        "static-catalog": 30.418669,
+        "capture-receipt": 0.234982,
+        "candidate-scan": 0.400482,
+        "module-inputs": 45.921009,
+        "geometry-inputs": 0.012511,
+        "complete-pso": 49.763476,
+        "game-preparation": 198.294586,
+        "local-finalize": 9.596715
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "completed",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "reused_files": 28852
+          },
+          "snapshot": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "reused_files": 28852
+          },
+          "source": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "reused_files": 28852
+          }
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9134.375
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9271.0
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 6169.543975830078,
+      "raw_result_sha256": "22a90c016ae5bf9f529732dccced7c949b305085206fb234f78d565d745c6e5a",
+      "raw_console_sha256": "92b2a8689febdfa57600c6942ac5f47dcc9794a6d29f7bd293cad1430de74a75",
+      "raw_samples_sha256": "68b114f54969ecfb0808db972cae16c65ac9c484913758601900a35982fe28f2",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "before",
+      "source_revision": "780afcd0",
+      "run": 3,
+      "phase": "warm",
+      "to_scene_seconds": 193.83184916700702,
+      "scene": {
+        "frames": 1497,
+        "fps": 49.87981530140803,
+        "p95_ms": 20.91,
+        "p99_ms": 21.54,
+        "gpu_ms": 18.8761122244489,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5907.731544494629
+      },
+      "phases_seconds": {
+        "archive-policy": 0.1898,
+        "local-libraries": 8.254448,
+        "fixed-helpers": 0.561458,
+        "source-view": 70.145611,
+        "static-catalog": 30.259889,
+        "capture-receipt": 0.261091,
+        "candidate-scan": 0.400144,
+        "module-inputs": 27.819853,
+        "geometry-inputs": 0.01213,
+        "complete-pso": 29.200694,
+        "game-preparation": 158.446053,
+        "local-finalize": 7.992838
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "completed",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "reused_files": 28852
+          },
+          "snapshot": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "reused_files": 28852
+          },
+          "source": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "reused_files": 28852
+          }
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9271.0
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9255.0
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 5932.840919494629,
+      "raw_result_sha256": "22a90c016ae5bf9f529732dccced7c949b305085206fb234f78d565d745c6e5a",
+      "raw_console_sha256": "ebdbff337ea0bbf89dbcc4395accbb368756b977079cdeb45d20c0ac4305c737",
+      "raw_samples_sha256": "6b7575c16a77421463ec19ea9b3f123f82e12365a9165534924d5d48b6e7573b",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "candidate",
+      "source_revision": "4a9deb514a2382d55c75fe923cd5dc88ed173982",
+      "run": 1,
+      "phase": "initial",
+      "to_scene_seconds": 357.3326179590076,
+      "scene": {
+        "frames": 1479,
+        "fps": 49.27409824902043,
+        "p95_ms": 21.52,
+        "p99_ms": 23.71,
+        "gpu_ms": 19.037173766058146,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5983.497444152832
+      },
+      "phases_seconds": {
+        "archive-policy": 0.130725,
+        "local-libraries": 0.000158,
+        "fixed-helpers": 10.320066,
+        "source-view": 72.263094,
+        "static-catalog": 249.998647,
+        "capture-receipt": 0.218766,
+        "candidate-scan": 0.000205,
+        "module-inputs": 0.728777,
+        "geometry-inputs": 0.000156,
+        "game-preparation": 323.575879
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "empty",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 31441421851,
+            "hashed_files": 28852,
+            "journal_reused": false,
+            "reused_files": 0
+          },
+          "snapshot": {
+            "hashed_bytes": 31441421851,
+            "hashed_files": 28852,
+            "journal_reused": false,
+            "reused_files": 0
+          },
+          "source": {
+            "hashed_bytes": 31441421851,
+            "hashed_files": 28852,
+            "journal_reused": false,
+            "reused_files": 0
+          }
+        },
+        "local_libraries": {
+          "built": 22,
+          "requests": 22,
+          "skipped": 0
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9239.0
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9210.125
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 5998.466171264648,
+      "raw_result_sha256": "487a03904b771f4844367a9d33d0b396c97c49ad3fe4d19450ff6ffc5cf40920",
+      "raw_console_sha256": "f8409352f90feb7021f24f730d0e4bd8d3f5cc97aa22efea513af52e2afabbb1",
+      "raw_samples_sha256": "9dea7e3b039cb6cbec5af6817c6747fe9dfb95f3dfddb7fec21b4f2421a4d8cd",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "candidate",
+      "source_revision": "4a9deb514a2382d55c75fe923cd5dc88ed173982",
+      "run": 2,
+      "phase": "warm",
+      "to_scene_seconds": 196.5750700000208,
+      "scene": {
+        "frames": 1491,
+        "fps": 49.67781057794185,
+        "p95_ms": 21.01,
+        "p99_ms": 22.26,
+        "gpu_ms": 18.988303152246814,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6166.825408935547
+      },
+      "phases_seconds": {
+        "archive-policy": 0.187956,
+        "local-libraries": 58.786257,
+        "fixed-helpers": 0.570088,
+        "source-view": 18.348206,
+        "static-catalog": 6.288774,
+        "capture-receipt": 0.230278,
+        "candidate-scan": 0.1542,
+        "module-inputs": 43.807385,
+        "geometry-inputs": 0.009632,
+        "complete-pso": 46.602177,
+        "game-preparation": 115.771034,
+        "local-finalize": 1.121188
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "completed",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": false,
+            "reused_files": 28852
+          },
+          "snapshot": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": false,
+            "reused_files": 28852
+          },
+          "source": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": false,
+            "reused_files": 28852
+          }
+        },
+        "local_libraries": {
+          "built": 0,
+          "persistent_audit_reused": true,
+          "requests": 227,
+          "skipped": 227
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9210.125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9305.9375
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 6189.794136047363,
+      "raw_result_sha256": "487a03904b771f4844367a9d33d0b396c97c49ad3fe4d19450ff6ffc5cf40920",
+      "raw_console_sha256": "26c908891d502187b9c26d098fb09b49f385371cf1ea6c4a9c30264f0f7c9c46",
+      "raw_samples_sha256": "2c1b91def53fa673dc139dc3e3c3e441d94ba847868f42a03feaf0a9b0f006e5",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "candidate",
+      "source_revision": "4a9deb514a2382d55c75fe923cd5dc88ed173982",
+      "run": 3,
+      "phase": "warm",
+      "to_scene_seconds": 78.2944290000014,
+      "scene": {
+        "frames": 1497,
+        "fps": 49.89289857743581,
+        "p95_ms": 21.04,
+        "p99_ms": 22.18,
+        "gpu_ms": 18.76937207748831,
+        "draws_median": 1366,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5926.137908935547
+      },
+      "phases_seconds": {
+        "archive-policy": 0.194963,
+        "local-libraries": 1.891374,
+        "fixed-helpers": 0.56222,
+        "source-view": 7.963072,
+        "static-catalog": 1.285508,
+        "capture-receipt": 0.216419,
+        "candidate-scan": 0.163391,
+        "module-inputs": 27.113759,
+        "geometry-inputs": 0.128867,
+        "complete-pso": 20.974937,
+        "game-preparation": 58.178671,
+        "local-finalize": 0.253946
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "completed",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "snapshot": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "source": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          }
+        },
+        "local_libraries": {
+          "built": 0,
+          "persistent_audit_reused": true,
+          "requests": 227,
+          "skipped": 227
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9305.9375
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9265.9375
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 5937.059761047363,
+      "raw_result_sha256": "487a03904b771f4844367a9d33d0b396c97c49ad3fe4d19450ff6ffc5cf40920",
+      "raw_console_sha256": "61f01fed24a819cc527e47617de21355b636fbf2ad91d90fef462c3748a9697e",
+      "raw_samples_sha256": "e8797bb0b2c47e0e10f6f3c4383bdf147a577059479ac3c354b105aaad4455c7",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "candidate",
+      "source_revision": "4a9deb514a2382d55c75fe923cd5dc88ed173982",
+      "run": 4,
+      "phase": "additional-stable-warm",
+      "to_scene_seconds": 113.25327587500215,
+      "scene": {
+        "frames": 1517,
+        "fps": 50.55547705441196,
+        "p95_ms": 20.42,
+        "p99_ms": 20.84,
+        "gpu_ms": 18.5477587343441,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5925.544204711914
+      },
+      "phases_seconds": {
+        "archive-policy": 0.118003,
+        "local-libraries": 9.890188,
+        "fixed-helpers": 0.551766,
+        "source-view": 7.638785,
+        "static-catalog": 1.257264,
+        "capture-receipt": 0.214173,
+        "candidate-scan": 0.169518,
+        "module-inputs": 25.092456,
+        "geometry-inputs": 0.009763,
+        "complete-pso": 47.887603,
+        "game-preparation": 82.589553,
+        "local-finalize": 1.214115
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "completed",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "snapshot": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "source": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          }
+        },
+        "local_libraries": {
+          "built": 0,
+          "persistent_audit_reused": true,
+          "requests": 231,
+          "skipped": 231
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9105.8125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9105.8125
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 5941.7473068237305,
+      "raw_result_sha256": "ffd5ef22ccfc7e1cd8873d825df53e9646a9f34631a8050579f26e0a46c03ff1",
+      "raw_console_sha256": "8d41e24d31857b971eb466986c7746c7caa06ad6f322734214359a0d8d2b9e2b",
+      "raw_samples_sha256": "b7e10a4e478b9be110d204871cc0d93b08fecb9fe0bd3e42bedccd47cfd68103",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "candidate",
+      "source_revision": "4a9deb514a2382d55c75fe923cd5dc88ed173982",
+      "run": 5,
+      "phase": "additional-stable-warm",
+      "to_scene_seconds": 79.2626641249517,
+      "scene": {
+        "frames": 1512,
+        "fps": 50.376490970880255,
+        "p95_ms": 20.66,
+        "p99_ms": 21.29,
+        "gpu_ms": 18.6796164021164,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5932.872261047363
+      },
+      "phases_seconds": {
+        "archive-policy": 0.148757,
+        "local-libraries": 2.299638,
+        "fixed-helpers": 0.601938,
+        "source-view": 9.128232,
+        "static-catalog": 1.382662,
+        "capture-receipt": 0.242846,
+        "candidate-scan": 0.199987,
+        "module-inputs": 25.387464,
+        "geometry-inputs": 0.011285,
+        "complete-pso": 21.459853,
+        "game-preparation": 58.179207,
+        "local-finalize": 0.410798
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "completed",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "snapshot": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "source": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          }
+        },
+        "local_libraries": {
+          "built": 0,
+          "persistent_audit_reused": true,
+          "requests": 231,
+          "skipped": 231
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9041.8125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9270.8125
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 5940.309761047363,
+      "raw_result_sha256": "f450552b56e6a21d9cfb934886e439f79462c26fe4f629595500f815ef69378f",
+      "raw_console_sha256": "db9a8708bf4ec18436ba30d7baa0464519c69a9dbed4454fcebcf273348e0ade",
+      "raw_samples_sha256": "922ab5104512471a774bb0a788c9dfe3a9ee9179a13a0f25e6d0140b47fa57e4",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "final",
+      "source_revision": "579df61dedc4f2f24d003a564ccb1708be77a6ef",
+      "run": 6,
+      "phase": "additional-stable-warm",
+      "to_scene_seconds": 84.00571079202928,
+      "scene": {
+        "frames": 1520,
+        "fps": 50.633923396203784,
+        "p95_ms": 20.52,
+        "p99_ms": 21.66,
+        "gpu_ms": 18.528605263157896,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5925.887565612793
+      },
+      "phases_seconds": {
+        "archive-policy": 0.121475,
+        "local-libraries": 2.302105,
+        "fixed-helpers": 0.558212,
+        "source-view": 8.278397,
+        "static-catalog": 1.361973,
+        "capture-receipt": 0.213607,
+        "candidate-scan": 0.170847,
+        "module-inputs": 25.000574,
+        "geometry-inputs": 0.068053,
+        "complete-pso": 25.85487,
+        "game-preparation": 61.279916,
+        "local-finalize": 0.330246
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "completed",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "snapshot": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "source": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          }
+        },
+        "local_libraries": {
+          "built": 0,
+          "persistent_audit_reused": true,
+          "requests": 231,
+          "skipped": 231
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9166.8125
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9580.5625
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 5944.293838500977,
+      "raw_result_sha256": "99166d530bc9e29f395a8a7b2ce600c11f78cc1af9700052f76861fb87b09a2f",
+      "raw_console_sha256": "e7a82d41c9cf983fe05e6cdf106b43921cf0e50b9d28abbef7b8152b49b13e78",
+      "raw_samples_sha256": "cf7de19a1476e0143eaeb9fc9b6553c01ee9323f638ab946990e835a2d2458c8",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    },
+    {
+      "kind": "final",
+      "source_revision": "579df61dedc4f2f24d003a564ccb1708be77a6ef",
+      "run": 7,
+      "phase": "additional-stable-warm",
+      "to_scene_seconds": 79.20362408307847,
+      "scene": {
+        "frames": 1502,
+        "fps": 50.04426351803176,
+        "p95_ms": 20.79,
+        "p99_ms": 21.55,
+        "gpu_ms": 18.761358189081225,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 5904.669021606445
+      },
+      "phases_seconds": {
+        "archive-policy": 0.123336,
+        "local-libraries": 2.204669,
+        "fixed-helpers": 0.566062,
+        "source-view": 8.334261,
+        "static-catalog": 1.427673,
+        "capture-receipt": 0.216862,
+        "candidate-scan": 0.189634,
+        "module-inputs": 25.861082,
+        "geometry-inputs": 0.009682,
+        "complete-pso": 21.31662,
+        "game-preparation": 57.691128,
+        "local-finalize": 0.305689
+      },
+      "completion": {
+        "fixed_helpers": "completed",
+        "game_pso": "completed",
+        "incremental_inputs": {
+          "catalogue": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "snapshot": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          },
+          "source": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "reused_files": 28852
+          }
+        },
+        "local_libraries": {
+          "built": 0,
+          "persistent_audit_reused": true,
+          "requests": 231,
+          "skipped": 231
+        },
+        "reason": "prepared",
+        "requested": "auto",
+        "status": "prepared"
+      },
+      "before": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9572.5625
+      },
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 9586.9375
+      },
+      "peak_pressure": 2,
+      "peak_observed_combined_footprint_mib": 5924.700271606445,
+      "raw_result_sha256": "62bb3ab841f6f93378716627ea5dfde045d87e88f386b83a62c8f704df23e57d",
+      "raw_console_sha256": "3f60f14df1e4efdf3c5397ca2dae68b781ecc1f044c3f7eef2cb37ca73f676f7",
+      "raw_samples_sha256": "b4679e424dcb468f72f2080d46fc2297e822d76a040d2fbd8ea37416cb96e87d",
+      "same_settings_sha256": {
+        "BB_CONFIG": "d1e1784a6ec8ec693e1ab9f596215ed89acd3933de326574422200255940d38f",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "full_app_signature_before_after": true,
+      "original_QA_save_unchanged": true,
+      "formal_data_modified": false
+    }
+  ]
+}
