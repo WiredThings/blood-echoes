@@ -131,7 +131,10 @@ class SourceView(unittest.TestCase):
 
     def test_modified_cache_snapshot_is_refused_and_preserved(self):
         first=self.prepare();p=first['game_root']/'eboot.bin';p.chmod(0o600);p.write_bytes(b'changed private snapshot')
-        with self.assertRaisesRegex(ValueError,'snapshot contents changed'):self.prepare()
+        second=self.prepare()
+        self.assertNotEqual(first['game_root'],second['game_root'])
+        self.assertEqual(second['report']['cache_recovery'],'source-snapshot-invalid')
+        self.assertEqual((second['game_root']/'eboot.bin').read_bytes(),(self.game/'eboot.bin').read_bytes())
         self.assertEqual(p.read_bytes(),b'changed private snapshot')
 
     def test_source_content_change_creates_new_snapshot_and_keeps_previous(self):
@@ -154,34 +157,36 @@ class SourceView(unittest.TestCase):
     def test_warm_snapshot_extra_file_is_refused_without_deletion(self):
         first=self.prepare();root=first['game_root'];root.chmod(0o700)
         extra=root/'unexpected.bin';extra.write_bytes(b'authored unadmitted file');root.chmod(0o500)
-        with self.assertRaisesRegex(ValueError,'snapshot file set changed'):self.prepare()
+        second=self.prepare()
+        self.assertNotEqual(first['game_root'],second['game_root'])
+        self.assertFalse((second['game_root']/'unexpected.bin').exists())
         self.assertEqual(extra.read_bytes(),b'authored unadmitted file')
 
     def no_ready(self):
         self.assertFalse(list((self.gpu/'automatic-game-inputs/source-views').glob('*/READY.json')))
 
-    def test_cold_hashes_each_source_twice_and_each_clone_once(self):
+    def test_cold_hashes_each_source_once_and_each_clone_once(self):
         counts=Counter();original=view.file_sha
         def count(path,*args,**kwargs):
             counts[Path(path)]+=1;return original(path,*args,**kwargs)
         sources=[p for p in self.game.rglob('*')if p.is_file()]
         with patch.object(view,'file_sha',side_effect=count):result=self.prepare()
         for source in sources:
-            self.assertEqual(counts[source],2,'initial records and final live source SHA remain')
+            self.assertEqual(counts[source],1,'initial source SHA plus final unchanged metadata')
             destination=result['game_root']/source.relative_to(self.game)
             self.assertEqual(counts[destination],1,'final complete snapshot SHA remains')
             self.assertEqual(destination.stat().st_mode&0o777,0o400)
         self.assertEqual(result['game_root'].stat().st_mode&0o777,0o500)
 
-    def test_warm_hash_passes_unchanged_and_no_more_clones(self):
+    def test_warm_does_not_read_any_game_or_snapshot_contents(self):
         first=self.prepare();clones=self.clones;counts=Counter();original=view.file_sha
         def count(path,*args,**kwargs):counts[Path(path)]+=1;return original(path,*args,**kwargs)
         with patch.object(view,'file_sha',side_effect=count):second=self.prepare()
         self.assertEqual(first['game_root'],second['game_root']);self.assertEqual(self.clones,clones)
         for source in self.game.rglob('*'):
             if source.is_file():
-                self.assertEqual(counts[source],2)
-                self.assertEqual(counts[first['game_root']/source.relative_to(self.game)],1)
+                self.assertEqual(counts[source],0)
+                self.assertEqual(counts[first['game_root']/source.relative_to(self.game)],0)
 
     def test_same_size_change_before_clone_is_rejected_by_final_snapshot_sha(self):
         source=self.game/'eboot.bin';old=source.read_bytes();stamp=source.stat()

@@ -74,10 +74,12 @@ class AutomaticCatalogue(unittest.TestCase):
 
     def test_output_tampering_refused_without_overwrite(self):
         first = self.prepare(); first['index'].write_text('tampered\n')
-        with self.assertRaisesRegex(ValueError, 'metadata changed'):
-            self.prepare()
+        second=self.prepare()
+        self.assertNotEqual(first['generation'],second['generation'])
+        self.assertIn('-retry-',second['generation'].name)
+        self.assertEqual(second['report']['cache_recovery'],'static-metadata-invalid')
         self.assertEqual(first['index'].read_text(), 'tampered\n')
-        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(self.calls), 2)
 
     def test_source_file_and_directory_links_refused(self):
         link = self.game / 'link'; link.symlink_to(self.game / 'game.bin')

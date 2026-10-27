@@ -1,0 +1,110 @@
+{
+  "status": "passed",
+  "suites": [
+    {
+      "suite": "test_incremental_file_hashes",
+      "exit": 0,
+      "tests": 17,
+      "seconds": 0.073
+    },
+    {
+      "suite": "test_incremental_preparation",
+      "exit": 0,
+      "tests": 12,
+      "seconds": 0.194
+    },
+    {
+      "suite": "test_launcher_source_view",
+      "exit": 0,
+      "tests": 26,
+      "seconds": 0.391
+    },
+    {
+      "suite": "test_launcher_game_catalog",
+      "exit": 0,
+      "tests": 13,
+      "seconds": 0.157
+    },
+    {
+      "suite": "test_source_code_closure",
+      "exit": 0,
+      "tests": 13,
+      "seconds": 0.486
+    },
+    {
+      "suite": "test_launcher_runtime_scope",
+      "exit": 0,
+      "tests": 25,
+      "seconds": 0.072
+    },
+    {
+      "suite": "test_launcher_runtime_scope_observer",
+      "exit": 0,
+      "tests": 18,
+      "seconds": 0.237
+    },
+    {
+      "suite": "test_quick_restart_preparation",
+      "exit": 0,
+      "tests": 19,
+      "seconds": 0.216
+    },
+    {
+      "suite": "test_launcher_local_aot",
+      "exit": 0,
+      "tests": 20,
+      "seconds": 2.132
+    },
+    {
+      "suite": "test_launcher_game_pso_automatic",
+      "exit": 0,
+      "tests": 10,
+      "seconds": 0.129
+    },
+    {
+      "suite": "test_launcher_game_modules",
+      "exit": 0,
+      "tests": 10,
+      "seconds": 0.142
+    },
+    {
+      "suite": "test_qa_launch_clone",
+      "exit": 0,
+      "tests": 20,
+      "seconds": 0.662
+    },
+    {
+      "suite": "test_qa_launch_conditions",
+      "exit": 0,
+      "tests": 34,
+      "seconds": 0.607
+    },
+    {
+      "suite": "test_qa_memory_policy",
+      "exit": 0,
+      "tests": 10,
+      "seconds": 0.032
+    },
+    {
+      "suite": "test_native_source_package",
+      "exit": 0,
+      "tests": 8,
+      "seconds": 0.118
+    },
+    {
+      "suite": "test_normal_preparation_build_plan",
+      "exit": 0,
+      "tests": 9,
+      "seconds": 0.068
+    },
+    {
+      "suite": "test_fixed_helper_failure_records",
+      "exit": 0,
+      "tests": 7,
+      "seconds": 0.037
+    }
+  ],
+  "total_tests": 271,
+  "formal_data_modified": false,
+  "game_started": false
+}

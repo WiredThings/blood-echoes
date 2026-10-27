@@ -6,13 +6,14 @@ compilation. A static program identity is explicitly NOT a complete PSO recipe.
 The child process releases its temporary decompression/index memory before play.
 """
 from pathlib import Path
-import argparse, hashlib, json, os, signal, stat, subprocess, sys, tempfile, time
+import argparse, ast, hashlib, json, os, signal, stat, subprocess, sys, tempfile, time
 
 SCHEMA = 1
 MAX_FILES = 100000
 MAX_METADATA = 512 * 1024 * 1024
 MAX_LINE = 32 * 1024 * 1024
 TOOLS = Path(__file__).resolve().parent
+from incremental_file_hashes import Hashes,replaceable
 DEPENDENCIES = ('launcher_game_catalog.py', 'game_shader_catalog.py',
                 'gnm_shader_metadata.py', 'full_game_catalog.py',
                 'static_program_links.py', 'decode_shader_cache.py')
@@ -91,10 +92,59 @@ def scanner_identity(source_root,runtime_profile=None):
         from launcher_runtime_profile import code_bytes
         runtime_profile.code(path);return code_bytes(path,limit=4*1024*1024,content=False)[1]['sha256']
     files = {name: code_hash(TOOLS / name) for name in DEPENDENCIES}
+    controller=(TOOLS/'launcher_game_catalog.py').read_bytes()
+    need(hashlib.sha256(controller).hexdigest()==files['launcher_game_catalog.py'],'scanner controller changed')
+    files['launcher_game_catalog.py']=scanner_body_digest(controller.decode())
     original_loader = TOOLS.parent / 'vendor/blood_echoes/loader/prepare.py'
     files['original-self-loader'] = code_hash(original_loader)
     files['native-runtime-info'] = code_hash(Path(source_root) / 'shader_recompiler/runtime_info.h')
     return digest(files)
+
+
+# The previous scheduler hashed this whole module into scanner identity. Its
+# eight parsing/publication function bodies are unchanged: permit only that one
+# known identity to reuse validated old indices. Other parsers/enum bytes must
+# still match, and a later parsing change disables this migration automatically.
+LEGACY_CONTROLLER_SHA='0299bbac7743ff75a5702a8e953ebc612ba55a6c3c90a92657a8d3a18ad69021'
+LEGACY_SCANNER_BODY='59aa3212068873a18f3bb7b163c2440272de9f18d99a25ebccb8c6db41546cf8'
+SCANNER_FUNCTIONS={'directory','file_sha','digest','write_json','source_inventory','output_receipt','read_ready','build_static'}
+
+def scanner_body_digest(text):
+    # ast.dump's empty-field rendering differs between Python 3.11 and 3.14.
+    # Ignore only the added *empty* type_params field, never actual syntax.
+    def canonical(value):
+        if isinstance(value,ast.AST):
+            return [type(value).__name__,[(k,canonical(v))for k,v in ast.iter_fields(value)if not(k=='type_params'and not v)]]
+        if isinstance(value,list):return [canonical(v)for v in value]
+        if isinstance(value,bytes):return dict(bytes_hex=value.hex())
+        return value
+    tree=ast.parse(text)
+    return digest([canonical(n)for n in tree.body if isinstance(n,ast.FunctionDef)and n.name in SCANNER_FUNCTIONS])
+
+def legacy_scanners(source_root,runtime_profile=None):
+    if scanner_body_digest(Path(__file__).read_text())!=LEGACY_SCANNER_BODY:return []
+    def code_hash(path):
+        if runtime_profile is None:return file_sha(path)[0]
+        from launcher_runtime_profile import code_bytes
+        runtime_profile.code(path);return code_bytes(path,limit=4*1024*1024,content=False)[1]['sha256']
+    files={name:LEGACY_CONTROLLER_SHA if name=='launcher_game_catalog.py'else code_hash(TOOLS/name)for name in DEPENDENCIES}
+    files['original-self-loader']=code_hash(TOOLS.parent/'vendor/blood_echoes/loader/prepare.py')
+    files['native-runtime-info']=code_hash(Path(source_root)/'shader_recompiler/runtime_info.h')
+    return [digest(files)]
+
+
+def plain_files(root,check=lambda:None):
+    root=directory(root);files={}
+    for base,dirs,names in os.walk(root,followlinks=False):
+        check()
+        for name in dirs:directory(Path(base)/name)
+        for name in sorted(names):
+            p=Path(base)/name
+            need(p==p.resolve(strict=True),'linked static source refused')
+            files[str(p.relative_to(root))]=p
+            need(len(files)<=MAX_FILES,'static input file-count budget')
+    need(files,'empty game source inventory')
+    return files
 
 
 def output_receipt(root):
@@ -197,22 +247,38 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
     game = directory(game_root)
     if runtime_profile is not None:runtime_profile.source(game)
     else:need(game.is_relative_to(project.parent) and not gpu.is_relative_to(game), 'isolated actual app0 required')
-    check(); sources = source_inventory(game, check)
-    scan_identity = scanner_identity(source_root,runtime_profile)
-    identity = digest(dict(schema=SCHEMA, source_files=sources, scanner=scan_identity))
     cache = gpu / 'automatic-game-inputs'; cache.mkdir(mode=0o700, exist_ok=True); directory(cache)
+    selected_files=plain_files(game,check)
+    hashes=Hashes(cache/('catalogue-source-metadata-'+digest(str(game))+'.json'),
+        digest(dict(schema=1,role='static-source-inventory',root=str(game))),hasher=file_sha,check=check)
+    sources=[]
+    for name,path in sorted(selected_files.items()):
+        value,size=hashes.get(path,check);sources.append(dict(path=name,sha256=value,bytes=size))
+    scan_identity = scanner_identity(source_root,runtime_profile)
+    scheduler_identity=scan_identity
+    identity = digest(dict(schema=SCHEMA, source_files=sources, scanner=scan_identity))
     generation = cache / identity
     current = cache / 'current.json'
-    if current.exists():
-        file_sha(current)
-        need(current.stat().st_size <= 4096, 'static generation pointer budget')
-        selected = json.loads(current.read_text())
-        name = selected.get('generation')
-        need(isinstance(name, str) and Path(name).name == name, 'static generation pointer path')
-        if selected.get('identity') == identity:
-            need(name == identity or name.startswith(identity + '-retry-'), 'static generation pointer identity')
-            generation = cache / name
-    ready = read_ready(generation, identity) if generation.exists() else None
+    cache_problem=None
+    try:
+        if current.exists()or current.is_symlink():
+            file_sha(current)
+            need(current.stat().st_size <= 4096, 'static generation pointer budget')
+            selected = json.loads(current.read_text())
+            name = selected.get('generation')
+            need(isinstance(name, str) and Path(name).name == name, 'static generation pointer path')
+            selected_identity=selected.get('identity')
+            if selected_identity!=identity:
+                for legacy in legacy_scanners(source_root,runtime_profile):
+                    legacy_identity=digest(dict(schema=SCHEMA,source_files=sources,scanner=legacy))
+                    if legacy_identity==selected_identity:
+                        identity=legacy_identity;scan_identity=legacy;generation=cache/identity;break
+            if selected_identity == identity:
+                need(name == identity or name.startswith(identity + '-retry-'), 'static generation pointer identity')
+                generation = cache / name
+        ready = read_ready(generation, identity) if generation.exists() else None
+    except(OSError,ValueError,KeyError,TypeError):
+        ready=None;cache_problem='static-metadata-invalid'
     reused = ready is not None
     if ready is None:
         # An interrupted generation is retained for inspection, never trusted or
@@ -247,13 +313,14 @@ def prepare(*, project, gpu_root, game_root, source_root, cohort, check=lambda: 
                             os.killpg(proc.pid, signal.SIGKILL); proc.wait()
         ready = read_ready(generation, identity)
         need(ready is not None, 'worker did not publish complete static metadata')
-        write_json(cache / 'current.json', dict(identity=identity, generation=generation.name))
-    check()
+        if replaceable(current):write_json(cache / 'current.json', dict(identity=identity, generation=generation.name))
+    check();need(plain_files(game,check)==selected_files,'static source file set changed during preparation');hashes.verify();hashes.publish()
     return dict(catalog=generation / 'catalog.json', index=generation / 'static-program-index.jsonl',
                 game_root=game, gpu_root=gpu, source_root=Path(source_root), cache_root=cache,
                 identity=identity, cohort=cohort, generation=generation,
                 report=dict(status='reused' if reused else 'indexed', identity=identity,
-                            source_files=len(sources), scanner_identity=scan_identity,
+                            source_files=len(sources), scanner_identity=scan_identity,scheduler_identity=scheduler_identity,
+                            source_hashes=hashes.report(),cache_recovery=cache_problem,
                             seconds=time.monotonic() - started, ready=ready,
                             full_pso_claim=False, default_enabled=True, formal_data_modified=False))
 
