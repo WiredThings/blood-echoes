@@ -1,0 +1,19 @@
+{
+  "status": "installed-verified",
+  "version": "0.2.57",
+  "source_revision": "14a4d49a0a67cac49ecb9a0249906d45ef3acadb",
+  "accepted_runtime_code_revision": "94ba35fa3daa87297c4189ead3e7af39c53b5043",
+  "same_native_and_preparation_code_as_accepted": true,
+  "previous_version": "0.2.56",
+  "atomic_exchange": true,
+  "files": 990,
+  "whole_app_deep_strict_seal": true,
+  "formal_data_modified": false,
+  "formal_GUI_started": false,
+  "game_started": false,
+  "release_updated": false,
+  "texture_entry_verified_from_installed_python": true,
+  "texture_request_hours": 8,
+  "texture_trigger_created": false,
+  "white_model_cause_resolved": false
+}
