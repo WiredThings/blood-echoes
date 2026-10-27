@@ -5,7 +5,7 @@ code/options/manifest/toolchain identity and continuous event history must match
 Owned geometry or unknown input protocols stay on their original native path.
 """
 from pathlib import Path
-import hashlib,json,os,stat
+import hashlib,json,os,stat,re
 from incremental_file_hashes import digest,replaceable
 from startup_change_journal import query,unchanged,MAX_MESSAGE
 from game_pso_owned_audit import checked_bytes
@@ -14,6 +14,29 @@ from game_pso_progress_identity import input_identity
 
 MAX_PROOF_BYTES=512*1024*1024
 MAX_PROOF_FILES=100000
+
+def startup_preference(path,check):
+ """Canonical scheduling preference, never an input or admission certificate.
+
+ Native RememberPreparedArtifact may select any successfully prepared recipe.
+ Prove the selected receipt AND archive; the enclosing proof still hashes every
+ receipt/archive byte. Changing that preference cannot change a factory's key.
+ Invalid, missing, foreign or damaged targets refuse the scheduling shortcut.
+ """
+ raw,_=checked_bytes(path,limit=4096);entry=json.loads(raw)
+ if set(entry)!={'schema','preparation','key'} or type(entry['schema'])is not int or entry['schema']!=1:return None
+ prep=entry['preparation'];key=entry['key']
+ if not all(isinstance(x,str)and re.fullmatch('[0-9a-f]{64}',x)for x in(prep,key)):return None
+ if path.parent.name!='native-pipeline-artifacts-v1-'+prep:return None
+ receipt=json.loads(checked_bytes(path.parent/(key+'.json'),limit=4096)[0])
+ if set(receipt)!={'schema','recipe_key','preparation','archive','archive_bytes','archive_sha256'}:return None
+ if type(receipt['schema'])is not int or receipt['schema']!=1 or receipt['recipe_key']!=key or receipt['preparation']!=prep:return None
+ name=receipt['archive'];size=receipt['archive_bytes'];expected=receipt['archive_sha256']
+ if not isinstance(name,str)or len(name)>240 or '/'in name or '\\'in name or '..'in name or not name.startswith(key+'-')or not name.endswith('.binaryarchive'):return None
+ if type(size)is not int or not 0<size<=MAX_PROOF_BYTES or not isinstance(expected,str)or not re.fullmatch('[0-9a-f]{64}',expected):return None
+ actual,actual_size=file_sha(path.parent/name,check)
+ if actual!=expected or actual_size!=size:return None
+ return dict(schema=1,preparation=prep,verified_artifact_preference=True)
 
 def content_proof(roots,check):
  """Bounded streaming proof of logical bytes and security-relevant metadata.
@@ -35,10 +58,15 @@ def content_proof(roots,check):
    for name in names:
     check();p=folder/name;s=p.lstat();count+=1
     if count>MAX_PROOF_FILES or not stat.S_ISREG(s.st_mode)or s.st_uid!=os.getuid()or s.st_size<0 or total+s.st_size>MAX_PROOF_BYTES:return None
-    sha,size=file_sha(p,check);after=p.lstat()
+    sha,size=file_sha(p,check)
+    preference=None
+    if p.name=='startup-entry.json':
+     preference=startup_preference(p,check)
+     if preference is None:return None
+    after=p.lstat()
     stamp=lambda x:(x.st_dev,x.st_ino,x.st_mode,x.st_uid,x.st_gid,x.st_nlink,x.st_size,x.st_mtime_ns,x.st_ctime_ns)
     if stamp(s)!=stamp(after)or size!=s.st_size:return None
-    total+=size;append(['file',str(p.relative_to(root)),security(s),size,sha])
+    total+=size;append(['file',str(p.relative_to(root)),security(s),size,preference if preference is not None else sha])
  return dict(schema=1,sha256=value.hexdigest(),files=count,bytes=total)
 
 class Schedule:

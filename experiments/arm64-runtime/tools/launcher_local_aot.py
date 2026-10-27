@@ -282,7 +282,18 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     visible_local={k:local[k]for k in('built','skipped','requests')if type(local.get(k))is int and local[k]>=0}
     if type(local.get('persistent_audit_reused'))is bool:visible_local['persistent_audit_reused']=local['persistent_audit_reused']
     if visible_local:visible['local_libraries']=visible_local
+    modules=report.get('game_pso',{}).get('scan',{}).get('automatic_modules',{})
+    typed=modules.get('typed_companions',{}).get('counts',{})
+    module_counts={k:typed[k]for k in('inventory_records','native_attempts','native_completed','verified_target_products','verified_target_reuses','verified_existing')if type(typed.get(k))is int and typed[k]>=0}
+    if module_counts:visible['typed_modules']=module_counts
     print('Metal local preparation: '+json.dumps(visible,sort_keys=True),flush=True)
+    if runtime_profile is not None:
+        # Explicit temporary Shared-only metadata request, applied after all
+        # preparation/identity work. Never changes compilation, saves or input.
+        from texture_binding_request import apply as texture_diagnostic
+        env, diagnostic = texture_diagnostic(env)
+        if diagnostic is not None:
+            print('Texture binding capture: '+json.dumps(diagnostic,sort_keys=True),flush=True)
     os.execve(executable, [executable, *arguments], env)
 
 

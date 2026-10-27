@@ -16,6 +16,32 @@ def association_key(f,profile_sha):
 def stage_key(unit,stage):
  return(stage['program_hash'],stage['hardware_stage'],stage['logical_stage'],stage['permutation_hash'],stage['spirv']['sha256'],unit['profile']['reference']['sha256'])
 
+def target_product_key(f,target_specs):
+ """An already-proved target product, NOT equivalence of captured sources.
+
+ Keep the original full source UID and receipt. A different capture locator,
+ origin or snapshot digest need not be compiled when a previously validated
+ source already produces exactly this code/spec/SPIR-V for the current target.
+ """
+ return tuple(f[k]for k in ('program_hash','hardware_stage','logical_stage','permutation',
+  'permutation_hash','canonical_spec_sha256','code_sha256','observed_spirv_sha256','observed_spirv_bytes'))+(tuple(sorted(target_specs)),)
+
+def verified_entry(entry,*,profile_sha,component,nonce,cohort,game_root):
+ raw,_=checked_bytes(Path(entry['packet']),limit=256*1024,expected=entry['packet_sha256']);packet=json.loads(raw)
+ receipt=json.loads(checked_bytes(Path(entry['receipt']),limit=256*1024,expected=entry['receipt_sha256'])[0])
+ need(packet['selected_backend_sha256']==component['library_sha256']and packet['selected_backend']==str(component['library']),'same actual typed compiler')
+ need(packet['game_root']==str(game_root),'same typed game source')
+ need(packet['profile']['sha256']==profile_sha,'same typed profile')
+ checked_bytes(Path(packet['profile']['path']),expected=profile_sha)
+ need(packet['expected']==entry['facts']and entry['source_input_identity']==entry['facts']['input_integrity_sha256'],'original complete typed source identity')
+ need(packet['automatic_preparation']==dict(schema=1,nonce=nonce,cohort=cohort),'same typed automatic admission')
+ need(entry['target_spec_sha256s']==[r['sha256']for r in packet['target_specs']],'indexed typed target set')
+ for ref in packet['target_specs']:checked_bytes(Path(ref['path']),limit=16384,expected=ref['sha256'])
+ need(Path(entry['receipt']).parent==Path(entry['spirv']).parent and Path(entry['spirv']).name=='module.spv','same typed output root')
+ need(entry['spirv_sha256']==receipt['spirv_sha256'],'indexed typed SPIR-V identity')
+ validate_call(0,receipt,Path(entry['spirv']).parent,packet)
+ return entry
+
 def validate_call(exit_code,result,output,packet):
  need(exit_code==0 and result.get('candidate_only')is True and result.get('companion_contract_schema')==1,'successful typed companion contract')
  need(all(result.get(k)is False for k in('runtime_cache_import_allowed','gpu_started','native_info_srt_deserialized','old_walker_executed','guest_memory_read','full_final_pso_ready')),'typed companion forbidden state')
@@ -44,6 +70,14 @@ def prepare(*,context,gpu,root,component,identity,catalog,cohort,nonce,profiles,
  if capture is None:return dict(status='unavailable',reason='normal-path typed capture not configured',counts={}),{}
  capture=directory(Path(capture));need(capture.is_relative_to(gpu/'automatic-game-inputs')and capture!=gpu/'automatic-game-inputs','selected owned companion root')
  counts=collections.Counter();gaps=collections.Counter();ready={};index.setdefault('companions',{});seen=set()
+ products=collections.defaultdict(list);verified_products={}
+ for entry in index['companions'].values():
+  try:
+   # This is only a lookup hint. Complete old packet/receipt/output validation
+   # below is mandatory before a hint may satisfy a current target.
+   if entry.get('native_typed_companion')is True and entry.get('target_spec_sha256s'):
+    products[target_product_key(entry['facts'],entry['target_spec_sha256s'])].append(entry)
+  except(KeyError,TypeError):pass
  for profile_sha,profile in profiles.items():
   check()
   if time.monotonic()>=deadline:gaps['total-budget-pending']+=1;break
@@ -57,13 +91,25 @@ def prepare(*,context,gpu,root,component,identity,catalog,cohort,nonce,profiles,
    for line in stream:
     check();count+=1;need(count<=8192 and len(line)<=16384,'bounded native typed inventory facts');facts=json.loads(line);need(set(facts)==set(FIELDS),'native typed inventory schema');counts['inventory_records']+=1
     key=association_key(facts,profile_sha);target=targets.get(key,{})
+    product=target_product_key(facts,target)if target else None
+    prepared=verified_products.get((profile_sha,product))if product is not None else None
+    if prepared is None and product is not None:
+     for old in products.get(product,()):
+      check()
+      try:prepared=verified_entry(old,profile_sha=profile_sha,component=component,nonce=nonce,cohort=cohort,game_root=context['game_root'])
+      except(ValueError,OSError,KeyError,TypeError):continue
+      verified_products[(profile_sha,product)]=prepared;counts['verified_target_products']+=1;break
+    if prepared is not None:
+     ready[key]=prepared;counts['verified_target_reuses']+=1;continue
     uid=digest(dict(kind='typed-owned-companion-v1',facts=facts,profile=profile_sha,compiler=component['module_consumer_sha256'],library=component['library_sha256'],cohort=cohort,target_specs=sorted(target)))
     if uid in seen:counts['exact_reuses']+=1;continue
     seen.add(uid);entry=index['companions'].get(uid)
     if uid in index.get('companion_rejected',{}):gaps['same-producer-rejected-input']+=1;continue
     if entry is not None:
      try:
-      raw,_=checked_bytes(Path(entry['packet']),limit=256*1024,expected=entry['packet_sha256']);packet=json.loads(raw);receipt=json.loads(checked_bytes(Path(entry['receipt']),limit=256*1024,expected=entry['receipt_sha256'])[0]);validate_call(0,receipt,Path(entry['spirv']).parent,packet);need(packet['automatic_preparation']==dict(schema=1,nonce=nonce,cohort=cohort),'same typed automatic admission');ready[key]=entry;counts['verified_existing']+=1;continue
+      verified_entry(entry,profile_sha=profile_sha,component=component,nonce=nonce,cohort=cohort,game_root=context['game_root']);ready[key]=entry;counts['verified_existing']+=1
+      if product is not None:verified_products[(profile_sha,product)]=entry
+      continue
      except(ValueError,OSError,KeyError):gaps['invalid-indexed-typed-module']+=1;continue
     if time.monotonic()>=deadline:gaps['total-budget-pending']+=1;continue
     work=root/('companion-module-'+uid+'-'+secrets.token_hex(8));work.mkdir(mode=0o700);packet=_packet(kind='owned-fetch-companion-module-input',case=work,profile_ref=profile,capture_root=capture,game_root=context['game_root'],component=component,nonce=nonce,cohort=cohort);packet.update(companion_key=facts['companion_key'],expected=facts,target_specs=[])
@@ -74,6 +120,7 @@ def prepare(*,context,gpu,root,component,identity,catalog,cohort,nonce,profiles,
      path=work/'input/packet.json';atomic_json(path,packet);counts['native_attempts']+=1;result=native_runner(component,path,work/'output',work,gpu,nonce,cohort,check,identity)
      entry=dict(packet=str(path),packet_sha256=file_sha(path),receipt=str(work/'output/result.json'),receipt_sha256=file_sha(work/'output/result.json'),spirv=str(work/'output/module.spv'),spirv_sha256=result['spirv_sha256'],target_spec_sha256s=result['target_spec_sha256s'],facts=facts,source_input_identity=facts['input_integrity_sha256'],native_typed_companion=True)
      index['companions'][uid]=entry;atomic_json(index_path,index);ready[key]=entry;counts['native_completed']+=1
+     if product is not None:verified_products[(profile_sha,product)]=entry
     except NativeModuleRejected as error:
      gaps[str(error)]+=1
      if error.deterministic:index.setdefault('companion_rejected',{})[uid]=dict(reason=str(error),consumer_sha256=component['module_consumer_sha256'],library_sha256=component['library_sha256']);atomic_json(index_path,index)

@@ -55,4 +55,36 @@ class Scheduling(unittest.TestCase):
  def test_geometry_and_unknown_protocol_cannot_shortcut(self):
   self.u['owned_geometry_pso']={};self.write();self.assertIsNone(self.schedule().path);del self.u['owned_geometry_pso'];self.u['record_type']='unknown';self.write();self.assertIsNone(self.schedule().path)
 
+class PreferenceProof(unittest.TestCase):
+ def setup_artifacts(self,root):
+  import hashlib
+  prep='a'*64;directory=root/('native-pipeline-artifacts-v1-'+prep);directory.mkdir();keys=['b'*64,'c'*64]
+  for key in keys:
+   data=('authored '+key).encode();name=key+'-author.binaryarchive';(directory/name).write_bytes(data);(directory/(key+'.json')).write_text(json.dumps(dict(schema=1,recipe_key=key,preparation=prep,archive=name,archive_bytes=len(data),archive_sha256=hashlib.sha256(data).hexdigest())))
+  def select(key): (directory/'startup-entry.json').write_text(json.dumps(dict(schema=1,preparation=prep,key=key)))
+  select(keys[0]);return directory,keys,select
+ def test_only_valid_preference_may_change_without_changing_proof(self):
+  from pso_startup_schedule import content_proof
+  with tempfile.TemporaryDirectory()as tmp:
+   root=Path(tmp).resolve();d,keys,select=self.setup_artifacts(root);a=content_proof([root],lambda:None);self.assertIsNotNone(a);select(keys[1]);self.assertEqual(a,content_proof([root],lambda:None))
+ def test_bad_pointer_or_target_cannot_be_hidden_as_schedule_metadata(self):
+  from pso_startup_schedule import content_proof
+  for mode in ('missing-key','wrong-preparation','damaged-archive','damaged-receipt','extra-field','linked-target'):
+   with tempfile.TemporaryDirectory()as tmp:
+    root=Path(tmp).resolve();d,keys,select=self.setup_artifacts(root);pointer=d/'startup-entry.json'
+    if mode=='missing-key':select('d'*64)
+    elif mode=='wrong-preparation':pointer.write_text(json.dumps(dict(schema=1,preparation='d'*64,key=keys[0])))
+    elif mode=='damaged-archive':(d/(keys[0]+'-author.binaryarchive')).write_bytes(b'changed')
+    elif mode=='damaged-receipt':(d/(keys[0]+'.json')).write_text('{}')
+    elif mode=='extra-field':pointer.write_text(json.dumps(dict(schema=1,preparation='a'*64,key=keys[0],trusted=True)))
+    else:
+     archive=d/(keys[0]+'-author.binaryarchive');original=root/'external';archive.rename(original);archive.symlink_to(original)
+    try:proof=content_proof([root],lambda:None)
+    except (OSError,ValueError,KeyError):proof=None
+    self.assertIsNone(proof,mode)
+ def test_receipt_or_archive_changes_remain_in_full_content_proof(self):
+  from pso_startup_schedule import content_proof
+  with tempfile.TemporaryDirectory()as tmp:
+   root=Path(tmp).resolve();d,keys,select=self.setup_artifacts(root);a=content_proof([root],lambda:None);select(keys[1]);(d/(keys[0]+'-author.binaryarchive')).write_bytes(b'changed unselected');self.assertNotEqual(a,content_proof([root],lambda:None))
+
 if __name__=='__main__':unittest.main()

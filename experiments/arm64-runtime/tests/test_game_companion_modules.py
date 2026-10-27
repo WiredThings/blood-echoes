@@ -63,4 +63,51 @@ class TypedContracts(unittest.TestCase):
    args=dict(context=dict(capture_root=capture,game_root=root),gpu=gpu,root=store,component=dict(library='/not-executed',library_sha256='d'*64,module_consumer_sha256='e'*64),identity={},catalog={},cohort=cohort,nonce=nonce,profiles={profile_sha:dict(path=str(profile),sha256=profile_sha)},targets={},index=index,index_path=store/'index.json',check=lambda:None,deadline=time.monotonic()+60,native_runner=native)
    report,ready=prepare(**args);self.assertEqual(counter['module'],21);self.assertEqual(len(ready),21);self.assertEqual(report['counts']['native_completed'],21)
    report,ready=prepare(**args);self.assertEqual(counter['module'],21);self.assertEqual(report['counts']['verified_existing'],21);self.assertEqual(counter['inventory'],2)
+class TargetProductReuse(unittest.TestCase):
+ fixture=TypedContracts.fixture
+ def entry(self,root):
+  p,r,out=self.fixture(root);profile=Path(p['profile']['path']);p['profile']['sha256']=file_sha(profile);p.update(selected_backend='/authored-library',game_root=str(root),automatic_preparation=dict(schema=1,nonce='a'*64,cohort='b'*64));target=profile.parent/'target.bin';target.write_bytes(b'authored target');p['target_specs']=[dict(path=str(target),sha256=file_sha(target))]
+  packet=profile.parent/'packet.json';packet.write_text(json.dumps(p));r['input_packet_sha256']=file_sha(packet);r['target_spec_sha256s']=[file_sha(target)];receipt=out/'result.json';receipt.write_text(json.dumps(r))
+  entry=dict(packet=str(packet),packet_sha256=file_sha(packet),receipt=str(receipt),receipt_sha256=file_sha(receipt),spirv=str(out/'module.spv'),spirv_sha256=r['spirv_sha256'],facts=p['expected'],source_input_identity=p['expected']['input_integrity_sha256'],native_typed_companion=True,target_spec_sha256s=r['target_spec_sha256s'])
+  args=dict(profile_sha=p['profile']['sha256'],component=dict(library='/authored-library',library_sha256='6'*64,module_consumer_sha256='e'*64),nonce='a'*64,cohort='b'*64,game_root=root)
+  return p,entry,args
+ def test_different_capture_is_same_product_without_claiming_same_source(self):
+  from game_companion_modules import target_product_key
+  with tempfile.TemporaryDirectory()as tmp:
+   p,e,a=self.entry(Path(tmp).resolve());other=dict(e['facts'],companion_key='7'*64,input_integrity_sha256='8'*64,reference_origin=1)
+   self.assertNotEqual(other,e['facts']);self.assertEqual(target_product_key(other,e['target_spec_sha256s']),target_product_key(e['facts'],e['target_spec_sha256s']))
+ def test_every_product_dimension_and_complete_target_set_matters(self):
+  from game_companion_modules import target_product_key
+  with tempfile.TemporaryDirectory()as tmp:
+   p,e,a=self.entry(Path(tmp).resolve());f=e['facts'];key=target_product_key(f,e['target_spec_sha256s'])
+   for field in set(FIELDS)-{'companion_key','input_integrity_sha256','reference_origin'}:
+    changed=dict(f);changed[field]=999 if type(f[field])is int else 'different';self.assertNotEqual(key,target_product_key(changed,e['target_spec_sha256s']),field)
+   self.assertNotEqual(key,target_product_key(f,[]))
+ def test_old_source_and_actual_bytes_must_still_verify(self):
+  from game_companion_modules import verified_entry
+  for part in ('packet','receipt','spirv'):
+   with tempfile.TemporaryDirectory()as tmp:
+    p,e,a=self.entry(Path(tmp).resolve());self.assertEqual(verified_entry(e,**a),e);Path(e[part]).write_bytes(b'corrupt')
+    with self.assertRaises(ValueError):verified_entry(e,**a)
+ def test_profile_compiler_nonce_cohort_and_game_root_cannot_cross(self):
+  from game_companion_modules import verified_entry
+  with tempfile.TemporaryDirectory()as tmp:
+   root=Path(tmp).resolve();p,e,a=self.entry(root)
+   for k,v in [('profile_sha','9'*64),('nonce','9'*64),('cohort','9'*64),('game_root',root/'other'),('component',dict(library='/other',library_sha256='6'*64))]:
+    with self.assertRaises(ValueError):verified_entry(e,**dict(a,**{k:v}))
+ def test_target_and_original_full_source_cannot_be_forged(self):
+  from game_companion_modules import verified_entry
+  with tempfile.TemporaryDirectory()as tmp:
+   p,e,a=self.entry(Path(tmp).resolve())
+   for k,v in [('source_input_identity','9'*64),('target_spec_sha256s',[]),('spirv_sha256','9'*64)]:
+    with self.assertRaises(ValueError):verified_entry(dict(e,**{k:v}),**a)
+ def test_repeated_capture_does_not_spawn_another_module_or_alias_source_uid(self):
+  from game_companion_modules import prepare,association_key
+  with tempfile.TemporaryDirectory()as tmp:
+   root=Path(tmp).resolve();p,e,a=self.entry(root);gpu=root/'gpu';capture=gpu/'automatic-game-inputs/capture';capture.mkdir(parents=True);store=gpu/'automatic-game-inputs/store';store.mkdir();index=dict(companions={'original-source-uid':e});facts=dict(e['facts'],companion_key='7'*64,input_integrity_sha256='8'*64,reference_origin=1);count=[]
+   def native(component,path,out,*args):
+    packet=json.loads(Path(path).read_text());self.assertEqual(packet['kind'],'owned-fetch-companion-inventory');out.mkdir();(out/'inventory.jsonl').write_text(json.dumps(facts)+'\n');count.append(1);return dict(accepted=1,rejected=0)
+   report,ready=prepare(context=dict(capture_root=capture,game_root=root),gpu=gpu,root=store,component=a['component'],identity={},catalog={},cohort=a['cohort'],nonce=a['nonce'],profiles={a['profile_sha']:p['profile']},targets={association_key(facts,a['profile_sha']):{e['target_spec_sha256s'][0]:{}}},index=index,index_path=store/'index.json',check=lambda:None,deadline=time.monotonic()+20,native_runner=native)
+   self.assertEqual(report['counts']['verified_target_reuses'],1);self.assertEqual(report['counts'].get('native_attempts',0),0);self.assertEqual(set(index['companions']),{'original-source-uid'});self.assertEqual(next(iter(ready.values()))['source_input_identity'],'2'*64)
+
 if __name__=='__main__':unittest.main(verbosity=2)
