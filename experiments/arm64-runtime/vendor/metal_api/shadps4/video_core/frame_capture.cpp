@@ -246,6 +246,7 @@ bool FrameCapture::NativeMode() {
     return enabled;
 }
 bool FrameCapture::NativeRecording() {return NativeMode()&&state.load(std::memory_order_relaxed)==Recording;}
+const std::string& FrameCapture::TextureDiagnosticDirectory() {return TextureDiagnosticDir();}
 bool FrameCapture::TextureBindingsEnabled() {
     static const bool enabled=[] {const char* v=std::getenv("BB_CAPTURE_TEXTURE_BINDINGS");return v&&std::strcmp(v,"1")==0;}();
     return NativeMode() && enabled;

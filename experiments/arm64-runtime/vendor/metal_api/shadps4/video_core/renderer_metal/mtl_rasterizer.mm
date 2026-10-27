@@ -1,6 +1,7 @@
 #include "video_core/frame_capture.h"
 #include "video_core/renderer_metal/mtl_memory_stats.h"
 #include "video_core/renderer_metal/mtl_copy_watch.h"
+#include "video_core/renderer_metal/mtl_texture_probe.h"
 #include "common/scope_exit.h"
 #include "video_core/renderer_metal/mtl_occlusion.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -123,6 +124,7 @@ struct Rasterizer::Impl {
     std::unordered_map<const GraphicsPipeline*, const RenderPipeline*> velocity_variants;
     bool velocity_requested = false;
     id<MTLBuffer> copy_watch_buffer=nil;
+    TextureProbe texture_probe;
     struct CopyWatchRecord {u64 sequence{},shader{};u32 reads{},writes{};};
     std::array<CopyWatchRecord,128> copy_watch_records{};
     size_t copy_watch_count{};
@@ -243,6 +245,7 @@ Rasterizer::Rasterizer(Device& device_, Scheduler& scheduler_, Runtime& runtime_
         scheduler.EndEncoder(); // joins replay and closes compute/blit as well as render
         scheduler.EndEncoder(); // a velocity render-tail callback may have encoded host work
         rasterizer.impl->DrainCopyWatch(scheduler);
+        rasterizer.impl->texture_probe.Drain(scheduler);
     });
 }
 
@@ -251,6 +254,7 @@ Rasterizer::~Rasterizer() {
     // they stop, and the draw preparation workers (which hold the pipeline cache) go, first.
     ShutdownThreads();
     impl->DrainCopyWatch(scheduler);
+    impl->texture_probe.Drain(scheduler);
     if(impl->copy_watch_buffer)MemoryStats::Retire((__bridge const void*)impl->copy_watch_buffer);
     VideoCore::FrameCapture::ClearNativeBoundaryDrain(this);
     draw_prep.reset();
@@ -1963,7 +1967,20 @@ void Rasterizer::RecordDraw(const VideoCore::PipelineBase* pipeline, const Rende
                 forced = Drop::IndexDataUnreadable;
             }
         }
-        if (!SetupDraw(graphics, guest_state, dynamic, draw.is_indexed, forced)) {
+        std::optional<RenderState> diagnostic_continuation;
+        if (!impl->velocity_replaying && graphics.Render().fs && VideoCore::FrameCapture::NativeRecording()) {
+            const auto& stages=graphics.GetStages();
+            const auto* vs=stages[u32(Shader::SwStage::Vertex)];
+            const auto* ps=stages[u32(Shader::SwStage::Fragment)];
+            // A diagnostic blit splits an existing pass. Its clear was already consumed;
+            // resuming the same attachments must load, exactly like tessellation's split.
+            const bool continuing=scheduler.IsRenderingWith(guest_state) ||
+                scheduler.IsRenderingWith(WithoutClears(guest_state));
+            if(vs&&ps&&impl->texture_probe.Draw(scheduler,impl->dev.device,vs->pgm_hash,
+                ps->pgm_hash,draw.num_indices,*graphics.Render().fs,impl->textures.data(),impl->num_textures)&&continuing)
+                diagnostic_continuation=WithoutClears(guest_state);
+        }
+        if (!SetupDraw(graphics, diagnostic_continuation?*diagnostic_continuation:guest_state, dynamic, draw.is_indexed, forced)) {
             return;
         }
         RenderList& list = impl->Commands();

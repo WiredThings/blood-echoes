@@ -44,6 +44,8 @@ public:
     // Private metadata capture: retain normal texture-set memoization while observing bindings.
     // No texture contents, cache invalidation or GPU allocation. Explicit opt-in only.
     static bool TextureBindingsEnabled();
+    // Canonical, explicitly admitted private directory; empty in ordinary play.
+    static const std::string& TextureDiagnosticDirectory();
     static void FrameBoundary(u64 frame);
     /// A single renderer owns native frame recording. Installed before recording threads run,
     /// cleared after they stop. No callback allocation; only invoked for armed/recording frames.
