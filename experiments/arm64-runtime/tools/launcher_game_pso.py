@@ -71,7 +71,7 @@ def verified_mixed_schedule(report):
 
 def prepare(*,project,execution_root,arguments,environment,cohort,options,observe,
             runner=None,component_loader=load,candidate_builder=build,toolchain_probe=None,prepared_inputs=None,
-            catalogue_prepare=None,module_prepare=None,capture_configure=None,source_view_prepare=None,restart_binding=None,runtime_profile=None,resume_only=False):
+            catalogue_prepare=None,module_prepare=None,capture_configure=None,source_view_prepare=None,restart_binding=None,runtime_profile=None,resume_only=False,warm_schedule=None):
  from launcher_runtime_profile import kw,work
  project=Path(project).resolve(strict=True)
  if execution_root is None:return dict(status='unavailable',reason='packaged PSO component unavailable')
@@ -95,6 +95,14 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
    from prepare_fetch_capture_receipt import configure_capture as capture_configure
   from quick_restart_preparation import resume
   reused=resume(bound=restart_binding,environment=environment,gpu=gpu,component=component,
+      backend=selected['library'],cohort=cohort,check=check,configure_capture=capture_configure,**kw(runtime_profile))
+  if reused is not None:
+   check(force=True);return reused
+ if warm_schedule is not None:
+  if capture_configure is None:
+   from prepare_fetch_capture_receipt import configure_capture as capture_configure
+  from quick_restart_preparation import resume_warm
+  reused=resume_warm(schedule=warm_schedule,gpu=gpu,component=component,
       backend=selected['library'],cohort=cohort,check=check,configure_capture=capture_configure,**kw(runtime_profile))
   if reused is not None:
    check(force=True);return reused

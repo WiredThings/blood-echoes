@@ -127,6 +127,138 @@ def local_selection(environment,gpu,cohort):
     roots=[directory(root/cohort/'requests'),directory(root/cohort/'artifacts'/selected['BB_MTL_LOCAL_AOT_BUILD_ID'])]
     return selected,roots
 
+def warm_binding(bound):
+    """Preparation identity across Play sessions, not F3/session authority.
+
+    Start with the CURRENT admitted original launch, never a receipt-provided
+    identity. Saves are represented only by the original --user argument, not
+    their changing contents. Accounts and online choice are never serialized.
+    """
+    if not isinstance(bound,dict)or digest(bound.get('value'))!=bound.get('identity'):return None
+    value=bound['value']
+    if set(value)!={'schema','supervisor','nonce_identity','cohort','stage','cpu','component_files','final_inputs','arguments','selection','gpu_root'}:return None
+    stable={k:v for k,v in value.items()if k not in('supervisor','nonce_identity')}
+    return dict(identity=digest(stable),value=stable)
+
+def _warm_path(gpu,bound):
+    if bound is None or not HEX64.fullmatch(bound['identity'])or digest(bound['value'])!=bound['identity']:raise ValueError('warm binding digest')
+    return directory(Path(gpu)/'automatic-game-inputs')/('warm-prepared-'+bound['identity']+'.json')
+
+def source_scope(bound):
+    """Watch the actual original sources, never the save/log/data parent.
+
+    A missing optional mod root is pinned as absent and checked on reuse, so
+    adding it cannot evade history without watching the noisy data directory.
+    """
+    selection=bound['value']['selection'];roots=[directory(selection['base'])];optional={}
+    for name in ('mods','last'):
+        value=selection[name]
+        if value is None or(name=='mods'and selection['enabled']!='1'):continue
+        path=Path(value).absolute();exists=os.path.lexists(path);optional[str(path)]=exists
+        if exists:roots.append(directory(path))
+    return dict(roots=sorted({str(p)for p in roots}),optional=optional)
+
+def warm_anchor(bound):
+    """Anchor sources BEFORE the existing full preparation, not after it."""
+    try:
+        stable=warm_binding(bound)
+        if stable is None:return None
+        scope=source_scope(stable)
+        from startup_change_journal import query
+        token=query(scope['roots'])
+        return dict(binding=stable,scope=scope,journal=token)if token is not None else None
+    except(ValueError,OSError,KeyError,TypeError):return None
+
+def _warm_products(gpu,bound,context,local):
+    selected=local_selection(local,gpu,bound['value']['cohort'])
+    if selected is None:raise ValueError('warm local selection')
+    roots=list(selected[1])+[directory(context['generation']),directory(context['game_root'])]
+    # New runtime-captured combinations invalidate scheduling so the next Play
+    # prepares them. Runtime admission remains responsible for actual objects.
+    optional={}
+    for path in (Path(gpu)/'cache',Path(gpu)/'automatic-game-inputs'/('runtime-'+bound['value']['cohort'])/'fetch-compiler-companions-v1'):
+        exists=os.path.lexists(path);optional[str(path)]=exists
+        if exists:roots.append(directory(path))
+    return dict(roots=sorted({str(p)for p in roots}),optional=optional)
+
+def _optional_current(scope):
+    return all(os.path.lexists(p)is exists for p,exists in scope['optional'].items())
+
+def registered_local(local,check):
+    """Load the existing real tools/SDK registration; a miss never probes all
+    tools here. Ordinary incremental preparation still owns that recovery.
+    """
+    import tempfile
+    from local_metal_builder import NativeToolchain,FixedRunner,canonical,digest as byte_digest
+    from tool_environment_registration import Registration
+    class Guard:
+        def check(self,**_):check()
+    root=directory(local['BB_MTL_LOCAL_AOT_ROOT'])
+    with tempfile.TemporaryDirectory(prefix='warm-environment-',dir=root)as scratch:
+        chain=NativeToolchain(FixedRunner(Path(scratch)));registration=Registration(root)
+        result=registration.load(chain,Guard())
+        return (result is not None and result[0]==local['BB_MTL_LOCAL_AOT_BUILD_ID']
+            and byte_digest(canonical(registration.active['toolchain']['environment']))==local['BB_MTL_LOCAL_AOT_ENVIRONMENT_ID'])
+
+def publish_warm(*,anchor,context,gpu,local_environment,check=lambda:None):
+    """Persist completed scheduling, without granting artifact import rights."""
+    try:
+        if anchor is None:return False
+        bound=anchor['binding'];scope=source_scope(bound)
+        from startup_change_journal import query,unchanged
+        if scope!=anchor['scope']or not unchanged(anchor['journal'],scope['roots']):return False
+        _context(context,gpu,check)
+        selected=local_selection(local_environment,gpu,bound['value']['cohort'])
+        if selected is None:return False
+        products=_warm_products(gpu,bound,context,selected[0]);token=query(products['roots']);check()
+        if token is None:return False
+        payload=dict(schema=1,kind='unchanged-preparation-schedule',binding=bound,context=context,
+            source=anchor,products=dict(scope=products,journal=token),local=selected[0],artifact_authority=False)
+        if len(json.dumps(payload,sort_keys=True,separators=(',',':')).encode())>128*1024:return False
+        if source_scope(bound)!=scope or not unchanged(anchor['journal'],scope['roots']):return False
+        write_json(_warm_path(gpu,bound),payload);return True
+    except(ValueError,OSError,KeyError,TypeError):return False
+
+def prepared_warm(*,bound,environment,gpu,check=lambda:None,tool_check=registered_local):
+    """Cross-session scheduling reuse; never restore quickload, mode or tokens."""
+    try:
+        if environment.get('BB_QUICKLOAD_PENDING')=='1':return None
+        stable=warm_binding(bound)
+        if stable is None or stable['value']['gpu_root']!=str(directory(gpu)):return None
+        path=_warm_path(gpu,stable);info=path.lstat()
+        if info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o600:return None
+        saved=json.loads(checked_bytes(path,limit=128*1024)[0])
+        if saved.get('schema')!=1 or saved.get('kind')!='unchanged-preparation-schedule'or saved.get('binding')!=stable or saved.get('artifact_authority')is not False:return None
+        scope=source_scope(stable);source=saved['source']
+        if source['binding']!=stable or source['scope']!=scope or not _optional_current(scope):return None
+        selected=local_selection(saved['local'],gpu,stable['value']['cohort'])
+        if selected is None or saved['local']!=selected[0]:return None
+        products=_warm_products(gpu,stable,saved['context'],selected[0])
+        if products!=saved['products']['scope']or not _optional_current(products):return None
+        from startup_change_journal import unchanged
+        if not unchanged(source['journal'],scope['roots'])or not unchanged(saved['products']['journal'],products['roots']):return None
+        if not tool_check(selected[0],check):return None
+        check();return saved
+    except(ValueError,OSError,KeyError,TypeError,subprocess.SubprocessError):return None
+
+def resume_warm(*,schedule,gpu,component,backend,cohort,check,configure_capture,runtime_profile=None):
+    try:
+        if schedule is None or component.get('automatic_capture_schema')!=1 or schedule['binding']['value']['cohort']!=cohort:return None
+        context=_context(schedule['context'],gpu,check)
+        root=directory(Path(gpu)/'automatic-game-inputs'/('runtime-'+cohort))
+        report=configure_capture(root=root,**context,backend=Path(backend),runtime_source_root=component['source_root'],**({'code_owners':(0,os.getuid())}if runtime_profile is not None else{}))
+        capture=report['capture_environment']
+        if capture!={'BB_FETCH_CAPTURE_ROOT':str(root),'BB_FETCH_CAPTURE_GAME_ROOT':str(context['game_root'])}:return None
+        from startup_change_journal import unchanged
+        source=schedule['source'];products=schedule['products']
+        if source_scope(schedule['binding'])!=source['scope']or not _optional_current(products['scope']):return None
+        if not unchanged(source['journal'],source['scope']['roots'])or not unchanged(products['journal'],products['scope']['roots']):return None
+        return dict(status='unchanged-preparation-schedule-reused',capture_environment=capture,
+            anticipatory_scan_and_warmup_skipped=True,artifact_authority=False,runtime_full_key_checks_retained=True,
+            runtime_cache_import_allowed=False,actual_final_read_admission=False,full_final_pso_ready=False,
+            static_registry_rescanned=False,original_arguments_preserved=True)
+    except(ValueError,OSError,KeyError,TypeError):return None
+
 def prepared_local(*,bound,environment,gpu,probe=process,cwd_probe=process_cwd,runtime_profile=None):
     """Front-loaded F3 hint; changed/unobservable products use normal policy.
 
