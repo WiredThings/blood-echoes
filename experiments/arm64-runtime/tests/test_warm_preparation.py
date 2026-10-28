@@ -109,6 +109,19 @@ class Warm(unittest.TestCase):
   products,current=self.product_events([self.f.view/'shader.bin'])
   with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
    self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def test_existing_startup_preference_semantics_keep_real_archive_validation(self):
+  from launcher_game_catalog import write_json
+  prep='c'*64;root=self.cache/('native-pipeline-artifacts-v1-'+prep);root.mkdir()
+  keys=['a'*64,'b'*64]
+  for key in keys:
+   blob=('authored '+key).encode();name=key+'-author.binaryarchive';(root/name).write_bytes(blob)
+   write_json(root/(key+'.json'),dict(schema=1,recipe_key=key,preparation=prep,archive=name,archive_bytes=len(blob),archive_sha256=hashlib.sha256(blob).hexdigest()))
+  entry=root/'startup-entry.json';write_json(entry,dict(schema=1,preparation=prep,key=keys[0]))
+  products,current=self.product_events([entry]);write_json(entry,dict(schema=1,preparation=prep,key=keys[1]))
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
+   self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
+   (root/(keys[1]+'-author.binaryarchive')).write_bytes(b'damaged')
+   self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
  def test_change_between_load_and_capture_cannot_be_adopted(self):
   self.assertTrue(self.publish());saved=self.load();(self.cache/'pso.bin').write_text('changed after lookup')
   self.assertIsNone(self.resume(saved))

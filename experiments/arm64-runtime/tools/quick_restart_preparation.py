@@ -225,7 +225,12 @@ def _inventory(scope,context,check):
                 elif stat.S_ISREG(s.st_mode)and s.st_nlink==1 and 0<=s.st_size<=256*1024*1024:
                     total+=s.st_size
                     if total>1024*1024*1024:raise ValueError('warm product byte budget')
-                    row=['file',*file_sha(p),s.st_mode,s.st_uid,s.st_gid]
+                    if p.name=='startup-entry.json':
+                        from pso_startup_schedule import startup_preference
+                        preference=startup_preference(p,check)
+                        if preference is None:raise ValueError('invalid prepared artifact preference')
+                        row=['preference',preference,s.st_mode,s.st_uid,s.st_gid]
+                    else:row=['file',*file_sha(p),s.st_mode,s.st_uid,s.st_gid]
                 else:raise ValueError('nonplain warm product')
                 rows[str(p)]=row
                 if len(rows)>20000:raise ValueError('warm product count budget')
@@ -266,6 +271,10 @@ def _products_current(products,context,check):
         elif row[0]=='file':
             if not stat.S_ISREG(s.st_mode)or s.st_nlink!=1 or s.st_size!=row[2]or row[3:]!=[s.st_mode,s.st_uid,s.st_gid]:return False
             if list(file_sha(path))!=row[1:3]:return False
+        elif row[0]=='preference':
+            from pso_startup_schedule import startup_preference
+            if not stat.S_ISREG(s.st_mode)or s.st_nlink!=1 or row[2:]!=[s.st_mode,s.st_uid,s.st_gid]:return False
+            if startup_preference(path,check)!=row[1]:return False
         else:return False
     check();return unchanged(current,scope['roots'])
 
