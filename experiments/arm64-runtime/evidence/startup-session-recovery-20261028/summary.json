@@ -41,12 +41,13 @@
   "net_system_swap_growth_mib": 611.0625,
   "native_runtime_roles_unchanged": true,
   "texture_cpu_baseline_fix_retained": true,
-  "formal_app_updated": false,
+  "formal_app_updated": true,
   "formal_saves_settings_cache_modified": false,
   "private_texture_diagnostics_disabled": true,
   "Release_updated": false,
   "Cua": false,
   "screen_capture": false,
   "save_associated_schedule_implemented": false,
-  "matched_old_new_FPS_or_memory_claim": false
+  "matched_old_new_FPS_or_memory_claim": false,
+  "installed_code_revision": "2109ed70474da36be136a79911b663843e782c98"
 }
