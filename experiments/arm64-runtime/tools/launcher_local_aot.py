@@ -336,6 +336,8 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     if type(publication)is bool:visible['f3_schedule_published']=publication
     warm_publication=report.get('game_pso',{}).get('warm_schedule_published')
     if type(warm_publication)is bool:visible['warm_schedule_published']=warm_publication
+    coverage=report.get('game_pso',{}).get('completion_coverage_counts')
+    if isinstance(coverage,dict)and set(coverage)=={'required','scheduled_reused','native_hits','native_built'}and all(type(v)is int and v>=0 for v in coverage.values()):visible['completed_preparation']=coverage
     health=report.get('game_pso',{}).get('startup_health',{})
     if isinstance(health,dict)and set(health)=={'observations','coalesced','forced'}and all(type(v)is int and v>=0 for v in health.values()):visible['startup_health']=health
     static=report.get('game_pso',{}).get('scan',{}).get('automatic_static_inputs',{})

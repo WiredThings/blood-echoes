@@ -61,6 +61,39 @@ def strict_lookup_ready(row,ready):
    all(type(c.get(k))is int for k in('hits','built','compile_attempts'))and c['hits']==n and c['built']==c['compile_attempts']==0 and
    len(row['artifact_events'])==n and all(e['state']==1 for e in row['artifact_events']))
 
+def verified_completion_schedule(report):
+ """A completed current queue, including newly built native recipes.
+
+ This is scheduling evidence, never artifact import authority. In particular a
+ native build is not counted as a cache hit, nor a missing GS recipe receipt
+ fabricated. The producer commits each outcome only after its final real
+ environment verification, binding exact unit/payload/outcome identities.
+ """
+ try:
+  document=report['completion_coverage'];body=document['body']
+  if set(document)!={'body','sha256'}or digest(body)!=document['sha256']:return False
+  if set(body)!={'schema','kind','manifest_sha256','job_id','cycle_id','context_sha256','environment_identity','required','scheduled_reused','native_hits','native_built','bindings_sha256','artifact_authority'}:return False
+  if type(body['schema'])is not int or body['schema']!=1 or body['kind']!='current-verified-required-queue'or body['artifact_authority']is not False:return False
+  if not all(isinstance(body[k],str)and re.fullmatch('[0-9a-f]{64}',body[k])for k in('manifest_sha256','job_id','context_sha256','environment_identity','bindings_sha256')):return False
+  if not isinstance(body['cycle_id'],str)or not re.fullmatch('[0-9a-f]{32}',body['cycle_id']):return False
+  counts=('required','scheduled_reused','native_hits','native_built')
+  if not all(type(body[k])is int and body[k]>=0 for k in counts)or body['required']<=0:return False
+  if report.get('status')!='completed'or report.get('required_preparation_complete')is not True or report.get('index_complete')is not True or report.get('cycle_stage')!='done':return False
+  for k in('deferred','rejected','protection_stops','index_rejected','source_late_deferred','provisional_native','not_visited'):
+   if type(report.get(k))is not int or report[k]!=0:return False
+  for k in('unique_units','completed','visited'):
+   if type(report.get(k))is not int or report[k]!=body['required']:return False
+  for field,key in(('scheduled_reused','scheduled_reused'),('verified_artifact_hits','native_hits')):
+   if type(report.get(field))is not int or report[field]!=body[key]:return False
+  if sum(body[k]for k in('scheduled_reused','native_hits','native_built'))!=body['required']:return False
+  if any(report.get(k)is True for k in('budget_deferred','pending_preparation','state_is_artifact_authority')):return False
+  if any(report.get(k)!=body['manifest_sha256']for k in('manifest_sha256','active_manifest_sha256','incoming_manifest_sha256')):return False
+  if report.get('job_id')!=body['job_id']or report.get('cycle_id')!=body['cycle_id']or report.get('current_context_sha256')!=body['context_sha256']:return False
+  if 'current_context'in report and digest(report['current_context'])!=body['context_sha256']:return False
+  proof=report.get('warm_environment_verification',{})if report.get('warm_fast_path')is True else report.get('final_environment_verification',{})
+  return proof.get('status')=='environment-verified'and proof.get('environment_identity')==body['environment_identity']
+ except(KeyError,TypeError,ValueError,AttributeError):return False
+
 class Queue:
  """Versioned scheduling hints. Only a fully indexed current snapshot is executable.
 
@@ -239,7 +272,8 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
  # the native page contract. This is never a cap on full-manifest coverage.
  page_size=min(page_size,16)
  start=clock();run=uuid.uuid4().hex;queue=None;cycle=None;active=None;ordinal=0;fresh=False
- report=dict(schema=1,progress_schema=2,orchestration_schema=1,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,
+ coverage=dict(scheduled_reused=0,native_hits=0,native_built=0);bindings=hashlib.sha256()
+ report=dict(schema=1,progress_schema=2,orchestration_schema=1,status='partial',completed=0,deferred=0,rejected=0,protection_stops=0,recorded=0,current_context_sha256=digest(context),
    verified_artifact_hits=0,collection_strict_hits=0,strict_lookup_attempts=0,visited=0,work_units=0,collected=0,provisional_native=0,provisional_artifact_hits=0,source_late_deferred=0,
    events_preview=[],event_count=0,max_page_items=0,initial_local_calls=0,final_local_calls=0,warm_fast_path=False,
    full_manifest_preparation_verified=False,required_preparation_complete=False,state_is_artifact_authority=False,scheduled_reused=0)
@@ -255,6 +289,10 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
   if event_sink:event_sink(v)
  def finish(item,state,*,recorded=False,row=None):
   report['visited']+=1;report[state]+=1;queue.mark(item,run,ready=state=='completed',recorded=recorded or state=='completed');event(item,state,worker_phase=row.get('phase')if row else None)
+ def covered(item,kind,outcome):
+  need(kind in coverage and isinstance(outcome,str)and re.fullmatch('[0-9a-f]{64}',outcome),'current verified outcome binding')
+  coverage[kind]+=1
+  bindings.update(canonical([item['id'],execution_identity(item['unit']),kind,outcome])+b'\n')
  def call(item,p,allow):
   nonlocal ordinal,active
   guard();active=item;ordinal+=1;row=execute(item['unit'],p,allow,ordinal)
@@ -276,6 +314,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
    if not page:break
    for item in page:
     finish(item,'completed',recorded=True)
+    covered(item,'native_hits'if kind=='warm'or item['native_hit']else'native_built',item['collection_outcome_sha'])
     if commit_unit is not None:commit_unit(item['unit'])
     if kind=='commit':
      report['provisional_native']-=1
@@ -308,6 +347,7 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
       if isinstance(reused,dict)and reused.get('status')=='required-recipe-schedule-reused'and reused.get('previous_native_verification')is True and reused.get('native_worker_invoked')is False and reused.get('runtime_artifact_authority')is False:
        queue.collect(item,cycle,'scheduled',reused);report['scheduled_reused']+=1
        finish(item,'completed',recorded=True);event(item,'previous-native-schedule-reused')
+       covered(item,'scheduled_reused',digest(reused))
        continue
      if phase!='record'and not initial_started:
       report['initial_local_calls']+=1;initial=local('prepare');report['initial_local']=initial;initial_started=True
@@ -394,5 +434,16 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
    report.update(unique_units=queue.total(),observed_ready_hint_count=queue.hint_count(),index_complete=queue.get('indexed',False),active_manifest_sha256=queue.get('active_manifest',None),incoming_manifest_sha256=queue.manifest_sha)
    if cycle is not None:report.update(cycle_stage=cycle['stage'],cycle_collected=queue.phase_count(cycle)if phase!='prepare'else 0,cycle_first_pass_strict=queue.phase_count(cycle,'provisional'),cycle_rejected=queue.phase_count(cycle,'rejected'))
    report['not_visited']=max(0,report['unique_units']-report['visited']);report['budget_deferred_remaining']=report['not_visited']if report['index_complete']else None
-   report['rejected_total']=report['rejected']+queue.get('rejected');report['deferred_total_known']=report['deferred']+report['not_visited'];queue.close()
+   report['rejected_total']=report['rejected']+queue.get('rejected');report['deferred_total_known']=report['deferred']+report['not_visited']
+   # Emit only after actual per-unit commits, full membership and the final
+   # environment proof. No worker-ready boolean or cache-hit arithmetic alone
+   # can manufacture this record; incomplete/interrupted runs have no coverage.
+   proof=report.get('warm_environment_verification',{})if report['warm_fast_path']else report.get('final_environment_verification',{})
+   if report['required_preparation_complete']and proof.get('status')=='environment-verified':
+    body=dict(schema=1,kind='current-verified-required-queue',manifest_sha256=queue.manifest_sha,
+        job_id=queue.job,cycle_id=cycle['id'],context_sha256=digest(context),environment_identity=proof.get('environment_identity'),
+        required=queue.total(),**coverage,bindings_sha256=bindings.hexdigest(),artifact_authority=False)
+    report['completion_coverage']=dict(body=body,sha256=digest(body))
+    if not verified_completion_schedule(report):report.pop('completion_coverage')
+   queue.close()
  return report
