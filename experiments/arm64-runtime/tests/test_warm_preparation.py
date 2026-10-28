@@ -82,9 +82,10 @@ class Warm(unittest.TestCase):
   self.assertFalse(self.publish(anchor=anchor))
  def test_refusal_diagnostic_is_bounded_and_preserves_return_contract(self):
   self.assertTrue(self.publish());diagnostic={}
-  self.assertIsNotNone(self.load(diagnostic=diagnostic));self.assertEqual(diagnostic,{'last_check':'accepted'})
+  self.assertIsNotNone(self.load(diagnostic=diagnostic));self.assertEqual(diagnostic,{'last_check':'accepted','product_check':'accepted'})
   (self.cache/'unknown.key').write_text('new actual input');diagnostic={}
-  self.assertIsNone(self.load(diagnostic=diagnostic));self.assertEqual(diagnostic,{'last_check':'product-history-and-bytes'})
+  self.assertIsNone(self.load(diagnostic=diagnostic));self.assertEqual(diagnostic['last_check'],'product-history-and-bytes');self.assertIn(diagnostic['product_check'],('journal-query','unregistered-event'))
+  if 'product_event_id'in diagnostic:self.assertRegex(diagnostic['product_event_id'],r'^[0-9a-f]{64}$')
   self.assertNotIn(str(self.f.root),json.dumps(diagnostic))
  def product_events(self,paths,**overrides):
   scope=quick._warm_products(self.f.gpu,quick.warm_binding(self.bound),self.f.context,self.local)
