@@ -17,11 +17,11 @@ TIMEBASE=MachTimebase()
 assert ctypes.CDLL('/usr/lib/libSystem.B.dylib').mach_timebase_info(ctypes.byref(TIMEBASE))==0 and TIMEBASE.denom
 libproc=ctypes.CDLL('/usr/lib/libproc.dylib',use_errno=True)
 libproc.proc_pid_rusage.argtypes=[ctypes.c_int,ctypes.c_int,ctypes.c_void_p];libproc.proc_pid_rusage.restype=ctypes.c_int
-def usage(lines):
+def usage(lines,*,include_tools=False):
     rows=[]
     for line in lines:
         fields=line.strip().split(None,3)
-        if len(fields)!=4 or Path(fields[3]).name not in ('bb-probe-metal','bb-gpu','bb-game-arm64'):continue
+        if len(fields)!=4 or(not include_tools and Path(fields[3]).name not in ('bb-probe-metal','bb-gpu','bb-game-arm64')):continue
         data=Usage()
         if libproc.proc_pid_rusage(int(fields[0]),0,ctypes.byref(data))==0:
             rows.append(dict(pid=int(fields[0]),role=Path(fields[3]).name,footprint_bytes=data.footprint,resident_bytes=data.resident,cpu_user_ns=data.user*TIMEBASE.numer//TIMEBASE.denom,cpu_system_ns=data.system*TIMEBASE.numer//TIMEBASE.denom,cpu_user_ticks=data.user,cpu_system_ticks=data.system,pageins=data.pageins))

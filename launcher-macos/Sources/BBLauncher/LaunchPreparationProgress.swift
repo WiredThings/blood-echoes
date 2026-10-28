@@ -30,8 +30,14 @@ struct LaunchPreparationProgress: Equatable {
             return
         }
         guard !failed, !finished else { return }
-        if line.hasPrefix("Metal local preparation failed:") {
+        if Self.isFailure(line) {
             fail()
+            return
+        }
+        if line.hasPrefix("Image/link preparation: "),
+           let value = Self.record(String(line.dropFirst("Image/link preparation: ".count))),
+           let status = value["status"] as? String, ["built", "reused"].contains(status) {
+            advance(2, "Preparing game…")
             return
         }
         let prefix = "Metal preparation phase: "
@@ -57,6 +63,11 @@ struct LaunchPreparationProgress: Equatable {
         } else if percent == 100 && line.hasPrefix("ARM GPU frontend ready symbols=") {
             finished = true
         }
+    }
+
+    static func isFailure(_ line: String) -> Bool {
+        ["Metal local preparation failed:", "Metal local preparation stage failed:",
+         "Image/link preparation failed:", "Unsupported game files:"].contains { line.hasPrefix($0) }
     }
 
     private static func record(_ text: String) -> [String: Any]? {

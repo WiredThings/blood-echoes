@@ -15,7 +15,7 @@ struct MetalOptimizationSection: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             if model.runtimeCapabilities.automaticMetalPreparation {
-                Text(L10n.key("Metal libraries are prepared automatically on this Mac before play."))
+                Text(L10n.key("Metal libraries are prepared on this Mac when needed; unchanged results are reused."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             DisclosureGroup(L10n.key("Adopted optimizations (default on)"), isExpanded: $showAdopted) {

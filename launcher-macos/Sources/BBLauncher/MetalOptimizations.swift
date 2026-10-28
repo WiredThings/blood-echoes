@@ -33,7 +33,7 @@ enum MetalOptimizations {
     }
     static let all: [MetalOptimization] = {
         let legacy: [MetalOptimization] = [
-        .init(id: "BB_MTL_TWO_LEVEL_BDA", title: "Two-level GPU address table", note: "Saves about 0.9 GiB versus the flat table. Switching rebuilds the shader cache.", defaultOn: true, evidence: .adopted),
+        .init(id: "BB_MTL_TWO_LEVEL_BDA", title: "Two-level GPU address table", note: "Saves about 0.9 GiB versus the flat table. Switching selects compatible shader variants and retains existing caches.", defaultOn: true, evidence: .adopted),
         .init(id: "BB_MTL_CLEAR_DISCARD", title: "Skip loading attachments before a full clear", note: "Keeps the clear result while avoiding an unnecessary previous-content load.", defaultOn: true, evidence: .adoptedExperimental),
         .init(id: "BB_MTL_OVERWRITE_DISCARD", title: "Skip loading fully overwritten copy targets", note: "Only discards previous contents when the copy replaces the complete target.", defaultOn: true, evidence: .adoptedExperimental),
         .init(id: "BB_MTL_PROXY_CLEAR", title: "Clear the existing scene copy directly", note: "Avoids a native-resolution round trip. About 5% faster in the earlier matched scene test.", defaultOn: true, evidence: .adopted),
@@ -65,10 +65,10 @@ enum MetalOptimizations {
         .init(id: "BB_MTL_HOT_STAGING_REUSE", title: "Reuse recent DeviceLocal staging blocks", note: "Tries recently used DeviceLocal staging blocks first. Capacity and completion fences are unchanged; performance benefit is unconfirmed.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_GATHER_REUSE", title: "Reuse cross-chunk reads within one draw", note: "Reuses complete or contained read snapshots within one draw or dispatch. Writes, mapping changes and ring wrap invalidate them. No extra GPU buffers; FPS benefit is not established.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_FRAGMENT_UNIFORMS", title: "Specialize fragment parameter reads", note: "Correctness tested, but repeatable gameplay benefit is unconfirmed; may increase compilation or resource overhead.", defaultOn: false, evidence: .experimental),
-        .init(id: "BB_MTL_LIBRARY_REUSE", title: "Reuse identical Metal libraries", note: "Avoids duplicate compilation; practical benefit is unconfirmed.", defaultOn: false, evidence: .experimental),
+        .init(id: "BB_MTL_LIBRARY_REUSE", title: "Reuse identical Metal libraries", note: "Reuses identical libraries within the running renderer. Separate from automatic disk preparation; benefit is unconfirmed.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_INLINE_UPDATES", title: "Write small parameters with a compute kernel", note: "Removes tiny buffer copies, but adds compute transitions. No repeatable FPS gain; memory was about 37 MiB higher in one comparison.", defaultOn: false, evidence: .experimental),
-        .init(id: "BB_MTL_RELAXED_MATH", title: "Use relaxed fragment and compute math", note: "V2 float profile: benefit is unconfirmed and floating-point results may change. Switching rebuilds the shader cache.", defaultOn: false, evidence: .experimental),
-        .init(id: "BB_MTL_PERSIST_WARM_ARCHIVE", title: "Save and load binary pipeline archives", note: "Earlier archive loading used about 0.6 GiB more process memory. Default off; turning off ignores existing archive files without deleting them.", defaultOn: false, evidence: .memoryRisk),
+        .init(id: "BB_MTL_RELAXED_MATH", title: "Use relaxed fragment and compute math", note: "May change floating-point results; benefit is unconfirmed. Uses separate compatible shader variants.", defaultOn: false, evidence: .experimental),
+        .init(id: "BB_MTL_PERSIST_WARM_ARCHIVE", title: "Save and load binary pipeline archives", note: "Earlier archive loading used about 0.6 GiB more memory. Off retains files and does not disable automatic local preparation.", defaultOn: false, evidence: .memoryRisk),
         ]
         guard nativeHostAvailable else { return legacy }
         return [.init(id: "BB_METAL_ARM64", title: "ARM64 renderer host", note: "Runs the renderer in a native process; the game still uses Rosetta. About 6% faster in the matched M4 test.", defaultOn: true, evidence: .adoptedExperimental)] + legacy

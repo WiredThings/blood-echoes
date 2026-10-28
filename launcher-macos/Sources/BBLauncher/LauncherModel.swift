@@ -811,7 +811,7 @@ final class LauncherModel: ObservableObject {
         for line in lines {
             progress?.consume(line)
             if job == .game && line == "Runtime: quickload switched to offline" { useOfflineAfterRestore() }
-            if line.contains("STOP:") || line.contains("Traceback") || line.range(of: "error:", options: .caseInsensitive) != nil {
+            if LaunchPreparationProgress.isFailure(line) || line.contains("STOP:") || line.contains("Traceback") || line.range(of: "error:", options: .caseInsensitive) != nil {
                 lastProblem = line
             }
             added.append(LogLine(id: nextLineID, text: line))

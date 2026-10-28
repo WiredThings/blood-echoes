@@ -324,7 +324,7 @@
 "Write small parameters with a compute kernel" = "Write small parameters with a compute kernel";
 "Use relaxed fragment and compute math" = "Use relaxed fragment and compute math";
 "Save and load binary pipeline archives" = "Save and load binary pipeline archives";
-"Saves about 0.9 GiB versus the flat table. Switching rebuilds the shader cache." = "Saves about 0.9 GiB versus the flat table. Switching rebuilds the shader cache.";
+"Saves about 0.9 GiB versus the flat table. Switching selects compatible shader variants and retains existing caches." = "Saves about 0.9 GiB versus the flat table. Switching selects compatible shader variants and retains existing caches.";
 "Keeps the clear result while avoiding an unnecessary previous-content load." = "Keeps the clear result while avoiding an unnecessary previous-content load.";
 "Only discards previous contents when the copy replaces the complete target." = "Only discards previous contents when the copy replaces the complete target.";
 "Avoids a native-resolution round trip. About 5% faster in the earlier matched scene test." = "Avoids a native-resolution round trip. About 5% faster in the earlier matched scene test.";
@@ -345,8 +345,8 @@
 "Adopted by choice despite noisy isolated FPS; the safe full-surface fallback remains." = "Adopted by choice despite noisy isolated FPS; the safe full-surface fallback remains.";
 "Correctness tested, but repeatable gameplay benefit is unconfirmed; may increase compilation or resource overhead." = "FPS benefit unconfirmed; may add compilation or resource overhead.";
 "Removes tiny buffer copies, but adds compute transitions. No repeatable FPS gain; memory was about 37 MiB higher in one comparison." = "FPS benefit unconfirmed; about 37 MiB more memory in one comparison.";
-"V2 float profile: benefit is unconfirmed and floating-point results may change. Switching rebuilds the shader cache." = "May change floating-point results; FPS benefit unconfirmed. Switching rebuilds shaders.";
-"Earlier archive loading used about 0.6 GiB more process memory. Default off; turning off ignores existing archive files without deleting them." = "Earlier loading used about 0.6 GiB more memory. Off ignores archive files without deleting them.";
+"May change floating-point results; benefit is unconfirmed. Uses separate compatible shader variants." = "May change floating-point results; benefit is unconfirmed. Uses separate compatible shader variants.";
+"Earlier archive loading used about 0.6 GiB more memory. Off retains files and does not disable automatic local preparation." = "Earlier archive loading used about 0.6 GiB more memory. Off retains files and does not disable automatic local preparation.";
 "Adopted" = "Verified";
 "Adopted bundle" = "Adopted bundle";
 "Experimental" = "Experimental";
@@ -373,7 +373,7 @@
 
 "Unsynced" = "Unsynced";
 
-"Shaders may compile when entering a scene for the first time." = "Shaders may compile when entering a scene for the first time.";
+"Prepared shaders are reused; newly encountered pipeline combinations may still compile." = "Prepared shaders are reused; newly encountered pipeline combinations may still compile.";
 
 "Settings apply on the next game launch." = "Settings apply on the next game launch.";
 
@@ -549,11 +549,11 @@
 "Runs the renderer in a native process; the game still uses Rosetta. About 6% faster in the matched M4 test." = "Runs the renderer in a native process; the game still uses Rosetta. About 6% faster in the matched M4 test.";
 
 "Reuse identical Metal libraries" = "Reuse identical Metal libraries";
-"Avoids duplicate compilation; practical benefit is unconfirmed." = "Avoids duplicate compilation; practical benefit is unconfirmed.";
+"Reuses identical libraries within the running renderer. Separate from automatic disk preparation; benefit is unconfirmed." = "Reuses identical libraries within the running renderer. Separate from automatic disk preparation; benefit is unconfirmed.";
 
 // Runtime capabilities
 "This runtime requires a native ARM64 Metal renderer host." = "This runtime requires a native ARM64 Metal renderer host.";
-"Metal libraries are prepared automatically on this Mac before play." = "Metal libraries are prepared automatically on this Mac before play.";
+"Metal libraries are prepared on this Mac when needed; unchanged results are reused." = "Metal libraries are prepared on this Mac when needed; unchanged results are reused.";
 
 "This ARM64 runtime currently supports Metal only." = "This ARM64 runtime currently supports Metal only.";
 

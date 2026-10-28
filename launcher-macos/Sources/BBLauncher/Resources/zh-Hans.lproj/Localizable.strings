@@ -324,7 +324,7 @@
 "Write small parameters with a compute kernel" = "用计算内核写入小参数";
 "Use relaxed fragment and compute math" = "片元与计算采用宽松浮点运算";
 "Save and load binary pipeline archives" = "保存并加载二进制管线归档";
-"Saves about 0.9 GiB versus the flat table. Switching rebuilds the shader cache." = "相比平铺地址表约节省 0.9 GiB。切换后会重建着色器缓存。";
+"Saves about 0.9 GiB versus the flat table. Switching selects compatible shader variants and retains existing caches." = "相比平铺表约省 0.9 GiB；切换使用对应着色器变体，保留原缓存。";
 "Keeps the clear result while avoiding an unnecessary previous-content load." = "保留清除结果，省去对旧内容的不必要加载。";
 "Only discards previous contents when the copy replaces the complete target." = "仅在复制完整覆盖目标时，才丢弃目标原来的内容。";
 "Avoids a native-resolution round trip. About 5% faster in the earlier matched scene test." = "省去一次原生分辨率往返。此前同场景对照约提升 5%。";
@@ -345,8 +345,8 @@
 "Adopted by choice despite noisy isolated FPS; the safe full-surface fallback remains." = "尽管单项帧率波动较大，仍按你的选择采用；保留安全的完整表面回退。";
 "Correctness tested, but repeatable gameplay benefit is unconfirmed; may increase compilation or resource overhead." = "帧率收益未确认，可能增加编译或资源开销。";
 "Removes tiny buffer copies, but adds compute transitions. No repeatable FPS gain; memory was about 37 MiB higher in one comparison." = "帧率收益未确认；一次对照中多用约 37 MiB 内存。";
-"V2 float profile: benefit is unconfirmed and floating-point results may change. Switching rebuilds the shader cache." = "可能改变浮点结果，收益未确认；切换后需重建着色器。";
-"Earlier archive loading used about 0.6 GiB more process memory. Default off; turning off ignores existing archive files without deleting them." = "此前加载时多用约 0.6 GiB 内存；关闭后忽略归档文件，保留文件。";
+"May change floating-point results; benefit is unconfirmed. Uses separate compatible shader variants." = "可能改变浮点结果，收益未确认；使用独立的兼容着色器变体。";
+"Earlier archive loading used about 0.6 GiB more memory. Off retains files and does not disable automatic local preparation." = "此前加载多用约 0.6 GiB 内存；关闭后保留文件，不影响自动本机准备。";
 "Adopted" = "已验证";
 "Adopted bundle" = "组合采用";
 "Experimental" = "实验性";
@@ -373,7 +373,7 @@
 
 "Unsynced" = "不同步";
 
-"Shaders may compile when entering a scene for the first time." = "首次进入场景时可能需要编译着色器。";
+"Prepared shaders are reused; newly encountered pipeline combinations may still compile." = "复用已准备的着色器；新遇到的管线组合仍可能需要编译。";
 
 "Settings apply on the next game launch." = "设置在下次启动游戏时生效。";
 
@@ -549,11 +549,11 @@
 "Runs the renderer in a native process; the game still uses Rosetta. About 6% faster in the matched M4 test." = "渲染器在原生进程中运行，游戏仍使用 Rosetta。M4 同场景对照约提升 6%。";
 
 "Reuse identical Metal libraries" = "复用相同着色器库";
-"Avoids duplicate compilation; practical benefit is unconfirmed." = "减少重复编译，实际收益待确认。";
+"Reuses identical libraries within the running renderer. Separate from automatic disk preparation; benefit is unconfirmed." = "复用运行中渲染器的相同库；不控制自动磁盘准备，收益待确认。";
 
 // Runtime capabilities
 "This runtime requires a native ARM64 Metal renderer host." = "此运行时需要原生 ARM64 Metal 渲染宿主。";
-"Metal libraries are prepared automatically on this Mac before play." = "启动游戏前，自动在这台 Mac 上准备 Metal 库。";
+"Metal libraries are prepared on this Mac when needed; unchanged results are reused." = "需要时在本机准备 Metal 库；无变化时直接复用。";
 
 "This ARM64 runtime currently supports Metal only." = "此 ARM64 运行时目前仅支持 Metal。";
 

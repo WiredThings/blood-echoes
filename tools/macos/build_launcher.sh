@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tools/macos/build_launcher.sh: builds the native launcher (launcher-macos/, SwiftUI) into
 # out/Blood Echoes.app. The app is native arm64; it starts run_optimized.sh with the
-# tested native renderer and x86-64 game under Rosetta 2. Needs Xcode or Command Line Tools.
+# selected packaged engine (ARM64/FEX or legacy Rosetta). Needs Xcode or Command Line Tools.
 #   bash tools/macos/build_launcher.sh
 #   open "out/Blood Echoes.app"
 # The repository path is embedded in the app (Info.plist BBRepoPath; Settings can override it).

@@ -24,7 +24,9 @@ final class LaunchPreparationProgressTests: XCTestCase {
     }
 
     func testFailedPhaseCannotTurnIntoSuccessFromLaterOutput() {
-        for error in [phase("source-view", "end", "raised"), "Metal local preparation failed: source changed"] {
+        for error in [phase("source-view", "end", "raised"), "Metal local preparation failed: source changed",
+                      "Metal local preparation stage failed: damaged library", "Image/link preparation failed: changed output",
+                      "Unsupported game files: version 1.00"] {
             var p = LaunchPreparationProgress()
             p.consume(phase("source-view")); p.consume(error)
             p.consume(done); p.consume("ARM GPU frontend ready symbols=327")
@@ -41,6 +43,21 @@ final class LaunchPreparationProgressTests: XCTestCase {
             p.consume(line)
         }
         XCTAssertEqual(p, LaunchPreparationProgress())
+    }
+
+    func testImageResultAndFailureClassificationUseActualProtocol() {
+        for status in ["built", "reused"] {
+            var p = LaunchPreparationProgress()
+            p.consume("Image/link preparation: {\"status\":\"\(status)\"}")
+            XCTAssertEqual(p.percent, 2)
+            XCTAssertFalse(p.finished)
+            p.consume(phase("local-libraries", "end"))
+            p.consume("Image/link preparation: {\"status\":\"reused\"}")
+            XCTAssertEqual(p.percent, 15)
+        }
+        XCTAssertFalse(LaunchPreparationProgress.isFailure("Image/link preparation: {\"status\":\"reused\"}"))
+        XCTAssertFalse(LaunchPreparationProgress.isFailure("ordinary log mentions Unsupported game files:"))
+        XCTAssertTrue(LaunchPreparationProgress.isFailure("Unsupported game files: bad version"))
     }
 
     func testFastCachedPathMaySkipStages() {

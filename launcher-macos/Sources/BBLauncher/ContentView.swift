@@ -191,7 +191,7 @@ struct PlayBar: View {
             }
             return model.lastProblem ?? L10n.key("Details are in the log.")
         case .running, .stopping:
-            return L10n.key("Shaders may compile when entering a scene for the first time.")
+            return L10n.key("Prepared shaders are reused; newly encountered pipeline combinations may still compile.")
         case let .exited(status, bySignal) where status != 0 && !bySignal:
             return model.lastProblem ?? L10n.key("Details are in the log (Help ▸ Show the Last Run's Log).")
         default:

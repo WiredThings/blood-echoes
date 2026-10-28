@@ -27,6 +27,31 @@ def deadline(elapsed,ready,startup,scene):
  if ready is None:return 'startup time budget'if elapsed>=startup else None
  return 'scene sample completed'if elapsed-ready>=scene else None
 
+def tool_memory_summary(path,ready):
+ """Observed whole owned-tree peaks, not an allocator HWM or physical sum.
+
+ Read the complete bounded-line trace after teardown, not the scene deque,
+ which can have discarded the beginning of a long preparation phase.
+ """
+ peak=before=0;roles={};observations=0
+ with Path(path).open()as stream:
+  for line in stream:
+   if len(line)>4*1024*1024:raise ValueError('tool memory sample line bound')
+   value=json.loads(line);rows=value.get('tool_usage')
+   if rows is None:continue
+   if not isinstance(rows,list)or len(rows)>4096:raise ValueError('tool memory process bound')
+   total=0;per_role=collections.Counter();seen=set()
+   for row in rows:
+    pid=row['pid'];role=row['role'];size=row['footprint_bytes']
+    if type(pid)is not int or pid<=0 or pid in seen or not isinstance(role,str)or not 0<len(role)<=256 or type(size)is not int or size<0:raise ValueError('tool memory sample shape')
+    seen.add(pid);total+=size;per_role[role]+=size
+   observations+=1;peak=max(peak,total)
+   if ready is None or value['seconds']<=ready:before=max(before,total)
+   for role,size in per_role.items():roles[role]=max(roles.get(role,0),size)
+ return dict(observations=observations,owned_tree_peak_mib=peak/2**20,
+  before_scene_peak_mib=before/2**20,role_peaks_mib={k:v/2**20 for k,v in sorted(roles.items())},
+  sampled_not_allocator_hwm=True,shared_pages_may_be_counted_more_than_once=True)
+
 def scene_summary(frames,samples,ready,scene_seconds):
  """Bounded post-stop telemetry only; reject menu or broken clocks as results."""
  tail=collections.deque(maxlen=20000)
@@ -265,7 +290,7 @@ def selected_cache_mode(requested,formal_stage):
  if formal_stage is not None and requested not in(None,'empty'):raise ValueError('staged code comparison requires empty cache mode; QA shader cache import is forbidden')
  return 'empty'if formal_stage is not None else requested or'seeded'
 
-def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False):
+def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False,track_tool_memory=False):
  from qa_launch_clone import inventory_savedata
  from qa_f3_contract import F3Check,NewLogLines
  f3=F3Check()if functional_f3 else None
@@ -304,7 +329,11 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
   with(root/'console.log').open('w')as log,(root/'samples.jsonl').open('w')as sample_log:
    proc=subprocess.Popen(command,cwd=c['stage'],env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
    while proc.poll()is None:
-    now=time.monotonic();elapsed=now-started;rows=descendants();s=observer.system();s.update(seconds=elapsed,processes=rows,usage=usage([f'{i} {j} 0 {path}'for i,j,path in rows]));samples.append(s);peak_pressure=max(peak_pressure,s['pressure']);sample_log.write(json.dumps(s,separators=(',',':'))+'\n');sample_log.flush()
+    now=time.monotonic();elapsed=now-started;rows=descendants();s=observer.system()
+    measured=usage([f'{i} {j} 0 {path}'for i,j,path in rows],**({'include_tools':True}if track_tool_memory else{}))
+    s.update(seconds=elapsed,processes=rows,usage=[row for row in measured if row['role']in('bb-probe-metal','bb-gpu','bb-game-arm64')])
+    if track_tool_memory:s['tool_usage']=measured
+    samples.append(s);peak_pressure=max(peak_pressure,s['pressure']);sample_log.write(json.dumps(s,separators=(',',':'))+'\n');sample_log.flush()
     reason=policy.observe(now-protection_start,s)
     if pressed and now-last_press>=.18:input_('');pressed=False
     if (ready is None or f3 is not None)and now>=next_frames:
@@ -341,6 +370,9 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
   if report['status']=='sampled':
    try:report['scene_sample']=scene_summary(frames,samples,ready,scene_seconds)
    except ValueError as error:report.update(status='incomplete',error=str(error))
+  if track_tool_memory:
+   try:report['tool_memory']=tool_memory_summary(root/'samples.jsonl',ready)
+   except(ValueError,KeyError,TypeError)as error:report.update(status='incomplete',tool_memory_error=str(error))
   report['qualification']=('Original normal Play and original offline F3 supervisor; isolated scripted quicksave/quickload API, not a physical keyboard test. No FPS/performance or full visual/network conclusion.'if f3 is not None else'Original Swift frozen conditions; Continue only. Scene camera is not full gameplay/visual/network/F3 acceptance. Telemetry has overhead; combined footprints may double-count shared memory. No matched old/new performance or sustained-memory conclusion.')
   if c.get('execution_code_admission')is not None:
    sealed=finish_app_seal(report,c['execution_code_admission']);report.clear();report.update(sealed)
