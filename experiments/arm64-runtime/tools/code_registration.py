@@ -74,8 +74,8 @@ def native_gpu_identity(target,backend,profile,*,resolver=None):
  from launcher_runtime_profile import code_bytes,owned_dir
  from gpu_candidate_identity import resolve_gpu_edge
  if resolver is None:
-  from warm_archive_manifest import resolve_gpu_identity
-  resolver=resolve_gpu_identity
+  from warm_archive_manifest import resolve_gpu_identity_full
+  resolver=resolve_gpu_identity_full
  target=profile.code(Path(target).resolve(strict=True));backend=profile.code(backend)
  if backend!=profile.bundle.stage:raise ValueError('registered GPU backend mismatch')
  roles=profile.bundle.native['frozen_runtime'];role=str(target.relative_to(backend))

@@ -151,6 +151,9 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
     # its separate native record/load phases and full final admission.
     from contextlib import ExitStack
     with ExitStack() as cleanup:
+        if runtime_profile is not None:
+            from warm_archive_manifest import native_validation_scope
+            cleanup.enter_context(native_validation_scope(runtime_profile))
         if local_prepare is None:
             import tempfile
             from local_aot_policy import prepare as policy_prepare

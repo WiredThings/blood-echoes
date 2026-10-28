@@ -1,6 +1,18 @@
 """Once-per-explicit-startup PSO archive cohort; never called per draw."""
 from pathlib import Path
 import hashlib,json
+from contextvars import ContextVar
+from contextlib import contextmanager
+
+_native_scope=ContextVar('admitted_native_code_scope',default=None)
+
+@contextmanager
+def native_validation_scope(profile):
+    from launcher_runtime_profile import RuntimeProfile
+    if not isinstance(profile,RuntimeProfile):raise ValueError('actual runtime code profile required')
+    token=_native_scope.set(profile)
+    try:yield
+    finally:_native_scope.reset(token)
 
 def file_identity(path):
     path=Path(path).resolve(strict=True)
@@ -21,6 +33,13 @@ def make_manifest(*,translator_artifacts,game_artifacts,options,profile,identity
 
 
 def resolve_gpu_identity(target,backend_root,*,code_owners=None):
+    scope=_native_scope.get()
+    if scope is not None and Path(backend_root).resolve(strict=True)==scope.bundle.stage:
+        return scope.native_identity(target)
+    return resolve_gpu_identity_full(target,backend_root,code_owners=code_owners)
+
+
+def resolve_gpu_identity_full(target,backend_root,*,code_owners=None):
     # Resolve the selected executable's actual single GPU load edge, then reuse
     # the existing ownership/architecture/signature/SHA verification contract.
     import subprocess

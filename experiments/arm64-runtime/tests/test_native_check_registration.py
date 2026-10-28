@@ -46,5 +46,15 @@ class NativeRegistration(unittest.TestCase):
   self.proof.pop('strict_signatures')
   with self.assertRaises(ValueError):self.run_case()
   self.assertEqual(list((self.work/'native-code-checks').glob('*.json')),[])
+ def test_original_callers_share_explicit_launch_scope_and_scope_expires(self):
+  import warm_archive_manifest as w
+  scope=p.RuntimeProfile(self.profile.bundle,self.work,self.work,self.work,self.work,self.work,self.work,self.work)
+  with patch.object(w,'resolve_gpu_identity_full',side_effect=self.resolve):
+   with w.native_validation_scope(scope):
+    a=w.resolve_gpu_identity(self.target,self.stage);b=w.resolve_gpu_identity(self.target,self.stage);self.assertEqual(a,b);self.assertEqual(self.calls,1)
+   w.resolve_gpu_identity(self.target,self.stage);self.assertEqual(self.calls,2)
+ def test_unadmitted_object_cannot_supply_launch_scope(self):
+  import warm_archive_manifest as w
+  with self.assertRaises(ValueError),w.native_validation_scope(self.profile):pass
 
 if __name__=='__main__':unittest.main()
