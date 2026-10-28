@@ -177,6 +177,16 @@ class Formal(unittest.TestCase):
    self.assertIs(component.load(self.stage,runtime_profile=scope)['production'],True)
    c['worker']='bin/bb-probe-metal';path.write_text(json.dumps(c))
    with self.assertRaisesRegex(ValueError,'role mismatch'):component.load(self.stage,runtime_profile=scope)
+ def test_metadata_isolated_interpreter_does_not_require_launcher_import_scope(self):
+  scope=self.scope();out=self.data/'out/runtime-sessions'/self.env['BB_ARM_SESSION_NONCE']/'.arm-module-info.bin';out.parent.mkdir(parents=True)
+  helper=self.stage/'native-runtime-tools/prepare_module_metadata.py'
+  script='''import importlib.util,json,sys
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('author_metadata_helper',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+value=m.formal_inputs(*sys.argv[2:7],json.loads(sys.argv[7]));assert value is not None
+'''
+  result=subprocess.run([sys.executable,'-I','-B','-c',script,str(helper),str(self.stage),str(self.stage/'bin/bb-probe-metal'),self.args[0],str(self.game),str(out),json.dumps(self.env)],capture_output=True,text=True)
+  self.assertEqual(result.returncode,0,result.stderr)
  def test_formal_id_inside_private_apps_is_still_formal_not_qa_fallback(self):
   private=self.root/'developer-project';(private/'apps').mkdir(parents=True);target=private/'apps/Formal Author.app';shutil.move(self.app,target)
   self.app=target;self.stage=target/'Contents/Resources/bbport';exe=self.stage/'bin/bb-probe-metal'

@@ -64,8 +64,10 @@ def formal_inputs(code_root,executable,boot,game,out,environment):
  path=owned_file(root/'native-runtime-tools/launcher_runtime_profile.py',2*1024**2,code_owners=(0,os.getuid()))
  require(digest(path)==manifest['runtime_tools']['launcher_runtime_profile.py'],'formal metadata profile tool identity')
  name='_blood_echoes_metadata_profile_'+digest(path);spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);sys.modules[name]=module;spec.loader.exec_module(module)
- data=module.owned_dir(environment['BB_DATA_DIR']);work=module.owned_dir(data/module.WORK,create=True)
- admitted=module.bundle(root,registration_root=work/'code-registration');require(admitted is not None,'formal metadata outer bundle admission')
+ # This helper runs under Python -I, outside the launcher's import scope.
+ # Keep its original self-contained full code gate until the native/child
+ # registration handoff exists; do not add an unverified sys.path fallback.
+ admitted=module.bundle(root);require(admitted is not None,'formal metadata outer bundle admission')
  return module.metadata_inputs(admitted,boot,game,out,environment)
 def select_loader(*,code_root=None,executable=None,loader=None,script=None):
  script=Path(script if script is not None else __file__).absolute()
