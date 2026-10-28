@@ -63,7 +63,7 @@ def verified_mixed_schedule(report):
  if not(0<reused<total and report['completed']==total and reused+native==total
         and report['collection_strict_hits']==report['strict_lookup_attempts']==native):return False
  if any(report[k]for k in('deferred','rejected','protection_stops','index_rejected','source_late_deferred')):return False
- proof=report.get('final_environment_verification',{})
+ proof=report.get('warm_environment_verification',{}) if report.get('warm_fast_path')is True else report.get('final_environment_verification',{})
  identity=proof.get('environment_identity') if isinstance(proof,dict)else None
  return (proof.get('status')=='environment-verified' and isinstance(identity,str)and len(identity)==64
          and all(c in '0123456789abcdef'for c in identity))if isinstance(proof,dict)else False

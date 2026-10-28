@@ -198,6 +198,16 @@ class MixedSchedule(unittest.TestCase):
         self.assertFalse(result['full_manifest_preparation_verified'])
         self.assertEqual(result['recipe_schedule']['published'],0)
 
+    def test_warm_strict_collection_uses_its_real_environment_verification_field(self):
+        result=self.report();result['warm_fast_path']=True
+        result['warm_environment_verification']=result.pop('final_environment_verification')
+        self.assertTrue(launcher.verified_mixed_schedule(result))
+        result['warm_fast_path']=False
+        self.assertFalse(launcher.verified_mixed_schedule(result))
+        result['warm_fast_path']=True
+        result['warm_environment_verification']['status']='environment-captured'
+        self.assertFalse(launcher.verified_mixed_schedule(result))
+
     def test_missing_partial_failed_bool_or_unverified_environment_never_complete(self):
         import copy
         cases=[('status','partial'),('required_preparation_complete',False),('index_complete',False),
