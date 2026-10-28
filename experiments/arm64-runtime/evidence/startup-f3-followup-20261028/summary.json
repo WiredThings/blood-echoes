@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "status": "targeted-F3-fix-installed",
+  "date": "2026-10-28",
+  "measured_revision": "3dd97f5c813b2ad6636296a595f130a4cbae75f5",
+  "installed_revision": "798adbbb3ee21e750988fe22cab5fc63c225f2c3",
+  "installed_runtime_delta": "one-line restoration of original result object; diagnostic-only added return fields removed; all other preparation tool bytes equal",
+  "final_target_five_seconds_reached": false,
+  "tests": {
+    "launcher_game_pso": 19,
+    "quick_restart": 25,
+    "launcher_local_aot": 22,
+    "startup_phase": 9,
+    "failures": 0
+  },
+  "F3": {
+    "control": {
+      "status": "functional-checked",
+      "restore_to_observed_scene_seconds": 39.210257999948226,
+      "offline_protocol_seen": true,
+      "automatic_continue_seen": true,
+      "original_QA_source_save_unchanged": true
+    },
+    "candidate": {
+      "status": "functional-checked",
+      "restore_to_observed_scene_seconds": 20.513007333967835,
+      "offline_protocol_seen": true,
+      "automatic_continue_seen": true,
+      "original_QA_source_save_unchanged": true
+    },
+    "seconds_saved": 18.69725066598039,
+    "same_isolated_cache_source_and_original_QA_save": true,
+    "profiling": false,
+    "Cua": false,
+    "screen_recording": false
+  },
+  "ordinary_startup": {
+    "first_new_package_registration_seconds": 48.20580695802346,
+    "stable_warm_seconds": 36.93297300010454,
+    "stable_warm_net_benefit_not_established": true,
+    "stable_phase_seconds": {
+      "archive_policy": 0.158272,
+      "local_libraries": 1.65166,
+      "fixed_helpers": 0.782746,
+      "game_preparation": 14.144066,
+      "source_view": 0.71483,
+      "static_catalog": 2.23882,
+      "module_inputs": 3.024072,
+      "complete_PSO": 6.499739,
+      "local_finalize": 0.577883
+    },
+    "initial_libraries_built": 0,
+    "final_libraries_built": 0
+  },
+  "F3_milestones_after_restore_seconds": {
+    "preparation_and_CPU_report": 5.167,
+    "GPU_process_started": 6.194,
+    "GPU_core_ready": 9.254,
+    "character_state_ready": 14.377,
+    "scene_observed": 20.513007333967835
+  },
+  "memory": {
+    "final_runs_peak_pressure": [
+      2,
+      2,
+      2
+    ],
+    "final_runs_swap_delta_mib": [
+      -16.0,
+      -21.375,
+      -24.0
+    ],
+    "control_last_30_samples_combined_footprint_mib": 6785.4,
+    "candidate_last_30_samples_combined_footprint_mib": 6534.7,
+    "not_a_long_exploration_test": true,
+    "shared_pages_may_be_double_counted": true
+  },
+  "startup_stack_diagnostic": {
+    "separate_from_timing": true,
+    "CPU_seconds": 8,
+    "GPU_seconds": 4,
+    "sampling_interval_ms": 10,
+    "GPU_reader_thread_samples": 342,
+    "GPU_WarmUp_samples": 221,
+    "CPU_game_worker_waiting_GPU_init_samples": 323,
+    "remote_watch_waitpid_is_normal_background_watch": true,
+    "aggregate_thread_sample_counts_are_not_wall_time": true
+  },
+  "known_remaining": [
+    "8 geometry PSOs lack per-recipe persistent proof; ordinary startup still validates them natively",
+    "remaining GPU WarmUp loads old cached stages and creates current-process modules/objects",
+    "the gap between character-ready and frame-camera confirmation is not yet attributed",
+    "same-session script/image/bootstrap and native role admission still have measurable cost"
+  ],
+  "incomplete_runs": [
+    {
+      "status": "incomplete",
+      "reason": "900-second first-registration test budget; memory pressure normal; never reached game scene",
+      "accepted_as_benchmark": false
+    },
+    {
+      "status": "sampled",
+      "phase": "private-seed-resume",
+      "scene_seconds": 134.324991417001,
+      "accepted_as_stable_warm": false
+    }
+  ],
+  "delivery": {
+    "version": "0.2.58",
+    "bundle_id": "io.github.bbport.optimized",
+    "native_eight_roles_unchanged": true,
+    "Swift_code_unchanged": true,
+    "diagnostics_enabled": false,
+    "formal_saves_settings_cache_modified": false,
+    "formal_cache_files_content_rechecked": [
+      {
+        "part": "cache",
+        "files": 5105,
+        "bytes": 160397602,
+        "unchanged": true
+      },
+      {
+        "part": "local-metal",
+        "files": 9393,
+        "bytes": 59630791,
+        "unchanged": true
+      }
+    ],
+    "Release_updated": false
+  }
+}

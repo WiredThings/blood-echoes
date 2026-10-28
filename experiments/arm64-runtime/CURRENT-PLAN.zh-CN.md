@@ -1,3 +1,9 @@
+## 2026-10-28 F3真实失效修复与后续启动拆分
+
+本机0.2.58已更新至798adbbb（游戏实测基于3dd97f5c，最终仅恢复一行返回对象/去重复统计，全部其余准备工具一致，75项控制全过）。富缓存同组F3旧39.21→新20.51秒；普通暖启动36.93秒，五秒目标和暖启动净收益均未完成。8条GS只有当次native严格验证，缺逐recipe持久证明，原F3门控遗漏混合成功已修；剩余ordinary重验6.5秒不能直接删。OS健康观察合并100ms并强制边界实时检查，不改文件/完整键/保护规则。记录了初末建库各自工作量。另做短栈采样，GPU WarmUp及stage/对象创建、CPU等待GPU init有证据；remote-watch等待是正常后台行为。
+
+无Cua的计时与栈诊断分开。正式存档、设置、缓存未动，正式GPU两部分14500左右文件再次完整摘要一致；八原生角色和Swift代码不变，诊断关闭、白模修复保留，无Release。详docs/startup-f3-followup.zh-CN.md与evidence/startup-f3-followup-20261028/summary.json。首次预算中止和私有恢复轮不作暖/F3验收。两个无关FEX未提交改动保留。原目标不重建、不标完成。
+
 ## 2026-10-28 本轮已交付
 
 验证、UI 功能对账和实际窗口走查完成，本机 `/Applications/Blood Echoes.app` 已原子替换为 0.2.58（190b038），严格签名通过。Bundle ID 与八个原生角色不变，诊断关闭、白模修复保留，正式存档／设置／缓存未更改，Release 不更新。证据见 `docs/launcher-feature-audit.zh-CN.md` 和 `evidence/startup-registration-20261028/launcher-delivery-summary.json`。总目标不自动完成；F3 五秒与长期游玩仍有边界。未处理工作区两个独立 FEX/unwind 候选。
