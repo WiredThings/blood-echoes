@@ -2,6 +2,8 @@
 
 [简体中文](README.zh-CN.md) · [Download Latest](https://github.com/WiredThings/blood-echoes/releases/latest) · [User guide](docs/USER_GUIDE.md) · [Changes and third-party credits](docs/THIRD_PARTY_CHANGES.md)
 
+The development ARM64 runtime incrementally prepares local Metal libraries and pipelines by default. Ordinary warm starts reuse unchanged completed preparation; F3 retains its original session recovery. This remains separate from the Latest Release described below. See [reuse rules and validation](experiments/arm64-runtime/docs/ordinary-warm-reuse.zh-CN.md).
+
 A standalone macOS launcher and Bloodborne compatibility runtime with **direct Metal rendering**,
 **temporal MetalFX**, and English, Simplified Chinese and Traditional Chinese launcher interfaces.
 This is the **WiredThings fork** of [DiAvisoo/bbport-mac-optimized](https://github.com/DiAvisoo/bbport-mac-optimized).

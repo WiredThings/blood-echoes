@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "source_revision": "f5a030d0eff66753215c6b205f6352b8697045c6",
+  "evidence_root": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793177090063845000/cross-session-warm-and-F3-retry",
+  "status": "validated-and-installed",
+  "runs": [
+    {
+      "label": "warm-registration",
+      "status": "sampled",
+      "ordinary_start_to_observed_scene_s": 27.44442366703879,
+      "preparation_statuses": [
+        "unchanged-preparation-schedule-reused"
+      ],
+      "module_compiler_children": 0,
+      "PSO_validation_workers": 0,
+      "observed_prepare_verification_tools": {},
+      "sampled_source_compiles": 0,
+      "sampled_PSO_failures": 0,
+      "strict_PSO_attempts_equal_hits": true,
+      "peak_pressure": 2,
+      "swap_growth_mib": -104.0,
+      "tail_combined_footprint_mib": 6597.49006652832,
+      "tool_memory": {
+        "observations": 248,
+        "owned_tree_peak_mib": 6606.717864990234,
+        "before_scene_peak_mib": 6429.639739990234,
+        "role_peaks_mib": {
+          "bash": 5.7825775146484375,
+          "bb-gpu": 3253.9255599975586,
+          "bb-probe-metal": 3349.462921142578,
+          "python3": 177.67251586914062,
+          "tee": 1.0627288818359375
+        },
+        "sampled_not_allocator_hwm": true,
+        "shared_pages_may_be_counted_more_than_once": true
+      },
+      "formal_source_save_unchanged": true
+    },
+    {
+      "label": "ordinary-warm-1",
+      "status": "sampled",
+      "ordinary_start_to_observed_scene_s": 27.472633457975462,
+      "preparation_statuses": [
+        "unchanged-preparation-schedule-reused"
+      ],
+      "module_compiler_children": 0,
+      "PSO_validation_workers": 0,
+      "observed_prepare_verification_tools": {},
+      "sampled_source_compiles": 0,
+      "sampled_PSO_failures": 0,
+      "strict_PSO_attempts_equal_hits": true,
+      "peak_pressure": 2,
+      "swap_growth_mib": 175.125,
+      "tail_combined_footprint_mib": 6604.404151916504,
+      "tool_memory": {
+        "observations": 248,
+        "owned_tree_peak_mib": 6616.280410766602,
+        "before_scene_peak_mib": 6412.405296325684,
+        "role_peaks_mib": {
+          "bash": 4.438529968261719,
+          "bb-gpu": 3252.5818099975586,
+          "bb-probe-metal": 3359.4317169189453,
+          "python3": 202.01624298095703,
+          "tee": 1.0627288818359375
+        },
+        "sampled_not_allocator_hwm": true,
+        "shared_pages_may_be_counted_more_than_once": true
+      },
+      "formal_source_save_unchanged": true
+    },
+    {
+      "label": "same-session-F3",
+      "status": "functional-checked",
+      "ordinary_start_to_observed_scene_s": 28.420229624956846,
+      "preparation_statuses": [
+        "unchanged-preparation-schedule-reused",
+        "same-supervisor-f3-schedule-reused"
+      ],
+      "module_compiler_children": 0,
+      "PSO_validation_workers": 0,
+      "observed_prepare_verification_tools": {},
+      "sampled_source_compiles": 0,
+      "sampled_PSO_failures": 0,
+      "strict_PSO_attempts_equal_hits": true,
+      "peak_pressure": 2,
+      "swap_growth_mib": -24.0,
+      "tail_combined_footprint_mib": 6757.388618469238,
+      "tool_memory": {
+        "observations": 321,
+        "owned_tree_peak_mib": 6775.2336502075195,
+        "before_scene_peak_mib": 6433.280364990234,
+        "role_peaks_mib": {
+          "bash": 4.454154968261719,
+          "bb-gpu": 3434.909912109375,
+          "bb-probe-metal": 3338.1973876953125,
+          "python3": 202.04753875732422,
+          "tee": 1.0627288818359375
+        },
+        "sampled_not_allocator_hwm": true,
+        "shared_pages_may_be_counted_more_than_once": true
+      },
+      "formal_source_save_unchanged": true,
+      "F3_to_observed_scene_s": 26.494988417020068,
+      "F3_offline": true,
+      "F3_automatic_continue": true,
+      "scripted_API_not_physical_keyboard": true
+    },
+    {
+      "label": "ordinary-warm-2",
+      "status": "sampled",
+      "ordinary_start_to_observed_scene_s": 27.684969583060592,
+      "preparation_statuses": [
+        "unchanged-preparation-schedule-reused"
+      ],
+      "module_compiler_children": 0,
+      "PSO_validation_workers": 0,
+      "observed_prepare_verification_tools": {},
+      "sampled_source_compiles": 0,
+      "sampled_PSO_failures": 0,
+      "strict_PSO_attempts_equal_hits": true,
+      "peak_pressure": 2,
+      "swap_growth_mib": -24.0,
+      "tail_combined_footprint_mib": 6787.333839416504,
+      "tool_memory": {
+        "observations": 248,
+        "owned_tree_peak_mib": 6801.452285766602,
+        "before_scene_peak_mib": 6658.702217102051,
+        "role_peaks_mib": {
+          "bash": 4.454154968261719,
+          "bb-gpu": 3449.8628997802734,
+          "bb-probe-metal": 3361.5410690307617,
+          "python3": 201.79753875732422,
+          "tee": 1.0627288818359375
+        },
+        "sampled_not_allocator_hwm": true,
+        "shared_pages_may_be_counted_more_than_once": true
+      },
+      "formal_source_save_unchanged": true
+    }
+  ],
+  "related_tests": 197,
+  "native_eight_roles_unchanged": true,
+  "Swift_launcher_code_unchanged": true,
+  "Cua": false,
+  "screen_recording": false,
+  "audio": false,
+  "diagnostic_readback": false,
+  "Release_updated": false,
+  "formal_app_updated": true,
+  "qualification": "Short static scene only; no matched sustained FPS or long-running memory claim. Combined footprints may count shared pages twice. Initial new-package registration and protection-aborted run are separate, not accepted fast measurements.",
+  "new_package_registration_with_existing_cache_s": 62.69696091604419,
+  "previous_aborted_observed_scene_s": 27.40968833398074,
+  "installation": {
+    "status": "installed",
+    "app": "/Applications/Blood Echoes.app",
+    "version": "0.2.58",
+    "source_revision": "f5a030d0eff66753215c6b205f6352b8697045c6",
+    "bundle_id": "io.github.bbport.optimized",
+    "native_roles_unchanged": true,
+    "swift_launcher_code_unchanged": true,
+    "changed_code_files": [
+      "Contents/Info.plist",
+      "Contents/MacOS/bbport",
+      "Contents/Resources/bbport/ARM64-LOCAL-PREPARATION.json",
+      "Contents/Resources/bbport/native-runtime-tools/launcher_game_pso.py",
+      "Contents/Resources/bbport/native-runtime-tools/launcher_local_aot.py",
+      "Contents/Resources/bbport/native-runtime-tools/quick_restart_preparation.py",
+      "Contents/_CodeSignature/CodeResources"
+    ],
+    "diagnostics_enabled": false,
+    "white_model_fix_retained": true,
+    "formal_saves_settings_cache_modified": false,
+    "Release_updated": false
+  },
+  "formal_data_verification": {
+    "nodes": 16467,
+    "bytes_hashed": 325147987,
+    "unchanged": true,
+    "includes": [
+      "normal saves",
+      "quick checkpoints",
+      "settings",
+      "native renderer cache",
+      "Local libraries"
+    ]
+  }
+}

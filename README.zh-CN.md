@@ -2,6 +2,8 @@
 
 [English](README.md) · [下载 Latest](https://github.com/WiredThings/blood-echoes/releases/latest) · [使用指南](docs/USER_GUIDE.zh-CN.md) · [分支改动与第三方来源](docs/THIRD_PARTY_CHANGES.md)
 
+开发分支的 ARM64 版本默认增量准备本机 Metal 库和管线；普通暖启动可复用未变化的已完成准备，F3 保留原会话快速恢复。它与下文的 Latest Release 分开，见[复用规则与验收记录](experiments/arm64-runtime/docs/ordinary-warm-reuse.zh-CN.md)。
+
 这是 [DiAvisoo/bbport-mac-optimized](https://github.com/DiAvisoo/bbport-mac-optimized) 的
 **WiredThings 分支**，提供独立 macOS 启动器、**直接 Metal 渲染**、**MetalFX 时域升频**，
 以及英文、简体中文、繁体中文启动器界面。当前 **0.2.51** 修复细分曲面阶段的数据布局错配，
