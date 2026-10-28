@@ -797,6 +797,7 @@ class PreparationSession:
                         if isinstance(error,Stopped):raise
                     return result
                 def compile(self,*args,**kwargs):return actual.compile(*args,**kwargs)
+                def unchanged(self,*args,**kwargs):return actual.unchanged(*args,**kwargs)
             try:
                 summary=build(root,cohort,enabled=True,guard=guard,toolchain=EnclosedToolchain(),**({'runtime_profile':self.runtime_profile}if self.runtime_profile is not None else{}))
                 self.stats['full_build_seconds']+=self.clock()-started

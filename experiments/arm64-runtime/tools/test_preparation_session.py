@@ -50,6 +50,19 @@ class Controls(unittest.TestCase):
   first=self.call();self.assertEqual(first['status'],'passed');self.assertFalse(first['session_reused']);self.assertIsNotNone(self.session.snapshot);return first
  def test_same_session_reuses_no_identify_or_compile_guard_still_runs(self):
   self.settled();before=(self.factories,self.compiles,self.guard.calls);result=self.call();self.assertTrue(result['session_reused']);self.assertEqual((self.factories,self.compiles),before[:2]);self.assertGreater(self.guard.calls,before[2]);self.assertEqual(self.session.stats['reuses'],1)
+ def retained_target(self):
+  self.cohort='b'*64;self.base=self.root/self.cohort;self.base.mkdir();self.requests=self.base/'requests';self.requests.mkdir();return self.request(1)
+ def test_session_retained_product_forwards_real_toolchain_check(self):
+  before=self.compiles;request=self.retained_target();calls=[];original=m.NativeToolchain.unchanged
+  def checked(chain,guard):calls.append(chain);return original(chain,guard)
+  with patch.object(m.NativeToolchain,'unchanged',checked):result=self.call()
+  self.assertEqual(result['status'],'passed',result);self.assertEqual(result['built'],0);self.assertEqual(result['reused_products'],1);self.assertEqual(self.compiles,before);self.assertTrue(calls)
+  self.assertTrue(m.already_succeeded(self.base/'artifacts'/result['build_id'],request,result['build_id']))
+ def test_session_retained_product_rejects_actual_changed_toolchain(self):
+  request=self.retained_target();before=self.compiles
+  with patch.object(m.NativeToolchain,'unchanged',side_effect=m.Refused('author selected tool changed')):result=self.call()
+  self.assertEqual(result['status'],'refused',result);self.assertEqual(result['error'],'author selected tool changed');self.assertIsNone(self.session.summary);self.assertEqual(self.compiles,before)
+  self.assertFalse((self.base/'artifacts'/result['build_id']/(request['key']+'.json')).exists())
  def test_record_phase_explicit_invalidation(self):
   self.settled();before=self.factories;self.session.invalidate('record-phase');self.assertFalse(self.call()['session_reused']);self.assertEqual(self.factories,before+1)
  def test_added_request_full_audit_build_then_zero_build_settles(self):

@@ -63,14 +63,18 @@ class Controls(unittest.TestCase):
    p=next(p for p in folder.glob('*.'+suffix)if p.name!='build.json');tmp=p.with_name('replacement');tmp.write_bytes(p.read_bytes());os.replace(tmp,p);self.assertFalse(self.call()['session_reused']);self.assertTrue(self.call()['session_reused'])
  def test_bad_source_refused_and_failure_not_cached(self):
   self.settled();p=next(self.requests.glob('*.metal'));p.write_bytes(b'BAD');r=self.call();self.assertEqual(r['status'],'refused');self.assertIsNone(self.session.summary);before=self.factories;r=self.call();self.assertEqual(r['status'],'refused');self.assertGreater(self.factories,before)
- def test_bad_library_receipt_pair_refused_not_memoized(self):
-  self.settled();folder=self.base/'artifacts'/self.session.summary['build_id'];next(folder.glob('*.metallib')).write_bytes(b'BAD');self.assertEqual(self.call()['status'],'refused');self.assertIsNone(self.session.summary)
+ def test_bad_library_pair_preserved_and_verified_repair_not_memoized(self):
+  self.settled();folder=self.base/'artifacts'/self.session.summary['build_id'];broken=next(folder.glob('*.metallib'));broken.write_bytes(b'BAD');result=self.call()
+  self.assertEqual(result['status'],'passed',result);self.assertEqual(result['repaired_products'],1);self.assertIsNone(self.session.summary)
+  retained=Path(result['results'][0]['retained_previous'])/broken.name;self.assertEqual(retained.read_bytes(),b'BAD');self.assertNotEqual(broken.read_bytes(),b'BAD')
+  self.assertFalse(self.call()['session_reused']);self.assertTrue(self.call()['session_reused'])
  def test_tool_binary_change_new_identity_and_no_reuse(self):
   first=self.settled();self.tools['metal'].write_bytes(b'CHANGED-AUTHOR-TOOL');second=self.call();self.assertFalse(second['session_reused']);self.assertNotEqual(first['build_id'],second['build_id']);self.assertGreater(second['built'],0)
  def test_selected_tool_path_change_invalidates(self):
   self.settled();p=self.P/'metal-other';p.write_bytes(b'OTHER-AUTHOR-TOOL');self.tools['metal']=p;self.assertFalse(self.call()['session_reused'])
  def test_sdk_settings_or_selection_and_os_change_invalidates(self):
-  self.settled();(self.sdk/'SDKSettings.json').write_text('{"author":1}');self.assertFalse(self.call()['session_reused']);self.assertTrue(self.call()['session_reused'])
+  first=self.settled();(self.sdk/'SDKSettings.json').write_text('{"author":1}');changed=self.call();self.assertFalse(changed['session_reused']);self.assertNotEqual(first['build_id'],changed['build_id']);self.assertGreater(changed['built'],0)
+  self.assertFalse(self.call()['session_reused']);self.assertTrue(self.call()['session_reused'])
   new=self.P/'Other.sdk';new.mkdir();(new/'SDKSettings.json').write_text('{}');self.sdk=new;self.assertFalse(self.call()['session_reused']);self.os_build='CHANGED-AUTHOR-OS';self.assertFalse(self.call()['session_reused'])
  def test_delete_rename_and_external_link_rejected_or_invalidated(self):
   self.settled();p=next(self.requests.glob('*.metal'));os.link(p,self.P/'outside-link');self.assertEqual(self.call()['status'],'refused');self.assertIsNone(self.session.summary)

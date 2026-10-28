@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "status": "isolated-native-and-game-validated",
+  "cause": "PreparationSession.EnclosedToolchain omitted forwarding NativeToolchain.unchanged during retained product adoption",
+  "targeted_tests": 82,
+  "old_real_builder_error": "unchanged",
+  "requests": 499,
+  "first_repair": {
+    "compiled": 113,
+    "adopted": 386,
+    "seconds": 112.46256841591094
+  },
+  "stable_builder": {
+    "label": "fixed-stable-warm",
+    "seconds": 2.124943625065498,
+    "status": "passed",
+    "error": null,
+    "built": 0,
+    "skipped": 499,
+    "requests": 499,
+    "persistent_audit_reused": true
+  },
+  "first_game_prepare_and_scene_seconds": 202.62799704202916,
+  "first_warm_with_new_inputs_seconds": 54.4865878749406,
+  "covered_ordinary_warm_seconds": 30.81766212498769,
+  "F3": [
+    {
+      "scene_recovered_seconds": 16.449918875005096,
+      "preparation_seconds": 0.967542,
+      "offline_protocol": true,
+      "automatic_continue": true
+    },
+    {
+      "scene_recovered_seconds": 18.26321162492968,
+      "preparation_seconds": 1.013559,
+      "offline_protocol": true,
+      "automatic_continue": true
+    }
+  ],
+  "peak_pressure": 2,
+  "net_system_swap_growth_mib": 611.0625,
+  "native_runtime_roles_unchanged": true,
+  "texture_cpu_baseline_fix_retained": true,
+  "formal_app_updated": false,
+  "formal_saves_settings_cache_modified": false,
+  "private_texture_diagnostics_disabled": true,
+  "Release_updated": false,
+  "Cua": false,
+  "screen_capture": false,
+  "save_associated_schedule_implemented": false,
+  "matched_old_new_FPS_or_memory_claim": false
+}
