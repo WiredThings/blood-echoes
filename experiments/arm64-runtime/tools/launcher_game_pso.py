@@ -97,7 +97,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   reused=resume(bound=restart_binding,environment=environment,gpu=gpu,component=component,
       backend=selected['library'],cohort=cohort,check=check,configure_capture=capture_configure,**kw(runtime_profile))
   if reused is not None:
-   check(force=True);return {**reused,'startup_health':dict(health.stats)}
+   check(force=True);return reused
  if resume_only:return None
  # Default source preparation precedes cache enumeration, including a fresh
  # install with no shader-cache records. Keep original app0/arguments unchanged.
