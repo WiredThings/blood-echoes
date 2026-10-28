@@ -60,6 +60,22 @@ class Startup(unittest.TestCase):
         self.assertEqual(opts, {'BB_MTL_DIRECT_COPY':'1'})
         self.assertNotIn('authored-secret', json.dumps(report))
 
+    def test_final_cache_hit_does_not_hide_initial_library_compilation(self):
+        calls=[]
+        def libraries(**kw):
+            calls.append(kw)
+            return {},dict(status='prepared',built=2 if len(calls)==1 else 0,
+                           skipped=1 if len(calls)==1 else 3,requests=3)
+        _,result=prepare_launch(str(self.inputs/'runtime'),self.args,self.env,project=self.root,
+            archive_prepare=self.identity,local_prepare=libraries,
+            observe=lambda:dict(locked=False,pressure=1,swap_mib=100),
+            fixed_helper_prepare=lambda **kw:({},dict(status='completed')),
+            game_prepare=lambda **kw:dict(status='completed',preparation=dict(status='completed')))
+        self.assertEqual(len(calls),2)
+        self.assertEqual(result['initial_local_work'],dict(built=2,skipped=1,requests=3))
+        self.assertEqual(result['local']['built'],0)
+        self.assertEqual(result['local']['skipped'],3)
+
     def test_explicit_off_does_not_inspect_files_or_services(self):
         env = {'BB_MTL_LOCAL_AOT_MODE':'off'}
         def fail(**kw): raise AssertionError('off performed work')

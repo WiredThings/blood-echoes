@@ -226,6 +226,9 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
         updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
                                        cohort=cohort, engine='arm64', graphics=True,**kw(runtime_profile))
     env.update(updates)
+    # Finalization has its own report; retain the first pass's actual work so
+    # a final cache hit does not hide compilation earlier in the same launch.
+    initial_local_work={k:report[k]for k in('built','skipped','reused_products','repaired_products','requests')if type(report.get(k))is int and report[k]>=0}
     if fixed_helper_prepare is None:
         from launcher_fixed_helpers import prepare as fixed_helper_prepare
     with preparation_phase('fixed-helpers'):
@@ -282,7 +285,7 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
         except (ValueError,OSError,KeyError,TypeError):
             pass # Optional scheduling hint cannot replace a completed original launch.
     manifest = dict(schema=1, status=report['status'], requested=mode or 'auto',
-                    local=report, game_pso=game_report, fixed_helpers=helper_report, cohort=cohort, before=before, after=after,
+                    local=report, initial_local_work=initial_local_work, game_pso=game_report, fixed_helpers=helper_report, cohort=cohort, before=before, after=after,
                     original_arguments_preserved=True, formal_data_modified=False)
     return env, manifest
 
@@ -298,6 +301,7 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     # Never emit the inherited environment: it may contain the original QA token.
     visible={k:report[k]for k in ('status','requested')if k in report}
     if report.get('local',{}).get('reason'):visible['reason']=report['local']['reason']
+    if report.get('initial_local_work'):visible['initial_local_libraries']=report['initial_local_work']
     if 'game_pso'in report:visible['game_pso']=report['game_pso'].get('status')
     if 'fixed_helpers'in report:visible['fixed_helpers']=report['fixed_helpers'].get('status')
     publication=report.get('game_pso',{}).get('restart_schedule_published')
