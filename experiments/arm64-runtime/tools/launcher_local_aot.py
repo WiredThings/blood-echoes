@@ -159,14 +159,14 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
             from local_aot_policy import prepare as policy_prepare
             from local_metal_builder import PreparationSession,NativeToolchain,FixedRunner,Safety
             from native_observer import NativeObserver
-            from qa_memory_policy import MemoryPolicy
+            from launcher_runtime_profile import preparation_memory_policy
             from qa_build_guard import require_no_games
             from launcher_runtime_profile import work
             scratch=cleanup.enter_context(tempfile.TemporaryDirectory(prefix='library-session-',dir=work(project,runtime_profile)))
             session=PreparationSession(Path(scratch),runtime_profile=runtime_profile)
             cleanup.callback(session.close)
             safety_observer=NativeObserver();cleanup.callback(safety_observer.close)
-            guard=Safety(safety_observer,require_no_games,MemoryPolicy)
+            guard=Safety(safety_observer,require_no_games,preparation_memory_policy(runtime_profile))
             def local_prepare(**values):
                 def builder(root,cohort,**build_options):
                     return session.build(root,cohort,guard=guard,
@@ -182,9 +182,10 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
 
 def _prepared(executable, arguments, env, project, inputs, options, mode,
               archive_prepare, local_prepare, observe, backend_root, code_root, game_prepare, fixed_helper_prepare=None,runtime_profile=None):
-    from launcher_runtime_profile import kw
+    from launcher_runtime_profile import kw,preparation_memory_policy
+    qa_protection=preparation_memory_policy(runtime_profile)is not None
     before = observe()
-    if before['locked'] or before['pressure'] == 4:
+    if qa_protection and (before['locked'] or before['pressure'] == 4):
         raise RuntimeError('locked or severe pressure before local Metal preparation')
     with preparation_phase('archive-policy'):
         updates, identity = archive_prepare(enabled=True, engine='arm64',
@@ -214,7 +215,7 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
                 if set(capture)-{'BB_FETCH_CAPTURE_ROOT','BB_FETCH_CAPTURE_GAME_ROOT'}:
                     raise ValueError('unexpected runtime capture environment')
                 after=observe()
-                if after['locked']or after['pressure']==4 or after['swap_mib']-before['swap_mib']>2048:
+                if qa_protection and (after['locked']or after['pressure']==4 or after['swap_mib']-before['swap_mib']>2048):
                     raise RuntimeError('protection after F3 preparation reuse')
                 env.update(previous);env.update(capture)
                 return env,dict(schema=1,status='prepared',requested=mode or 'auto',
@@ -228,7 +229,7 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     from quick_restart_preparation import prepared_warm,warm_anchor,publish,publish_warm
     def reuse_check():
         sample=observe()
-        if sample['locked']or sample['pressure']==4 or sample['swap_mib']-before['swap_mib']>2048:
+        if qa_protection and (sample['locked']or sample['pressure']==4 or sample['swap_mib']-before['swap_mib']>2048):
             raise RuntimeError('protection during unchanged preparation reuse')
     if restart is not None and env.get('BB_QUICKLOAD_PENDING')!='1'and mode in(None,'','auto','load'):
         diagnostic={}
@@ -292,7 +293,7 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     after = observe()
     # Preserve the entire preparation interval's cumulative budget. The builder
     # owns its continuous severe/burst checks; this boundary does not reset it.
-    if after['locked'] or after['pressure'] == 4 or after['swap_mib']-before['swap_mib'] > 2048:
+    if qa_protection and (after['locked'] or after['pressure'] == 4 or after['swap_mib']-before['swap_mib'] > 2048):
         raise RuntimeError('protection after local Metal preparation')
     if report['status'] in ('stopped', 'failed-protection'):
         raise RuntimeError('local Metal preparation stopped by its safety guard')
@@ -304,7 +305,7 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
         from quick_restart_preparation import publish
         def restart_check():
             sample=observe()
-            if sample['locked'] or sample['pressure']==4 or sample['swap_mib']-before['swap_mib']>2048:
+            if qa_protection and (sample['locked'] or sample['pressure']==4 or sample['swap_mib']-before['swap_mib']>2048):
                 raise RuntimeError('protection during F3 preparation receipt')
         try:
             published=publish(bound=restart, context=restart_context, gpu=env['BB_GPU_USER_DIR'], check=restart_check,

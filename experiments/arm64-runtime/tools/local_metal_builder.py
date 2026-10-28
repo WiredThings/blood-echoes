@@ -377,16 +377,19 @@ def retain_invalid_pair(root,cohort,build_id,key,folder,pins,guard):
 class Safety:
     def __init__(self,observer,require_no_games,policy_factory,clock=time.monotonic):
         self.observer=observer;self.no_games=require_no_games;self.clock=clock
-        self.started=clock();baseline=observer.system()
-        if baseline['locked']or baseline['pressure']==4:raise Stopped('locked or severe pressure before build')
-        self.policy=policy_factory(baseline);self.no_games()
+        self.started=clock();self.policy=None
+        if policy_factory is not None:
+            baseline=observer.system()
+            if baseline['locked']or baseline['pressure']==4:raise Stopped('locked or severe pressure before build')
+            self.policy=policy_factory(baseline)
+        self.no_games()
     def check(self,*,preflight=False):
-        now=self.clock()-self.started;sample=self.observer.system()
-        reason=self.policy.observe(now,sample)
+        now=self.clock()-self.started;sample=self.observer.system()if self.policy is not None else None
+        reason=self.policy.observe(now,sample)if self.policy is not None else None
         if reason or now>TOTAL_TIMEOUT:raise Stopped(reason or 'total build timeout')
         if preflight:
             self.no_games()
-            if sample['pressure']==4:raise Stopped('severe pressure before new compiler stage')
+            if sample is not None and sample['pressure']==4:raise Stopped('severe pressure before new compiler stage')
 
 class FixedRunner:
     def __init__(self,private_tmp):self.tmp=private_tmp
@@ -566,14 +569,14 @@ class NativeToolchain:
                         cwd=source.parent,outputs=((library,LIBRARY_MAX),))
         self._unchanged_full(guard)
 
-def real_services(private_tmp):
+def real_services(private_tmp,runtime_profile=None):
     import sys
     sys.path.insert(0,str(Path(__file__).resolve().parent))
     from native_observer import NativeObserver
-    from qa_memory_policy import MemoryPolicy
+    from launcher_runtime_profile import preparation_memory_policy
     from qa_build_guard import require_no_games
     observer=NativeObserver()
-    return observer,Safety(observer,require_no_games,MemoryPolicy),NativeToolchain(FixedRunner(private_tmp))
+    return observer,Safety(observer,require_no_games,preparation_memory_policy(runtime_profile)),NativeToolchain(FixedRunner(private_tmp))
 
 def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtime_profile=None):
     # Do not move path resolution, imports, enumeration, hashes or services above this gate.
@@ -592,7 +595,7 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
         except BlockingIOError as error:raise Refused('another builder owns this cohort')from error
         summary_path=artifact_root/'builder-summary.json'
         if(guard is None)!=(toolchain is None):raise Refused('internal test services must be supplied together')
-        if guard is None:observer,guard,toolchain=real_services(private_tmp)
+        if guard is None:observer,guard,toolchain=real_services(private_tmp,runtime_profile)
         guard.check(preflight=True)
         from paged_metal_requests import RequestIndex,PAGE_MAX
         index=RequestIndex(requests,private_tmp,guard,api=__import__('sys').modules[__name__])

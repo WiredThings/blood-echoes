@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse,contextlib,importlib.util,json,os,sys,tempfile,types,unittest
 from unittest.mock import patch
 p=argparse.ArgumentParser(add_help=False);p.add_argument('--source-root',type=Path,default=Path(__file__).resolve().parents[1]);a,left=p.parse_known_args();sys.argv=[sys.argv[0],*left]
+sys.path.insert(0,str((a.source_root/'tools').resolve()))
 s=importlib.util.spec_from_file_location('fixed_helpers',a.source_root/'tools/launcher_fixed_helpers.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 from tiling_fixture import libraries
 def response(ready=8,stopped=False,local=14,processed=14):

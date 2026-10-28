@@ -190,7 +190,7 @@ def prepare(config,*,services=None):
   from game_pso_owned_audit import audit_owned_stage,audit_owned_key_profile,load_canonical_layout
   from qa_build_guard import require_no_games
   from native_observer import NativeObserver
-  from qa_memory_policy import MemoryPolicy
+  from launcher_runtime_profile import preparation_memory_policy
   from warm_archive_manifest import resolve_gpu_identity
   # Data globals are explicit; code imports stay in this loaded closure.
   import local_aot_policy,local_metal_builder
@@ -199,7 +199,7 @@ def prepare(config,*,services=None):
   from local_aot_policy import prepare as local_prepare
   from local_metal_builder import build as local_build,NativeToolchain,FixedRunner,Stopped as BuilderStopped,PreparationSession
   services=dict(audit_stage=audit_owned_stage,audit_key_profile=audit_owned_key_profile,load_layout=load_canonical_layout,
-    require_no_games=require_no_games,observer_factory=NativeObserver,memory_policy=MemoryPolicy,resolve_identity=resolve_gpu_identity,
+    require_no_games=require_no_games,observer_factory=NativeObserver,memory_policy=preparation_memory_policy(runtime_profile),resolve_identity=resolve_gpu_identity,
     local_prepare=local_prepare,local_build=local_build,toolchain=NativeToolchain,runner=FixedRunner,builder_stopped=BuilderStopped,builder_session_factory=PreparationSession)
  observer=None;require_no_games=services['require_no_games'];policy_type=services['memory_policy']
  need(HEX.fullmatch(a.cohort)and HEX.fullmatch(a.library_sha256)and HEX.fullmatch(a.layout_sha256),'current identities required')
@@ -231,12 +231,12 @@ def prepare(config,*,services=None):
  if getattr(a,'options_identity',None):need(HEX.fullmatch(a.options_identity),'declared options identity')
  selection_provenance=dict(effective_options=effective_options,declared_options_identity=getattr(a,'options_identity',None))
  observer=services.get('observer') or services['observer_factory']()
- before=observer.system()
- if before['locked']or before['pressure']==4:
+ before=observer.system()if policy_type is not None else None
+ if before is not None and (before['locked']or before['pressure']==4):
   result=dict(status='stopped',error='locked or severe pressure at preflight',completed=0,protection_stops=1,game_started=False)
   (run/'result.json').write_text(json.dumps(result,indent=2)+'\n');observer.close();return result
  clock=services.get('clock',time.monotonic)
- policy=policy_type(before);start=clock();samples=[];sample_count=0;outcomes=[];outcome_count=0;phase_env={};stop_error=None
+ policy=policy_type(before)if policy_type is not None else None;start=clock();samples=[];sample_count=0;outcomes=[];outcome_count=0;phase_env={};stop_error=None
  samples_path=run/'samples.jsonl';outcomes_path=run/'outcomes.jsonl';events_path=run/'events.jsonl'
  builder_tmp=fresh(run,'local-builder-tmp');result={}
  session_factory=services.get('builder_session_factory');builder_session=session_factory(builder_tmp,**kw(runtime_profile))if session_factory else None
@@ -246,6 +246,7 @@ def prepare(config,*,services=None):
  def check():
   nonlocal sample_count
   elapsed=clock()-start
+  if policy is None:return
   try:s=observer.system()
   except Exception as error:raise Stopped('cannot observe protection state: '+str(error))from error
   sample=dict(seconds=elapsed,**s);sample_count+=1
@@ -411,8 +412,8 @@ def prepare(config,*,services=None):
    builder_session.close();result['builder_session']=dict(builder_session.stats)
   if recipe_schedules is not None:
    result['recipe_schedule']=dict(recipe_schedules.stats);recipe_schedules.close()
-  result.update(before=before,after=observer.system(),samples_preview=samples,sample_count=sample_count,samples_jsonl=str(samples_path),
-    memory_policy=policy_type.MANIFEST,wall_seconds=clock()-start,outcomes_preview=outcomes,outcome_count=outcome_count,
+  result.update(before=before,after=observer.system()if policy is not None else None,samples_preview=samples,sample_count=sample_count,samples_jsonl=str(samples_path),
+    memory_policy=policy_type.MANIFEST if policy_type is not None else dict(qa_stops=False,mode='application-preparation'),wall_seconds=clock()-start,outcomes_preview=outcomes,outcome_count=outcome_count,
     outcomes_jsonl=str(outcomes_path),events_jsonl=str(events_path),worker_identity=identity,current_context=context,selection_provenance=selection_provenance,
     runtime_cache_import_allowed=False,actual_final_read_admission=False,game_started=False)
   (run/'result.json').write_text(json.dumps(result,indent=2)+'\n');observer.close()

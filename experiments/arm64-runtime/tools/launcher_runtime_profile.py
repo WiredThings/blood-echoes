@@ -262,6 +262,19 @@ def _game_profile(profile):
     need(not isinstance(profile,PackagingCapabilityProfile),'packaging capability profile is not a game runtime profile')
     return profile
 
+def preparation_memory_policy(profile):
+    """QA stop rules belong to private harnesses, never normal application use.
+
+    Selection comes from the admitted runtime scope, not an environment switch.
+    A QA harness testing this same application still owns its OUTER MemoryPolicy.
+    Compilation/input/key/log/time/concurrency bounds are independent of this.
+    """
+    if profile is not None:
+        need(isinstance(profile,RuntimeProfile),'actual runtime profile required for application preparation')
+        return None
+    from qa_memory_policy import MemoryPolicy
+    return MemoryPolicy
+
 def kw(profile):
     _game_profile(profile);return {'runtime_profile':profile}if profile is not None else{}
 def work(project,profile=None):

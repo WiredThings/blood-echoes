@@ -93,15 +93,16 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  elif gpu==project/'state'or not gpu.is_relative_to(project/'state'):raise ValueError('fixed helper isolated GPU root required')
  artifact=gpu/'cache'/title/'metal';artifact.mkdir(parents=True,exist_ok=True)
  if artifact!=artifact.resolve(strict=True):raise ValueError('linked renderer artifact root')
- from qa_memory_policy import MemoryPolicy
+ from launcher_runtime_profile import preparation_memory_policy
  from qa_build_guard import require_no_games
- baseline=observe();policy=MemoryPolicy(baseline)
- if protection_baseline is not None:policy.baseline=min(policy.baseline,protection_baseline['swap_mib'])
+ policy_type=preparation_memory_policy(runtime_profile)
+ policy=policy_type(observe())if policy_type is not None else None
+ if policy is not None and protection_baseline is not None:policy.baseline=min(policy.baseline,protection_baseline['swap_mib'])
  start=time.monotonic();job=work(project,runtime_profile)/('fixed-helper-seeds-'+str(time.time_ns()));job.mkdir(mode=0o700)
  calls=[];report=dict(schema=1,status='deferred',known=8,calls=calls,artifact_cache_dir=str(artifact),cohort=cohort,
   original_arguments_preserved=True,storage_opened=False,renderer_owners_constructed=False,formal_data_modified=False)
  def check():
-  sample=observe();reason=policy.observe(time.monotonic()-start,sample)
+  reason=policy.observe(time.monotonic()-start,observe())if policy is not None else None
   if reason:raise ProtectionStopped('fixed helper protection stop: '+reason)
   if time.monotonic()-start>120:raise TimeoutError('bounded fixed helper preparation interval')
  def execute(phase,env,ordinal):
@@ -187,7 +188,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   raise
  finally:
   report.update(seconds=time.monotonic()-start);observation_error=None
-  try:report['after']=observe()
+  try:report['after']=observe()if policy is not None else None
   except Exception as error:
    report['after_error']=str(error)
    if not primary_error:

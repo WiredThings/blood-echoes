@@ -109,7 +109,7 @@ class Controls(unittest.TestCase):
 # Full controller seam, with authored worker/selector/queue only. It starts no
 # subprocess and does not claim native Metal validation from synthetic outcomes.
 class ControllerControls(unittest.TestCase):
- def exercise(self,requests,*,batch=True,failed_ordinal=None,stop_discovery=False):
+ def exercise(self,requests,*,batch=True,failed_ordinal=None,stop_discovery=False,application=False):
   import prepare_game_psos as prep,game_pso_queue as queue,hashlib,types
   with tempfile.TemporaryDirectory()as tmp:
    p=Path(tmp).resolve();state=p/'state';state.mkdir();run=state/'run';run.mkdir();gpu=state/'gpu';gpu.mkdir();artifact=gpu/'artifact';artifact.mkdir();worker=p/'worker';worker.write_bytes(b'author worker');lib=p/'libbbgpu.dylib';lib.write_bytes(b'author library');manifest=p/'manifest';manifest.write_text('author');layout=p/'layout';layout.write_text('author')
@@ -141,6 +141,9 @@ class ControllerControls(unittest.TestCase):
     def __init__(self,seed):pass
     def observe(self,*args):return None
    services=dict(batch_capability=batch,require_no_games=lambda:None,memory_policy=Policy,resolve_identity=lambda *args:dict(library=str(lib),library_sha256=library_sha),load_layout=lambda *args:{},observer_factory=lambda:observer,audit_stage=None,audit_key_profile=None,local_prepare=lambda **kw:({'BB_MTL_LOCAL_AOT_MODE':'record'if kw['mode']=='record'else'load','BB_MTL_LOCAL_AOT_BUILD_ID':'e'*64},dict(status='prepared')),builder_stopped=RuntimeError)
+   if application:
+    services['memory_policy']=None
+    observer.system=lambda:(_ for _ in()).throw(AssertionError('application polled QA protection'))
    if stop_discovery:
     class Services(dict):
      def get(self,key,default=None):
@@ -150,6 +153,11 @@ class ControllerControls(unittest.TestCase):
    config=dict(project=p,run_root=run,gpu_root=gpu,artifact_cache_dir=artifact,worker=worker,manifest=manifest,layout=layout,source_root=p,cohort='f'*64,library_sha256=library_sha,layout_sha256='d'*64,environment={})
    with patch.object(queue,'run_manifest',side_effect=orchestrate),patch.object(prep,'freeze',side_effect=freeze),patch.object(b,'Worker',Batch),patch.object(prep.subprocess,'Popen',side_effect=popen):result=prep.prepare(config,services=services)
    self.assertTrue(closed);return result,spawned
+ def test_application_worker_keeps_exact_native_success_without_qa_health_policy(self):
+  r,spawned=self.exercise([('prepare',False)],application=True)
+  self.assertEqual(r['status'],'completed');self.assertEqual(r['completed'],1)
+  self.assertEqual(r['sample_count'],0);self.assertIsNone(r['before']);self.assertIsNone(r['after'])
+  self.assertEqual(r['memory_policy'],dict(qa_stops=False,mode='application-preparation'))
  def test_controller17_recipes_become_two_bounded_workers(self):
   r,spawned=self.exercise([('prepare',False)]*17);self.assertEqual((r['completed'],len(spawned),r['native_batch']['recipes']),(17,2,17))
  def test_controller_phase_and_policy_switch_start_new_worker(self):

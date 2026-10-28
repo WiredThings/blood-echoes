@@ -143,15 +143,14 @@ class Formal(unittest.TestCase):
   scope=self.scope();seen=[];c=dict(fixed_helper_seed_schema=2,library_sha256='a'*64,worker=self.stage/'bin/game-pso-preparer')
   def stop(command,env,*args):seen.append(env);raise StopBeforeSpawn()
   with patch('warm_archive_manifest.resolve_gpu_identity',return_value=dict(library_sha256='a'*64)),patch('launcher_game_pso.title_id',return_value='CUSA03173'),patch('qa_build_guard.require_no_games',return_value=None):
-   with self.assertRaises(StopBeforeSpawn):fixed.prepare(project=scope.work_root,execution_root=self.stage,arguments=self.args,environment=scope.environment(self.env),cohort='b'*64,options={},observe=lambda:dict(locked=False,pressure=1,swap_mib=0),component_loader=lambda *a,**k:c,toolchain_probe=lambda:True,runner=stop,runtime_profile=scope)
+   with self.assertRaises(StopBeforeSpawn):fixed.prepare(project=scope.work_root,execution_root=self.stage,arguments=self.args,environment=scope.environment(self.env),cohort='b'*64,options={},observe=lambda:(_ for _ in()).throw(AssertionError('application helper invoked QA protection')),component_loader=lambda *a,**k:c,toolchain_probe=lambda:True,runner=stop,runtime_profile=scope)
   self.assertEqual(seen[0]['BB_GPU_USER_DIR'],str(scope.gpu_root));self.assertEqual(seen[0]['BB_ARM_GPU_BASE_DIR'],str(self.base));self.assertEqual(seen[0]['BB_DATA_DIR'],str(self.data))
  def test_normal_pso_worker_retains_namespace_after_cleanenv(self):
   import prepare_game_psos as psos
-  from qa_memory_policy import MemoryPolicy
   scope=self.scope();run=scope.work_root/'pso';run.mkdir();artifact=scope.gpu_root/'cache/CUSA03173/metal';artifact.mkdir(parents=True)
   manifest=scope.work_root/'candidates.jsonl';manifest.write_text('author');layout=self.stage/'native-runtime-inputs/layout.json';layout.parent.mkdir();layout.write_text('{}')
-  observed=[];observer=SimpleNamespace(system=lambda:dict(locked=False,pressure=1,swap_mib=0),close=lambda:None)
-  services=dict(require_no_games=lambda:None,observer=observer,memory_policy=MemoryPolicy,resolve_identity=lambda *a,**k:dict(library_sha256='a'*64),load_layout=lambda *a,**k:{},audit_stage=None,audit_key_profile=None,local_prepare=lambda **kwargs:({},dict(status='prepared')),builder_stopped=RuntimeError)
+  observed=[];observer=SimpleNamespace(system=lambda:(_ for _ in()).throw(AssertionError('application worker invoked QA protection')),close=lambda:None)
+  services=dict(require_no_games=lambda:None,observer=observer,memory_policy=profile.preparation_memory_policy(scope),resolve_identity=lambda *a,**k:dict(library_sha256='a'*64),load_layout=lambda *a,**k:{},audit_stage=None,audit_key_profile=None,local_prepare=lambda **kwargs:({},dict(status='prepared')),builder_stopped=RuntimeError)
   config=dict(project=scope.work_root,worker=self.stage/'bin/game-pso-preparer',library_sha256='a'*64,layout=layout,layout_sha256='b'*64,source_root=layout.parent,cohort='c'*64,manifest=manifest,gpu_root=scope.gpu_root,run_root=run,artifact_cache_dir=artifact,runtime_profile=scope)
   def freeze(unit,layout,packetdir,*args,**kwargs):(packetdir/'packet.json').write_text('{}');return {},{}
   def run_manifest(*args,**kwargs):kwargs['prepare_phase']('prepare',lambda:None);return kwargs['execute']({},'prepare',False,1)

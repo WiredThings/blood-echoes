@@ -34,12 +34,13 @@ class StartupHealth:
  """
  def __init__(self,observe,policy_factory,clock=time.monotonic):
   self.observe=observe;self.clock=clock;self.started=clock();self.last=self.started
-  self.next_poll=self.started;self.policy=policy_factory(observe())
-  self.stats=dict(observations=1,coalesced=0,forced=0)
+  self.next_poll=self.started;self.policy=policy_factory(observe())if policy_factory is not None else None
+  self.stats=dict(observations=int(self.policy is not None),coalesced=0,forced=0)
  def check(self,*,force=False):
   now=self.clock()
   if now<self.last:raise ValueError('startup health monotonic clock reversed')
   self.last=now
+  if self.policy is None:return
   if not force and now<self.next_poll:self.stats['coalesced']+=1;return
   sample=self.observe();self.stats['observations']+=1
   if force:self.stats['forced']+=1
@@ -87,8 +88,8 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  gpu=Path(environment['BB_GPU_USER_DIR']).resolve(strict=True)
  if runtime_profile is not None:runtime_profile.work(project);runtime_profile.gpu(gpu)
  elif not gpu.is_relative_to(project/'state')or gpu==project/'state':raise ValueError('isolated selected GPU root required')
- from qa_memory_policy import MemoryPolicy
- health=StartupHealth(observe,MemoryPolicy);check=health.check
+ from launcher_runtime_profile import preparation_memory_policy
+ health=StartupHealth(observe,preparation_memory_policy(runtime_profile));check=health.check
  check(force=True);run=work(project,runtime_profile)/('game-pso-launch-'+str(time.time_ns()));run.mkdir(mode=0o700)
  if restart_binding is not None:
   if capture_configure is None:
