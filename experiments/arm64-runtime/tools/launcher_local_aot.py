@@ -276,8 +276,9 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
             if sample['locked'] or sample['pressure']==4 or sample['swap_mib']-before['swap_mib']>2048:
                 raise RuntimeError('protection during F3 preparation receipt')
         try:
-            publish(bound=restart, context=restart_context, gpu=env['BB_GPU_USER_DIR'], check=restart_check,
+            published=publish(bound=restart, context=restart_context, gpu=env['BB_GPU_USER_DIR'], check=restart_check,
                     local_environment=env,**kw(runtime_profile))
+            game_report['restart_schedule_published']=published is True
         except (ValueError,OSError,KeyError,TypeError):
             pass # Optional scheduling hint cannot replace a completed original launch.
     manifest = dict(schema=1, status=report['status'], requested=mode or 'auto',
@@ -299,6 +300,8 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     if report.get('local',{}).get('reason'):visible['reason']=report['local']['reason']
     if 'game_pso'in report:visible['game_pso']=report['game_pso'].get('status')
     if 'fixed_helpers'in report:visible['fixed_helpers']=report['fixed_helpers'].get('status')
+    publication=report.get('game_pso',{}).get('restart_schedule_published')
+    if type(publication)is bool:visible['f3_schedule_published']=publication
     health=report.get('game_pso',{}).get('startup_health',{})
     if isinstance(health,dict)and set(health)=={'observations','coalesced','forced'}and all(type(v)is int and v>=0 for v in health.values()):visible['startup_health']=health
     static=report.get('game_pso',{}).get('scan',{}).get('automatic_static_inputs',{})
