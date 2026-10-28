@@ -54,10 +54,14 @@ class Warm(unittest.TestCase):
   self.f.env.update(BB_ONLINE='1',BB_THD_TOKEN='private-current-token');self.assertTrue(self.publish())
   saved=self.load();self.assertIsNotNone(saved);self.assertNotIn('private-current-token',json.dumps(saved))
   self.assertIsNone(self.load(environment={**self.f.env,'BB_QUICKLOAD_PENDING':'1'}))
- def test_external_game_change_missing_mod_root_creation_or_captured_input_invalidates(self):
-  for folder,name in [(self.f.game,'shader.bin'),(self.cache,'new.key'),(self.capture,'new.json')]:
+ def test_external_game_change_missing_mod_root_creation_or_new_required_key_invalidates(self):
+  for folder,name in [(self.f.game,'shader.bin'),(self.cache,'new.key')]:
    self.assertTrue(self.publish());p=folder/name;p.write_text('new input');self.assertIsNone(self.load());p.unlink()
   self.assertTrue(self.publish());mods=self.f.root/'mods';mods.mkdir();self.assertIsNone(self.load())
+ def test_supplementary_capture_does_not_invalidate_complete_required_queue(self):
+  self.assertTrue(self.publish());(self.capture/'new-session.befetchc').write_text('new observation')
+  self.assertIsNotNone(self.load())
+  (self.cache/'new-required.key').write_text('new actual PSO input');self.assertIsNone(self.load())
  def test_mod_selection_order_compiled_inputs_and_compatibility_identity_miss(self):
   self.assertTrue(self.publish())
   changed=copy.deepcopy(self.f.archive);changed['manifest']['game']['boot']['sha256']='0'*64
@@ -91,7 +95,7 @@ class Warm(unittest.TestCase):
   with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
    self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
  def test_only_absent_exact_native_temporary_names_can_be_ignored(self):
-  temp=self.capture/'.pending-123-4';products,current=self.product_events([temp])
+  temp=self.cache/'.pending-123-4';products,current=self.product_events([temp])
   with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
    self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
    temp.write_text('still pending');self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
@@ -110,7 +114,7 @@ class Warm(unittest.TestCase):
   self.assertIsNone(self.resume(saved))
  def test_bad_receipt_unknown_schema_and_extra_local_fields_are_rejected(self):
   for field,value in [('schema',2),('artifact_authority',True),('kind','same-supervisor-f3-preparation-schedule'),('local',{**self.local,'BB_THD_TOKEN':'forbidden'})]:
-   self.assertTrue(self.publish());p=quick._warm_path(self.f.gpu,quick.warm_binding(self.bound));doc=json.loads(p.read_text());doc[field]=value;p.write_text(json.dumps(doc));self.assertIsNone(self.load())
+   self.assertTrue(self.publish());p=quick._warm_path(self.f.gpu,quick.warm_binding(self.bound));doc=json.loads(p.read_text());doc['body'][field]=value;doc['sha256']=quick.digest(doc['body']);p.write_text(json.dumps(doc));self.assertIsNone(self.load())
   p.write_bytes(b'not json');self.assertIsNone(self.load());self.assertEqual(p.read_bytes(),b'not json')
  def test_unknown_capture_fields_and_protection_failure_are_not_suppressed(self):
   self.assertTrue(self.publish());saved=self.load()

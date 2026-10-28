@@ -174,10 +174,14 @@ def _warm_products(gpu,bound,context,local):
     selected=local_selection(local,gpu,bound['value']['cohort'])
     if selected is None:raise ValueError('warm local selection')
     roots=list(selected[1])+[directory(context['generation']),directory(context['game_root'])]
-    # New runtime-captured combinations invalidate scheduling so the next Play
-    # prepares them. Runtime admission remains responsible for actual objects.
+    # The complete required queue is derived from source/index plus actual
+    # renderer cache keys/meta/SPIR-V, all watched below. Supplementary capture
+    # packets are observations (including session-specific equivalent inputs),
+    # not additional required PSOs. They stay on disk for the next incremental
+    # pass when a real key/source changes; watching their append-only store here
+    # would invalidate every Play although every required target is prepared.
     optional={}
-    for path in (Path(gpu)/'cache',Path(gpu)/'automatic-game-inputs'/('runtime-'+bound['value']['cohort'])/'fetch-compiler-companions-v1'):
+    for path in (Path(gpu)/'cache',):
         exists=os.path.lexists(path);optional[str(path)]=exists
         if exists:roots.append(directory(path))
     return dict(roots=sorted({str(p)for p in roots}),optional=optional)
@@ -283,7 +287,7 @@ def publish_warm(*,anchor,context,gpu,local_environment,check=lambda:None):
             source=anchor,products=dict(scope=products,journal=token,files=files),local=selected[0],artifact_authority=False)
         if len(json.dumps(payload,sort_keys=True,separators=(',',':')).encode())>WARM_MAX_BYTES:return False
         if source_scope(bound)!=scope or not unchanged(anchor['journal'],scope['roots']):return False
-        write_json(_warm_path(gpu,bound),payload);return True
+        write_json(_warm_path(gpu,bound),dict(body=payload,sha256=digest(payload)));return True
     except(ValueError,OSError,KeyError,TypeError):return False
 
 def prepared_warm(*,bound,environment,gpu,check=lambda:None,tool_check=registered_local):
@@ -294,7 +298,9 @@ def prepared_warm(*,bound,environment,gpu,check=lambda:None,tool_check=registere
         if stable is None or stable['value']['gpu_root']!=str(directory(gpu)):return None
         path=_warm_path(gpu,stable);info=path.lstat()
         if info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o600:return None
-        saved=json.loads(checked_bytes(path,limit=WARM_MAX_BYTES)[0])
+        document=json.loads(checked_bytes(path,limit=WARM_MAX_BYTES)[0])
+        if set(document)!={'body','sha256'}or digest(document['body'])!=document['sha256']:return None
+        saved=document['body']
         if saved.get('schema')!=1 or saved.get('kind')!='unchanged-preparation-schedule'or saved.get('binding')!=stable or saved.get('artifact_authority')is not False:return None
         scope=source_scope(stable);source=saved['source']
         if source['binding']!=stable or source['scope']!=scope or not _optional_current(scope):return None
