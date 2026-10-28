@@ -231,7 +231,9 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
         if sample['locked']or sample['pressure']==4 or sample['swap_mib']-before['swap_mib']>2048:
             raise RuntimeError('protection during unchanged preparation reuse')
     if restart is not None and env.get('BB_QUICKLOAD_PENDING')!='1'and mode in(None,'','auto','load'):
-        schedule=prepared_warm(bound=restart,environment=env,gpu=env['BB_GPU_USER_DIR'],check=reuse_check)
+        diagnostic={}
+        schedule=prepared_warm(bound=restart,environment=env,gpu=env['BB_GPU_USER_DIR'],check=reuse_check,diagnostic=diagnostic)
+        print('Metal preparation reuse: '+json.dumps(dict(status='accepted'if schedule is not None else'miss',**diagnostic),sort_keys=True),flush=True)
         if schedule is not None:
             if game_prepare is None:
                 from launcher_game_pso import prepare as game_prepare

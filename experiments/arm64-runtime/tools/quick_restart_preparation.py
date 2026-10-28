@@ -299,28 +299,35 @@ def publish_warm(*,anchor,context,gpu,local_environment,check=lambda:None):
         write_json(_warm_path(gpu,bound),dict(body=payload,sha256=digest(payload)));return True
     except(ValueError,OSError,KeyError,TypeError):return False
 
-def prepared_warm(*,bound,environment,gpu,check=lambda:None,tool_check=registered_local):
+def prepared_warm(*,bound,environment,gpu,check=lambda:None,tool_check=registered_local,diagnostic=None):
     """Cross-session scheduling reuse; never restore quickload, mode or tokens."""
     try:
+        def at(stage):
+            if diagnostic is not None:diagnostic['last_check']=stage
+        at('current-binding')
         if environment.get('BB_QUICKLOAD_PENDING')=='1':return None
         stable=warm_binding(bound)
         if stable is None or stable['value']['gpu_root']!=str(directory(gpu)):return None
-        path=_warm_path(gpu,stable);info=path.lstat()
+        at('receipt-file');path=_warm_path(gpu,stable);info=path.lstat()
         if info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o600:return None
-        document=json.loads(checked_bytes(path,limit=WARM_MAX_BYTES)[0])
+        at('receipt-structure');document=json.loads(checked_bytes(path,limit=WARM_MAX_BYTES)[0])
         if set(document)!={'body','sha256'}or digest(document['body'])!=document['sha256']:return None
         saved=document['body']
         if saved.get('schema')!=1 or saved.get('kind')!='unchanged-preparation-schedule'or saved.get('binding')!=stable or saved.get('artifact_authority')is not False:return None
-        scope=source_scope(stable);source=saved['source']
+        at('source-scope');scope=source_scope(stable);source=saved['source']
         if source['binding']!=stable or source['scope']!=scope or not _optional_current(scope):return None
-        selected=local_selection(saved['local'],gpu,stable['value']['cohort'])
+        at('local-selection');selected=local_selection(saved['local'],gpu,stable['value']['cohort'])
         if selected is None or saved['local']!=selected[0]:return None
-        products=_warm_products(gpu,stable,saved['context'],selected[0])
+        at('product-scope');products=_warm_products(gpu,stable,saved['context'],selected[0])
         if products!=saved['products']['scope']or not _optional_current(products):return None
         from startup_change_journal import unchanged
-        if not unchanged(source['journal'],scope['roots'])or not _products_current(saved['products'],saved['context'],check):return None
+        at('source-history')
+        if not unchanged(source['journal'],scope['roots']):return None
+        at('product-history-and-bytes')
+        if not _products_current(saved['products'],saved['context'],check):return None
+        at('registered-tool-environment')
         if not tool_check(selected[0],check):return None
-        check();return saved
+        check();at('accepted');return saved
     except(ValueError,OSError,KeyError,TypeError,subprocess.SubprocessError):return None
 
 def resume_warm(*,schedule,gpu,component,backend,cohort,check,configure_capture,runtime_profile=None):
