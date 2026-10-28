@@ -153,6 +153,36 @@ class Entry(unittest.TestCase):
         self.assertEqual(result['status'],'empty');self.assertNotIn('_restart_context',result)
 
 
+class HealthPolling(unittest.TestCase):
+    def setUp(self):
+        self.now=0.0;self.sample=dict(pressure=1,locked=False,swap_mib=0);self.reads=0
+        from qa_memory_policy import MemoryPolicy
+        def read():self.reads+=1;return self.sample.copy()
+        self.guard=launcher.StartupHealth(read,MemoryPolicy,clock=lambda:self.now)
+    def test_many_file_checks_share_only_the_recent_os_sample(self):
+        self.guard.check(force=True)
+        for _ in range(10000):self.guard.check()
+        self.assertEqual(self.reads,2)
+        self.assertEqual(self.guard.stats['coalesced'],10000)
+        self.now=.101;self.guard.check();self.assertEqual(self.reads,3)
+    def test_forced_handoff_observes_lock_without_waiting_for_interval(self):
+        self.guard.check();self.now=.001;self.sample['locked']=True
+        with self.assertRaisesRegex(RuntimeError,'screen locked'):self.guard.check(force=True)
+    def test_poll_interval_observes_severe_pressure_for_original_five_seconds(self):
+        self.guard.check();self.sample['pressure']=4
+        self.now=.101;self.guard.check()
+        self.now=5.102
+        with self.assertRaisesRegex(RuntimeError,'severe pressure sustained5s'):self.guard.check()
+    def test_swap_growth_and_unknown_samples_keep_original_rejection(self):
+        self.sample['swap_mib']=2049
+        with self.assertRaisesRegex(RuntimeError,'2GiB'):self.guard.check(force=True)
+        self.sample['pressure']=3
+        with self.assertRaisesRegex(ValueError,'pressure'):self.guard.check(force=True)
+    def test_clock_reversal_is_rejected_even_with_coalescing(self):
+        self.guard.check();self.now=-.01
+        with self.assertRaisesRegex(ValueError,'clock reversed'):self.guard.check()
+
+
 class MixedSchedule(unittest.TestCase):
     def report(self):
         return dict(status='completed',required_preparation_complete=True,index_complete=True,

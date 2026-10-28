@@ -299,6 +299,8 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     if report.get('local',{}).get('reason'):visible['reason']=report['local']['reason']
     if 'game_pso'in report:visible['game_pso']=report['game_pso'].get('status')
     if 'fixed_helpers'in report:visible['fixed_helpers']=report['fixed_helpers'].get('status')
+    health=report.get('game_pso',{}).get('startup_health',{})
+    if isinstance(health,dict)and set(health)=={'observations','coalesced','forced'}and all(type(v)is int and v>=0 for v in health.values()):visible['startup_health']=health
     static=report.get('game_pso',{}).get('scan',{}).get('automatic_static_inputs',{})
     view=static.get('source_view',{})
     counts={}

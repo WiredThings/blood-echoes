@@ -26,6 +26,27 @@ def title_id(arguments,stage,project,runtime_profile=None):
  if not isinstance(title,str)or not re.fullmatch(r'CUSA[0-9]{5}',title):raise ValueError('invalid actual TITLE_ID')
  return title
 
+class StartupHealth:
+ """Coalesce only OS health observations, never file/product validation.
+
+ The fixed 100ms interval is shorter than the game harness's 250ms sampling.
+ Forced handoffs read fresh state. No persistent watcher or runtime cache.
+ """
+ def __init__(self,observe,policy_factory,clock=time.monotonic):
+  self.observe=observe;self.clock=clock;self.started=clock();self.last=self.started
+  self.next_poll=self.started;self.policy=policy_factory(observe())
+  self.stats=dict(observations=1,coalesced=0,forced=0)
+ def check(self,*,force=False):
+  now=self.clock()
+  if now<self.last:raise ValueError('startup health monotonic clock reversed')
+  self.last=now
+  if not force and now<self.next_poll:self.stats['coalesced']+=1;return
+  sample=self.observe();self.stats['observations']+=1
+  if force:self.stats['forced']+=1
+  reason=self.policy.observe(now-self.started,sample);self.next_poll=now+0.1
+  if reason:raise RuntimeError('game PSO preparation safety stop: '+reason)
+
+
 def verified_mixed_schedule(report):
  """Queue completion can combine per-recipe reuse and fresh native checks.
 
@@ -67,11 +88,8 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  if runtime_profile is not None:runtime_profile.work(project);runtime_profile.gpu(gpu)
  elif not gpu.is_relative_to(project/'state')or gpu==project/'state':raise ValueError('isolated selected GPU root required')
  from qa_memory_policy import MemoryPolicy
- start=observe();policy=MemoryPolicy(start);started=time.monotonic()
- def check():
-  now=observe();reason=policy.observe(time.monotonic()-started,now)
-  if reason:raise RuntimeError('game PSO preparation safety stop: '+reason)
- check();run=work(project,runtime_profile)/('game-pso-launch-'+str(time.time_ns()));run.mkdir(mode=0o700)
+ health=StartupHealth(observe,MemoryPolicy);check=health.check
+ check(force=True);run=work(project,runtime_profile)/('game-pso-launch-'+str(time.time_ns()));run.mkdir(mode=0o700)
  if restart_binding is not None:
   if capture_configure is None:
    from prepare_fetch_capture_receipt import configure_capture as capture_configure
@@ -79,7 +97,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   reused=resume(bound=restart_binding,environment=environment,gpu=gpu,component=component,
       backend=selected['library'],cohort=cohort,check=check,configure_capture=capture_configure,**kw(runtime_profile))
   if reused is not None:
-   check();return reused
+   check(force=True);return {**reused,'startup_health':dict(health.stats)}
  if resume_only:return None
  # Default source preparation precedes cache enumeration, including a fresh
  # install with no shader-cache records. Keep original app0/arguments unchanged.
@@ -96,9 +114,11 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
                source_view=dict(status='unavailable',errno=error.errno),original_arguments_preserved=True)
   if catalogue_prepare is None:
    from launcher_game_catalog import prepare as catalogue_prepare
+  check(force=True)
   with preparation_phase('static-catalog'):
    prepared_inputs=catalogue_prepare(project=project,gpu_root=gpu,game_root=source_view['game_root'],
        source_root=component['source_root'],cohort=cohort,check=check,**kw(runtime_profile))
+  check(force=True)
   prepared_inputs['report']['source_view']=source_view['report']
  # Use the admitted original SFO reader on the byte-equal canonical snapshot.
  # The actual final exec still receives the untouched original mod view.
@@ -134,6 +154,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
       component=component,cohort=cohort,check=check,environment=environment,
       selected_renderer=Path(environment['BB_GPU_PROCESS']),backend_root=stage,
       candidate_manifest={'path':str(manifest),'sha256':summary['manifest_sha256']},**kw(runtime_profile))
+ check(force=True)
  summary['automatic_modules']={k:v for k,v in module_inputs.items()if k not in('geometry_resolver','cache_root')}
  # A stable owned recipe is admitted only after this same-build controller's
  # native capability, load edge and complete input/result checks have succeeded.
@@ -175,12 +196,14 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   cohort=cohort,gpu_root=gpu,run_root=job,artifact_cache_dir=artifact,phase='all',allow_compile=True,
   page_size=16,max_recipes=None,seconds=600,progress_root=gpu/'game-pso-progress',environment={k:v for k,v in environment.items()if k=='BB_GS_DEBUG' or k in ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES','MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')or k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))},options_identity=digest(options))
  config.update(kw(runtime_profile))
+ check(force=True)
  with preparation_phase('complete-pso'):
   report=runner(config)
- check()
+ check(force=True)
  if report.get('status')in('stopped','failed-protection'):raise RuntimeError('game PSO preparation stopped by safety guard')
  result=dict(status=report.get('status','failed'),scan=summary,preparation=report,artifact_cache_dir=str(artifact),title_id=title,
-             runtime_cache_import_allowed=False,original_arguments_preserved=True,capture_environment=capture_environment)
+             runtime_cache_import_allowed=False,original_arguments_preserved=True,capture_environment=capture_environment,
+             startup_health=dict(health.stats))
  actual_verified=report.get('status')=='completed' and report.get('full_manifest_preparation_verified')is True
  unchanged_schedule=(report.get('status')=='unchanged-schedule-reused' and report.get('persistent_schedule_reused')is True
                      and report.get('previous_actual_native_verification')is True and report.get('runtime_full_key_and_artifact_checks_retained')is True)
