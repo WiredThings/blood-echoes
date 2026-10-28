@@ -238,11 +238,16 @@ def _inventory(scope,context,check):
             for n in dirs:directory(Path(parent)/n)
     check();return rows
 
-def _products_current(products,context,check):
+def _products_current(products,context,check,diagnostic=None):
+    def at(stage,path=None):
+        if diagnostic is not None:
+            diagnostic['product_check']=stage
+            if path is not None:diagnostic['product_event_id']=digest(str(path))
     from startup_change_journal import query,unchanged
+    at('journal-query')
     scope=products['scope'];old=products['journal'];current=query(scope['roots'],old)
     if current is None:return False
-    if current.get('unchanged')is True:return True
+    if current.get('unchanged')is True:at('accepted');return True
     known={json.dumps(r,separators=(',',':'))for r in old['events']};paths=set()
     mounts={}
     for pin in old['pins'].values():
@@ -255,6 +260,7 @@ def _products_current(products,context,check):
         paths.add(Path(mounts[event[0]])/relative)
     immutable=[Path(context['generation']),Path(context['game_root'])];next_check=0
     for path in paths:
+        at('event-scope',path)
         if any(path==p or path.is_relative_to(p)for p in immutable):return False
         if time.monotonic()>=next_check:check();next_check=time.monotonic()+.1
         row=products['files'].get(str(path))
@@ -263,20 +269,23 @@ def _products_current(products,context,check):
             # never input. Ignore only an exact known shape AND absent node.
             temp=re.fullmatch(r'\.pending-[0-9]+-[0-9]+|[A-Za-z0-9_.-]+\.tmp(?:-[0-9]+-[0-9]+)?',path.name)
             if temp and not os.path.lexists(path)and any(path.is_relative_to(Path(r))for r in scope['roots']):continue
+            at('unregistered-event',path)
             return False
         s=path.lstat()
         if path!=path.resolve(strict=True):return False
         if row[0]=='directory':
             if row!=['directory',s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid]:return False
         elif row[0]=='file':
+            at('file-identity-and-bytes',path)
             if not stat.S_ISREG(s.st_mode)or s.st_nlink!=1 or s.st_size!=row[2]or row[3:]!=[s.st_mode,s.st_uid,s.st_gid]:return False
             if list(file_sha(path))!=row[1:3]:return False
         elif row[0]=='preference':
+            at('startup-preference',path)
             from pso_startup_schedule import startup_preference
             if not stat.S_ISREG(s.st_mode)or s.st_nlink!=1 or row[2:]!=[s.st_mode,s.st_uid,s.st_gid]:return False
             if startup_preference(path,check)!=row[1]:return False
         else:return False
-    check();return unchanged(current,scope['roots'])
+    check();at('final-journal');return unchanged(current,scope['roots'])
 
 def publish_warm(*,anchor,context,gpu,local_environment,check=lambda:None):
     """Persist completed scheduling, without granting artifact import rights."""
@@ -324,7 +333,7 @@ def prepared_warm(*,bound,environment,gpu,check=lambda:None,tool_check=registere
         at('source-history')
         if not unchanged(source['journal'],scope['roots']):return None
         at('product-history-and-bytes')
-        if not _products_current(saved['products'],saved['context'],check):return None
+        if not _products_current(saved['products'],saved['context'],check,diagnostic):return None
         at('registered-tool-environment')
         if not tool_check(selected[0],check):return None
         check();at('accepted');return saved
