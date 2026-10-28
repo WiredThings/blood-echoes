@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "status": "installed-after-scoped-validation",
+  "version": "0.2.58",
+  "installed_source_revision": "190b038cec5a8d84d35a1f49cf118b98d0ef7793",
+  "swift": {
+    "executed": 125,
+    "skipped": 1,
+    "failures": 0,
+    "skip": "real iCloud synthetic check needs a selected test directory"
+  },
+  "python_tool_memory_tests": 5,
+  "selection_matrix": [
+    {
+      "phase": "Mod-A",
+      "status": "sampled",
+      "scene_ready_seconds": 55.533,
+      "scene_footprint_mib": 6737.48,
+      "owned_tree_sample_peak_mib": 6752.56,
+      "pso_native_batch_processes": 0,
+      "original_QA_source_save_unchanged": true
+    },
+    {
+      "phase": "Mod-A-plus-B",
+      "status": "sampled",
+      "scene_ready_seconds": 46.347,
+      "scene_footprint_mib": 6754.07,
+      "owned_tree_sample_peak_mib": 6769.72,
+      "pso_native_batch_processes": 0,
+      "original_QA_source_save_unchanged": true
+    },
+    {
+      "phase": "Mod-A-restored",
+      "status": "sampled",
+      "scene_ready_seconds": 32.942,
+      "scene_footprint_mib": 6715.68,
+      "owned_tree_sample_peak_mib": 6734.19,
+      "pso_native_batch_processes": 0,
+      "original_QA_source_save_unchanged": true
+    },
+    {
+      "phase": "original-resources-restored",
+      "status": "sampled",
+      "scene_ready_seconds": 31.855,
+      "scene_footprint_mib": 6541.64,
+      "owned_tree_sample_peak_mib": 6559.69,
+      "pso_native_batch_processes": 0,
+      "original_QA_source_save_unchanged": true
+    },
+    {
+      "phase": "unrelated-menu-key",
+      "status": "sampled",
+      "scene_ready_seconds": 33.96,
+      "scene_footprint_mib": 6728.26,
+      "owned_tree_sample_peak_mib": 6756.3,
+      "pso_native_batch_processes": 0,
+      "original_QA_source_save_unchanged": true
+    }
+  ],
+  "final_package_smoke": {
+    "status": "sampled",
+    "scene_ready_seconds": 43.758,
+    "first_registration_for_new_package": true,
+    "scene_footprint_mib": 6714.29,
+    "sampled_tree_peak_mib": 6735.83,
+    "peak_pressure": 4,
+    "severe_sample_interval_seconds": [
+      44.02,
+      44.27
+    ],
+    "severe_samples": 2,
+    "swap_growth_mib": 277.9375,
+    "pressure_before": 1,
+    "pressure_after": 1,
+    "protection_stopped": false
+  },
+  "gui": {
+    "status": "passed",
+    "native_AX_walkthrough": true,
+    "file_pickers_opened": false,
+    "real_online_or_cloud_revalidation": false
+  },
+  "delivery": {
+    "bundle_id": "io.github.bbport.optimized",
+    "native_roles_unchanged": true,
+    "texture_fix_retained": true,
+    "diagnostics_enabled": false,
+    "formal_data_modified": false,
+    "settings_content_before_after_unchanged": true,
+    "Release_updated": false
+  },
+  "limitations": [
+    "short static scene samples do not prove long-exploration memory behavior",
+    "process footprints may double count shared pages",
+    "sampled peaks are not allocator HWM",
+    "five-second F3 scene target remains open"
+  ]
+}
