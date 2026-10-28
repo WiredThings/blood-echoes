@@ -71,6 +71,18 @@ class FormalStage(unittest.TestCase):
   self.source['effective_scripts']=dict(self.source['effective_scripts'],**{'run.sh':'f'*64})
   # Keep source proof different without changing this real formal byte closure.
   with self.assertRaisesRegex(ValueError,'sixteen scripts'):self.admit()
+ def image_projection(self,extra=''):
+  from prepare_local_aot_stage import ORIGINAL_IMAGES,image_preparation_revision
+  original=('# author prefix\n'+ORIGINAL_IMAGES+'# author tail\n').encode();self.put(self.source['stage']/'run.sh',original)
+  self.source['effective_scripts']=dict(self.source['effective_scripts'],**{'run.sh':hashlib.sha256(original).hexdigest()})
+  target=image_preparation_revision(original.decode()).encode()+extra.encode();self.put(self.stage/'run.sh',target)
+  parity=dict(effective_sources=dict(self.source['effective_scripts'],**{'run.sh':hashlib.sha256(target).hexdigest()}),image_preparation_reuse=True)
+  self.put(self.stage/'SOURCE-PARITY.json',json.dumps(parity).encode())
+ def test_only_exact_image_hook_can_extend_original_qa_projection(self):
+  self.image_projection();before=dict(self.source['effective_scripts']);result=self.admit();self.assertTrue(result['identity']['image_preparation_exact_projection']);self.assertEqual(dict(self.source['effective_scripts']),before)
+ def test_image_hook_marker_cannot_authorize_extra_script_mutation(self):
+  self.image_projection('\necho author-unrelated-change\n')
+  with self.assertRaisesRegex(ValueError,'sixteen scripts'):self.admit()
  def test_wrong_host_edge_or_nested_target_refused(self):
   def wrong(target,stage,**kw):return dict(self.actual(target,stage,**kw),library='/wrong/host')
   with self.assertRaisesRegex(ValueError,'CPU/host'):self.admit(identity_resolver=wrong)

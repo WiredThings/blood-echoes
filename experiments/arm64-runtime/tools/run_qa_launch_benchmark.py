@@ -122,8 +122,18 @@ def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,ide
  hashes=dict(admitted.native['frozen_runtime'])
  if set(hashes)!=FORMAL_ROLES:raise ValueError('formal stage requires exactly eight frozen actual runtime roles')
  runtime={role:canonical(stage/role,within=stage)for role in hashes}
- parity=json.loads(code_bytes(stage/'SOURCE-PARITY.json')[0])['effective_sources']
- if set(parity)!=set(SCRIPTS)or dict(source['effective_scripts'])!=parity:raise ValueError('formal stage differs from original QA receipt sixteen scripts')
+ parity_record=json.loads(code_bytes(stage/'SOURCE-PARITY.json')[0]);parity=parity_record['effective_sources']
+ expected=dict(source['effective_scripts']);image_reuse_projection=False
+ if parity!=expected and set(parity)==set(expected)==set(SCRIPTS)and{k for k in expected if parity[k]!=expected[k]}=={'run.sh'}and parity_record.get('image_preparation_reuse')is True:
+  # One exact source-reviewed addition. Do not edit the original QA receipt,
+  # accept arbitrary new script hashes, or skip any of the other 15 bodies.
+  from prepare_local_aot_stage import image_preparation_revision,IMAGE_HOOK
+  original=code_bytes(Path(source['stage'])/'run.sh',limit=4*1024*1024,expected=expected['run.sh'])[0]
+  revised=image_preparation_revision(original.decode()).encode()
+  actual=code_bytes(stage/'run.sh',limit=4*1024*1024,expected=parity['run.sh'])[0]
+  if revised!=original and actual==revised and actual.count(IMAGE_HOOK.encode())==1:
+   expected['run.sh']=hashlib.sha256(revised).hexdigest();image_reuse_projection=True
+ if set(parity)!=set(SCRIPTS)or expected!=parity:raise ValueError('formal stage differs from original QA receipt sixteen scripts')
  owners={'code_owners':(0,os.getuid())};cpus={}
  for role in CPU_ROLES:
   value=(identity_resolver or resolve_gpu_identity)(runtime[role],stage,**owners)
@@ -137,7 +147,7 @@ def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,ide
  return dict(app=app,stage=stage,runtime=runtime,runtime_sha256=hashes,seal=seal,
   identity=dict(profile='staged-formal-bundle-isolated-CLI',app=str(app),stage=str(stage),
    native_manifest_sha256=sha(stage/'NATIVE-METAL.json'),runtime_sha256=hashes,
-   effective_scripts=parity,cpu=cpus,gpu=gpu,whole_app_pre_seal=seal,formal_GUI_started=False,formal_data_read=False))
+   effective_scripts=parity,image_preparation_exact_projection=image_reuse_projection,cpu=cpus,gpu=gpu,whole_app_pre_seal=seal,formal_GUI_started=False,formal_data_read=False))
 
 def reference_image(path):
  """Read actual x86/ARM Mach-O metadata with the existing package parser."""
