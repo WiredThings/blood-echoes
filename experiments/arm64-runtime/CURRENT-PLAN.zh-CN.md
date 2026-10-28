@@ -1,3 +1,9 @@
+## 2026-10-28 正式启动误触 QA 保护已修复并安装
+
+本机0.2.58已更新a7087799。用户日志确认原退出在fixed-helpers准备阶段，2GiB系统swap增长触发QA停止，尚未启动游戏。现按已准入RuntimeProfile分离六个准备入口中的QA停止规则；2GiB累计/1GiB突增/锁屏/压力等级不再导致正式准备按测试规则退出，私有CLI和外层QA harness保留原保护。实际输入/完整键/签名/路径、资源窗口、并发、工作超时、取消和退出码不变，不靠环境开关关闭测试保护。
+
+219项定向回归通过，含合成16GiB增长反例与正式scope的助手/worker观察禁止断言。真实候选包在全新私有GPU目录编译22份库，8类native助手全部ready，正式助手QA健康观察0；外层原QA保护正常，17.78秒、压力1、swap无增长，没有启动游戏或重跑长测。严格签名和六文件源码一致核对通过，八原生角色/Swift代码不变，正式22,270节点/405,230,586bytes身份与摘要前后相同，白模修复保留、诊断关闭、无Release。详docs/application-preparation-policy.zh-CN.md和evidence/application-preparation-policy-20261028/summary.json。其它有效任务及两个无关FEX候选保留；不标整个目标完成。
+
 ## 2026-10-28 修复正式准备误触 QA 保护
 
 用户报告正式启动因 swap 增长超过2GiB返回74，日志确认在fixed-helpers阶段，尚未进入游戏。已将普通启动/F3边界、本机库、固定助手、PSO控制器与worker的QA停止规则按已准入RuntimeProfile分离；保留独立CLI和外层QA harness保护，完整文件/编译/资源/超时与退出码合同不变。定向反例与原回归推进中，真实小规模Metal及本机安装待完成，不把源码候选当安装结果。详docs/application-preparation-policy.zh-CN.md。正式数据不动，无Release；原任务和无关FEX候选保留。

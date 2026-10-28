@@ -1,0 +1,34 @@
+{
+  "status": "installed",
+  "source_revision": "a708779991f0ae4bfe18bc3b7176d9db3f38c4b6",
+  "version": "0.2.58",
+  "observed_failure": {
+    "stage": "fixed-helpers",
+    "reason": "unexpected >2GiB swap growth",
+    "exit": 74,
+    "game_process_started": false
+  },
+  "targeted_tests": 219,
+  "synthesized_swap_test_gib": 16,
+  "real_memory_deliberately_increased": false,
+  "real_metal": {
+    "native_helpers_ready": 8,
+    "native_helper_calls": 2,
+    "local_libraries_built": 22,
+    "application_qa_health_observations": 0,
+    "outer_qa_guard_preserved": true,
+    "seconds": 17.78047749999996,
+    "swap_growth_mib": 0,
+    "pressure_before": 1,
+    "pressure_after": 1,
+    "game_launched": false
+  },
+  "production_changes": 6,
+  "formal_nodes_before_after": 22270,
+  "formal_bytes_before_after": 405230586,
+  "formal_data_written": false,
+  "native_roles_and_swift_code_unchanged": true,
+  "quality_changed": false,
+  "Release_updated": false,
+  "full_gameplay_benchmark_repeated": false
+}
