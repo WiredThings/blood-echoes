@@ -95,10 +95,16 @@ class Formal(unittest.TestCase):
   p.chmod(0o644);scope=self.scope()
   with patch.object(profile.os,'getuid',return_value=os.getuid()+1),self.assertRaises(ValueError):scope.gpu(scope.gpu_root)
  def test_root_code_owner_is_explicit_and_does_not_authorize_data(self):
-  original=os.fstat
+  original=os.fstat;original_lstat=os.lstat;original_stat=os.stat
+  def owned_shape(s):
+   fields={n:getattr(s,n)for n in('st_mode','st_dev','st_ino','st_gid','st_size','st_mtime_ns','st_ctime_ns','st_nlink')};return SimpleNamespace(**fields,st_uid=0)
   def root_owned(fd):
-   s=original(fd);fields={n:getattr(s,n)for n in('st_mode','st_dev','st_ino','st_size','st_mtime_ns','st_ctime_ns','st_nlink')};return SimpleNamespace(**fields,st_uid=0)
-  with patch.object(os,'fstat',side_effect=root_owned):
+   return owned_shape(original(fd))
+  def root_path(path,*args,**kwargs):
+   s=original_lstat(path,*args,**kwargs);return owned_shape(s)if Path(path).is_relative_to(self.app)else s
+  def root_stat(path,*args,**kwargs):
+   s=original_stat(path,*args,**kwargs);return owned_shape(s)if not isinstance(path,int)and Path(path).is_relative_to(self.app)else s
+  with patch.object(os,'fstat',side_effect=root_owned),patch.object(os,'lstat',side_effect=root_path),patch.object(os,'stat',side_effect=root_stat):
    self.assertIsNotNone(profile.bundle(self.stage))
    with self.assertRaises(ValueError):checked_bytes(self.data/'bbport.ini')
    self.assertEqual(checked_bytes(self.stage/'NATIVE-METAL.json',code_owners=(0,os.getuid()))[0],(self.stage/'NATIVE-METAL.json').read_bytes())
@@ -167,7 +173,7 @@ class Formal(unittest.TestCase):
   path=self.stage/'GAME-PSO-COMPONENT.json';path.write_text(json.dumps(c))
   with self.assertRaises(ValueError):component.load(self.stage)
   actual=dict(library=str(self.stage/c['library']),library_sha256=c['library_sha256'])
-  with patch('warm_archive_manifest.resolve_gpu_identity',return_value=actual),patch.object(component,'load_canonical_layout',return_value={}):
+  with patch.object(profile.RuntimeProfile,'native_identity',return_value=actual),patch.object(component,'load_canonical_layout',return_value={}):
    self.assertIs(component.load(self.stage,runtime_profile=scope)['production'],True)
    c['worker']='bin/bb-probe-metal';path.write_text(json.dumps(c))
    with self.assertRaisesRegex(ValueError,'role mismatch'):component.load(self.stage,runtime_profile=scope)

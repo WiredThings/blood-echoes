@@ -11,28 +11,29 @@ MAX_EVENTS=4096
 MAX_MESSAGE=1024*1024
 
 
-def query(roots,previous=None):
+def query(roots,previous=None,*,code_roots=False):
     try:
-        request=json.dumps(dict(roots=[str(Path(p).absolute())for p in roots],previous=previous),separators=(',',':')).encode()
+        if type(code_roots)is not bool:return None
+        request=json.dumps(dict(roots=[str(Path(p).absolute())for p in roots],previous=previous,code_roots=code_roots),separators=(',',':')).encode()
         if len(request)>MAX_MESSAGE:return None
         env={k:v for k,v in os.environ.items()if not k.startswith(('BB_','DYLD_'))}
         result=subprocess.run([sys.executable,'-B',str(Path(__file__).resolve()),'--native-query'],
             input=request,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=5,env=env)
         if result.returncode or len(result.stdout)>MAX_MESSAGE:return None
         value=json.loads(result.stdout)
-        return value if type(value.get('schema'))is int and value['schema']==1 and value.get('complete')is True else None
+        return value if type(value.get('schema'))is int and value['schema']==1 and value.get('complete')is True and value.get('code_roots',False)is code_roots else None
     except(OSError,ValueError,TypeError,subprocess.TimeoutExpired):return None
 
 
-def unchanged(token,roots):
+def unchanged(token,roots,*,code_roots=False):
     if not isinstance(token,dict):return False
-    value=query(roots,token)
+    value=query(roots,token,code_roots=code_roots)
     return value is not None and value.get('unchanged')is True
 
 
-def _native(roots,previous):
+def _native(roots,previous,*,code_roots=False):
     import ctypes as C,time
-    if sys.platform!='darwin' or not isinstance(roots,list)or not 0<len(roots)<=MAX_ROOTS:raise ValueError('journal roots')
+    if sys.platform!='darwin' or type(code_roots)is not bool or not isinstance(roots,list)or not 0<len(roots)<=MAX_ROOTS:raise ValueError('journal roots')
     cf=C.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
     fs=C.CDLL('/System/Library/Frameworks/CoreServices.framework/Frameworks/FSEvents.framework/FSEvents')
     callback_type=C.CFUNCTYPE(None,C.c_void_p,C.c_void_p,C.c_size_t,C.c_void_p,C.POINTER(C.c_uint32),C.POINTER(C.c_uint64))
@@ -56,7 +57,8 @@ def _native(roots,previous):
     groups={};pins={}
     for name in sorted(set(roots)):
         p=Path(name).absolute();s=p.lstat()
-        if p!=p.resolve(strict=True)or not stat.S_ISDIR(s.st_mode)or s.st_uid!=os.getuid():raise ValueError('journal canonical owned root')
+        owners=(0,os.getuid())if code_roots else(os.getuid(),)
+        if p!=p.resolve(strict=True)or not stat.S_ISDIR(s.st_mode)or s.st_uid not in owners or(code_roots and s.st_mode&0o022):raise ValueError('journal canonical owned root')
         mount=p
         while not os.path.ismount(mount):mount=mount.parent
         uuid=fs.FSEventsCopyUUIDForDevice(s.st_dev)
@@ -72,6 +74,7 @@ def _native(roots,previous):
         pins[name]=[s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,volume,str(mount)]
         groups.setdefault((s.st_dev,name),[]).append('/'+str(p.relative_to(mount)))
     if previous is not None:
+        if previous.get('code_roots',False)is not code_roots:raise ValueError('journal root policy changed')
         if type(previous.get('schema'))is not int or previous['schema']!=1 or previous.get('pins')!=pins:raise ValueError('journal roots/volume changed')
         cursor=previous['cursor'];known=previous['events']
         if type(cursor)is not int or not 0<cursor<2**64-1 or not isinstance(known,list)or len(known)>MAX_EVENTS:raise ValueError('journal checkpoint')
@@ -129,7 +132,7 @@ def _native(roots,previous):
     # Exact overlap events only. New/changed events at older IDs are NOT ignored.
     old={json.dumps(row,separators=(',',':'))for row in known}
     clean=previous is not None and all(json.dumps(row,separators=(',',':'))in old for row in events)
-    return dict(schema=1,complete=True,pins=pins,cursor=cursor,events=events,unchanged=clean)
+    return dict(schema=1,complete=True,pins=pins,cursor=cursor,events=events,unchanged=clean,code_roots=code_roots)
 
 
 if __name__=='__main__':
@@ -137,7 +140,7 @@ if __name__=='__main__':
         if sys.argv[1:]!=['--native-query']:raise ValueError('native-only query')
         raw=sys.stdin.buffer.read(MAX_MESSAGE+1)
         if len(raw)>MAX_MESSAGE:raise ValueError('query budget')
-        request=json.loads(raw);result=_native(request['roots'],request['previous'])
+        request=json.loads(raw);result=_native(request['roots'],request['previous'],code_roots=request.get('code_roots',False))
         raw=json.dumps(result,separators=(',',':')).encode()
         if len(raw)>MAX_MESSAGE:raise ValueError('response budget')
         sys.stdout.buffer.write(raw)

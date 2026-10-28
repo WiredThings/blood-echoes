@@ -299,14 +299,18 @@ def load(stage,*,runtime_profile=None):
  if runtime_profile is not None:
   for key,value in dict(worker='bin/game-pso-preparer',module_consumer='bin/game-module-preparer',library='bin/gpu-metal-arm64/libbbgpu.dylib',layout='native-runtime-inputs/layout.json',source_root='native-runtime-inputs/layout-source').items():
    need(m.get(key)==value,'formal component role mismatch: '+key)
- def code_sha(p):return sha(p,owner=0 if runtime_profile is not None and p.stat().st_uid==0 else os.getuid())
+ def code_sha(p):
+  if runtime_profile is not None:
+   from launcher_runtime_profile import code_bytes
+   return code_bytes(p,limit=512*1024*1024,content=False)[1]['sha256']
+  return sha(p)
  result=dict(m)
  for field in('worker','library','layout','source_root'):
   p=relative(stage,m[field]);need(p==p.resolve(strict=True)and p.is_relative_to(stage),'linked/outside component')
   result[field]=p
   if field!='source_root':need(HEX.fullmatch(m[field+'_sha256'])and code_sha(p)==m[field+'_sha256'],'packaged component identity changed: '+field)
  from warm_archive_manifest import resolve_gpu_identity
- actual=resolve_gpu_identity(result['worker'],stage,**code_args)
+ actual=runtime_profile.native_identity(result['worker'])if runtime_profile is not None else resolve_gpu_identity(result['worker'],stage,**code_args)
  need(actual['library']==str(result['library'])and actual['library_sha256']==result['library_sha256'],
       'packaged worker actual GPU edge/library mismatch')
  result['native_layout']=load_canonical_layout(result['layout'],result['source_root'],result['layout_sha256'],**code_args)
@@ -315,7 +319,7 @@ def load(stage,*,runtime_profile=None):
   need(module==module.resolve(strict=True)and module.is_relative_to(stage),'linked/outside module consumer')
   need(HEX.fullmatch(m['module_consumer_sha256'])and code_sha(module)==m['module_consumer_sha256'],
        'packaged module consumer changed')
-  edge=resolve_gpu_identity(module,stage,**code_args)
+  edge=runtime_profile.native_identity(module)if runtime_profile is not None else resolve_gpu_identity(module,stage,**code_args)
   need(edge['library']==str(result['library'])and edge['library_sha256']==result['library_sha256'],
        'packaged module consumer actual GPU mismatch')
   need(m.get('coherent_renderer')is True and m.get('diagnostic_only')is False,'invalid module producer type')

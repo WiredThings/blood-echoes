@@ -2,11 +2,21 @@
 from pathlib import Path
 import hashlib,os,re,stat,struct,subprocess
 
+_verification_work=dict(hash_reads=0,hash_bytes=0,tools={})
+def verification_work():return dict(_verification_work,tools=dict(_verification_work['tools']))
+def output(command):
+ name=Path(command[0]).name;_verification_work['tools'][name]=_verification_work['tools'].get(name,0)+1
+ return subprocess.check_output(command,text=True)
+
 def sha(path):
- with Path(path).open('rb')as f:return hashlib.file_digest(f,'sha256').hexdigest()
+ value=hashlib.sha256();_verification_work['hash_reads']+=1
+ with Path(path).open('rb')as f:
+  for block in iter(lambda:f.read(1024*1024),b''):
+   value.update(block);_verification_work['hash_bytes']+=len(block)
+ return value.hexdigest()
 def load_rpaths(target):
  """Only this main executable's declared paths; no environment/default search."""
- text=subprocess.check_output(['/usr/bin/otool','-l',str(target)],text=True)
+ text=output(['/usr/bin/otool','-l',str(target)])
  paths=[];pending=False
  for raw in text.splitlines():
   line=raw.strip()
@@ -54,20 +64,22 @@ def verify(meta,backend_root,*,code_owners=None):
   if code_owners is not None and st.st_mode&0o022:raise ValueError('writable bundled GPU code')
  if sha(library)!=meta['library_sha256']:raise ValueError('GPU candidate library identity changed')
  for path in(target,library):
-  if subprocess.check_output(['/usr/bin/lipo','-archs',str(path)],text=True).strip()!='arm64':raise ValueError('GPU candidate must be native ARM64')
+  if output(['/usr/bin/lipo','-archs',str(path)]).strip()!='arm64':raise ValueError('GPU candidate must be native ARM64')
  with target.open('rb')as source:header=source.read(16)
  if len(header)!=16 or struct.unpack('<4I',header)[0]!=0xfeedfacf or struct.unpack('<4I',header)[3]!=2:raise ValueError('GPU child must be a thin native main executable')
- lines=subprocess.check_output(['/usr/bin/otool','-L',str(target)],text=True).splitlines()[1:]
+ lines=output(['/usr/bin/otool','-L',str(target)]).splitlines()[1:]
  deps=[x.strip().split(' (compatibility')[0]for x in lines]
  gpu=[x for x in deps if Path(x).name.startswith('libbbgpu')]
  resolved=[]
+ rpaths=load_rpaths(target)if any(edge.startswith('@rpath/')for edge in gpu)else[]
  for edge in gpu:
-  resolved.append(str(resolve_gpu_edge(target,edge)))
+  resolved.append(str(resolve_gpu_edge(target,edge,rpaths=rpaths)))
  if resolved!=[str(library)]:raise ValueError('GPU child load edge does not match candidate library: '+repr(gpu))
  for path in(target,library):
+  _verification_work['tools']['codesign']=_verification_work['tools'].get('codesign',0)+1
   signature=subprocess.run(['/usr/bin/codesign','--verify','--strict',str(path)],capture_output=True,text=True)
   if signature.returncode:raise ValueError('GPU signature rejected: '+path.name+': '+(signature.stdout+signature.stderr).strip()[:1024])
- return dict(target=str(target),target_sha256=sha(target),library=str(library),library_sha256=sha(library),load_edge_verified=True,strict_signatures=True,architecture='arm64',declared_gpu_load_edges=gpu)
+ return dict(target=str(target),target_sha256=sha(target),library=str(library),library_sha256=sha(library),load_edge_verified=True,strict_signatures=True,architecture='arm64',declared_gpu_load_edges=gpu,declared_rpaths=rpaths)
 
 
 def select_for_isolated_run(manifest_path, *, engine, graphics, private_root):

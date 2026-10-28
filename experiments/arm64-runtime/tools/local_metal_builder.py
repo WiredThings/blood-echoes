@@ -392,7 +392,13 @@ def tool_fingerprint(path):
     return dict(path=str(path),sha256=sha,stat=list(_identity(before)),session_stat=_session_stat(before))
 
 class NativeToolchain:
-    def __init__(self,runner,*,fingerprint=tool_fingerprint):self.runner=runner;self.fingerprint=fingerprint
+    def __init__(self,runner,*,fingerprint=tool_fingerprint):self.runner=runner;self.fingerprint=fingerprint;self.registration=None
+    def configure_registration(self,root):
+        if isinstance(self.runner,FixedRunner):
+            from tool_environment_registration import Registration
+            self.registration=Registration(root)
+    def registration_work(self):
+        return dict(self.registration.stats)if self.registration is not None else {}
     def sdk_identity(self,guard):
         guard.check(preflight=True)
         raw=self.runner.run(['/usr/bin/xcrun','--show-sdk-path'],10,guard).decode().strip()
@@ -411,6 +417,13 @@ class NativeToolchain:
         if not files:raise Refused('missing SDK identity files')
         return dict(schema=1,metadata=files),dict(selected=str(selected),canonical=str(sdk),pins=pins)
     def identify(self,guard):
+        if self.registration is not None:
+            reused=self.registration.load(self,guard)
+            if reused is not None:return reused
+        result=self._identify_full(guard)
+        if self.registration is not None:self.registration.save(self,guard)
+        return result
+    def _identify_full(self,guard):
         tools={};versions={}
         for name in('metal','metallib'):
             found=self.runner.run(['/usr/bin/xcrun','--find',name],10,guard).decode().strip()
@@ -432,6 +445,10 @@ class NativeToolchain:
         return self.build_id,manifest
     def unchanged(self,guard):
         guard.check(preflight=True)
+        if self.registration is not None and self.registration.current(self,guard):return
+        return self._unchanged_full(guard)
+    def _unchanged_full(self,guard):
+        guard.check(preflight=True)
         for name in('metal','metallib'):
             found=self.runner.run(['/usr/bin/xcrun','--find',name],10,guard).decode().strip()
             if str(Path(found).resolve(strict=True))!=self.pins[name]['path']:raise Refused('selected toolchain changed during build')
@@ -445,6 +462,10 @@ class NativeToolchain:
         stable=lambda s:dict(selected=s['selected'],canonical=s['canonical'],pins={p:v[:6]for p,v in s['pins'].items()})
         if sdk!=self.build_manifest['sdk']or stable(selection)!=stable(self.sdk_selection):raise Refused('selected SDK changed during build')
     def preparation_environment(self,guard):
+        if self.registration is not None and self.registration.current(self,guard):
+            return self.registration.active['toolchain']['environment']
+        return self._preparation_environment_full(guard)
+    def _preparation_environment_full(self,guard):
         # Session invalidation only, never a replacement for artifact/toolchain ID.
         guard.check(preflight=True)
         raw=self.runner.run(['/usr/bin/xcrun','--show-sdk-path'],10,guard).decode().strip()
@@ -468,7 +489,7 @@ class NativeToolchain:
         if not os_build or len(os_build.encode())>256 or os_build!=self.build_manifest['os_build']:raise Refused('OS build changed within preparation')
         return dict(sdk_selected=str(selected),sdk=str(sdk),os_build=os_build,pins=pins)
     def compile(self,source,air,library,request,guard):
-        self.unchanged(guard)
+        self._unchanged_full(guard)
         command=['/usr/bin/xcrun','metal','-std='+request['language'],
                  '-fmetal-math-mode='+request['math_mode'],'-fmetal-math-fp32-functions='+request['math_fp32'],
                  '-c',str(source),'-o',str(air)]
@@ -477,7 +498,7 @@ class NativeToolchain:
         if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1 or not 0<row.st_size<=AIR_MAX:raise Refused('invalid/empty AIR output')
         self.runner.run(['/usr/bin/xcrun','metallib',str(air),'-o',str(library)],STAGE_TIMEOUT,guard,
                         cwd=source.parent,outputs=((library,LIBRARY_MAX),))
-        self.unchanged(guard)
+        self._unchanged_full(guard)
 
 def real_services(private_tmp):
     import sys
@@ -517,6 +538,8 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
             encoded=canonical(value)+b'\n'
             if os.write(results_fd,encoded)!=len(encoded):raise Refused('short result log write')
         for deferred in index.deferred():record_result(deferred)
+        configure=getattr(toolchain,'configure_registration',None)
+        if callable(configure):configure(root)
         build_id,manifest=toolchain.identify(guard)
         if not HEX.fullmatch(build_id)or digest(canonical(manifest))!=build_id:raise Refused('invalid toolchain build identity')
         summary['build_id']=build_id
@@ -642,6 +665,8 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
                 if summary['status']!='stopped':summary['status']='failed'
                 summary['index_cleanup_error']=str(error)[:512]
         if summary_path is not None:
+            report_registration=getattr(toolchain,'registration_work',None)
+            if callable(report_registration):summary['toolchain_registration']=report_registration()
             try:atomic_json(summary_path,summary)
             except Exception as error:
                 # Preserve a lock/memory stop even when its diagnostic cannot be
@@ -798,6 +823,12 @@ class PreparationSession:
                     return result
                 def compile(self,*args,**kwargs):return actual.compile(*args,**kwargs)
                 def unchanged(self,*args,**kwargs):return actual.unchanged(*args,**kwargs)
+                def configure_registration(self,root):
+                    configure=getattr(actual,'configure_registration',None)
+                    if callable(configure):configure(root)
+                def registration_work(self):
+                    report=getattr(actual,'registration_work',None)
+                    return report()if callable(report)else {}
             try:
                 summary=build(root,cohort,enabled=True,guard=guard,toolchain=EnclosedToolchain(),**({'runtime_profile':self.runtime_profile}if self.runtime_profile is not None else{}))
                 self.stats['full_build_seconds']+=self.clock()-started

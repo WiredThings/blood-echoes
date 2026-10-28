@@ -1,0 +1,330 @@
+{
+  "status": "isolated-tool-controls",
+  "scene_acceptance": false,
+  "formal_app_updated": false,
+  "formal_data_modified": false,
+  "temporary_diagnostics_enabled": false,
+  "results": {
+    "package": {
+      "rows": [
+        {
+          "case": "initial",
+          "seconds": 0.09452154103200883,
+          "registration": {
+            "receipt": "missing",
+            "hashed_files": 75,
+            "hashed_bytes": 57064523,
+            "reused_files": 0,
+            "metadata_only": false,
+            "journal_reused": false
+          },
+          "actual_reads": 79,
+          "actual_bytes": 57076151
+        },
+        {
+          "case": "fresh-process-digest-state",
+          "seconds": 0.0773674170486629,
+          "registration": {
+            "receipt": "verified",
+            "hashed_files": 0,
+            "hashed_bytes": 0,
+            "reused_files": 75,
+            "metadata_only": true,
+            "journal_reused": true
+          },
+          "actual_reads": 4,
+          "actual_bytes": 11628
+        }
+      ],
+      "game_started": false,
+      "formal_app_modified": false
+    },
+    "toolchain": {
+      "rows": [
+        {
+          "name": "initial",
+          "seconds": 0.7275929580209777,
+          "build_id": "49a14db0839df0b30c8c1d9dce57c7e2c2d6929f0768278a66cc3b2dd3ba97bf",
+          "registration": {
+            "reused": 0,
+            "full_probes": 1,
+            "selection_checks": 3,
+            "metadata_checks": 1
+          },
+          "commands": [
+            [
+              "/usr/bin/xcrun",
+              "--find",
+              "metal"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "metal",
+              "--version"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "--find",
+              "metallib"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "metallib",
+              "--version"
+            ],
+            [
+              "/usr/bin/sw_vers",
+              "-buildVersion"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "--version"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "--show-sdk-path"
+            ],
+            [
+              "/usr/bin/xcode-select",
+              "-p"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "--find",
+              "metal"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "--find",
+              "metallib"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "--show-sdk-path"
+            ],
+            [
+              "/usr/bin/xcrun",
+              "--show-sdk-path"
+            ],
+            [
+              "/usr/bin/sw_vers",
+              "-buildVersion"
+            ],
+            [
+              "/usr/bin/xcode-select",
+              "-p"
+            ],
+            [
+              "/usr/bin/xcode-select",
+              "-p"
+            ]
+          ]
+        },
+        {
+          "name": "registered",
+          "seconds": 0.12913358304649591,
+          "build_id": "49a14db0839df0b30c8c1d9dce57c7e2c2d6929f0768278a66cc3b2dd3ba97bf",
+          "registration": {
+            "reused": 1,
+            "full_probes": 0,
+            "selection_checks": 2,
+            "metadata_checks": 2
+          },
+          "commands": [
+            [
+              "/usr/bin/xcode-select",
+              "-p"
+            ],
+            [
+              "/usr/bin/xcode-select",
+              "-p"
+            ]
+          ]
+        }
+      ],
+      "game_started": false,
+      "formal_data_modified": false
+    },
+    "native_checks": {
+      "rows": [
+        {
+          "case": "first-real-verification",
+          "seconds": 0.15702670894097537,
+          "commands": [
+            [
+              "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+              "-B",
+              "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/tools/startup_change_journal.py",
+              "--native-query"
+            ],
+            [
+              "/usr/bin/otool",
+              "-L",
+              "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu"
+            ],
+            [
+              "/usr/bin/lipo",
+              "-archs",
+              "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu"
+            ],
+            [
+              "/usr/bin/lipo",
+              "-archs",
+              "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/gpu-metal-arm64/libbbgpu.dylib"
+            ],
+            [
+              "/usr/bin/otool",
+              "-L",
+              "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu"
+            ],
+            [
+              "/usr/bin/codesign",
+              "--verify",
+              "--strict",
+              "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu"
+            ],
+            [
+              "/usr/bin/codesign",
+              "--verify",
+              "--strict",
+              "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/gpu-metal-arm64/libbbgpu.dylib"
+            ],
+            [
+              "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+              "-B",
+              "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/tools/startup_change_journal.py",
+              "--native-query"
+            ]
+          ],
+          "identity": {
+            "target": "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu",
+            "target_sha256": "7ccb037bde319f1365ea8e8389cf0af4e5d4096e5b128deea05bb8c4d9d64b2b",
+            "library": "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/gpu-metal-arm64/libbbgpu.dylib",
+            "library_sha256": "87cc59248abc56b6f257910088bc6e0ae1b06b2fa7dfe470b08ddb149ddf1b1f",
+            "load_edge_verified": true,
+            "strict_signatures": true,
+            "architecture": "arm64",
+            "declared_gpu_load_edges": [
+              "@loader_path/../../../gpu-metal-arm64/libbbgpu.dylib"
+            ],
+            "declared_rpaths": []
+          }
+        },
+        {
+          "case": "registered-real-verification",
+          "seconds": 0.061047457973472774,
+          "commands": [
+            [
+              "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+              "-B",
+              "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/tools/startup_change_journal.py",
+              "--native-query"
+            ],
+            [
+              "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+              "-B",
+              "/Users/k.d./Documents/Codex/2026-10-16/https-github-com-loreanxavier-pt-pc/work/blood-echoes-arm64-audit/experiments/arm64-runtime/tools/startup_change_journal.py",
+              "--native-query"
+            ]
+          ],
+          "identity": {
+            "architecture": "arm64",
+            "declared_gpu_load_edges": [
+              "@loader_path/../../../gpu-metal-arm64/libbbgpu.dylib"
+            ],
+            "declared_rpaths": [],
+            "library": "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/gpu-metal-arm64/libbbgpu.dylib",
+            "library_sha256": "87cc59248abc56b6f257910088bc6e0ae1b06b2fa7dfe470b08ddb149ddf1b1f",
+            "load_edge_verified": true,
+            "strict_signatures": true,
+            "target": "/Applications/Blood Echoes.app/Contents/Resources/bbport/bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu",
+            "target_sha256": "7ccb037bde319f1365ea8e8389cf0af4e5d4096e5b128deea05bb8c4d9d64b2b"
+          }
+        }
+      ],
+      "game_started": false,
+      "formal_data_modified": false
+    },
+    "images": {
+      "rows": [
+        {
+          "status": "built",
+          "identity": "49a6b7fbb4c07494dd077e5d73f4b276e89d36771bdfde3d74c50e4f104908fb",
+          "seconds": 3.255928916973062,
+          "original_algorithms_invoked": true,
+          "restored_outputs": 8,
+          "source_hashes": {
+            "receipt": "missing",
+            "hashed_files": 4,
+            "hashed_bytes": 95147467,
+            "reused_files": 0,
+            "metadata_only": false,
+            "journal_reused": false
+          },
+          "product_hashes": {
+            "receipt": "missing",
+            "hashed_files": 8,
+            "hashed_bytes": 393287892,
+            "reused_files": 0,
+            "metadata_only": false,
+            "journal_reused": false
+          },
+          "shader_validation_reused": false,
+          "case": "initial"
+        },
+        {
+          "status": "reused",
+          "identity": "49a6b7fbb4c07494dd077e5d73f4b276e89d36771bdfde3d74c50e4f104908fb",
+          "seconds": 0.3856954580405727,
+          "original_algorithms_invoked": false,
+          "restored_outputs": 0,
+          "source_hashes": {
+            "receipt": "verified",
+            "hashed_files": 0,
+            "hashed_bytes": 0,
+            "reused_files": 4,
+            "metadata_only": true,
+            "journal_reused": true
+          },
+          "product_hashes": {
+            "receipt": "verified",
+            "hashed_files": 8,
+            "hashed_bytes": 393287892,
+            "reused_files": 0,
+            "metadata_only": false,
+            "journal_reused": false
+          },
+          "shader_validation_reused": true,
+          "case": "ordinary-warm"
+        },
+        {
+          "status": "reused",
+          "identity": "49a6b7fbb4c07494dd077e5d73f4b276e89d36771bdfde3d74c50e4f104908fb",
+          "seconds": 0.27654591703321785,
+          "original_algorithms_invoked": false,
+          "restored_outputs": 0,
+          "source_hashes": {
+            "receipt": "verified",
+            "hashed_files": 0,
+            "hashed_bytes": 0,
+            "reused_files": 4,
+            "metadata_only": true,
+            "journal_reused": true
+          },
+          "product_hashes": {
+            "receipt": "verified",
+            "hashed_files": 0,
+            "hashed_bytes": 0,
+            "reused_files": 8,
+            "metadata_only": true,
+            "journal_reused": true
+          },
+          "shader_validation_reused": true,
+          "case": "f3-equivalent-input-reuse"
+        }
+      ],
+      "maxrss": 812613632,
+      "game_started": false
+    }
+  }
+}

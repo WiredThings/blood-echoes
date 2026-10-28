@@ -38,6 +38,11 @@ class SourceClosure(unittest.TestCase):
   self.assertEqual(effective,self.run.replace(writer.HOOK_ANCHOR,writer.HOOK+writer.HOOK_ANCHOR));self.assertEqual(effective.count(writer.HOOK),1)
   self.assertEqual(result['parity']['original_sources']['run.sh'],hashlib.sha256(self.run.encode()).hexdigest())
   self.assertFalse(result['parity']['source_projection']['hook_already_present'])
+ def test_original_image_calls_have_one_exact_reversible_reuse_hook(self):
+  original=writer.ORIGINAL_IMAGES+self.run;self.put(self.repo/'run.sh',original.encode());result=self.build();run=(self.output/'run.sh').read_text()
+  self.assertEqual(run.count(writer.IMAGE_HOOK),1);self.assertEqual(writer.original_image_preparation(run.replace(writer.HOOK,'',1)),original)
+  self.assertFalse(result['parity']['final_exec_hook_only']);self.assertTrue(result['parity']['image_preparation_reuse'])
+  self.assertEqual(result['parity']['original_sources']['run.sh'],hashlib.sha256(original.encode()).hexdigest())
  def test_existing_exact_hook_and_log_are_projected_and_forward_verified(self):
   hooked=self.run.replace(writer.HOOK_ANCHOR,writer.HOOK+writer.HOOK_ANCHOR);self.put(self.repo/'run.sh',hooked.encode())
   old=(self.repo/'tools/macos/run_optimized.sh').read_text();new=writer.runtime_log_revision(old);self.put(self.repo/'tools/macos/run_optimized.sh',new.encode())

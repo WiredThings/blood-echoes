@@ -8,13 +8,13 @@ def file_identity(path):
     with path.open('rb') as stream: digest=hashlib.file_digest(stream,'sha256').hexdigest()
     return dict(sha256=digest,bytes=path.stat().st_size)
 
-def make_manifest(*,translator_artifacts,game_artifacts,options,profile):
+def make_manifest(*,translator_artifacts,game_artifacts,options,profile,identity_reader=file_identity):
     # Inputs are actual loaded/build artifacts and actual applied game patch inputs,
     # not a version label, program hash, cache inventory count or directory name.
     if not translator_artifacts or not game_artifacts or not profile:
         raise ValueError("complete translator, game/patch, and profile inputs required")
-    manifest=dict(schema=1,translator={k:file_identity(v)for k,v in sorted(translator_artifacts.items())},
-                  game={k:file_identity(v)for k,v in sorted(game_artifacts.items())},
+    manifest=dict(schema=1,translator={k:identity_reader(v)for k,v in sorted(translator_artifacts.items())},
+                  game={k:identity_reader(v)for k,v in sorted(game_artifacts.items())},
                   options=dict(sorted(options.items())),profile=profile)
     payload=json.dumps(manifest,sort_keys=True,separators=(',',':')).encode()
     return hashlib.sha256(payload).hexdigest(),manifest
@@ -24,9 +24,9 @@ def resolve_gpu_identity(target,backend_root,*,code_owners=None):
     # Resolve the selected executable's actual single GPU load edge, then reuse
     # the existing ownership/architecture/signature/SHA verification contract.
     import subprocess
-    from gpu_candidate_identity import verify,sha,resolve_gpu_edge
+    from gpu_candidate_identity import verify,sha,resolve_gpu_edge,output
     target=Path(target).resolve(strict=True)
-    deps=[line.strip().split(' (compatibility')[0]for line in subprocess.check_output(['/usr/bin/otool','-L',str(target)],text=True).splitlines()[1:]]
+    deps=[line.strip().split(' (compatibility')[0]for line in output(['/usr/bin/otool','-L',str(target)]).splitlines()[1:]]
     edges=[edge for edge in deps if Path(edge).name.startswith('libbbgpu')]
     if len(edges)!=1:raise ValueError('selected executable must have exactly one GPU load edge')
     edge=edges[0]

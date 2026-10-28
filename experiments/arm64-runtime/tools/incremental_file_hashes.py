@@ -45,9 +45,10 @@ def replaceable(path):
 
 
 class Hashes:
-    def __init__(self,path,binding,*,hasher,check=lambda:None,watch_roots=None):
+    def __init__(self,path,binding,*,hasher,check=lambda:None,watch_roots=None,source_stamp=None,code_roots=False):
         self.path=Path(path).absolute();self.binding=binding;self.hasher=hasher;self.check=check
         self.previous={};self.seen={};self.hashed_files=0;self.hashed_bytes=0;self.reused_files=0
+        self.source_stamp=source_stamp or stamp;self.code_roots=code_roots
         self.receipt_status='missing';self.watch_roots=watch_roots;self.journal_token=None;self.journal_valid=False
         try:
             before=stamp(self.path)
@@ -72,10 +73,11 @@ class Hashes:
         except (OSError,ValueError,TypeError,KeyError):self.receipt_status='invalid'
         if watch_roots:
             from startup_change_journal import query,unchanged
-            self.journal_valid=self.receipt_status=='verified' and unchanged(self.journal_token,watch_roots)
+            journal_args={'code_roots':True}if code_roots else{}
+            self.journal_valid=self.receipt_status=='verified' and unchanged(self.journal_token,watch_roots,**journal_args)
             # Anchor BEFORE reading/validating. Events during that pass remain
             # visible to the next launch; never advance past unvalidated changes.
-            if not self.journal_valid:self.journal_token=query(watch_roots)
+            if not self.journal_valid:self.journal_token=query(watch_roots,**journal_args)
 
 
     def get(self,path,check=None):
@@ -86,13 +88,13 @@ class Hashes:
             self.seen[key]=cached
             if len(self.seen)>MAX_FILES:raise ValueError('incremental source file-count budget')
             return cached['sha256'],cached['bytes']
-        before=stamp(p)
+        before=self.source_stamp(p)
         if cached is not None and cached['stamp']==before:
             if key not in self.seen:self.reused_files+=1
             row=cached
         else:
             value,size=self.hasher(p,self.check if check is None else check)
-            if stamp(p)!=before or size!=before[6]:raise ValueError('selected source contents changed during incremental hash')
+            if self.source_stamp(p)!=before or size!=before[6]:raise ValueError('selected source contents changed during incremental hash')
             row=dict(stamp=before,sha256=value,bytes=size)
             self.hashed_files+=1;self.hashed_bytes+=size
         self.seen[key]=row
@@ -103,11 +105,11 @@ class Hashes:
         if self.journal_valid:
             from startup_change_journal import unchanged
             self.check()
-            if unchanged(self.journal_token,self.watch_roots):return
+            if unchanged(self.journal_token,self.watch_roots,**({'code_roots':True}if self.code_roots else{})):return
             self.journal_valid=False;self.journal_token=None
         for name,row in self.seen.items():
             self.check()
-            if stamp(name)!=row['stamp']:raise ValueError('selected source contents changed during incremental validation')
+            if self.source_stamp(name)!=row['stamp']:raise ValueError('selected source contents changed during incremental validation')
 
     def publish(self):
         self.verify()

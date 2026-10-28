@@ -38,6 +38,10 @@ class NativeChanges(unittest.TestCase):
   original=self.root/'original';original.mkdir();token=journal.query([original]);self.assertIsNotNone(token);original.rename(self.root/'old');original.mkdir();self.assertFalse(journal.unchanged(token,[original]))
  def test_multiple_roots_detect_changes_in_each(self):
   other=self.root.parent/'other';other.mkdir();roots=[self.root,other];token=journal.query(roots);self.assertIsNotNone(token);self.assertTrue(journal.unchanged(token,roots));(other/'new').write_bytes(b'new');self.assertFalse(journal.unchanged(token,roots));token=journal.query(roots);self.assertIsNotNone(token);self.source.write_bytes(b'changed');self.assertFalse(journal.unchanged(token,roots))
+ def test_code_root_policy_is_explicit_and_not_reusable_as_data_proof(self):
+  token=journal.query([self.root],code_roots=True);self.assertIsNotNone(token);self.assertTrue(token['code_roots']);self.assertTrue(journal.unchanged(token,[self.root],code_roots=True));self.assertFalse(journal.unchanged(token,[self.root]))
+ def test_root_owned_code_supported_without_relaxing_data_roots(self):
+  root=Path('/usr/bin').resolve();self.assertEqual(root.stat().st_uid,0);self.assertIsNone(journal.query([root]));token=journal.query([root],code_roots=True);self.assertIsNotNone(token);self.assertTrue(journal.unchanged(token,[root],code_roots=True))
  def test_warm_get_and_verify_do_not_stat_each_source(self):
   hint=self.root.parent/(self.root.name+'-hint.json');self.addCleanup(lambda:hint.unlink(missing_ok=True))
   h=Hashes(hint,'scope',hasher=file_sha,watch_roots=[self.root]);want=h.get(self.source);h.publish();h=Hashes(hint,'scope',hasher=file_sha,watch_roots=[self.root]);self.assertTrue(h.journal_valid)

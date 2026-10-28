@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse,ast,hashlib,json,os,shutil,stat,time
 
 PRIVATE_PROJECT=Path('/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype')
-TOOLS=('recipe_preparation_schedule.py','resource_parse_products.py','compilation_domains.py','module_product_schedule.py','texture_binding_request.py','pso_startup_schedule.py','startup_change_journal.py','incremental_file_hashes.py','launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py','local_metal_builder.py',
+TOOLS=('image_preparation_products.py','code_registration.py','tool_environment_registration.py','recipe_preparation_schedule.py','resource_parse_products.py','compilation_domains.py','module_product_schedule.py','texture_binding_request.py','pso_startup_schedule.py','startup_change_journal.py','incremental_file_hashes.py','launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py','local_metal_builder.py',
        'warm_archive_manifest.py','gpu_candidate_identity.py','native_observer.py',
        'qa_memory_policy.py','qa_build_guard.py','paged_metal_requests.py',
        'launcher_game_pso.py','game_pso_component.py','game_pso_candidates.py',
@@ -37,6 +37,26 @@ if [[ ${BB_ARM_LAUNCHER_COMPAT:-0} == 1 && ${BB_RENDERER:-} == metal ]]; then
     probe=$PYTHON
 fi
 '''
+ORIGINAL_IMAGES='''"$PYTHON" scripts/prepare.py "$game" --out "$out"
+"$PYTHON" scripts/link_libc.py "$game" --out "$out"
+"$PYTHON" scripts/link_modules.py "$game" --out "$out"
+'''
+IMAGE_HOOK='''# Reuse original image/link products before ordinary or F3 preparation.
+if [[ ${BB_ARM_LAUNCHER_COMPAT:-0} == 1 && ${BB_RENDERER:-} == metal ]]; then
+    "$PYTHON" tools/macos/local_metal_startup.py --prepare-images "$game" --out "$out"
+else
+'''+ORIGINAL_IMAGES+'''fi
+'''
+
+def image_preparation_revision(text):
+    if text.count(IMAGE_HOOK)>1:raise ValueError('duplicate image preparation hook')
+    if IMAGE_HOOK in text:return text
+    if text.count(ORIGINAL_IMAGES)>1:raise ValueError('ambiguous original image preparation')
+    return text.replace(ORIGINAL_IMAGES,IMAGE_HOOK,1)
+
+def original_image_preparation(text):
+    if text.count(IMAGE_HOOK)>1:raise ValueError('duplicate image preparation hook')
+    return text.replace(IMAGE_HOOK,ORIGINAL_IMAGES,1)
 def sha(path):
     with Path(path).open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 def owned_dir(path):
@@ -83,12 +103,14 @@ def main():
     if tools!=tools.resolve(strict=True):raise ValueError('linked runtime tools')
     expected={'''+','.join(repr(name) for name in TOOLS)+'''}
     if set(manifest['runtime_tools'])!=expected:raise ValueError('incomplete runtime tool closure')
+    digest_files=0;digest_bytes=0
     for name,digest in manifest['runtime_tools'].items():
         path=tools/name; info=path.lstat()
         if not stat.S_ISREG(info.st_mode)or info.st_uid not in ((0,os.getuid())if formal else(os.getuid(),)):
             raise ValueError('runtime tool is not an owned regular file')
         with path.open('rb')as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
         if actual!=digest:raise ValueError('runtime tool identity changed: '+name)
+        digest_files+=1;digest_bytes+=info.st_size
     support=manifest['runtime_support']
     if set(support)!={'''+','.join(repr(name)for name in SUPPORT)+'''}:
         raise ValueError('incomplete original parser closure')
@@ -98,7 +120,16 @@ def main():
             raise ValueError('original parser is not canonical owned code')
         with path.open('rb')as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
         if actual!=digest:raise ValueError('original parser identity changed: '+name)
+        digest_files+=1;digest_bytes+=info.st_size
+    print('Package bootstrap verification: '+json.dumps(dict(hash_files=digest_files,hash_bytes=digest_bytes)),flush=True)
     sys.path.insert(0,str(tools))
+    if len(sys.argv)>1 and sys.argv[1]=='--prepare-images':
+        import image_preparation_products
+        if Path(image_preparation_products.__file__).resolve().parent!=tools:
+            raise ValueError('image preparation imported outside frozen closure')
+        sys.argv.pop(1)
+        image_preparation_products.main()
+        return
     import local_metal_builder,local_aot_policy,launcher_local_aot
     for module in (local_metal_builder,local_aot_policy,launcher_local_aot):
         if Path(module.__file__).resolve().parent!=tools:
@@ -171,7 +202,7 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
             raise ValueError('invalid original source path')
         if sha(original/relative)!=digest:raise ValueError('previous component stage changed: '+relative)
     new_run=(repository/'run.sh').read_text();old_run=(original/'run.sh').read_text()
-    if new_run.count(HOOK)!=1 or new_run.replace(HOOK,'',1)!=old_run:
+    if new_run.count(HOOK)!=1 or original_image_preparation(new_run.replace(HOOK,'',1))!=old_run:
         raise ValueError('new run.sh is not exactly the admitted final-exec hook')
     log_relative='tools/macos/run_optimized.sh'
     old_log=(original/log_relative).read_text()
@@ -210,7 +241,8 @@ def build_stage(*,project,repository,runtime_tools=None,destination=None):
     effective[log_relative]=sha(target/log_relative)
     changed=[name for name in source if effective[name]!=source[name]]
     parity=dict(original_sources=source,effective_sources=effective,
-        script_bodies_changed=changed,final_exec_hook_only=True,
+        script_bodies_changed=changed,final_exec_hook_only=IMAGE_HOOK not in new_run,
+        image_preparation_reuse=IMAGE_HOOK in new_run,
         runtime_log_only_correction=log_relative in changed,
         previous_stage=str(original),previous_stage_modified=False)
     (target/'SOURCE-PARITY.json').write_text(json.dumps(parity,indent=2)+'\n')
@@ -238,7 +270,7 @@ def projected_launcher_scripts(run,log):
     """Only the exact existing hook/log transform; no old revision is invented."""
     if run.count(HOOK)>1:raise ValueError('duplicate final-exec hook')
     had_hook=run.count(HOOK)==1
-    original_run=run.replace(HOOK,'',1)if had_hook else run
+    original_run=original_image_preparation(run.replace(HOOK,'',1)if had_hook else run)
     if 'local_metal_startup'in original_run or '# Native-runtime component preparation'in original_run:
         raise ValueError('partial or ambiguous final-exec hook')
     if original_run.count(HOOK_ANCHOR)!=1 or original_run.count(FINAL_EXEC)!=1:
@@ -246,7 +278,7 @@ def projected_launcher_scripts(run,log):
     prefix,tail=original_run.split(HOOK_ANCHOR,1)
     if not prefix.rstrip().splitlines()or not prefix.rstrip().splitlines()[-1].startswith('probe_args=(')or FINAL_EXEC not in tail:
         raise ValueError('final-exec hook is not immediately after original probe arguments')
-    effective_run=original_run.replace(HOOK_ANCHOR,HOOK+HOOK_ANCHOR,1)
+    effective_run=image_preparation_revision(original_run.replace(HOOK_ANCHOR,HOOK+HOOK_ANCHOR,1))
     if had_hook and effective_run!=run:raise ValueError('existing hook is not in the exact original final-exec position')
     if log.count(FEX_RENDER_LOG)>1:raise ValueError('duplicate FEX runtime log')
     had_log=log.count(FEX_RENDER_LOG)==1
@@ -254,7 +286,7 @@ def projected_launcher_scripts(run,log):
     if 'FEX game runtime'in original_log:raise ValueError('partial or ambiguous FEX runtime log')
     effective_log=runtime_log_revision(original_log)
     if had_log and effective_log!=log:raise ValueError('FEX log projection failed its original forward proof')
-    return original_run,effective_run,original_log,effective_log,dict(hook_already_present=had_hook,log_already_present=had_log,
+    return original_run,effective_run,original_log,effective_log,dict(hook_already_present=had_hook,log_already_present=had_log,image_hook_already_present=IMAGE_HOOK in run,
       original_identity_kind='current-repository-exact-known-projection'if had_hook or had_log else'current-repository-bytes')
 
 def _source_bytes(path,limit=4*1024*1024):
@@ -308,7 +340,7 @@ def write_source_closure(*,source,repository,runtime_tools,destination,project):
     inputs.update({str(tools/name):hashlib.sha256(raw).hexdigest()for name,raw in tool_files.items()})
     effective={name:hashlib.sha256(payload[name]).hexdigest()for name in SOURCE_SCRIPTS}
     changed=[name for name in SOURCE_SCRIPTS if original[name]!=effective[name]]
-    parity=dict(original_sources=original,effective_sources=effective,script_bodies_changed=changed,final_exec_hook_only=True,
+    parity=dict(original_sources=original,effective_sources=effective,script_bodies_changed=changed,final_exec_hook_only=IMAGE_HOOK not in new_run,image_preparation_reuse=IMAGE_HOOK in new_run,
       runtime_log_only_correction='tools/macos/run_optimized.sh'in changed,source_projection=projection,
       source_repository_modified=False,previous_stage_read=False)
     manifest=dict(schema=1,host_local_only=True,portable_installer=False,production=False,code_closure_only=True,

@@ -400,6 +400,8 @@ def prepare(config,*,services=None):
  except (Stopped,KeyboardInterrupt)as error:
   result=dict(status='stopped',error=str(error)or'interrupted',completed=0,protection_stops=1,full_manifest_preparation_verified=False)
  finally:
+  if result is None:
+   result=dict(status='failed',error='orchestration aborted before result',full_manifest_preparation_verified=False)
   try:close_batch(abort=result.get('status')in('failed','stopped'))
   except (ValueError,OSError,Stopped,Deferred)as error:
    result.update(status='stopped'if isinstance(error,(Stopped,Deferred))else'failed',error='batch terminal verification: '+str(error),full_manifest_preparation_verified=False)

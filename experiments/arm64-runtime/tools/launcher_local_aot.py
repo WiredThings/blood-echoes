@@ -145,7 +145,7 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
         if runtime_profile is None:archive_prepare = prepare_startup_archive_policy
         else:
             def archive_prepare(**values):
-                return prepare_startup_archive_policy(**values,resolver=lambda t,r:resolve_gpu_identity(t,r,code_owners=(0,os.getuid())))
+                return prepare_startup_archive_policy(**values,resolver=lambda t,r:runtime_profile.native_identity(t),manifest_builder=runtime_profile.archive_manifest)
     # Share one bounded, authenticated builder session across this launch's
     # initial/fixed-helper/final library checks. The PSO controller still owns
     # its separate native record/load phases and full final admission.
@@ -308,12 +308,18 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
     visible_local={k:local[k]for k in('built','skipped','reused_products','repaired_products','requests')if type(local.get(k))is int and local[k]>=0}
     if type(local.get('persistent_audit_reused'))is bool:visible_local['persistent_audit_reused']=local['persistent_audit_reused']
     if local.get('same_supervisor_reused')is True:visible_local['same_supervisor_reused']=True
+    if isinstance(local.get('toolchain_registration'),dict):visible_local['toolchain_registration']=local['toolchain_registration']
     if visible_local:visible['local_libraries']=visible_local
     modules=report.get('game_pso',{}).get('scan',{}).get('automatic_modules',{})
     typed=modules.get('typed_companions',{}).get('counts',{})
     module_counts={k:typed[k]for k in('inventory_records','native_attempts','native_completed','verified_target_products','verified_target_reuses','verified_existing','required_target_keys','verified_required_products','unresolved_static_stage_records','verified_generic_target_coverage')if type(typed.get(k))is int and typed[k]>=0}
     if modules.get('typed_companions',{}).get('historical_capture_inventory_skipped')is True:module_counts['historical_capture_inventory_skipped']=True
     if module_counts:visible['typed_modules']=module_counts
+    if runtime_profile is not None:
+        from launcher_runtime_profile import code_validation_work
+        from gpu_candidate_identity import verification_work
+        visible['startup_validation']=dict(package=runtime_profile.bundle.validation_work,
+            code_digests=code_validation_work(),native_verifiers=verification_work(),**runtime_profile.preparation_work)
     print('Metal local preparation: '+json.dumps(visible,sort_keys=True),flush=True)
     if runtime_profile is not None:
         # Explicit temporary Shared-only metadata request, applied after all
