@@ -1,0 +1,242 @@
+{
+  "schema": 1,
+  "status": "validated-and-installed",
+  "source_revision": "6909d36308a91e63c25d18a48450866a48b9f172",
+  "tests": 217,
+  "authored_actual_case_shape": {
+    "required": 685,
+    "scheduled_reused": 573,
+    "native_hits": 47,
+    "native_built": 65,
+    "old_gate_accepts": false,
+    "new_coverage_accepts": true
+  },
+  "native_control": {
+    "status": "passed",
+    "native_GPU": true,
+    "game_started": false,
+    "formal_data_modified": false,
+    "source_revision": "21240224b4e95b01d1bed29d7d452d269b1ce5f2",
+    "fresh_private_cache": true,
+    "source_bytes_copied_and_verified": true,
+    "GS_coverage": "authored targeted test; live game follows separately",
+    "runs": [
+      {
+        "label": "seed-one-existing",
+        "status": "completed",
+        "seconds": 4.528489915999671,
+        "coverage": {
+          "schema": 1,
+          "kind": "current-verified-required-queue",
+          "manifest_sha256": "ef9594d656065d7e5c7fe9856e53ce84712495cff19b45903b32ce3a2417ef24",
+          "job_id": "b436e516cd465a49fbdcefe5110a248e9b839c3818170bc69a51b30809c1728f",
+          "cycle_id": "9f958163aee740b487683727dbeae335",
+          "context_sha256": "59fce9718e2c155ece3779f306f9b5738cf89f313d9262d4aabd5ed0d3c3a7b5",
+          "environment_identity": "d5e69da232eca5e828af25b62a0f262dcc2c4e01bf5e7449103bec49f78f0931",
+          "required": 1,
+          "scheduled_reused": 0,
+          "native_hits": 0,
+          "native_built": 1,
+          "bindings_sha256": "79b8b7858776a792a3593cc11acb51fe5f71d2c1d3604535e66471735d5ae8f1",
+          "artifact_authority": false
+        },
+        "recipe_schedule": null,
+        "before": {
+          "pressure": 2,
+          "locked": false,
+          "swap_mib": 2211.0625
+        },
+        "after": {
+          "pressure": 2,
+          "locked": false,
+          "swap_mib": 2211.0625
+        }
+      },
+      {
+        "label": "prime-existing-proof",
+        "status": "completed",
+        "seconds": 1.827792333999696,
+        "coverage": {
+          "schema": 1,
+          "kind": "current-verified-required-queue",
+          "manifest_sha256": "ef9594d656065d7e5c7fe9856e53ce84712495cff19b45903b32ce3a2417ef24",
+          "job_id": "b436e516cd465a49fbdcefe5110a248e9b839c3818170bc69a51b30809c1728f",
+          "cycle_id": "a2a43595995843d8b6690513edc4d354",
+          "context_sha256": "59fce9718e2c155ece3779f306f9b5738cf89f313d9262d4aabd5ed0d3c3a7b5",
+          "environment_identity": "d5e69da232eca5e828af25b62a0f262dcc2c4e01bf5e7449103bec49f78f0931",
+          "required": 1,
+          "scheduled_reused": 0,
+          "native_hits": 1,
+          "native_built": 0,
+          "bindings_sha256": "c87f57bea0f853c4bea1c953d5ca764221df959cef537e9978da9461ba103d3d",
+          "artifact_authority": false
+        },
+        "recipe_schedule": null,
+        "before": {
+          "pressure": 2,
+          "locked": false,
+          "swap_mib": 2211.0625
+        },
+        "after": {
+          "pressure": 2,
+          "locked": false,
+          "swap_mib": 2211.0625
+        }
+      },
+      {
+        "label": "mixed-new-and-existing",
+        "status": "completed",
+        "seconds": 4.428197165999791,
+        "coverage": {
+          "schema": 1,
+          "kind": "current-verified-required-queue",
+          "manifest_sha256": "fed48d777e9a6841dc486ce679d70c3b7df0b6e66728a6ba0dec522fdb09011a",
+          "job_id": "b436e516cd465a49fbdcefe5110a248e9b839c3818170bc69a51b30809c1728f",
+          "cycle_id": "296a778beedf45dfbabfd14a88377b2c",
+          "context_sha256": "59fce9718e2c155ece3779f306f9b5738cf89f313d9262d4aabd5ed0d3c3a7b5",
+          "environment_identity": "d5e69da232eca5e828af25b62a0f262dcc2c4e01bf5e7449103bec49f78f0931",
+          "required": 2,
+          "scheduled_reused": 0,
+          "native_hits": 1,
+          "native_built": 1,
+          "bindings_sha256": "e4ae001c687a91fcad21a011fa74701436e31eacbc2291704142e7a4d48a0e4e",
+          "artifact_authority": false
+        },
+        "recipe_schedule": null,
+        "before": {
+          "pressure": 2,
+          "locked": false,
+          "swap_mib": 2211.0625
+        },
+        "after": {
+          "pressure": 2,
+          "locked": false,
+          "swap_mib": 2211.0625
+        }
+      },
+      {
+        "label": "repeat-complete",
+        "status": "completed",
+        "seconds": 2.1189304160002393,
+        "coverage": {
+          "schema": 1,
+          "kind": "current-verified-required-queue",
+          "manifest_sha256": "fed48d777e9a6841dc486ce679d70c3b7df0b6e66728a6ba0dec522fdb09011a",
+          "job_id": "b436e516cd465a49fbdcefe5110a248e9b839c3818170bc69a51b30809c1728f",
+          "cycle_id": "9c437536a66b4484a2fdad603b3ac099",
+          "context_sha256": "59fce9718e2c155ece3779f306f9b5738cf89f313d9262d4aabd5ed0d3c3a7b5",
+          "environment_identity": "d5e69da232eca5e828af25b62a0f262dcc2c4e01bf5e7449103bec49f78f0931",
+          "required": 2,
+          "scheduled_reused": 0,
+          "native_hits": 2,
+          "native_built": 0,
+          "bindings_sha256": "671344b51e0827cdbc7c8f07fe828ceaacf0f9b47de493ebdcd11487ee55f17e",
+          "artifact_authority": false
+        },
+        "recipe_schedule": null,
+        "before": {
+          "pressure": 2,
+          "locked": false,
+          "swap_mib": 2211.0625
+        },
+        "after": {
+          "pressure": 2,
+          "locked": false,
+          "swap_mib": 2211.0625
+        }
+      }
+    ]
+  },
+  "native_coverage_code_byte_identical_across_diagnostic_commit": true,
+  "warm_runs": [
+    {
+      "label": "ordinary-warm-after-refresh",
+      "status": "sampled",
+      "to_observed_scene_seconds": 23.38143908300026,
+      "preparation_phases": [
+        {
+          "event": "end",
+          "outcome": "returned",
+          "phase": "archive-policy",
+          "seconds": 0.866599
+        },
+        {
+          "event": "end",
+          "outcome": "returned",
+          "phase": "game-preparation",
+          "seconds": 1.247758
+        }
+      ],
+      "module_compiler_processes": 0,
+      "PSO_worker_processes": 0,
+      "sampled_source_compiles": 0,
+      "sampled_PSO_failures": 0,
+      "pressure_peak": 2,
+      "swap_growth_mib": -40.0,
+      "combined_footprint_mib": 6602.497787475586,
+      "source_save_unchanged": true
+    },
+    {
+      "label": "ordinary-warm-confirm",
+      "status": "sampled",
+      "to_observed_scene_seconds": 23.33779349999986,
+      "preparation_phases": [
+        {
+          "event": "end",
+          "outcome": "returned",
+          "phase": "archive-policy",
+          "seconds": 0.159875
+        },
+        {
+          "event": "end",
+          "outcome": "returned",
+          "phase": "game-preparation",
+          "seconds": 1.446396
+        }
+      ],
+      "module_compiler_processes": 0,
+      "PSO_worker_processes": 0,
+      "sampled_source_compiles": 0,
+      "sampled_PSO_failures": 0,
+      "pressure_peak": 1,
+      "swap_growth_mib": -8.0,
+      "combined_footprint_mib": 6571.54487991333,
+      "source_save_unchanged": true
+    }
+  ],
+  "formal_data": {
+    "nodes": 17577,
+    "bytes_hashed": 339049263,
+    "unchanged": true
+  },
+  "installation": {
+    "status": "installed",
+    "app": "/Applications/Blood Echoes.app",
+    "version": "0.2.58",
+    "source_revision": "6909d36308a91e63c25d18a48450866a48b9f172",
+    "bundle_id": "io.github.bbport.optimized",
+    "native_roles_unchanged": true,
+    "swift_launcher_code_unchanged": true,
+    "changed_code_files": [
+      "Contents/Info.plist",
+      "Contents/MacOS/bbport",
+      "Contents/Resources/bbport/ARM64-LOCAL-PREPARATION.json",
+      "Contents/Resources/bbport/native-runtime-tools/game_pso_queue.py",
+      "Contents/Resources/bbport/native-runtime-tools/launcher_game_pso.py",
+      "Contents/Resources/bbport/native-runtime-tools/launcher_local_aot.py",
+      "Contents/Resources/bbport/native-runtime-tools/quick_restart_preparation.py",
+      "Contents/_CodeSignature/CodeResources"
+    ],
+    "diagnostics_enabled": false,
+    "white_model_fix_retained": true,
+    "formal_saves_settings_cache_modified": false,
+    "Release_updated": false
+  },
+  "F3_protocol_unchanged": true,
+  "F3_five_second_target_not_pursued_user_accepts_current_speed": true,
+  "Release_updated": false,
+  "Cua": false,
+  "recording": false,
+  "audio": false,
+  "qualification": "Two fixed-scene warm starts, not full-game or long-term memory proof. Authored 685-unit case covers three-way reuse/new-build/GS persistence gaps; the small real Metal control covers existing native archive hits and actual new builds. No artificial per-recipe reuse was granted to unknown producers."
+}

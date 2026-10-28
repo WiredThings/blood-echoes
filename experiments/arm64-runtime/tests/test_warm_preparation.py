@@ -80,6 +80,12 @@ class Warm(unittest.TestCase):
  def test_source_change_during_full_preparation_cannot_publish(self):
   anchor=quick.warm_anchor(self.bound);(self.f.game/'changed').write_text('changed while preparing')
   self.assertFalse(self.publish(anchor=anchor))
+ def test_refusal_diagnostic_is_bounded_and_preserves_return_contract(self):
+  self.assertTrue(self.publish());diagnostic={}
+  self.assertIsNotNone(self.load(diagnostic=diagnostic));self.assertEqual(diagnostic,{'last_check':'accepted'})
+  (self.cache/'unknown.key').write_text('new actual input');diagnostic={}
+  self.assertIsNone(self.load(diagnostic=diagnostic));self.assertEqual(diagnostic,{'last_check':'product-history-and-bytes'})
+  self.assertNotIn(str(self.f.root),json.dumps(diagnostic))
  def product_events(self,paths,**overrides):
   scope=quick._warm_products(self.f.gpu,quick.warm_binding(self.bound),self.f.context,self.local)
   files=quick._inventory(scope,self.f.context,lambda:None)
