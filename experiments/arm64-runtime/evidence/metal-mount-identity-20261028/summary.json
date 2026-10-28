@@ -1,21 +1,221 @@
 {
-  "status": "passed",
-  "build_id": "eb1deec46bb716df790788df07241ee6ac2ff0a935a650b7f2df884e589818e5",
-  "old_build_ids": [
-    "49a14db0839df0b30c8c1d9dce57c7e2c2d6929f0768278a66cc3b2dd3ba97bf",
-    "382042194ba75021a4378e56eb434029e7c875a6462e1317dd860fad19db64a8"
+  "status": "installed",
+  "tests": 147,
+  "source_revision": "81ea2355e2aa8d86d1cf7da1c66a2087279fe32d",
+  "actual_local_product_control": {
+    "status": "passed",
+    "build_id": "eb1deec46bb716df790788df07241ee6ac2ff0a935a650b7f2df884e589818e5",
+    "old_build_ids": [
+      "49a14db0839df0b30c8c1d9dce57c7e2c2d6929f0768278a66cc3b2dd3ba97bf",
+      "382042194ba75021a4378e56eb434029e7c875a6462e1317dd860fad19db64a8"
+    ],
+    "old_manifests_equivalent": true,
+    "actual_tools_sdk_os_identified": true,
+    "selected_real_libraries": 3,
+    "migration_reused": 3,
+    "repeat_skipped": 3,
+    "repeat_audit_reused": false,
+    "compiler_invocations": 0,
+    "original_cache_bytes_and_identity_unchanged": true,
+    "game_started": false
+  },
+  "full_initial_migration": {
+    "libraries_reused": 503,
+    "source_libraries_built": 0,
+    "local_seconds": 256.627263,
+    "scene_seconds": 471.7389579999999,
+    "pso_native_hits": 112,
+    "pso_native_built": 467,
+    "required": 579
+  },
+  "early_warm_refusals": [
+    {
+      "phase": "ordinary-warm-after-migration",
+      "status": "sampled",
+      "scene_ready": 45.72300841699962,
+      "peak_pressure": 2,
+      "swap_growth_mib": 91.8125,
+      "scene_sample": {
+        "frames": 1230,
+        "fps": 40.99457505123489,
+        "p95_ms": 26.95,
+        "p99_ms": 28.32,
+        "gpu_ms": 22.264373983739837,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6763.09162902832
+      },
+      "tool_memory": {
+        "observations": 319,
+        "owned_tree_peak_mib": 6776.436614990234,
+        "before_scene_peak_mib": 6596.139739990234,
+        "role_peaks_mib": {
+          "bash": 5.6575775146484375,
+          "bb-gpu": 3439.6286849975586,
+          "bb-probe-metal": 3331.947296142578,
+          "game-module-preparer": 22.85992431640625,
+          "game-pso-preparer": 43.000640869140625,
+          "llvm-nm": 20.906570434570312,
+          "python3": 351.06371307373047,
+          "tee": 1.0471038818359375
+        },
+        "sampled_not_allocator_hwm": true,
+        "shared_pages_may_be_counted_more_than_once": true
+      },
+      "source_save_unchanged": true
+    },
+    {
+      "phase": "ordinary-warm-confirm",
+      "status": "sampled",
+      "scene_ready": 44.74724120799965,
+      "peak_pressure": 2,
+      "swap_growth_mib": 0.0,
+      "scene_sample": {
+        "frames": 1368,
+        "fps": 45.59889042699961,
+        "p95_ms": 23.79,
+        "p99_ms": 25.48,
+        "gpu_ms": 20.757573099415204,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6772.153991699219
+      },
+      "tool_memory": {
+        "observations": 316,
+        "owned_tree_peak_mib": 6794.827125549316,
+        "before_scene_peak_mib": 6648.530204772949,
+        "role_peaks_mib": {
+          "bash": 4.344779968261719,
+          "bb-gpu": 3435.347343444824,
+          "bb-probe-metal": 3355.4160232543945,
+          "game-module-preparer": 21.17242431640625,
+          "game-pso-preparer": 43.063140869140625,
+          "python3": 350.93871307373047,
+          "tee": 1.0471038818359375
+        },
+        "sampled_not_allocator_hwm": true,
+        "shared_pages_may_be_counted_more_than_once": true
+      },
+      "source_save_unchanged": true
+    }
   ],
-  "old_manifests_equivalent": true,
-  "actual_tools_sdk_os_identified": true,
-  "selected_real_libraries": 3,
-  "migration_reused": 3,
-  "repeat_skipped": 3,
-  "repeat_audit_reused": false,
-  "compiler_invocations": 0,
-  "original_cache_bytes_and_identity_unchanged": true,
-  "game_started": false,
-  "authored_tests": 76,
-  "installed": false,
+  "early_refusal_root_cause_not_proven": true,
+  "final_consecutive_warm": [
+    {
+      "phase": "ordinary-warm-diagnostic",
+      "status": "sampled",
+      "scene_ready": 22.351997916000073,
+      "peak_pressure": 2,
+      "swap_growth_mib": -8.0,
+      "scene_sample": {
+        "frames": 1346,
+        "fps": 44.85443635701999,
+        "p95_ms": 24.24,
+        "p99_ms": 28.38,
+        "gpu_ms": 20.97434621099554,
+        "draws_median": 1368.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6764.271224975586
+      },
+      "tool_memory": {
+        "observations": 228,
+        "owned_tree_peak_mib": 6786.108421325684,
+        "before_scene_peak_mib": 6272.186317443848,
+        "role_peaks_mib": {
+          "bash": 5.6575775146484375,
+          "bb-gpu": 3435.722412109375,
+          "bb-probe-metal": 3346.025375366211,
+          "llvm-nm": 1.187774658203125,
+          "python3": 200.4694366455078,
+          "tee": 1.0471038818359375
+        },
+        "sampled_not_allocator_hwm": true,
+        "shared_pages_may_be_counted_more_than_once": true
+      },
+      "source_save_unchanged": true
+    },
+    {
+      "phase": "ordinary-warm-confirm",
+      "status": "sampled",
+      "scene_ready": 23.331874915999833,
+      "peak_pressure": 2,
+      "swap_growth_mib": -24.0,
+      "scene_sample": {
+        "frames": 1383,
+        "fps": 46.07604045896134,
+        "p95_ms": 23.13,
+        "p99_ms": 23.89,
+        "gpu_ms": 20.34994938539407,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6544.904335021973
+      },
+      "tool_memory": {
+        "observations": 232,
+        "owned_tree_peak_mib": 6573.49934387207,
+        "before_scene_peak_mib": 6425.796195983887,
+        "role_peaks_mib": {
+          "bash": 5.6419525146484375,
+          "bb-gpu": 3230.7067642211914,
+          "bb-probe-metal": 3338.2131958007812,
+          "python3": 124.42244720458984,
+          "tee": 1.0471038818359375
+        },
+        "sampled_not_allocator_hwm": true,
+        "shared_pages_may_be_counted_more_than_once": true
+      },
+      "source_save_unchanged": true
+    }
+  ],
+  "runtime_complete_rows": [
+    {
+      "run": "metal-mount-startup-validation/ordinary-warm-diagnostic",
+      "complete_rows": 3051,
+      "last_partial_record_excluded": true,
+      "counters": {
+        "compiles": 0.0,
+        "metal_source_calls": 0.0,
+        "metal_source_failed": 0.0,
+        "metal_pso_failed": 0.0,
+        "metal_local_calls": 7.0
+      },
+      "all_strict_attempts_equal_hits": true
+    },
+    {
+      "run": "metal-mount-warm-confirm/ordinary-warm-confirm",
+      "complete_rows": 2956,
+      "last_partial_record_excluded": true,
+      "counters": {
+        "compiles": 0.0,
+        "metal_source_calls": 0.0,
+        "metal_source_failed": 0.0,
+        "metal_pso_failed": 0.0,
+        "metal_local_calls": 7.0
+      },
+      "all_strict_attempts_equal_hits": true
+    }
+  ],
+  "formal_nodes_checked": 17577,
+  "formal_bytes_checked": 339049263,
+  "formal_data_written": false,
   "Release_updated": false,
-  "formal_data_modified": false
+  "native_roles_and_swift_code_unchanged": true,
+  "diagnostics_enabled": false,
+  "first_adoption_is_not_warm_start": true
 }
