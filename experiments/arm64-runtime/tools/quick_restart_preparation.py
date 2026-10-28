@@ -1,11 +1,12 @@
 """Same-supervisor F3 scheduling hint, never an artifact or source authority."""
 from pathlib import Path
-import hashlib,json,os,re,shlex,stat,subprocess
+import hashlib,json,os,re,shlex,stat,subprocess,time
 from launcher_game_catalog import directory,file_sha,digest,read_ready,write_json
 from game_pso_owned_audit import checked_bytes
 
 HEX32=re.compile(r'[0-9a-f]{32}')
 HEX64=re.compile(r'[0-9a-f]{64}')
+WARM_MAX_BYTES=8*1024*1024
 
 def process(pid):
     result=subprocess.run(['/bin/ps','-p',str(pid),'-o','ppid=','-o','uid=','-o','lstart=','-o','command='],
@@ -200,6 +201,70 @@ def registered_local(local,check):
         return (result is not None and result[0]==local['BB_MTL_LOCAL_AOT_BUILD_ID']
             and byte_digest(canonical(registration.active['toolchain']['environment']))==local['BB_MTL_LOCAL_AOT_ENVIRONMENT_ID'])
 
+def _inventory(scope,context,check):
+    """Once after complete preparation, retain exact mutable product bytes.
+
+    Runtime re-publishes identical captured packets/keys atomically. Only those
+    files named by continuous journal events are re-read next time; never stat
+    or hash every product on an ordinary hit. Source snapshot events stay strict.
+    """
+    immutable={context['generation'],context['game_root']};rows={};total=0;next_check=0
+    for name in scope['roots']:
+        if name in immutable:continue
+        root=directory(name)
+        for parent,dirs,files in os.walk(root,followlinks=False):
+            for p in [Path(parent),*(Path(parent)/n for n in files)]:
+                if time.monotonic()>=next_check:check();next_check=time.monotonic()+.1
+                s=p.lstat()
+                if p!=p.resolve(strict=True)or s.st_uid!=os.getuid()or s.st_mode&0o022:raise ValueError('unsafe warm product')
+                if stat.S_ISDIR(s.st_mode):row=['directory',s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid]
+                elif stat.S_ISREG(s.st_mode)and s.st_nlink==1 and 0<=s.st_size<=256*1024*1024:
+                    total+=s.st_size
+                    if total>1024*1024*1024:raise ValueError('warm product byte budget')
+                    row=['file',*file_sha(p),s.st_mode,s.st_uid,s.st_gid]
+                else:raise ValueError('nonplain warm product')
+                rows[str(p)]=row
+                if len(rows)>20000:raise ValueError('warm product count budget')
+            # Do not let os.walk silently skip linked directories.
+            for n in dirs:directory(Path(parent)/n)
+    check();return rows
+
+def _products_current(products,context,check):
+    from startup_change_journal import query,unchanged
+    scope=products['scope'];old=products['journal'];current=query(scope['roots'],old)
+    if current is None:return False
+    if current.get('unchanged')is True:return True
+    known={json.dumps(r,separators=(',',':'))for r in old['events']};paths=set()
+    mounts={}
+    for pin in old['pins'].values():
+        if pin[0]in mounts and mounts[pin[0]]!=pin[-1]:return False
+        mounts[pin[0]]=pin[-1]
+    for event in current['events']:
+        if json.dumps(event,separators=(',',':'))in known:continue
+        relative=Path(event[3].lstrip('/'))
+        if '..'in relative.parts or event[0]not in mounts:return False
+        paths.add(Path(mounts[event[0]])/relative)
+    immutable=[Path(context['generation']),Path(context['game_root'])];next_check=0
+    for path in paths:
+        if any(path==p or path.is_relative_to(p)for p in immutable):return False
+        if time.monotonic()>=next_check:check();next_check=time.monotonic()+.1
+        row=products['files'].get(str(path))
+        if row is None:
+            # These private native writers' uncommitted temporary names are
+            # never input. Ignore only an exact known shape AND absent node.
+            temp=re.fullmatch(r'\.pending-[0-9]+-[0-9]+|[A-Za-z0-9_.-]+\.tmp(?:-[0-9]+-[0-9]+)?',path.name)
+            if temp and not os.path.lexists(path)and any(path.is_relative_to(Path(r))for r in scope['roots']):continue
+            return False
+        s=path.lstat()
+        if path!=path.resolve(strict=True):return False
+        if row[0]=='directory':
+            if row!=['directory',s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid]:return False
+        elif row[0]=='file':
+            if not stat.S_ISREG(s.st_mode)or s.st_nlink!=1 or s.st_size!=row[2]or row[3:]!=[s.st_mode,s.st_uid,s.st_gid]:return False
+            if list(file_sha(path))!=row[1:3]:return False
+        else:return False
+    check();return unchanged(current,scope['roots'])
+
 def publish_warm(*,anchor,context,gpu,local_environment,check=lambda:None):
     """Persist completed scheduling, without granting artifact import rights."""
     try:
@@ -212,9 +277,11 @@ def publish_warm(*,anchor,context,gpu,local_environment,check=lambda:None):
         if selected is None:return False
         products=_warm_products(gpu,bound,context,selected[0]);token=query(products['roots']);check()
         if token is None:return False
+        files=_inventory(products,context,check)
+        if not unchanged(token,products['roots']):return False
         payload=dict(schema=1,kind='unchanged-preparation-schedule',binding=bound,context=context,
-            source=anchor,products=dict(scope=products,journal=token),local=selected[0],artifact_authority=False)
-        if len(json.dumps(payload,sort_keys=True,separators=(',',':')).encode())>128*1024:return False
+            source=anchor,products=dict(scope=products,journal=token,files=files),local=selected[0],artifact_authority=False)
+        if len(json.dumps(payload,sort_keys=True,separators=(',',':')).encode())>WARM_MAX_BYTES:return False
         if source_scope(bound)!=scope or not unchanged(anchor['journal'],scope['roots']):return False
         write_json(_warm_path(gpu,bound),payload);return True
     except(ValueError,OSError,KeyError,TypeError):return False
@@ -227,7 +294,7 @@ def prepared_warm(*,bound,environment,gpu,check=lambda:None,tool_check=registere
         if stable is None or stable['value']['gpu_root']!=str(directory(gpu)):return None
         path=_warm_path(gpu,stable);info=path.lstat()
         if info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o600:return None
-        saved=json.loads(checked_bytes(path,limit=128*1024)[0])
+        saved=json.loads(checked_bytes(path,limit=WARM_MAX_BYTES)[0])
         if saved.get('schema')!=1 or saved.get('kind')!='unchanged-preparation-schedule'or saved.get('binding')!=stable or saved.get('artifact_authority')is not False:return None
         scope=source_scope(stable);source=saved['source']
         if source['binding']!=stable or source['scope']!=scope or not _optional_current(scope):return None
@@ -236,7 +303,7 @@ def prepared_warm(*,bound,environment,gpu,check=lambda:None,tool_check=registere
         products=_warm_products(gpu,stable,saved['context'],selected[0])
         if products!=saved['products']['scope']or not _optional_current(products):return None
         from startup_change_journal import unchanged
-        if not unchanged(source['journal'],scope['roots'])or not unchanged(saved['products']['journal'],products['roots']):return None
+        if not unchanged(source['journal'],scope['roots'])or not _products_current(saved['products'],saved['context'],check):return None
         if not tool_check(selected[0],check):return None
         check();return saved
     except(ValueError,OSError,KeyError,TypeError,subprocess.SubprocessError):return None
@@ -252,7 +319,7 @@ def resume_warm(*,schedule,gpu,component,backend,cohort,check,configure_capture,
         from startup_change_journal import unchanged
         source=schedule['source'];products=schedule['products']
         if source_scope(schedule['binding'])!=source['scope']or not _optional_current(products['scope']):return None
-        if not unchanged(source['journal'],source['scope']['roots'])or not unchanged(products['journal'],products['scope']['roots']):return None
+        if not unchanged(source['journal'],source['scope']['roots'])or not _products_current(products,schedule['context'],check):return None
         return dict(status='unchanged-preparation-schedule-reused',capture_environment=capture,
             anticipatory_scan_and_warmup_skipped=True,artifact_authority=False,runtime_full_key_checks_retained=True,
             runtime_cache_import_allowed=False,actual_final_read_admission=False,full_final_pso_ready=False,

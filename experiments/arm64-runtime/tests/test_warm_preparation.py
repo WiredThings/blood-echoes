@@ -26,8 +26,8 @@ class Warm(unittest.TestCase):
    p=Path(root)
    for f in [p,*p.rglob('*')]:
     st=f.lstat();rows[str(f)]=[st.st_ino,st.st_mode,st.st_size,st.st_mtime_ns,hashlib.sha256(f.read_bytes()).hexdigest()if f.is_file()else None]
-  return dict(rows=rows)
- def unchanged(self,token,roots,**kw):return token==self.query(roots)
+  return dict(rows=rows,unchanged=previous is not None and previous['rows']==rows)
+ def unchanged(self,token,roots,**kw):return token['rows']==self.query(roots)['rows']
  def publish(self,**overrides):
   values=dict(anchor=quick.warm_anchor(self.bound),context=self.f.context,gpu=self.f.gpu,local_environment=self.local);values.update(overrides)
   return quick.publish_warm(**values)
@@ -76,6 +76,35 @@ class Warm(unittest.TestCase):
  def test_source_change_during_full_preparation_cannot_publish(self):
   anchor=quick.warm_anchor(self.bound);(self.f.game/'changed').write_text('changed while preparing')
   self.assertFalse(self.publish(anchor=anchor))
+ def product_events(self,paths,**overrides):
+  scope=quick._warm_products(self.f.gpu,quick.warm_binding(self.bound),self.f.context,self.local)
+  files=quick._inventory(scope,self.f.context,lambda:None)
+  old=dict(pins={'root':[1,0,0,0,0,0,'/']},events=[])
+  current=dict(unchanged=False,events=[[1,i+1,0,str(p).lstrip('/')]for i,p in enumerate(paths)])
+  products=dict(scope=scope,files=files,journal=old);products.update(overrides)
+  return products,current
+ def test_byte_identical_atomic_republication_can_reuse_without_full_inventory(self):
+  p=self.cache/'pso.bin';products,current=self.product_events([p]);temporary=p.with_suffix('.new');temporary.write_bytes(p.read_bytes());os.replace(temporary,p)
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True),patch.object(quick,'_inventory',side_effect=AssertionError('whole cache traversal')):
+   self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
+  p.write_bytes(b'corrupt pipeline')
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
+   self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def test_only_absent_exact_native_temporary_names_can_be_ignored(self):
+  temp=self.capture/'.pending-123-4';products,current=self.product_events([temp])
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
+   self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
+   temp.write_text('still pending');self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+  unknown=self.cache/'unknown.key';products,current=self.product_events([unknown])
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
+   self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def test_changes_during_delta_hashing_or_immutable_snapshot_events_reject_reuse(self):
+  p=self.cache/'pso.bin';products,current=self.product_events([p])
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=False):
+   self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+  products,current=self.product_events([self.f.view/'shader.bin'])
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
+   self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
  def test_change_between_load_and_capture_cannot_be_adopted(self):
   self.assertTrue(self.publish());saved=self.load();(self.cache/'pso.bin').write_text('changed after lookup')
   self.assertIsNone(self.resume(saved))
