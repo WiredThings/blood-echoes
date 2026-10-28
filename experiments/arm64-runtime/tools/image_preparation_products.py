@@ -16,6 +16,16 @@ INPUTS=('eboot.bin','sce_module/libc.prx','sce_module/libSceFios2.prx','sce_sys/
 OUTPUTS=('boot.bin','boot-libc.bin','boot-linked.bin','eboot.elf','entry.bin','analysis.json','libc-link.json','link.json')
 RULES=('scripts/prepare.py','scripts/game_check.py','scripts/link_libc.py','scripts/link_modules.py')
 
+class OriginalFailure(Exception):
+ def __init__(self,code,message):super().__init__(message);self.code=code
+
+def original_algorithms(game,target,prepare,link_libc,link_modules):
+ # Keep the original fatal statuses. Neither failure can become supervisor
+ # menu restart (75), quickload (76), or an invented continuation protocol.
+ try:prepare.prepare(game,target);link_libc.link(game,target);link_modules.link(game,target)
+ except prepare.GameCheckError as error:raise OriginalFailure(2,'Unsupported game files: '+str(error))from error
+ except Exception as error:raise OriginalFailure(1,'Image/link preparation failed: '+str(error))from error
+
 def need(value,why):
  if not value:raise ValueError(why)
 
@@ -58,7 +68,7 @@ def prepare_images(*,stage,game,out,work,environment,build=None,check=lambda:Non
    sys.path.insert(0,str(stage/'scripts'))
    import prepare,link_libc,link_modules
    for module in(prepare,link_libc,link_modules):need(Path(module.__file__).resolve()==stage/'scripts'/Path(module.__file__).name,'image parser imported outside selected stage')
-   def build(game,target):prepare.prepare(game,target);link_libc.link(game,target);link_modules.link(game,target)
+   def build(game,target):original_algorithms(game,target,prepare,link_libc,link_modules)
   with tempfile.TemporaryDirectory(prefix='image-build-',dir=root)as temporary:
    scratch=Path(temporary);check();build(game,scratch);hashes.verify()
    generation=root/(identity+'-'+str(time.time_ns()));generation.mkdir(mode=0o700)
@@ -85,7 +95,8 @@ def prepare_images(*,stage,game,out,work,environment,build=None,check=lambda:Non
   if not semantic['skip_game_check']:
    sys.path.insert(0,str(stage/'scripts'));import game_check
    need(Path(game_check.__file__).resolve()==stage/'scripts/game_check.py','original game validator path')
-   need(game_check.problem(game)is None,'selected game or shader extraction failed original check')
+   problem=game_check.problem(game)
+   if problem is not None:raise OriginalFailure(2,'Unsupported game files: '+game_check.explain(*problem))
   if token is not None and journal.unchanged(token,[watch]):write(validation_path,dict(binding=compatibility,journal=token))
  # Retain the actual published inode stamps; unchanged out files need no copy.
  destination_path=registrations/'current-output.json';previous={}
@@ -120,6 +131,10 @@ def main():
   parity=json.loads(code_bytes(stage/'SOURCE-PARITY.json')[0])['effective_sources']
   for name in RULES:code_bytes(stage/name,limit=4*1024*1024,expected=parity[name],content=False)
  need(args.out.absolute()==data/'out','original output role')
- prepare_images(stage=stage,game=args.game,out=args.out,work=work,environment=os.environ)
+ try:prepare_images(stage=stage,game=args.game,out=args.out,work=work,environment=os.environ)
+ except OriginalFailure as error:
+  print(str(error),file=sys.stderr,flush=True);raise SystemExit(error.code)
+ except Exception as error:
+  print('Image/link preparation failed: '+str(error),file=sys.stderr,flush=True);raise SystemExit(1)
 
 if __name__=='__main__':main()

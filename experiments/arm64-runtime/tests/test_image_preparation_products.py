@@ -9,6 +9,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import image_preparation_products as m
 
+@unittest.skipUnless(sys.platform=='darwin','requires actual Darwin/APFS clonefile semantics')
 class Products(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name).resolve();self.stage=self.root/'code';self.game=self.root/'game';self.out=self.root/'out';self.work=self.root/'work';self.count=0
@@ -52,7 +53,19 @@ class Products(unittest.TestCase):
   with self.assertRaises(ValueError):self.run_case()
  def test_shader_check_is_not_silently_skipped(self):
   from types import SimpleNamespace
-  fake=SimpleNamespace(__file__=str(self.stage/'scripts/game_check.py'),problem=lambda game:('damaged',))
-  with patch.dict(sys.modules,game_check=fake),self.assertRaisesRegex(ValueError,'original check'):self.run_case({'BB_SKIP_GAME_CHECK':'0'})
+  fake=SimpleNamespace(__file__=str(self.stage/'scripts/game_check.py'),problem=lambda game:('damaged',),explain=lambda *args:'original damaged-shader refusal')
+  with patch.dict(sys.modules,game_check=fake),self.assertRaises(m.OriginalFailure)as result:self.run_case({'BB_SKIP_GAME_CHECK':'0'})
+  self.assertEqual(result.exception.code,2)
+ def test_original_game_and_link_errors_keep_fatal_statuses(self):
+  from types import SimpleNamespace
+  class Unsupported(Exception):pass
+  def game(*args):raise Unsupported('authored unsupported game')
+  def link(*args):raise ValueError('authored bad relocation')
+  first=SimpleNamespace(prepare=game,GameCheckError=Unsupported);other=SimpleNamespace(link=link)
+  with self.assertRaises(m.OriginalFailure)as error:m.original_algorithms(self.game,self.out,first,other,other)
+  self.assertEqual(error.exception.code,2)
+  first.prepare=lambda *args:None
+  with self.assertRaises(m.OriginalFailure)as error:m.original_algorithms(self.game,self.out,first,other,other)
+  self.assertEqual(error.exception.code,1)
 
 if __name__=='__main__':unittest.main()

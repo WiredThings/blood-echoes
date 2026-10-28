@@ -1,0 +1,894 @@
+{
+  "status": "concentrated-startup-stage-tested-not-full-goal-complete",
+  "source_revision": "6325dd582135c0727313f947492fc03dad0f942d",
+  "runs": [
+    {
+      "group": "candidate",
+      "label": "first-registration-after-code-update",
+      "status": "sampled",
+      "scene_seconds": 42.39193875005003,
+      "peak_pressure": 2,
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 13434.4375
+      },
+      "scene": {
+        "frames": 1445,
+        "fps": 48.14092731752756,
+        "p95_ms": 22.04,
+        "p99_ms": 23.4,
+        "gpu_ms": 19.588602076124566,
+        "draws_median": 1367,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6525.6540603637695
+      },
+      "source_save_unchanged": true,
+      "app_seal_before_after": {
+        "pre": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post_after_owned_process_cleanup": true
+      },
+      "preparation_records": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231,
+            "toolchain_registration": {
+              "full_probes": 1,
+              "metadata_checks": 2,
+              "reused": 0,
+              "selection_checks": 4
+            }
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "startup_validation": {
+            "code_digests": {
+              "hash_bytes": 41044,
+              "hash_reads": 7,
+              "memo_entries": 84,
+              "metadata_digest_hits": 61
+            },
+            "final_input_digests": {
+              "hashed_bytes": 3722,
+              "hashed_files": 2,
+              "journal_reused": false,
+              "metadata_only": false,
+              "receipt": "verified",
+              "reused_files": 2
+            },
+            "native_verifiers": {
+              "hash_bytes": 582217920,
+              "hash_reads": 40,
+              "tools": {
+                "codesign": 20,
+                "lipo": 20,
+                "otool": 20
+              }
+            },
+            "package": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "metadata_only": true,
+              "receipt": "verified",
+              "reused_files": 78
+            }
+          },
+          "status": "prepared",
+          "typed_modules": {
+            "inventory_records": 997,
+            "native_attempts": 48,
+            "native_completed": 48,
+            "required_target_keys": 48,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 45,
+            "verified_required_products": 0,
+            "verified_target_reuses": 484
+          }
+        }
+      ],
+      "image_records": [
+        {
+          "identity": "49a6b7fbb4c07494dd077e5d73f4b276e89d36771bdfde3d74c50e4f104908fb",
+          "original_algorithms_invoked": false,
+          "product_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 8
+          },
+          "restored_outputs": 0,
+          "seconds": 0.8515265419846401,
+          "shader_validation_reused": true,
+          "source_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 4
+          },
+          "status": "reused"
+        }
+      ],
+      "actual_runtime_reuse": {
+        "complete_rows": 3702,
+        "partial_rows_ignored": 1,
+        "maxima": {
+          "compiles": 0.0,
+          "metal_source_calls": 0.0,
+          "metal_source_failed": 0.0,
+          "metal_local_calls": 7.0,
+          "metal_local_failed": 0.0,
+          "metal_strict_pso_attempts": 7.0,
+          "metal_strict_pso_hits": 7.0
+        },
+        "strict_lookup_matches_in_every_complete_row": true,
+        "scope": "only this scene and menu frames; no full-game or uncaptured preframe claim"
+      }
+    },
+    {
+      "group": "candidate",
+      "label": "ordinary-warm-one",
+      "status": "sampled",
+      "scene_seconds": 28.774412292055786,
+      "peak_pressure": 2,
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 13402.375
+      },
+      "scene": {
+        "frames": 1428,
+        "fps": 47.597509063692335,
+        "p95_ms": 22.44,
+        "p99_ms": 24.04,
+        "gpu_ms": 19.81265406162465,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6530.404266357422
+      },
+      "source_save_unchanged": true,
+      "app_seal_before_after": {
+        "pre": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post_after_owned_process_cleanup": true
+      },
+      "preparation_records": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231,
+            "toolchain_registration": {
+              "full_probes": 0,
+              "metadata_checks": 3,
+              "reused": 1,
+              "selection_checks": 3
+            }
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "startup_validation": {
+            "code_digests": {
+              "hash_bytes": 41044,
+              "hash_reads": 7,
+              "memo_entries": 84,
+              "metadata_digest_hits": 61
+            },
+            "final_input_digests": {
+              "hashed_bytes": 3722,
+              "hashed_files": 2,
+              "journal_reused": false,
+              "metadata_only": false,
+              "receipt": "verified",
+              "reused_files": 2
+            },
+            "native_verifiers": {
+              "hash_bytes": 116428384,
+              "hash_reads": 8,
+              "tools": {
+                "codesign": 4,
+                "lipo": 4,
+                "otool": 4
+              }
+            },
+            "package": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "metadata_only": true,
+              "receipt": "verified",
+              "reused_files": 78
+            }
+          },
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 48,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 45,
+            "verified_required_products": 48
+          }
+        }
+      ],
+      "image_records": [
+        {
+          "identity": "49a6b7fbb4c07494dd077e5d73f4b276e89d36771bdfde3d74c50e4f104908fb",
+          "original_algorithms_invoked": false,
+          "product_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 8
+          },
+          "restored_outputs": 0,
+          "seconds": 0.8224116660421714,
+          "shader_validation_reused": true,
+          "source_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 4
+          },
+          "status": "reused"
+        }
+      ],
+      "actual_runtime_reuse": {
+        "complete_rows": 3505,
+        "partial_rows_ignored": 1,
+        "maxima": {
+          "compiles": 0.0,
+          "metal_source_calls": 0.0,
+          "metal_source_failed": 0.0,
+          "metal_local_calls": 7.0,
+          "metal_local_failed": 0.0,
+          "metal_strict_pso_attempts": 7.0,
+          "metal_strict_pso_hits": 7.0
+        },
+        "strict_lookup_matches_in_every_complete_row": true,
+        "scope": "only this scene and menu frames; no full-game or uncaptured preframe claim"
+      }
+    },
+    {
+      "group": "candidate",
+      "label": "ordinary-warm-two",
+      "status": "sampled",
+      "scene_seconds": 29.79059191606939,
+      "peak_pressure": 2,
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 13362.375
+      },
+      "scene": {
+        "frames": 1400,
+        "fps": 46.64681067425633,
+        "p95_ms": 22.77,
+        "p99_ms": 24.79,
+        "gpu_ms": 20.268614285714285,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6749.622764587402
+      },
+      "source_save_unchanged": true,
+      "app_seal_before_after": {
+        "pre": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post_after_owned_process_cleanup": true
+      },
+      "preparation_records": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231,
+            "toolchain_registration": {
+              "full_probes": 0,
+              "metadata_checks": 3,
+              "reused": 1,
+              "selection_checks": 3
+            }
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "startup_validation": {
+            "code_digests": {
+              "hash_bytes": 41044,
+              "hash_reads": 7,
+              "memo_entries": 84,
+              "metadata_digest_hits": 61
+            },
+            "final_input_digests": {
+              "hashed_bytes": 3722,
+              "hashed_files": 2,
+              "journal_reused": false,
+              "metadata_only": false,
+              "receipt": "verified",
+              "reused_files": 2
+            },
+            "native_verifiers": {
+              "hash_bytes": 0,
+              "hash_reads": 0,
+              "tools": {}
+            },
+            "package": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "metadata_only": true,
+              "receipt": "verified",
+              "reused_files": 78
+            }
+          },
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 48,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 45,
+            "verified_required_products": 48
+          }
+        }
+      ],
+      "image_records": [
+        {
+          "identity": "49a6b7fbb4c07494dd077e5d73f4b276e89d36771bdfde3d74c50e4f104908fb",
+          "original_algorithms_invoked": false,
+          "product_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 8
+          },
+          "restored_outputs": 0,
+          "seconds": 0.8171572500141338,
+          "shader_validation_reused": true,
+          "source_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 4
+          },
+          "status": "reused"
+        }
+      ],
+      "actual_runtime_reuse": {
+        "complete_rows": 3676,
+        "partial_rows_ignored": 1,
+        "maxima": {
+          "compiles": 0.0,
+          "metal_source_calls": 0.0,
+          "metal_source_failed": 0.0,
+          "metal_local_calls": 7.0,
+          "metal_local_failed": 0.0,
+          "metal_strict_pso_attempts": 7.0,
+          "metal_strict_pso_hits": 7.0
+        },
+        "strict_lookup_matches_in_every_complete_row": true,
+        "scope": "only this scene and menu frames; no full-game or uncaptured preframe claim"
+      }
+    },
+    {
+      "group": "candidate",
+      "label": "same-supervisor-F3",
+      "status": "functional-checked",
+      "scene_seconds": 32.94212891696952,
+      "peak_pressure": 2,
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 13509.9375
+      },
+      "scene": {},
+      "source_save_unchanged": true,
+      "app_seal_before_after": {
+        "pre": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post_after_owned_process_cleanup": true
+      },
+      "f3": {
+        "phase": "completed",
+        "since": 62.672502125031315,
+        "initial_ready": 32.94212891696952,
+        "original_cpu": 24520,
+        "original_gpu": 24695,
+        "replacement_cpu": 24813,
+        "completed": 78.02848674997222,
+        "offline_protocol_seen": true,
+        "automatic_continue_seen": true,
+        "scripted_api_not_physical_key_test": true,
+        "quickload_observed_seconds": 45.24281629198231,
+        "restore_to_scene_seconds": 17.429685833049007
+      },
+      "preparation_records": [
+        {
+          "fixed_helpers": "completed",
+          "game_pso": "completed",
+          "incremental_inputs": {
+            "catalogue": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "snapshot": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            },
+            "source": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "reused_files": 28852
+            }
+          },
+          "local_libraries": {
+            "built": 0,
+            "persistent_audit_reused": true,
+            "repaired_products": 0,
+            "requests": 231,
+            "reused_products": 0,
+            "skipped": 231,
+            "toolchain_registration": {
+              "full_probes": 0,
+              "metadata_checks": 3,
+              "reused": 1,
+              "selection_checks": 3
+            }
+          },
+          "reason": "prepared",
+          "requested": "auto",
+          "startup_validation": {
+            "code_digests": {
+              "hash_bytes": 41044,
+              "hash_reads": 7,
+              "memo_entries": 84,
+              "metadata_digest_hits": 61
+            },
+            "final_input_digests": {
+              "hashed_bytes": 3722,
+              "hashed_files": 2,
+              "journal_reused": false,
+              "metadata_only": false,
+              "receipt": "verified",
+              "reused_files": 2
+            },
+            "native_verifiers": {
+              "hash_bytes": 0,
+              "hash_reads": 0,
+              "tools": {}
+            },
+            "package": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "metadata_only": true,
+              "receipt": "verified",
+              "reused_files": 78
+            }
+          },
+          "status": "prepared",
+          "typed_modules": {
+            "historical_capture_inventory_skipped": true,
+            "required_target_keys": 48,
+            "unresolved_static_stage_records": 0,
+            "verified_generic_target_coverage": 45,
+            "verified_required_products": 48
+          }
+        },
+        {
+          "fixed_helpers": "same-supervisor-reused",
+          "game_pso": "same-supervisor-f3-schedule-reused",
+          "local_libraries": {
+            "same_supervisor_reused": true
+          },
+          "requested": "auto",
+          "startup_validation": {
+            "code_digests": {
+              "hash_bytes": 25510,
+              "hash_reads": 5,
+              "memo_entries": 83,
+              "metadata_digest_hits": 30
+            },
+            "final_input_digests": {
+              "hashed_bytes": 3722,
+              "hashed_files": 2,
+              "journal_reused": false,
+              "metadata_only": false,
+              "receipt": "verified",
+              "reused_files": 2
+            },
+            "native_verifiers": {
+              "hash_bytes": 0,
+              "hash_reads": 0,
+              "tools": {}
+            },
+            "package": {
+              "hashed_bytes": 0,
+              "hashed_files": 0,
+              "journal_reused": true,
+              "metadata_only": true,
+              "receipt": "verified",
+              "reused_files": 78
+            }
+          },
+          "status": "prepared"
+        }
+      ],
+      "image_records": [
+        {
+          "identity": "49a6b7fbb4c07494dd077e5d73f4b276e89d36771bdfde3d74c50e4f104908fb",
+          "original_algorithms_invoked": false,
+          "product_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 8
+          },
+          "restored_outputs": 0,
+          "seconds": 0.8775100000202656,
+          "shader_validation_reused": true,
+          "source_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 4
+          },
+          "status": "reused"
+        },
+        {
+          "identity": "49a6b7fbb4c07494dd077e5d73f4b276e89d36771bdfde3d74c50e4f104908fb",
+          "original_algorithms_invoked": false,
+          "product_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 8
+          },
+          "restored_outputs": 0,
+          "seconds": 0.9634727080119774,
+          "shader_validation_reused": true,
+          "source_hashes": {
+            "hashed_bytes": 0,
+            "hashed_files": 0,
+            "journal_reused": true,
+            "metadata_only": true,
+            "receipt": "verified",
+            "reused_files": 4
+          },
+          "status": "reused"
+        }
+      ],
+      "actual_runtime_reuse": {
+        "complete_rows": 1817,
+        "partial_rows_ignored": 1,
+        "maxima": {
+          "compiles": 0.0,
+          "metal_source_calls": 0.0,
+          "metal_source_failed": 0.0,
+          "metal_local_calls": 7.0,
+          "metal_local_failed": 0.0,
+          "metal_strict_pso_attempts": 7.0,
+          "metal_strict_pso_hits": 7.0
+        },
+        "strict_lookup_matches_in_every_complete_row": true,
+        "scope": "only this scene and menu frames; no full-game or uncaptured preframe claim"
+      }
+    },
+    {
+      "group": "installed-baseline",
+      "label": "baseline-settle",
+      "status": "sampled",
+      "scene_seconds": 38.033162832958624,
+      "peak_pressure": 2,
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 13537.8125
+      },
+      "scene": {
+        "frames": 1442,
+        "fps": 48.05872095813492,
+        "p95_ms": 22.07,
+        "p99_ms": 23.99,
+        "gpu_ms": 19.51371012482663,
+        "draws_median": 1367.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6535.966514587402
+      },
+      "source_save_unchanged": true,
+      "app_seal_before_after": {
+        "pre": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/installed-baseline/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/installed-baseline/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post_after_owned_process_cleanup": true
+      }
+    },
+    {
+      "group": "installed-baseline",
+      "label": "baseline-stable-warm",
+      "status": "sampled",
+      "scene_seconds": 30.789345416938886,
+      "peak_pressure": 2,
+      "after": {
+        "pressure": 1,
+        "locked": false,
+        "swap_mib": 13566.6875
+      },
+      "scene": {
+        "frames": 1405,
+        "fps": 46.825060905906625,
+        "p95_ms": 22.52,
+        "p99_ms": 24.25,
+        "gpu_ms": 20.137836298932385,
+        "draws_median": 1366,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6706.20881652832
+      },
+      "source_save_unchanged": true,
+      "app_seal_before_after": {
+        "pre": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/installed-baseline/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post": {
+          "status": "verified",
+          "command": [
+            "/usr/bin/codesign",
+            "--verify",
+            "--deep",
+            "--strict",
+            "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/startup-registration-1793163872049307000/installed-baseline/Blood Echoes.app"
+          ],
+          "exit": 0
+        },
+        "post_after_owned_process_cleanup": true
+      }
+    }
+  ],
+  "Cua": false,
+  "screenshots": false,
+  "screen_recording": false,
+  "audio": "none",
+  "formal_app_updated": false,
+  "formal_saves_settings_caches_modified": false,
+  "temporary_texture_diagnostics_enabled": false,
+  "Release_updated": false,
+  "original_native_roles_unchanged": true,
+  "remaining": [
+    "ordinary warm still schedules verified module/source results",
+    "native children and isolated metadata helper retain full code admission",
+    "two native full-verification calls remain on ordinary warm",
+    "actual scene/F3 target of five seconds not reached",
+    "full final-package Mod scene matrix not repeated in this stage"
+  ],
+  "measurement_limits": [
+    "Scene footprint sums can double-count shared CPU/GPU pages",
+    "Startup Python/compiler tool-tree peak not completely accounted",
+    "Small startup sample, no statistical FPS or long-exploration conclusion",
+    "F3 original API scripted; physical key and visual gameplay not reaccepted this stage"
+  ]
+}

@@ -22,7 +22,8 @@ class NativeRegistration(unittest.TestCase):
   self.profile=SimpleNamespace(code=code,work_root=self.work,bundle=SimpleNamespace(stage=self.stage,app=self.app,native=dict(frozen_runtime=self.roles)))
   self.proof=dict(target=str(self.target),target_sha256=self.roles['bin/worker'],library=str(self.lib),library_sha256=self.roles['bin/libbbgpu.dylib'],load_edge_verified=True,strict_signatures=True,architecture='arm64',declared_gpu_load_edges=['@loader_path/libbbgpu.dylib'],declared_rpaths=[])
   self.calls=0;self.q=patch.object(j,'query',return_value=dict(schema=1,complete=True,code_roots=True));self.u=patch.object(j,'unchanged',return_value=True);self.q.start();self.u.start()
- def tearDown(self):self.u.stop();self.q.stop();self.tmp.cleanup()
+  self.system=patch.object(r,'system_pin',return_value=[1,2,0o100555,0,0,1,32,10,11]);self.system.start()
+ def tearDown(self):self.system.stop();self.u.stop();self.q.stop();self.tmp.cleanup()
  def resolve(self,*args,**kw):self.calls+=1;return copy.deepcopy(self.proof)
  def run_case(self):return r.native_gpu_identity(self.target,self.stage,self.profile,resolver=self.resolve)
  def test_actual_first_result_then_no_external_verifier(self):
