@@ -57,3 +57,5 @@ GPU 完成信号和 command-buffer retirement 是不同边界：定向测试等�
 当前历史不穷举 render attachment 写入或 BDA/原始缓冲区写入。遇到 held/hoisted pass 的 storage 写入只报缺口，不能为了抓取改变 hoist 顺序。原始 CPU guest 内存不额外读取，CPU 摘要仅使用引擎已经计算的值。局部样本干净不等于整张纹理或全部 mip 正确；需结合现场完整读回确认。若抓取改变同步而使故障消失，只能记为同步敏感，不能当成修复。
 
 `run_texture_probe_test.py --lineage --compile-commands <renderer/compile_commands.json> --library <built-library>` 复用原测试入口。`test_texture_lineage.mm` 通过真实 TextureCache、上传、清除、promotion 和复制验证已知字节、父子身份和释放，包含坏输入、pending 上限、关闭和链接标记反例。`analyze_texture_lineage.py` 只接纳已完成且成功保存的样本，并保留缺口，不输出“根因已证实”。
+
+本次狗和村民的后续现场已关联到一次重新上传覆盖路径，并以真实 Metal 回归复现首次 CPU 摘要漏记的缺口。修正及证据边界见 [首次上传的 CPU 摘要与 GPU 内容保护](texture-cpu-baseline.zh-CN.md)。完整游戏白模是否消失仍待安装后复测。

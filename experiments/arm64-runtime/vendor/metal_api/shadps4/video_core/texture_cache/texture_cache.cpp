@@ -1140,17 +1140,18 @@ void TextureCache::RefreshImage(Image& image) {
             image.info.props.is_volume ? std::max(image.info.size.depth >> m, 1u) : 1u;
         const auto [mip_size, mip_pitch, mip_height, mip_offset] = image.info.mips_layout[m];
 
-        // Protect GPU modified resources from accidental CPU reuploads.
-        // Record the first upload too. Otherwise an unrelated CPU dirty mark
-        // can upload unchanged old bytes over a subsequent GPU write.
-        if (is_gpu_modified) {
-            const u8* addr = std::bit_cast<u8*>(image.info.guest_address);
-            const u64 hash = XXH3_64bits(addr + mip_offset, mip_size);
-            if (!is_gpu_dirty && image.mip_hashes[m] == hash) {
-                continue;
-            }
-            image.mip_hashes[m] = hash;
+        // A sampled image (including ExpandImage's destination) may acquire
+        // GPU ownership only AFTER this upload. Keep its CPU baseline now;
+        // otherwise the first later CpuDirty mark mistakes unchanged old
+        // backing for new data and overwrites the valid GPU contents.
+        // GpuDirty still forces the buffer-cache upload, and changed CPU bytes
+        // remain authoritative. This reuses the existing per-mip hash storage.
+        const u8* addr = std::bit_cast<u8*>(image.info.guest_address);
+        const u64 hash = XXH3_64bits(addr + mip_offset, mip_size);
+        if (is_gpu_modified && !is_gpu_dirty && image.mip_hashes[m] == hash) {
+            continue;
         }
+        image.mip_hashes[m] = hash;
 
         const u32 extent_width = mip_pitch ? std::min(mip_pitch, width) : width;
         const u32 extent_height = mip_height ? std::min(mip_height, height) : height;

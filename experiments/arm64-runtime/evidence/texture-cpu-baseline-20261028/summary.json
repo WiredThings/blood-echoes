@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "status": "synthetic-validated-live-fix-retest-pending",
+  "shared_cpu_baseline_gap_reproduced": true,
+  "all_in_game_white_model_causes_resolved": false,
+  "live_evidence_objects": [
+    "dog",
+    "armed-villager"
+  ],
+  "live_complete_view_readbacks": [
+    16,
+    26
+  ],
+  "live_lineage_snapshots_are_partial": true,
+  "live_copy_promotion_samples_preserved": true,
+  "live_later_upload_matches_corrupt_sample_patches": true,
+  "initial_and_later_input_heads_match": true,
+  "input_head_match_not_whole_cpu_memory_proof": true,
+  "old_backend_expected_failures": [
+    "plain-unchanged",
+    "expanded-unchanged",
+    "expanded-tail-changed"
+  ],
+  "new_cpu_baseline_tests": 7,
+  "legacy_upload_expansion_tests": 7,
+  "lineage_tests": 6,
+  "texel_reader_tests": 10,
+  "all_fixed_tests_passed": true,
+  "actual_library_verified": true,
+  "metal_validation_layer": true,
+  "changed_objects": 1,
+  "additional_persistent_fields": 0,
+  "additional_gpu_resources": 0,
+  "cache_budget_changed": false,
+  "per_draw_hashing_added": false,
+  "extra_work": "Record CPU mip hashes on actual non-GPU-owned uploads; Dirty fast return unchanged",
+  "shader_compiler_changed": false,
+  "formal_data_modified": false,
+  "Release_updated": false,
+  "raw_game_content_included": false
+}
