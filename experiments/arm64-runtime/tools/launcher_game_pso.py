@@ -26,6 +26,28 @@ def title_id(arguments,stage,project,runtime_profile=None):
  if not isinstance(title,str)or not re.fullmatch(r'CUSA[0-9]{5}',title):raise ValueError('invalid actual TITLE_ID')
  return title
 
+def verified_mixed_schedule(report):
+ """Queue completion can combine per-recipe reuse and fresh native checks.
+
+ GS recipes intentionally lack per-recipe persistence, but still use the
+ original native worker and final environment commit. Do not mistake their
+ absence from persistence counters for unverified GPU inputs. This only grants
+ a same-session scheduling hint; runtime artifact/full-key admission is intact.
+ """
+ if report.get('status')!='completed' or report.get('required_preparation_complete')is not True or report.get('index_complete')is not True:return False
+ counts=('unique_units','completed','scheduled_reused','verified_artifact_hits','collection_strict_hits','strict_lookup_attempts',
+         'deferred','rejected','protection_stops','index_rejected','source_late_deferred')
+ if not all(type(report.get(k))is int and report[k]>=0 for k in counts):return False
+ total=report['unique_units'];reused=report['scheduled_reused'];native=report['verified_artifact_hits']
+ if not(0<reused<total and report['completed']==total and reused+native==total
+        and report['collection_strict_hits']==report['strict_lookup_attempts']==native):return False
+ if any(report[k]for k in('deferred','rejected','protection_stops','index_rejected','source_late_deferred')):return False
+ proof=report.get('final_environment_verification',{})
+ identity=proof.get('environment_identity') if isinstance(proof,dict)else None
+ return (proof.get('status')=='environment-verified' and isinstance(identity,str)and len(identity)==64
+         and all(c in '0123456789abcdef'for c in identity))if isinstance(proof,dict)else False
+
+
 def prepare(*,project,execution_root,arguments,environment,cohort,options,observe,
             runner=None,component_loader=load,candidate_builder=build,toolchain_probe=None,prepared_inputs=None,
             catalogue_prepare=None,module_prepare=None,capture_configure=None,source_view_prepare=None,restart_binding=None,runtime_profile=None,resume_only=False):
@@ -168,7 +190,7 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
      and type(required_count)is int and required_count>0
      and all(type(recipe_schedule.get(k))is int and recipe_schedule[k]>=0 for k in('reused','published'))
      and recipe_schedule['reused']+recipe_schedule['published']==required_count)
- if restart_binding is not None and (actual_verified or unchanged_schedule or required_schedule) and capture_environment:
+ if restart_binding is not None and (actual_verified or unchanged_schedule or required_schedule or verified_mixed_schedule(report)) and capture_environment:
   from quick_restart_preparation import pending
   try:result['_restart_context']=pending(prepared_inputs)
   except(ValueError,OSError,KeyError,TypeError):pass

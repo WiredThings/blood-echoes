@@ -153,4 +153,56 @@ class Entry(unittest.TestCase):
         self.assertEqual(result['status'],'empty');self.assertNotIn('_restart_context',result)
 
 
+class MixedSchedule(unittest.TestCase):
+    def report(self):
+        return dict(status='completed',required_preparation_complete=True,index_complete=True,
+            unique_units=575,completed=575,scheduled_reused=567,verified_artifact_hits=8,
+            collection_strict_hits=8,strict_lookup_attempts=8,deferred=0,rejected=0,
+            protection_stops=0,index_rejected=0,source_late_deferred=0,
+            final_environment_verification=dict(status='environment-verified',environment_identity='a'*64),
+            recipe_schedule=dict(reused=567,published=0,refused=24),full_manifest_preparation_verified=False)
+
+    def test_actual_verified_gs_plus_persistent_plain_does_not_need_all_persistence(self):
+        result=self.report()
+        self.assertTrue(launcher.verified_mixed_schedule(result))
+        self.assertFalse(result['full_manifest_preparation_verified'])
+        self.assertEqual(result['recipe_schedule']['published'],0)
+
+    def test_missing_partial_failed_bool_or_unverified_environment_never_complete(self):
+        import copy
+        cases=[('status','partial'),('required_preparation_complete',False),('index_complete',False),
+            ('completed',574),('verified_artifact_hits',7),('collection_strict_hits',7),
+            ('strict_lookup_attempts',9),('deferred',1),('rejected',1),('protection_stops',1),
+            ('index_rejected',1),('source_late_deferred',1),('scheduled_reused',True),
+            ('final_environment_verification',dict(status='environment-captured',environment_identity='a'*64)),
+            ('final_environment_verification',dict(status='environment-verified',environment_identity='invalid'))]
+        for field,value in cases:
+            with self.subTest(field=field,value=value):
+                result=copy.deepcopy(self.report());result[field]=value
+                self.assertFalse(launcher.verified_mixed_schedule(result))
+        for key in self.report():
+            result=self.report();del result[key]
+            if key not in('recipe_schedule','full_manifest_preparation_verified'):
+                self.assertFalse(launcher.verified_mixed_schedule(result),key)
+
+    def test_real_controller_publishes_mixed_only_with_strict_static_context(self):
+        fixture=Entry();fixture.setUp()
+        try:
+            fixture.component.update(automatic_capture_schema=1,worker=fixture.stage/'worker',
+                worker_sha256='a'*64,layout=fixture.stage/'layout',layout_sha256='b'*64)
+            context=fixture.completed_static_context()
+            def candidates(**kw):
+                value=fixture.candidates(**kw);value['eligible']=575;return value
+            result=fixture.prepare(prepared_inputs=context,restart_binding=dict(authored=True),
+                capture_configure=fixture.configured_capture,candidate_builder=candidates,runner=lambda config:self.report())
+            self.assertIn('_restart_context',result)
+            self.assertFalse(result['runtime_cache_import_allowed'])
+            self.assertFalse(result['preparation']['full_manifest_preparation_verified'])
+            report=self.report();report['strict_lookup_attempts']=7
+            result=fixture.prepare(prepared_inputs=context,restart_binding=dict(authored=True),
+                capture_configure=fixture.configured_capture,candidate_builder=candidates,runner=lambda config:report)
+            self.assertNotIn('_restart_context',result)
+        finally:fixture.tearDown()
+
+
 if __name__ == '__main__': unittest.main()
