@@ -192,6 +192,68 @@ def verified_library_bytes(folder,request,build_id):
 def already_succeeded(folder,request,build_id):
     return verified_library_bytes(folder,request,build_id)is not None
 
+_METAL_VERSION=re.compile(r'(Apple metal version [^\n]+\nTarget: [^\n]+\nThread model: [^\n]+\nInstalledDir: )((?:/private)?/var/run/com\.apple\.security\.cryptexd/mnt/com\.apple\.MobileAsset\.MetalToolchain-v([0-9]+(?:\.[0-9]+)+)\.[A-Za-z0-9]{6,64})(/Metal\.xctoolchain/usr/metal/current/bin)')
+
+def stable_metal_version(version,*,selected=None):
+    """Only the evidenced cryptex random mount suffix is location, not code.
+
+    All other version/target/asset-version text stays in compatibility. Unknown
+    formats stay byte-exact. Live selection is still pinned by the registration;
+    historical manifests are compared only AFTER their original digest is checked.
+    """
+    match=_METAL_VERSION.fullmatch(version)
+    if match is None:return version
+    if selected is not None:
+        mount=Path(match[2]).resolve(strict=True)
+        if not Path(selected).resolve(strict=True).is_relative_to(mount/'Metal.xctoolchain'):
+            raise Refused('Metal InstalledDir differs from actual selected toolchain')
+        directory=Path(match[2]+match[4]).resolve(strict=True)
+        if not directory.is_relative_to(mount/'Metal.xctoolchain')or not directory.is_dir():
+            raise Refused('Metal InstalledDir is outside selected toolchain')
+    return match[1]+'<MetalToolchain-v'+match[3]+'>/Metal.xctoolchain/usr/metal/current/bin'
+
+def stable_build_manifest(manifest):
+    # Round-trip, retaining EVERY unknown field. No compiler/SDK/options fields
+    # are dropped; only the single recognized metal version location is changed.
+    result=json.loads(canonical(manifest))
+    if result.get('schema')==2 and isinstance(result.get('tools'),dict):
+        metal=result['tools'].get('metal')
+        if isinstance(metal,dict)and isinstance(metal.get('version'),str):
+            metal['version']=stable_metal_version(metal['version'])
+    return result
+
+def equivalent_builds(artifact_root,build_id,manifest,guard):
+    """Bounded one-time discovery in this exact cohort; never walk all caches."""
+    matches=[]
+    with os.scandir(artifact_root)as stream:
+        for n,item in enumerate(stream):
+            guard.check(preflight=True)
+            if n>=128:break # Preserve generations beyond the lookup budget.
+            if item.name==build_id or not HEX.fullmatch(item.name):continue
+            try:
+                folder=check_directory(Path(item.path));old=read_json(folder/'build.json')
+                if digest(canonical(old))!=item.name or stable_build_manifest(old)!=manifest:continue
+                matches.append((folder,item.name,old))
+            except(OSError,ValueError,TypeError,KeyError,Refused)as error:
+                if isinstance(error,Stopped):raise
+    return matches
+
+def retained_mount_product(candidates,request,guard):
+    for folder,old_id,old_manifest in candidates:
+        guard.check(preflight=True)
+        try:
+            # Re-read through adoption: directory discovery is not admission.
+            if read_json(folder/'build.json')!=old_manifest:continue
+            blob=verified_library_bytes(folder,request,old_id)
+            if blob is not None:
+                return blob,dict(schema=1,kind='verified-metal-mount-relocation-adoption',
+                    original_request=request,original_build_id=old_id,
+                    original_build_manifest=old_manifest,original_library_sha256=digest(blob),
+                    current_request=request,original_native_key_preserved=True)
+        except(OSError,ValueError,TypeError,KeyError,Refused)as error:
+            if isinstance(error,Stopped):raise
+    return None
+
 def retained_product(root,request,source,build_id,manifest,guard):
     """One content-addressed lookup; retain all native/origin identities.
 
@@ -437,6 +499,10 @@ class NativeToolchain:
         versions['xcrun']=self.runner.run(['/usr/bin/xcrun','--version'],10,guard).decode().strip()
         if not versions['xcrun']or len(versions['xcrun'].encode())>1024:raise Refused('empty or oversized xcrun version')
         sdk,self.sdk_selection=self.sdk_identity(guard)
+        # Keep the full observed version with the actual invocation pins for
+        # provenance. Only the random cryptex mount token leaves the product ID.
+        tools['metal']['reported_version']=versions['metal']
+        versions['metal']=stable_metal_version(versions['metal'],selected=tools['metal']['path'])
         # Paths/stamps only pin this invocation. Real compiler, SDK release
         # metadata and OS define product compatibility; a timestamp touch does
         # not create another product. Old schema1 directories remain intact.
@@ -584,6 +650,7 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
                            persistent_audit_reused=True,request_window=dict(max_batch=0,max_final_pins=0),
                            validation='unchanged-journal-and-current-tools-sdk-os')
             return summary
+        equivalent=equivalent_builds(artifact_root,build_id,manifest,guard)
         for batch in index.batches():
           for key in batch:
             guard.check(preflight=True)
@@ -602,7 +669,8 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
             with tempfile.TemporaryDirectory(prefix=key+'-',dir=private_tmp)as scratch:
                 scratch=Path(scratch);snapshot=scratch/'source.metal';air=scratch/'output.air';library=scratch/'output.metallib'
                 write_new(snapshot,source);del source
-                adopted=retained_product(root,request,regular_bytes(snapshot,SOURCE_MAX),build_id,manifest,guard)
+                adopted=retained_mount_product(equivalent,request,guard)
+                if adopted is None:adopted=retained_product(root,request,regular_bytes(snapshot,SOURCE_MAX),build_id,manifest,guard)
                 reused=adopted is not None;provenance=None
                 # The current native request/key remains untouched. The adopted
                 # binary gets its own ordinary receipt plus explicit provenance.

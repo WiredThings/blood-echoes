@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "build_id": "eb1deec46bb716df790788df07241ee6ac2ff0a935a650b7f2df884e589818e5",
+  "old_build_ids": [
+    "49a14db0839df0b30c8c1d9dce57c7e2c2d6929f0768278a66cc3b2dd3ba97bf",
+    "382042194ba75021a4378e56eb434029e7c875a6462e1317dd860fad19db64a8"
+  ],
+  "old_manifests_equivalent": true,
+  "actual_tools_sdk_os_identified": true,
+  "selected_real_libraries": 3,
+  "migration_reused": 3,
+  "repeat_skipped": 3,
+  "repeat_audit_reused": false,
+  "compiler_invocations": 0,
+  "original_cache_bytes_and_identity_unchanged": true,
+  "game_started": false,
+  "authored_tests": 76,
+  "installed": false,
+  "Release_updated": false,
+  "formal_data_modified": false
+}
