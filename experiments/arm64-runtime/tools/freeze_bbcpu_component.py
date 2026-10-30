@@ -68,7 +68,7 @@ def freeze(stage,*,repository,build,game,toolchain,search_dirs):
     cpu=app/'Contents/MacOS/bb-probe-metal';resolver.copy(game,cpu)
     roles={'cpu':cpu}
     for key,name in dict(preparer='bbcpu-code-preparer',scanner='bbcpu-scan',generator='bbrecomp').items():
-        source=owned(build/name);dest=stage/'bin/bbcpu-tools'/name
+        source=game if key=='preparer'and contract.get('runtime_image_export')==1 else owned(build/name);dest=stage/'bin/bbcpu-tools'/name
         resolver.copy(source,dest);roles[key]=dest
     abi=stage/'bin/bbcpu-tools/bbcpu-abi-identity.json';shutil.copy2(owned(build/'bbcpu-abi-identity.json'),abi);roles['abi']=abi
     headers=stage/'bbcpu-headers';header_files={}
@@ -86,6 +86,7 @@ def freeze(stage,*,repository,build,game,toolchain,search_dirs):
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(app)],check=True,capture_output=True)
     source_root=stage/'bbcpu-producer';sources=freeze_source(repository,source_root)
     doc=dict(schema=1,development_only=True,backend='bbcpu',default_execution='static',
+             runtime_image_export=contract.get('runtime_image_export',0),
              producer_root=str(source_root),producer_entry='experiments/arm64-runtime/tools/bbcpu_static_library.py',producer_files=sources,
              toolchain=toolchain,dependency_headers=header_files,runtime_dependencies={str(path.relative_to(stage)):sha(path)for path in resolver.machos if path not in roles.values()},
              **{name:dict(path=str(path.relative_to(stage)),sha256=sha(path))for name,path in roles.items()})

@@ -53,6 +53,7 @@
 #include "bbcpu_backend.h"
 #include "bbcpu_static_admission.h"
 #include "bbcpu_static_patch_audit.h"
+#include "bbcpu_effective_export.h"
 #include "bbcpu.h"
 #else
 #include "core/guest_cpu/fex_guest_cpu.h"
@@ -160,6 +161,13 @@ struct State {
 
 };
 State* active{};
+#ifdef BB_CPU_BACKEND_BBCPU
+std::vector<BbCpuImage::ResumeSite> cpu_resume_sites;
+void bbcpu_note_patch(uint64_t offset,size_t covered,const char* phase){
+ check(active&&covered&&offset<=active->image_size&&covered<=active->image_size-offset&&cpu_resume_sites.size()<64,"CPU resume site outside actual startup patch plan");
+ cpu_resume_sites.push_back({offset,covered,phase});
+}
+#endif
 bool graphics_enabled{};
 thread_local bool guest_running{};
 thread_local unsigned callback_depth{};
@@ -636,19 +644,30 @@ int game_main(int argc,char** argv){
 #endif
 #ifdef BB_CPU_BACKEND_BBCPU
   std::optional<BbCpuArtifact::Admitted> static_cpu;
+  std::optional<BbCpuArtifact::Candidate> static_candidate;
   std::unique_ptr<BbCpuPatchAudit::Audit> static_patch_audit;
   fs::path static_library;
-  if(const char* library=getenv("BB_RECOMP_LIB");library&&*library){
+  const char* cpu_export=getenv("BB_CPU_EXPORT_ROOT");
+  fs::path cpu_analysis;
+  std::string cpu_analysis_hash;
+  if(cpu_export){
+   const char* elf_path=getenv("BB_CPU_EXPORT_ELF");
+   check(!bundled&&elf_path&&private_path(elf_path)&&private_path(fs::path(cpu_export).parent_path()),"CPU export requires declared private preparation inputs");
+   BbCpuArtifact::File source(elf_path);BbCpuArtifact::Map original(source);auto layout=BbCpuImage::ReadLayout(original.Bytes(),b);
+   cpu_analysis=std::string(cpu_export)+"-analysis";
+   BbCpuImage::Export(cpu_analysis,b,layout,image.ptr,original.Bytes(),BbStaticCode::Hex(BbStaticCode::SourceHash(boot)),BbStaticCode::Hex(source.Hash()));
+   source.Unchanged();cpu_analysis_hash=BbStaticCode::Hex(BbStaticCode::SourceHash(cpu_analysis/"effective.elf"));
+  }
+  if(const char* library=getenv("BB_RECOMP_LIB");!cpu_export&&library&&*library){
    static_library=library;
    try{
-    static_cpu=BbCpuArtifact::Admit(b,image.ptr,static_library,private_path);
-    std::printf("BBCPU STATIC admitted effective_identity=%s; original source/patch bytes verified before runtime detours\n",static_cpu->effective_identity.c_str());
+    static_candidate=BbCpuArtifact::Open(b,static_library,private_path);
    }catch(const std::exception& error){
     std::fprintf(stderr,"BBCPU STATIC rejected reason=%s fallback=bbcpu-own-translator; disk artifact preserved\n",error.what());
    }
   }
-  if(static_cpu&&getenv("BB_CPU_STATIC_PATCH_AUDIT")&&std::string_view(getenv("BB_CPU_STATIC_PATCH_AUDIT"))=="1")
-   static_patch_audit=std::make_unique<BbCpuPatchAudit::Audit>(image.ptr,*static_cpu,runtime_work/"bbcpu-static-mismatches.jsonl");
+  if(static_candidate&&getenv("BB_CPU_STATIC_PATCH_AUDIT")&&std::string_view(getenv("BB_CPU_STATIC_PATCH_AUDIT"))=="1")
+   static_patch_audit=std::make_unique<BbCpuPatchAudit::Audit>(image.ptr,*static_candidate,runtime_work/"bbcpu-static-mismatches.jsonl");
   const bool static_patch_audit_active=bool(static_patch_audit);
   auto static_patch_stage=[&](const char* phase){if(static_patch_audit)static_patch_audit->Step(phase);};
 #endif
@@ -700,6 +719,19 @@ int game_main(int argc,char** argv){
   runtime_quicksave_bind(image.ptr,b.size);
 #ifdef BB_CPU_BACKEND_BBCPU
   static_patch_stage("quicksave-binding");
+  if(cpu_export){
+   const char* elf_path=getenv("BB_CPU_EXPORT_ELF");
+   check(!bundled&&elf_path&&private_path(elf_path)&&private_path(fs::path(cpu_export).parent_path()),"CPU export requires declared private preparation inputs");
+   BbCpuArtifact::File source(elf_path);BbCpuArtifact::Map original(source);auto layout=BbCpuImage::ReadLayout(original.Bytes(),b);
+   const auto exported=BbCpuImage::Export(cpu_export,b,layout,image.ptr,original.Bytes(),BbStaticCode::Hex(BbStaticCode::SourceHash(boot)),BbStaticCode::Hex(source.Hash()),cpu_resume_sites,"runtime-hooks-installed-v1",elf_path,cpu_analysis_hash);
+   fs::rename(cpu_analysis,fs::path(cpu_export)/"analysis");
+   source.Unchanged();std::printf("BBCPU effective runtime export identity=%s resume_sites=%zu; original installers completed before export\n",exported.identity.c_str(),cpu_resume_sites.size());
+   active=nullptr;std::fflush(nullptr);return 0;
+  }
+  if(static_candidate){
+   try{static_cpu=BbCpuArtifact::Match(*static_candidate,b,image.ptr);std::printf("BBCPU STATIC admitted effective_identity=%s; actual final startup code verified after runtime hooks\n",static_cpu->effective_identity.c_str());}
+   catch(const std::exception& error){std::fprintf(stderr,"BBCPU STATIC rejected reason=%s fallback=bbcpu-own-translator; disk artifact preserved\n",error.what());}
+  }
 #endif
   std::printf("ARM BOOT image=%#lx bytes=%llu native=%u linked=%u missing=%u\n",image.at(),b.size,native,linked,missing);
   for(auto m:b.modules)if(m.tls_module)runtime_set_module_tls(m.tls_module,static_cast<uint8_t*>(image.ptr)+m.tls_address,m.tls_filesz,m.tls_memsz);
@@ -746,6 +778,7 @@ int game_main(int argc,char** argv){
    check(!setenv("BB_RECOMP_LIB",static_library.c_str(),1),"bbcpu static environment restore failed");
    static_cpu.reset();
   }else std::puts("BBCPU static input absent; own translator/interpreter retained");
+  static_patch_audit.reset();static_candidate.reset();cpu_resume_sites.clear();cpu_resume_sites.shrink_to_fit();
   if(getenv("BB_CPU_STATIC_PATCH_AUDIT_ONLY")&&std::string_view(getenv("BB_CPU_STATIC_PATCH_AUDIT_ONLY"))=="1"){
    check(!bundled&&private_path(runtime_work)&&static_patch_audit_active&&bbcpu_recomp_functions(),"static audit-only requires admitted private startup evidence");
    std::puts("BBCPU STATIC audit-only complete before guest entry; no save loaded");std::fflush(nullptr);active=nullptr;return 0;
@@ -816,7 +849,7 @@ int game_main(int argc,char** argv){
 int main(int argc,char** argv){
 #ifdef BB_CPU_BACKEND_BBCPU
  if(argc==2&&std::string_view(argv[1])=="--cpu-backend-contract"){
-  std::printf("{\"schema\":1,\"backend\":\"bbcpu\",\"abi\":5,\"native_tsc\":true,\"header_contract_sha256\":\"%s\"}\n",BBCPU_ABI_IDENTITY);
+  std::printf("{\"schema\":1,\"backend\":\"bbcpu\",\"abi\":5,\"native_tsc\":true,\"runtime_image_export\":1,\"header_contract_sha256\":\"%s\"}\n",BBCPU_ABI_IDENTITY);
   return 0;
  }
 #endif

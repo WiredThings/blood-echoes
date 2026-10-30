@@ -1,15 +1,29 @@
 from pathlib import Path
 import contextlib,io,json,os,sys,tempfile,threading,time,unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from bbcpu_compile_schedule import capacity,run
+from bbcpu_compile_schedule import capacity,run,maximum_jobs,CPU_LIMIT
 from bbcpu_launch import stream_cpu_command
 
 class BudgetTests(unittest.TestCase):
+    def test_manual_ceiling_tracks_logical_cpu_count_and_auto_remains_conservative(self):
+        self.assertEqual(maximum_jobs('auto',cpu_count=10),2)
+        self.assertEqual(maximum_jobs('auto',cpu_count=1),1)
+        self.assertEqual(maximum_jobs('10',cpu_count=10),10)
+        for bad in('0','11','-1','01','+1','2.0','１２',' 2'):
+            with self.subTest(value=bad),self.assertRaises(ValueError):maximum_jobs(bad,cpu_count=10)
+        self.assertEqual(capacity(dict(pressure=1,headroom_mib=100000),CPU_LIMIT),CPU_LIMIT)
+        self.assertEqual(capacity(dict(pressure=2,headroom_mib=100000),CPU_LIMIT),1)
+        with self.assertRaises(ValueError):capacity(dict(pressure=1,headroom_mib=100000),CPU_LIMIT+1)
     def test_memory_and_pressure_boundaries(self):
         self.assertEqual(capacity(dict(pressure=1,headroom_mib=8192)),2)
         self.assertEqual(capacity(dict(pressure=2,headroom_mib=8192)),1)
         self.assertEqual(capacity(dict(pressure=4,headroom_mib=8192)),0)
         self.assertEqual(capacity(dict(pressure=1,headroom_mib=512)),0)
+        # Measured heavy-unit peak <475 MiB per process; allow 768 MiB per
+        # worker plus a separate reserve, without forcing serial at 2.7 GiB.
+        self.assertEqual(capacity(dict(pressure=1,headroom_mib=2750)),2)
+        self.assertEqual(capacity(dict(pressure=1,headroom_mib=2303)),1)
+        self.assertEqual(capacity(dict(pressure=1,headroom_mib=1535)),0)
         with self.assertRaises(ValueError):capacity(dict(pressure=3,headroom_mib=8192))
     def test_pressure_stops_new_dispatch_but_finishes_active_work(self):
         observations=[];calls=0;lock=threading.Lock();active=peak=0

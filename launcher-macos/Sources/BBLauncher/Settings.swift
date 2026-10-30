@@ -200,6 +200,7 @@ struct LauncherPrefs: Equatable {
     var nativeGpu = false
     var renderer = "metal"
     var cpuBackend = CPUBackend.fex
+    var cpuCompileJobs = "auto"
     var metalObjectMotion = true
     var metalOcclusion = true
     var online = false
@@ -248,6 +249,7 @@ struct LauncherPrefs: Equatable {
         static let nativeGpu = "nativeGpu"
         static let renderer = "renderer"
         static let cpuBackend = "cpuBackend"
+        static let cpuCompileJobs = "cpuCompileJobs"
         static let metalObjectMotion = "metalObjectMotion"
         static let metalOcclusion = "metalOcclusion"
         static let online = "online"
@@ -267,6 +269,7 @@ struct LauncherPrefs: Equatable {
         func flag(_ key: String, _ fallback: Bool) -> Bool { defaults.object(forKey: key) as? Bool ?? fallback }
         p.gameFolder = text(Key.gameFolder, p.gameFolder)
         p.cpuBackend = CPUBackend(rawValue: text(Key.cpuBackend, p.cpuBackend.rawValue)) ?? .fex
+        p.cpuCompileJobs = StaticCompilationConcurrency.normalized(text(Key.cpuCompileJobs, "auto"))
         p.repoOverride = text(Key.repoOverride, p.repoOverride)
         p.branch = text(Key.branch, p.branch)
         p.userFolder = text(Key.userFolder, p.userFolder)
@@ -362,6 +365,7 @@ struct LauncherPrefs: Equatable {
     func save(to defaults: UserDefaults) {
         defaults.set(gameFolder, forKey: Key.gameFolder)
         defaults.set(cpuBackend.rawValue, forKey: Key.cpuBackend)
+        defaults.set(cpuCompileJobs, forKey: Key.cpuCompileJobs)
         defaults.set(repoOverride, forKey: Key.repoOverride)
         defaults.set(branch, forKey: Key.branch)
         defaults.set(userFolder, forKey: Key.userFolder)

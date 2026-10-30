@@ -1,12 +1,21 @@
 """Preparation-only dispatch budget; no game runtime or cache eviction policy."""
 import concurrent.futures as futures
 import ctypes as C
+import os
 import time
 
 MIB=1024**2
+CPU_LIMIT=max(1,os.cpu_count()or 1)
 
-def capacity(sample,maximum=2,*,worker_mib=1024,reserve_mib=768):
-    if maximum not in(1,2):raise ValueError('at most two compiler workers')
+def maximum_jobs(value='auto',*,cpu_count=CPU_LIMIT):
+    if type(cpu_count)is not int or cpu_count<1:raise ValueError('invalid logical CPU count')
+    if value=='auto':return min(2,cpu_count)
+    if not isinstance(value,str)or not value.isascii()or not value.isdecimal()or str(int(value))!=value or not 1<=int(value)<=cpu_count:
+        raise ValueError('compiler job limit must be auto or 1..'+str(cpu_count))
+    return int(value)
+
+def capacity(sample,maximum=2,*,worker_mib=768,reserve_mib=768):
+    if type(maximum)is not int or not 1<=maximum<=CPU_LIMIT:raise ValueError('compiler limit exceeds logical CPU count')
     pressure=sample['pressure'];headroom=sample['headroom_mib']
     if pressure not in(1,2,4)or headroom<0:raise ValueError('invalid compiler memory observation')
     if pressure==4:return 0
@@ -31,13 +40,15 @@ class Memory:
         pages=vm['free_count']+vm['inactive_count']//2
         return dict(pressure=pressure.value,headroom_mib=pages*vm['page_bytes']/MIB)
 
-def run(items,work,*,maximum=2,observe,progress=lambda **event:None,
+def run(items,work,*,maximum=None,observe,progress=lambda **event:None,
         clock=time.monotonic,poll_seconds=.25,stall_seconds=300):
     """Submit only current capacity; finish running work when capacity falls.
 
     Existing objects are owned by the caller. A pause or failure never removes
     them. Output order is stable and independent of task completion order.
     """
+    maximum=maximum_jobs()if maximum is None else maximum
+    if type(maximum)is not int or not 1<=maximum<=CPU_LIMIT:raise ValueError('compiler limit exceeds logical CPU count')
     items=list(items);output=[None]*len(items);next_item=completed=0
     pending={};last_progress=clock();last_event=None;last_emit=-float('inf')
     with futures.ThreadPoolExecutor(max_workers=maximum)as pool:

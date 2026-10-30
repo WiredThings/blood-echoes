@@ -33,11 +33,12 @@ static int nloads;
 static const unsigned char *at(uint64_t va, uint64_t len) {
     for (int i = 0; i < nloads; ++i) {
         const Elf64_Phdr *p = loads[i];
-        if (va >= p->p_vaddr && va + len <= p->p_vaddr + p->p_filesz)
+        if (va >= p->p_vaddr && len <= p->p_filesz && va - p->p_vaddr <= p->p_filesz - len)
             return data + p->p_offset + (va - p->p_vaddr);
     }
     return NULL;
 }
+#include "prefix_frames.h"
 
 typedef struct { uint64_t start, size; } Function;
 static int by_start(const void *a, const void *b) {
@@ -224,24 +225,36 @@ static uint32_t discover(Function **functions, uint32_t n, const char *pointers)
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3 && argc != 4) {
+    const int prefix_mode=argc==5&&!strcmp(argv[1],"--prefix-frames");
+    if (argc != 3 && argc != 4 && !prefix_mode) {
         fprintf(stderr, "usage: %s ELF OUTDIR [POINTERS]\n", argv[0]);
         return 2;
     }
-    FILE *in = fopen(argv[1], "rb");
+    FILE *in = fopen(argv[prefix_mode?2:1], "rb");
     if (!in) { perror(argv[1]); return 1; }
     fseek(in, 0, SEEK_END); data_size = ftell(in); fseek(in, 0, SEEK_SET);
+    if (data_size < (long)sizeof(Elf64_Ehdr)) { fprintf(stderr,"invalid ELF header\n"); fclose(in); return 1; }
     data = malloc(data_size);
+    if (!data) { fclose(in); return 1; }
     if (fread(data, 1, data_size, in) != (size_t)data_size) return 1;
     fclose(in);
     const Elf64_Ehdr *eh = (const Elf64_Ehdr *)data;
+    if (memcmp(eh->e_ident,"\177ELF\2\1",6) || eh->e_machine!=62 ||
+        eh->e_phentsize<sizeof(Elf64_Phdr) || eh->e_phentsize%8 || eh->e_phoff%8 ||
+        eh->e_phoff>(uint64_t)data_size || eh->e_phnum>((uint64_t)data_size-eh->e_phoff)/eh->e_phentsize) {
+        fprintf(stderr,"invalid ELF program table\n"); return 1;
+    }
     const Elf64_Phdr *eh_frame = NULL;
     for (int p = 0; p < eh->e_phnum; ++p) {
         Elf64_Phdr *ph = (Elf64_Phdr *)(data + eh->e_phoff + p * eh->e_phentsize);
-        if (ph->p_type == PT_LOAD && nloads < 8 && ph->p_offset + ph->p_filesz <= (uint64_t)data_size)
+        if (ph->p_type == PT_LOAD) {
+            if(nloads==8 || ph->p_offset>(uint64_t)data_size || ph->p_filesz>(uint64_t)data_size-ph->p_offset ||
+               ph->p_vaddr>UINT64_MAX-ph->p_filesz){fprintf(stderr,"invalid ELF load range\n");return 1;}
             loads[nloads++] = ph;
+        }
         if (ph->p_type == PT_GNU_EH_FRAME) eh_frame = ph;
     }
+    if(prefix_mode)return prefix_frames(argv[3],argv[4]);
     if (!eh_frame) { fprintf(stderr, "no PT_GNU_EH_FRAME\n"); return 1; }
 
     /* .eh_frame_hdr: version, eh_frame_ptr_enc, fde_count_enc, table_enc, then the search table

@@ -587,3 +587,9 @@
 "Compiling CPU code…" = "正在编译 CPU 代码…";
 
 "Waiting for compiler memory…" = "等待编译所需的内存余量…";
+
+"Maximum compilation jobs" = "最大编译并发数";
+
+"Automatic" = "自动";
+
+"Actual concurrency adapts to available memory." = "实际并发会随内存余量调整。";

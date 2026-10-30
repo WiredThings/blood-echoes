@@ -68,6 +68,26 @@ static void map_image(const char *path) {
 typedef struct { uint64_t offset, size; } Function;
 static Function *functions;
 static size_t function_count;
+/* Actual original-prefix proof from scan --prefix-frames. A continuation starts
+ * after the prologue: its current RSP is not the original return slot. */
+typedef struct {uint64_t offset;int reg;int64_t delta;} ContinuationFrame;
+static ContinuationFrame continuation_frames[64];
+static size_t continuation_frame_count;
+static void load_continuation_frames(void){
+    const char *path=getenv("BB_RECOMP_CONTINUATIONS");if(!path)return;
+    FILE *f=fopen(path,"r");if(!f){perror(path);exit(1);}char line[256];
+    while(fgets(line,sizeof(line),f)){
+        if(!strcmp(line,"resume\tregister\tentry_delta\n"))continue;
+        unsigned long long offset;int reg;long long delta;char extra;
+        if(continuation_frame_count>=64||sscanf(line,"%llx %d %lld %c",&offset,&reg,&delta,&extra)!=3||reg<0||reg>=16||delta<-1048576||delta>1048576){fputs("invalid continuation frame proof\n",stderr);exit(1);}
+        for(size_t i=0;i<continuation_frame_count;++i)if(continuation_frames[i].offset==offset){fputs("duplicate continuation frame\n",stderr);exit(1);}
+        continuation_frames[continuation_frame_count++]=(ContinuationFrame){offset,reg,delta};
+    }
+    if(ferror(f)){fputs("continuation frame read failed\n",stderr);exit(1);}fclose(f);
+}
+static const ContinuationFrame *continuation_frame(uint64_t offset){
+    for(size_t i=0;i<continuation_frame_count;++i)if(continuation_frames[i].offset==offset)return &continuation_frames[i];return NULL;
+}
 
 static uint64_t size_of(const char *tsv, uint64_t offset) {
     static uint64_t *starts, *sizes;
@@ -2040,13 +2060,16 @@ static void generate(Function fn, uint64_t *stats) {
             if ((live_in[i] | live) != live_in[i]) { live_in[i] |= live; changed = 1; }
         }
     }
+    const ContinuationFrame *continuation=continuation_frame(fn.offset);
     uint32_t entry = live_in[0] | 1u << RSP; /* entry_rsp */
+    if(continuation)entry|=1u<<continuation->reg;
     for (size_t e = evs[count]; e < event_count; ++e) entry |= events[e].mask;
     emit("    const uint64_t B = rc->image_base;\n");
     emit("    uint64_t r[16];\n    BbVec xmm[16];\n   ");
     sync_copy(out, entry, 1);
     emit("\n    int fk = FK_CPU, fz = 8, fcf = 0;\n    uint64_t fa = 0, fb = 0, fr = 0, dn = 0;\n");
-    emit("    const uint64_t entry_rsp = r[RSP];\n");
+    if(continuation)emit("    const uint64_t entry_rsp = r[%d] %c %lluull; /* proven original return slot */\n",continuation->reg,continuation->delta<0?'-':'+',(unsigned long long)(continuation->delta<0?-continuation->delta:continuation->delta));
+    else emit("    const uint64_t entry_rsp = r[RSP];\n");
     emit("    (void)fa; (void)fb; (void)fr; (void)fz; (void)fcf; (void)entry_rsp; (void)dn;\n");
     /* The text with the copies: the masks of the markers in order. */
     size_t markers = 0;
@@ -2136,6 +2159,7 @@ static int snippets(const char *encodings, const char *path) {
 }
 
 int main(int argc, char **argv) {
+    load_continuation_frames();
     if (argc == 2 && !strcmp(argv[1], "--abi-identity")) {
 #ifdef BBCPU_ABI_IDENTITY
         puts(BBCPU_ABI_IDENTITY);

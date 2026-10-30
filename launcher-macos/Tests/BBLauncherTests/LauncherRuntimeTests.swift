@@ -2,6 +2,25 @@ import XCTest
 @testable import BBLauncher
 
 final class LauncherRuntimeTests: XCTestCase {
+    func testCompilationLimitUsesCPUCeilingAndIsOnlySentToSelectedBbcpu() throws {
+        XCTAssertEqual(StaticCompilationConcurrency.normalized("8", cpuCount: 8), "8")
+        for value in ["0", "9", "-1", "+1", "01", "bad"] {
+            XCTAssertEqual(StaticCompilationConcurrency.normalized(value, cpuCount: 8), "auto")
+        }
+        let runtime = LauncherRuntime.decode(Data(#"{"schema":1,"game_runtime":"arm64","cpu_backends":["fex","bbcpu"]}"#.utf8))
+        let original = ["BB_CPU_COMPILE_JOBS": "999"]
+        let selected = runtime.launchEnvironment(original, cpuBackend: .bbcpu, compileJobs: "1")
+        XCTAssertEqual(selected["BB_CPU_COMPILE_JOBS"], "1")
+        XCTAssertNil(runtime.launchEnvironment(original, cpuBackend: .fex, compileJobs: "1")["BB_CPU_COMPILE_JOBS"])
+        XCTAssertEqual(original["BB_CPU_COMPILE_JOBS"], "999")
+        let suite = "BloodEchoes.CompilationLimitTest." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var prefs = LauncherPrefs.load(from: defaults)
+        XCTAssertEqual(prefs.cpuCompileJobs, "auto")
+        prefs.cpuCompileJobs = "1"; prefs.save(to: defaults)
+        XCTAssertEqual(LauncherPrefs.load(from: defaults).cpuCompileJobs, "1")
+    }
     func testIndependentCPUSelectionIsOneSupervisorIntent() throws {
         let dual = LauncherRuntime.decode(Data(#"{"schema":1,"game_runtime":"arm64","cpu_backends":["fex","bbcpu"],"local_metal_preparation":"auto"}"#.utf8))
         XCTAssertEqual(dual.cpuBackends, [.fex, .bbcpu])

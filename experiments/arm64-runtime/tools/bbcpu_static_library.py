@@ -6,10 +6,11 @@ here. The existing launcher supplies the effective input and selected tools.
 """
 from pathlib import Path
 import argparse, fcntl, hashlib, importlib.util, json, os
-import shlex, shutil, stat, struct, subprocess, tempfile, threading, time, uuid
+import re,shlex, shutil, stat, struct, subprocess, tempfile, threading, time, uuid
 from local_metal_builder import canonical, child_directory, regular_bytes, tool_fingerprint
 from native_package_assets import Relocator, commands, loads, _system
-from bbcpu_compile_schedule import Memory as CompileMemory,run as compile_schedule
+from bbcpu_compile_schedule import Memory as CompileMemory,run as compile_schedule,maximum_jobs
+from bbcpu_resume_catalog import compilation_catalog
 
 SOURCE=Path(__file__).resolve().parents[1]
 VENDOR=SOURCE/'vendor/bbcpu'
@@ -54,6 +55,20 @@ def content_closure(rows,entry):
  return dict(executable=rows[str(entry.resolve())],dependencies=sorted(value for path,value in rows.items()if path!=str(entry.resolve())))
 def compile_flags(resource,includes):
  return [*original.CFLAGS,'-DBBCPU_NATIVE_TSC=1','-isystem',str(resource),'-isystem',str(VENDOR/'tools/recomp/sdkless'),*[value for path in includes for value in('-I',str(path))]]
+def rebind_identical_import_source(saved,current,source):
+ # A -> B -> A can restore the exact original ELF at a new inode/ctime.
+ # Rebind ONLY this declared import input after hashing its actual bytes;
+ # compiler/header/generator/selected-image changes still fail normal checks.
+ path=source['path'];old=saved.get('selected_inputs',[])
+ if not old or {r['path']for r in old}!={r['path']for r in current}:return None
+ now={r['path']:r for r in current}
+ if any(r!=now[r['path']]and r['path']!=path for r in old):return None
+ dependencies=[r for r in saved.get('pins',[])if r['path']!=path]
+ if not unchanged(dependencies):return None
+ before=snapshot(path)
+ if now.get(path)!=before or digest(path)!=source['sha256']or snapshot(path)!=before:return None
+ updated=dict(saved,selected_inputs=current,pins=[before if r['path']==path else r for r in saved['pins']])
+ return updated if unchanged(updated['pins'])else None
 
 class Producer:
  def __init__(self,args):
@@ -128,10 +143,18 @@ class Producer:
   descriptor=effective/'effective-input.json';doc=read_json(descriptor)
   need(doc.get('schema')==1 and len(doc.get('effective_identity',''))==64,'effective input descriptor required')
   abi=read_json(a.abi);need(abi.get('abi')==5 and abi.get('architecture')=='arm64'and abi.get('native_tsc')is True,'actual native-clock CPU ABI required')
-  basic=[descriptor,effective/'effective.elf',effective/'pointers.txt',a.abi,a.tools/'bbcpu-scan',a.tools/'bbrecomp',a.compiler,a.linker,(a.sdk/'usr/lib/libSystem.tbd').resolve(strict=True),Path(__file__).resolve(),VENDOR/'annotations/functions.tsv',Path(original.__file__).resolve()]
+  basic=[descriptor,effective/'effective.elf',effective/'pointers.txt',a.abi,a.tools/'bbcpu-scan',a.tools/'bbrecomp',a.compiler,a.linker,(a.sdk/'usr/lib/libSystem.tbd').resolve(strict=True),Path(__file__).resolve(),Path(__file__).with_name('bbcpu_resume_catalog.py'),VENDOR/'annotations/functions.tsv',Path(original.__file__).resolve()]
   for path in basic:self.pin(path)
+  import_input=doc.get('import_input');resume_entries=doc.get('resume_entries',[])
+  need(doc.get('phase')!='runtime-hooks-installed-v1'or isinstance(import_input,dict),'runtime export import input absent')
+  if import_input:
+   need(set(import_input)=={'path','sha256'},'invalid real import input')
+   self.pin(import_input['path'])
+   for name in('imports.py','ps4elf.py','import_names.inc'):self.pin(VENDOR/'tools/recomp'/name)
+  analysis=effective/'analysis/effective.elf'if doc.get('analysis_elf_sha256')else effective/'effective.elf'
+  if analysis!=effective/'effective.elf':self.pin(analysis)
   selected_inputs=list(self.pins.values())
-  request=dict(schema=1,effective_identity=doc['effective_identity'],cpu_contract=abi['header_contract_sha256'],compiler=str(a.compiler),linker=str(a.linker),sdk=str(a.sdk),tools=str(a.tools),include=[str(p.resolve(strict=True))for p in a.include],dependency_roots=sorted(str(p.resolve(strict=True))for p in a.dependency_root),options=original.CFLAGS,allowed_undefined=original.ALLOWED_UNDEFINED,clock='native-tsc-abi5')
+  request=dict(schema=1,effective_identity=doc['effective_identity'],resume_entries=resume_entries,import_input=import_input,cpu_contract=abi['header_contract_sha256'],compiler=str(a.compiler),linker=str(a.linker),sdk=str(a.sdk),tools=str(a.tools),include=[str(p.resolve(strict=True))for p in a.include],dependency_roots=sorted(str(p.resolve(strict=True))for p in a.dependency_root),options=original.CFLAGS,allowed_undefined=original.ALLOWED_UNDEFINED,clock='native-tsc-abi5')
   index=self.root/('ready-'+key(request)+'.json')
   # A final library does not depend on retaining its intermediate .o/C files.
   # The entry records real input/closure pins and the final immutable products.
@@ -140,6 +163,10 @@ class Producer:
    try:saved=read_json(index)
    except(Exception):saved={}
    inputs_match=saved.get('schema')==1 and saved.get('request')==request and saved.get('selected_inputs')==selected_inputs and unchanged(saved.get('pins',[]))
+   if not inputs_match and import_input and saved.get('schema')==1 and saved.get('request')==request:
+    rebound=rebind_identical_import_source(saved,selected_inputs,import_input)
+    if rebound is not None:
+     shutil.copyfile(index,index.with_name(index.stem+'-previous-'+self.session+'.json'));write_json(index,rebound);saved=rebound;inputs_match=True
    if inputs_match:
     artifact=Path(saved.get('result',{}).get('artifact','/'))
     product_names={Path(p['path']).name for p in saved.get('products',[])}
@@ -183,24 +210,33 @@ class Producer:
    attempts=child_directory(self.root,'generations',create=True);objects=child_directory(self.root,'objects',create=True)
    stage=attempts/(generation_key+'-'+self.session);stage.mkdir(mode=0o700);scan=stage/'scan';scan.mkdir();gen=stage/'gen';gen.mkdir();scratch=stage/'preprocessed';scratch.mkdir()
    emit('step',step='scan',effective_identity=doc['effective_identity'])
-   self.run([a.tools/'bbcpu-scan',effective/'effective.elf',scan,effective/'pointers.txt'],'scan');self.count['generator_processes']+=1
-   functions=scan/'functions.tsv';offsets=[];exclusions=doc.get('excluded_code_slots',[])
-   for line in functions.read_text().splitlines()[1:]:
-    if not line.strip():continue
-    fields=line.split('\t');offset=int(fields[0],0);size=int(fields[1],0)
-    if not any(offset<start+length and start<offset+size for start,length in exclusions):offsets.append(fields[0])
+   if analysis!=effective/'effective.elf':need(digest(analysis)==doc['analysis_elf_sha256'],'actual pre-hook analysis ELF changed')
+   # Analyze the real before-hook image, retaining calls hidden by entry
+   # detours (including upstream setjmp exclusions). Compile/hash ONLY the
+   # final post-hook image below; the analysis snapshot is never executed.
+   self.run([a.tools/'bbcpu-scan',analysis,scan,effective/'pointers.txt'],'scan');self.count['generator_processes']+=1
+   if import_input:
+    need(digest(import_input['path'])==import_input['sha256'],'original import input changed after export')
+    self.run([__import__('sys').executable,VENDOR/'tools/recomp/imports.py',import_input['path'],scan],'imports')
+   functions,offsets,fragment_count=compilation_catalog(scan,resume_entries,doc.get('excluded_code_slots',[]))
+   emit('resume-catalog',installed_sites=len(resume_entries),static_fragments=fragment_count)
    need(offsets,'no statically admissible functions found');listing=scan/'all.txt';listing.write_text('\n'.join(offsets)+'\n')
    env={**self.env,'BB_JIT':'0','BB_RECOMP_ANNOTATIONS':str(VENDOR/'annotations/functions.tsv')}
-   self.run([a.tools/'bbrecomp',effective/'effective.elf',functions,gen/'recomp.c','@'+str(listing)],'generate',env=env);self.count['generator_processes']+=1
+   if fragment_count:
+    frames=scan/'continuation-frames.tsv';self.run([a.tools/'bbcpu-scan','--prefix-frames',analysis,scan/'continuation-prefixes.tsv',frames],'continuation-stack-frames')
+    env['BB_RECOMP_CONTINUATIONS']=str(frames)
+   generated=self.run([a.tools/'bbrecomp',effective/'effective.elf',functions,gen/'recomp.c','@'+str(listing)],'generate',env=env);self.count['generator_processes']+=1
+   actual=re.findall(r'^([0-9]+) functions, [0-9]+ instructions:',generated,re.M)
+   need(len(actual)==1 and 0<int(actual[0])<=len(offsets),'actual generator function inventory absent or inconsistent')
    sources=sorted(gen.glob('recomp*.c'));need(sources and len(sources)<=8192,'invalid generated source count')
    # Limit concurrent compilers; no game/GPU runs alongside this producer.
    memory=CompileMemory()
    try:
     compiled=compile_schedule(sources,lambda source:self.object(source,flags,compiler_key,objects,scratch),
-      maximum=2 if a.jobs=='auto'else int(a.jobs),observe=memory,
+      maximum=maximum_jobs(a.jobs),observe=memory,
       progress=lambda **row:emit('compile-progress',**row))
    finally:memory.close()
-   function_count=len(offsets);source_count=len(sources)
+   function_count=int(actual[0]);source_count=len(sources)
   else:
    compiled=reusable_compiled;linker=saved['linker'];self.count['object_reuses']=len(compiled)
    self.pins.update({p['path']:p for p in saved['pins']})
@@ -242,7 +278,7 @@ def main():
  p=argparse.ArgumentParser(description=__doc__)
  for name in('effective','work','tools','abi','compiler','linker','sdk'):p.add_argument('--'+name,type=Path,required=True)
  p.add_argument('--dependency-root',type=Path,action='append',required=True);p.add_argument('--include',type=Path,action='append',default=[])
- p.add_argument('--jobs',choices=('auto','1','2'),default='auto');a=p.parse_args()
+ p.add_argument('--jobs',default='auto');a=p.parse_args();maximum_jobs(a.jobs)
  a.compiler=a.compiler.resolve(strict=True);a.linker=a.linker.resolve(strict=True);a.sdk=a.sdk.resolve(strict=True);a.tools=a.tools.resolve(strict=True);a.abi=a.abi.resolve(strict=True);a.work=work_root(a.work)
  lock=os.open(a.work/'.bbcpu-writer.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
  try:

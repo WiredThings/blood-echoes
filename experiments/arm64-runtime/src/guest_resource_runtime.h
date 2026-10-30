@@ -127,7 +127,12 @@ std::unique_ptr<Mapping> Install(State& state,Mapping& image,const Boot& boot,bo
  memcpy(mapping->ptr,plan.stubs.data(),plan.stubs.size());check(mprotect(mapping->ptr,mapping->size,PROT_READ)==0,"resource stub read permission failed");
  originals=plan.originals;
  state.ranges.push_back({mapping->at(),mapping->size,true,false});
- for(auto& patch:plan.patches)memcpy(static_cast<B*>(image.ptr)+patch.offset,patch.bytes.data(),patch.bytes.size());
+ for(auto& patch:plan.patches){
+#ifdef BB_CPU_BACKEND_BBCPU
+  bbcpu_note_patch(patch.offset,patch.bytes.size(),"resource-hooks");
+#endif
+  memcpy(static_cast<B*>(image.ptr)+patch.offset,patch.bytes.data(),patch.bytes.size());
+ }
  BbGuestHooks::ConfigureFexHooks(true);
  if(payload_gate_enabled)BbPayload::Get().Configure(metadata_complete.load());
  if(authored)BbGuestHooks::Install([](U,U){});

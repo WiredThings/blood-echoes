@@ -51,6 +51,13 @@ class BundleControls(unittest.TestCase):
   dev=self.project/'tools/prepare_module_metadata.py';dev.parent.mkdir();dev.write_text('# available old developer helper\n')
   self.helper.unlink()
   with self.assertRaises(FileNotFoundError):self.select()
+ def test_runtime_exporter_requires_exact_preparer_role_and_capability(self):
+  role='bin/bbcpu-tools/bbcpu-code-preparer';self.exe=self.root/role;self.exe.parent.mkdir(parents=True);self.exe.write_bytes(b'authored runtime exporter')
+  self.freeze(role);native=self.root/'NATIVE-METAL.json';model=json.loads(native.read_bytes());model.update(game_runtime='arm64',cpu_backends=['fex','bbcpu']);native.write_text(json.dumps(model))
+  component=self.root/'BBCPU-COMPONENT.json';doc=dict(schema=1,development_only=True,backend='bbcpu',runtime_image_export=1,preparer=dict(path=role,sha256=m.digest(self.exe)));component.write_text(json.dumps(doc))
+  self.assertEqual(self.select(),self.root/'vendor/blood_echoes/loader')
+  component.write_text(json.dumps({**doc,'runtime_image_export':0}))
+  with self.assertRaisesRegex(ValueError,'frozen component'):self.select()
  def test_unknown_runtime_role_rejected(self):
   wrong=self.root/'bin/other-runtime';wrong.write_bytes(b'author')
   with self.assertRaisesRegex(ValueError,'role is not declared'):self.select(executable=wrong)

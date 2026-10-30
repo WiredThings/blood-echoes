@@ -38,9 +38,37 @@ class LaunchTests(unittest.TestCase):
     def test_real_code_change_only_reexports_affected_inputs(self):
         self.prepare();(self.data/'unrelated-ui.txt').write_text('changed');self.assertFalse(self.prepare()[2]['effective_exported'])
         (self.out/'patches.bin').write_bytes(b'changed code patch');self.assertTrue(self.prepare()[2]['effective_exported'])
+    def test_compile_ceiling_is_prep_only_and_does_not_change_code_selection(self):
+        self.prepare();self.env['BB_CPU_COMPILE_JOBS']='1';_,env,report=self.prepare()
+        self.assertFalse(report['effective_exported']);self.assertNotIn('BB_CPU_COMPILE_JOBS',env)
+        self.assertEqual(self.calls[-1][self.calls[-1].index('--jobs')+1],'1')
+        count=len(self.calls);self.env['BB_CPU_COMPILE_JOBS']='999999'
+        with self.assertRaisesRegex(ValueError,'job limit'):self.prepare()
+        self.assertEqual(len(self.calls),count)
     def test_broken_schedule_preserved_and_rebuilt(self):
-        self.prepare();index=next((self.data/'bbcpu-preparation/effective').glob('*.json'));index.write_text('{broken')
+        self.prepare();index=next(p for p in(self.data/'bbcpu-preparation/effective').glob('*.json')if p.name!='input-register.json');index.write_text('{broken')
         self.assertTrue(self.prepare()[2]['effective_exported']);self.assertTrue(any(p.read_text()=='{broken'for p in index.parent.glob('*previous*.json')))
+    def test_identical_patch_rewrite_reuses_actual_content_registration(self):
+        self.prepare();path=self.out/'patches.bin';path.write_bytes(path.read_bytes())
+        self.assertFalse(self.prepare()[2]['effective_exported'])
+    def test_mod_switch_back_adopts_preserved_original_export(self):
+        self.prepare();path=self.out/'patches.bin';original=path.read_bytes();path.write_bytes(b'modified')
+        self.assertTrue(self.prepare()[2]['effective_exported']);path.write_bytes(original)
+        self.assertFalse(self.prepare()[2]['effective_exported'])
+    def test_runtime_hook_context_change_invalidates_only_export_selection(self):
+        self.prepare();self.env['BB_GAME_MENU']='0';self.assertTrue(self.prepare()[2]['effective_exported'])
+        self.env.pop('BB_GAME_MENU');self.assertFalse(self.prepare()[2]['effective_exported'])
+    def test_runtime_export_uses_original_arguments_and_strips_credentials(self):
+        self.doc['runtime_image_export']=1;self.write_doc()
+        def child(argv,**kw):
+            if Path(argv[0]).name!='bbcpu-code-preparer':return self.child(argv,**kw)
+            self.calls.append(argv);self.assertEqual(argv[1:],self.args);self.assertNotIn('BB_THD_TOKEN',kw['env']);self.assertEqual(kw['env']['BB_CPU_BACKEND'],'bbcpu')
+            out=Path(kw['env']['BB_CPU_EXPORT_ROOT']);out.mkdir(mode=0o700)
+            for name in('effective.elf','pointers.txt','effective-input.json'):(out/name).write_text('mock output')
+            (out/'analysis').mkdir();(out/'analysis/effective.elf').write_text('real pre-hook analysis fixture')
+            return subprocess.CompletedProcess(argv,0,'','')
+        report=launch.prepare('original-fex-role',self.args,self.env,stage=self.stage,project=self.project,runner=child)[2]
+        self.assertTrue(report['effective_exported'])
     def test_changed_kit_refused_before_any_child(self):
         (self.kit/'produce.py').write_text('changed')
         with self.assertRaisesRegex(ValueError,'bytes changed'):self.prepare()

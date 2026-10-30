@@ -664,7 +664,7 @@ final class LauncherModel: ObservableObject {
         guard process == nil, let repo = repoURL, repoCheck.allowsPlay, gameCheck.allowsPlay else { return }
         let qaID = Bundle.main.bundleIdentifier ?? ""
         let isolatedQA = qaID.range(of: #"^io\.github\.bbport\.optimized\.options-qa\.arm64\.gui\.[0-9]+$"#, options: .regularExpression) != nil
-        var env = runtimeCapabilities.launchEnvironment(environment(), isolatedQA: isolatedQA, cpuBackend: prefs.cpuBackend)
+        var env = runtimeCapabilities.launchEnvironment(environment(), isolatedQA: isolatedQA, cpuBackend: prefs.cpuBackend, compileJobs: prefs.cpuCompileJobs)
         if prefs.online {
             guard profile.onlineActive else {
                 state = .failed(L10n.key("Online play currently requires the Metal backend.")); return

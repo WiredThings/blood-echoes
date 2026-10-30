@@ -21,8 +21,10 @@ static uintptr_t code;
 uintptr_t bb_image_base;
 static _Atomic unsigned released_stacks;
 static uint64_t owned_stop;
+static unsigned hook_calls;
 static void release_stack(void *stack,size_t bytes){assert(munmap(stack,bytes)==0);atomic_fetch_add(&released_stacks,1);}
 static int hle_syscall(BbGuestRegs *regs) {
+    if(regs->rip==code+527){assert(regs->r[0]==38);++hook_calls;regs->r[0]=0xdeadbeef;return 1;}
     if(regs->rip==code+261){
         assert(regs->r[0]==37&&owned_stop);
         assert(!bbcpu_request_execution_stop(owned_stop+16));
@@ -50,7 +52,7 @@ static void *worker(void *value) {
 }
 static uint64_t native_counter(void){uint64_t n;__asm__ volatile("mrs %0,cntvct_el0":"=r"(n));return n;}
 int main(int argc,char **argv) {
-    assert(argc==1||(argc==3&&(!strcmp(argv[2],"static")||!strcmp(argv[2],"changed")||!strcmp(argv[2],"wrong-abi")||!strcmp(argv[2],"bad-span"))));
+    assert(argc==1||(argc==3&&(!strcmp(argv[2],"static")||!strcmp(argv[2],"changed")||!strcmp(argv[2],"wrong-abi")||!strcmp(argv[2],"bad-span")||!strcmp(argv[2],"resume")||!strcmp(argv[2],"resume-changed")||!strcmp(argv[2],"resume-branch"))));
     bbcpu_set_stack_release(release_stack);
     uint8_t *p=runtime_low_map(16384,PROT_READ|PROT_WRITE);
     assert(p);code=(uintptr_t)p;bb_image_base=code;
@@ -66,10 +68,20 @@ int main(int argc,char **argv) {
     const uint8_t static_exit[]={0x48,0x89,0xf8,0x48,0x83,0xec,0x08,0xbf,0x25,0,0,0,0xff,0xd0,0x0f,0x0b};
     const uint8_t exit_syscall[]={0x48,0x89,0xf8,0x0f,0x05,0x0f,0x0b};
     memcpy(p+4160,static_exit,sizeof(static_exit));memcpy(p+256,exit_syscall,sizeof(exit_syscall));
-    const int changed=argc==3&&!strcmp(argv[2],"changed");
+    const int resume_branch=argc==3&&!strcmp(argv[2],"resume-branch");
+    const int resume=argc==3&&(!strcmp(argv[2],"resume")||!strcmp(argv[2],"resume-changed")||resume_branch);
+    const int changed=argc==3&&(!strcmp(argv[2],"changed")||!strcmp(argv[2],"resume-changed"));
     const int wrong_abi=argc==3&&!strcmp(argv[2],"wrong-abi");
     const int bad_span=argc==3&&!strcmp(argv[2],"bad-span");
-    if(changed)p[4100]=0x29; /* same function changed from ADD to SUB */
+    if(resume){
+        const uint8_t body[]={0x55,0x48,0x89,0xe5,0x48,0x89,0xf8,0x48,0x01,0xf0,0x5d,0xc3};
+        const uint8_t stub[]={0x55,0x48,0x89,0xe5,0x48,0x89,0xf8,0x50,0xb8,38,0,0,0,0x0f,0x05,0x58,0xe9};
+        memcpy(p+4096,body,sizeof(body));memcpy(p+512,stub,sizeof(stub));
+        int32_t delta=512-(4096+5);p[4096]=0xe9;memcpy(p+4097,&delta,4);p[4101]=p[4102]=0x90;
+        delta=4103-(512+(int32_t)sizeof(stub)+4);memcpy(p+512+sizeof(stub),&delta,4);
+        if(resume_branch){p[4103]=0x53;p[4104]=0x48;p[4105]=0x01;p[4106]=0xf0;p[4107]=0xe9;delta=4208-4112;memcpy(p+4108,&delta,4);p[4208]=0x5b;p[4209]=0x5d;p[4210]=0xc3;}
+    }
+    if(changed)p[resume?4104:4100]=0x29; /* actual remaining ADD -> SUB */
     memcpy(p+128,seventh,sizeof(seventh));memcpy(p+200,syscall_code,sizeof(syscall_code));
     const uint8_t enter[]={0x48,0x83,0xec,0x08,0x48,0xb8};
     const uint8_t leave[]={0xff,0xd0,0x48,0x83,0xc4,0x08,0xc3};
@@ -79,13 +91,19 @@ int main(int argc,char **argv) {
     bbcpu_add_guest_code(code,16384);
     bbcpu_set_syscall_handler(hle_syscall);
     if(argc==3){
+        /* Force the shared epilogue through the ORIGINAL translator fallback;
+         * otherwise its compiled version hides an incorrect suffix RSP. */
+        if(resume_branch)assert(setenv("BB_RECOMP_OFF","0x1070",1)==0);
         assert(setenv("BB_RECOMP_LIB",argv[1],1)==0);
         bbcpu_recomp_load(code);
-        assert(bbcpu_recomp_functions()==(wrong_abi?0:bad_span?1:changed?2:3));
+        assert(bbcpu_recomp_functions()==(wrong_abi?0:bad_span?1:changed?2:resume?4:3));
         const uint64_t input[]={70,19};
-        for(int i=0;i<9000;++i)assert(bbcpu_call(code+4096,2,input)==(changed?51:89));
+        /* Resource adapters call the original trampoline directly: there is
+         * no enclosing static entry frame to hide a wrong return slot. */
+        for(int i=0;i<9000;++i)assert(bbcpu_call(code+(resume_branch?512:4096),2,input)==(changed?51:89));
         extern uint64_t bbcpu_recomp_calls;
-        assert((changed||wrong_abi||bad_span)?bbcpu_recomp_calls==0:bbcpu_recomp_calls>=8192);
+        assert((changed||wrong_abi||bad_span)?bbcpu_recomp_calls==0:bbcpu_recomp_calls>=((resume&&!resume_branch)?16384:8192));
+        if(resume)assert(hook_calls==9000);
         puts(bad_span?"BBCPU invalid function spans rejected; own translator retained":wrong_abi?"BBCPU wrong ABI rejected; own translator retained":changed?"BBCPU mismatch rejected; own translator returned changed result":"BBCPU static native code actually executed (at least 8192 calls)");
     }
     const uint64_t before=native_counter(),tick=bbcpu_call(code+4112,0,NULL),after=native_counter();

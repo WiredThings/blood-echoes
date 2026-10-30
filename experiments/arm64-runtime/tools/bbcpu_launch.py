@@ -4,6 +4,7 @@ Development authority is explicit. This never creates/selects a save, starts
 FEX, changes restart codes, or implements a second supervisor.
 """
 from pathlib import Path
+from bbcpu_compile_schedule import maximum_jobs
 import hashlib,json,os,plistlib,selectors,shutil,signal,stat,subprocess,sys,tempfile,time,uuid
 
 PRIVATE=(Path('/private/tmp'),Path('/Users/Shared/BloodEchoesDevelopment'))
@@ -96,8 +97,35 @@ def option(arguments,name,required=True):
     need(len(positions)<=1 and(not positions or positions[0]+1<len(arguments)),'ambiguous original CPU option: '+name)
     need(bool(positions)or not required,'missing original CPU option: '+name)
     return owned(arguments[positions[0]+1])if positions else None
+def registered_inputs(root,paths):
+    """Register these few selected sources, not the entire resource tree.
+
+    File identity/ctime changes trigger a real digest. Rewriting a small patch
+    file with identical bytes must not launch another native exporter.
+    Runtime admission still verifies the actual final mapped code.
+    """
+    register=root/'input-register.json'
+    try:old=read(register)
+    except(OSError,ValueError):old={}
+    rows={};pins=[]
+    for path in paths:
+        before=state(path);saved=old.get(str(path),{})
+        value=saved.get('sha256')if saved.get('state')==before else None
+        if not isinstance(value,str)or len(value)!=64:value=sha(path)
+        need(state(path)==before,'CPU source changed during registration')
+        rows[str(path)]=dict(state=before,sha256=value);pins.append(before)
+    if rows!=old:publish(register,rows)
+    return pins,[[str(path),rows[str(path)]['sha256']]for path in paths]
+def export_context(arguments,environment,mode):
+    keys=('BB_ARM_RESOURCE_HOOKS','BB_ARM_EXTRA_HEAPS','BB_ARM_EXTRA_HEAPS_FRESH',
+          'BB_GAME_MENU','BB_ARM_PAYLOAD_GATE','BB_ARM_RESOURCE_FAST','BB_ARM_RESOURCE_LEAF',
+          'BB_STUTTER_AUDIT','BB_FREE_CHECK','BB_LABEL_TRAP','BB_GUEST_HOOK_TRAPS',
+          'BB_DEV_WORLD_WARPER_DIR','BB_ARM_ALLOCATION_AUDIT','BB_NET_BACKEND')
+    return dict(mode=mode,arguments=list(map(str,arguments)),flags={key:environment[key]for key in keys if key in environment})
 def prepare(executable,arguments,environment,*,stage,project,runner=subprocess.run):
     started=time.monotonic();env=dict(environment)
+    jobs=env.pop('BB_CPU_COMPILE_JOBS','auto')
+    maximum_jobs(jobs)
     need(env.get('BB_CPU_BACKEND','fex')=='bbcpu','bbcpu hook requires the selected CPU')
     doc,paths=component(stage);stage=Path(stage)
     # Original script arguments already select the effective linked image and
@@ -107,40 +135,50 @@ def prepare(executable,arguments,environment,*,stage,project,runner=subprocess.r
     need(data.is_relative_to(project/'state')and boot.is_relative_to(data/'out'),'CPU preparation escaped original isolated launch data')
     root=data/'bbcpu-preparation';root.mkdir(mode=0o700,exist_ok=True);private(root)
     effective=root/'effective';effective.mkdir(mode=0o700,exist_ok=True);private(effective)
-    pins=[state(p)for p in(boot,elf,patch,*([startup]if startup else[]),paths['preparer'])]
-    schedule=hashlib.sha256(json.dumps(pins,separators=(',',':')).encode()).hexdigest();index=effective/(schedule+'.json')
+    pins,semantic_inputs=registered_inputs(effective,(boot,elf,patch,*([startup]if startup else[]),paths['preparer']))
+    context=export_context(arguments,env,doc.get('runtime_image_export',0))
+    product_names=('effective.elf','pointers.txt','effective-input.json',*(('analysis/effective.elf',)if doc.get('runtime_image_export')==1 else()))
+    schedule=hashlib.sha256(json.dumps(dict(inputs=semantic_inputs,context=context),sort_keys=True,separators=(',',':')).encode()).hexdigest();index=effective/(schedule+'.json')
     selected=None
     if index.is_file():
         try:old=read(index)
         except(ValueError,OSError):old={}
         candidate=Path(old.get('directory',''))
-        if candidate.parent==effective and old.get('inputs')==pins:
+        if candidate.parent==effective and old.get('semantic_inputs')==semantic_inputs and old.get('context')==context:
             try:
-                if [state(candidate/name)for name in('effective.elf','pointers.txt','effective-input.json')]==old.get('products'):selected=candidate
+                if [state(candidate/name)for name in product_names]==old.get('products'):selected=candidate
             except(OSError,ValueError):pass
     safe={k:v for k,v in env.items()if not k.startswith(('BB_','BBCPU_','DYLD_'))};safe.update(PYTHONDONTWRITEBYTECODE='1',PYTHONNOUSERSITE='1')
-    def run(argv,tag):
+    def run(argv,tag,environment=None):
         # A serial full-game first build can exceed an hour. This is a bounded
         # preparation deadline, independent from the short live-game QA budget.
         log=root/(tag+'-'+uuid.uuid4().hex+'.log')
         if tag=='static-library'and runner is subprocess.run:
             result=stream_cpu_command(argv,environment=safe,log=log,timeout=7200)
         else:
-            result=runner(list(map(str,argv)),env=safe,capture_output=True,text=True,timeout=7200 if tag=='static-library'else 3600)
+            result=runner(list(map(str,argv)),env=environment or safe,capture_output=True,text=True,timeout=7200 if tag=='static-library'else 3600)
             log.write_text(result.stdout+result.stderr)
         need(result.returncode==0,'bbcpu '+tag+' failed; isolated diagnostic: '+str(log))
         return result.stdout
     exported=selected is None
     if selected is None:
         selected=effective/uuid.uuid4().hex
-        argv=[paths['preparer'],'--boot',boot,'--elf',elf,'--patches',patch,'--out',selected]
-        if startup:argv+=['--startup',startup]
-        run(argv,'effective-code')
+        if doc.get('runtime_image_export')==1:
+            # The same host installs its actual native resource/heap/menu hooks
+            # and exits before guest entry. Keep original arguments/semantics;
+            # no second frontend, guest run, or authenticated network request.
+            export_env={k:v for k,v in env.items()if k!='BB_RECOMP_LIB'and not any(word in k.upper()for word in('TOKEN','CREDENTIAL','SECRET','KEYCHAIN'))and k not in('BB_AUTH_FILE','BB_NET_AUTH_FILE')}
+            export_env.update(BB_CPU_EXPORT_ROOT=str(selected),BB_CPU_EXPORT_ELF=str(elf),BB_CPU_STATIC_PATCH_AUDIT='0',BB_CPU_STATIC_PATCH_AUDIT_ONLY='0')
+            run([paths['preparer'],*arguments],'effective-code',export_env)
+        else:
+            argv=[paths['preparer'],'--boot',boot,'--elf',elf,'--patches',patch,'--out',selected]
+            if startup:argv+=['--startup',startup]
+            run(argv,'effective-code')
         need([state(Path(row[0]))for row in pins]==pins,'effective CPU sources changed during preparation')
-        publish(index,dict(schema=1,inputs=pins,directory=str(selected),products=[state(selected/name)for name in('effective.elf','pointers.txt','effective-input.json')]))
+        publish(index,dict(schema=1,inputs=pins,semantic_inputs=semantic_inputs,context=context,directory=str(selected),products=[state(selected/name)for name in product_names]))
     toolchain=doc['toolchain']
     products=root/'products';products.mkdir(mode=0o700,exist_ok=True);private(products)
-    argv=[sys.executable,paths['producer'],'--effective',selected,'--work',products,'--tools',paths['scanner'].parent,'--abi',paths['abi'],'--jobs','auto']
+    argv=[sys.executable,paths['producer'],'--effective',selected,'--work',products,'--tools',paths['scanner'].parent,'--abi',paths['abi'],'--jobs',jobs]
     for name in('compiler','linker','sdk'):argv+=['--'+name,toolchain[name]]
     roots={str(Path(path).resolve(strict=True))for path in toolchain['dependency_roots']}
     # Admit the final relocated tool closure as well as the explicit original

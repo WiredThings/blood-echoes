@@ -385,8 +385,13 @@ void bbcpu_set_fatal_handler(void (*handler)(const char *, uint64_t)) { fatal_ha
 _Noreturn void bbcpu_fatal(BbCpu *cpu, const BbInsn *in, const char *what) {
     char bytes[64] = {0};
     const uint8_t *code = (const uint8_t *)cpu->rip;
-    for (int i = 0; i < (in ? in->length : 8) && i < 15; ++i)
-        snprintf(bytes + i * 3, sizeof(bytes) - (size_t)i * 3, "%02x ", code[i]);
+    const unsigned count = in && in->length < 15 ? in->length : in ? 15 : 8;
+    if (bbcpu_is_guest_code_span(cpu->rip, count)) {
+        for (unsigned i = 0; i < count; ++i)
+            snprintf(bytes + i * 3, sizeof(bytes) - (size_t)i * 3, "%02x ", code[i]);
+    } else {
+        snprintf(bytes, sizeof(bytes), "unavailable: outside owned guest code");
+    }
     fprintf(stderr, "STOP: bbcpu: %s: %s at guest %#" PRIx64 " (bytes %s)\n", what,
             in ? ZydisMnemonicGetString((ZydisMnemonic)in->mnemonic) : "?", cpu->rip, bytes);
     fprintf(stderr, "  rax=%#" PRIx64 " rbx=%#" PRIx64 " rcx=%#" PRIx64 " rdx=%#" PRIx64

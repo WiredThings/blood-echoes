@@ -10,10 +10,10 @@ inline std::string Hash(const unsigned char* bytes,size_t count){
 struct Write {std::string stage;uint64_t offset,size;std::string before,after;};
 class Audit {
  struct Range {uint64_t offset;std::vector<unsigned char> before;};
- const unsigned char* image_;const BbCpuArtifact::Admitted& admitted_;
+ const unsigned char* image_;const BbCpuArtifact::Candidate& admitted_;
  std::vector<Range> ranges_;std::vector<Write>writes_;std::ofstream output_;
 public:
- Audit(const void* image,const BbCpuArtifact::Admitted& admitted,const std::filesystem::path& output):
+ Audit(const void* image,const BbCpuArtifact::Candidate& admitted,const std::filesystem::path& output):
   image_(static_cast<const unsigned char*>(image)),admitted_(admitted),output_(output){
   BbCpuImage::Require(bool(output_),"static patch audit output unavailable");
   for(auto p:admitted.layout.loads)if(p.flags&1){BbCpuImage::Require(p.memsz<=(128ull<<20),"static patch audit text bound");ranges_.push_back({p.address,{image_+p.address,image_+p.address+p.memsz}});}

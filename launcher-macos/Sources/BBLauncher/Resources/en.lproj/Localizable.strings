@@ -587,3 +587,9 @@
 "Compiling CPU code…" = "Compiling CPU code…";
 
 "Waiting for compiler memory…" = "Waiting for compiler memory…";
+
+"Maximum compilation jobs" = "Maximum compilation jobs";
+
+"Automatic" = "Automatic";
+
+"Actual concurrency adapts to available memory." = "Actual concurrency adapts to available memory.";

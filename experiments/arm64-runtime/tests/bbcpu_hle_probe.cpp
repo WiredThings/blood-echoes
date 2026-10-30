@@ -50,7 +50,7 @@ int main(int argc,char**argv){
  auto* memory=static_cast<unsigned char*>(runtime_low_map(32768,PROT_READ|PROT_WRITE));assert(memory);
  bb_image_base=reinterpret_cast<uintptr_t>(memory);sum_entry=bb_image_base;
  const unsigned char sum[]={0x48,0x89,0xf8,0x48,0x01,0xf0,0xc3};std::memcpy(memory,sum,sizeof(sum));
- memory[64]=0x48;memory[65]=0xb8;auto native=reinterpret_cast<uint64_t>(ForbiddenHost);std::memcpy(memory+66,&native,8);memory[74]=0xff;memory[75]=0xe0;
+ memory[64]=0x48;memory[65]=0xb8;auto native=argc==2&&std::string_view(argv[1])=="--unmapped-host"?UINT64_C(0x700000000020):reinterpret_cast<uint64_t>(ForbiddenHost);std::memcpy(memory+66,&native,8);memory[74]=0xff;memory[75]=0xe0;
  const unsigned char unowned[]={0x49,0x89,0xca,0x48,0xb8,1,0,0,0,0,0,0,0,0x0f,0x05,0xc3};std::memcpy(memory+96,unowned,sizeof(unowned));
  memory[512]=0xf4;assert(mprotect(memory,16384,PROT_READ)==0);
  HleCallRegistry registry;HleVeneerAllocator veneers;
@@ -64,7 +64,7 @@ int main(int argc,char**argv){
  auto run=[&](uint64_t entry){request.Rip=entry;auto result=cpu.Run(request);assert(std::holds_alternative<Core::GuestExecutionState>(result));return std::get<Core::GuestExecutionState>(result);};
  if(argc==2){
   const std::string_view mode=argv[1];
-  if(mode=="--raw-host")run(bb_image_base+64);
+  if(mode=="--raw-host"||mode=="--unmapped-host")run(bb_image_base+64);
   else if(mode=="--unowned-syscall")run(bb_image_base+96);
   else if(mode=="--bad-pointer"){request.Gpr[7]=1;run(read.second);}
   else if(mode=="--wrong-operation"){request.Gpr[0]=UINT64_MAX;run(seven.second+13);}

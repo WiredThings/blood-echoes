@@ -486,6 +486,16 @@ struct DisplaySection: View {
                 }
                 Text(L10n.key("Applies on the next launch. bbcpu prepares static code locally."))
                     .font(.caption).foregroundStyle(.secondary)
+                if model.prefs.cpuBackend == .bbcpu {
+                    Picker(L10n.key("Maximum compilation jobs"), selection: $model.prefs.cpuCompileJobs) {
+                        Text(L10n.key("Automatic")).tag("auto")
+                        ForEach(1...StaticCompilationConcurrency.maximum, id: \.self) { count in
+                            Text("\(count)").tag(String(count))
+                        }
+                    }
+                    Text(L10n.key("Actual concurrency adapts to available memory."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Picker(L10n.key("Renderer backend"), selection: $model.prefs.renderer) {
                 ForEach(Catalog.renderers) {

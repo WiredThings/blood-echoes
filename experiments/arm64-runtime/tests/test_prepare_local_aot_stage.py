@@ -11,6 +11,9 @@ ORIGINAL_PATHS=('run.sh','tools/macos/run_optimized.sh','tools/macos/supervise_r
  'scripts/link_modules.py','scripts/patches.py','scripts/game_check.py','scripts/mods.py',
  'scripts/prepare.py','scripts/ultrawide_ui.py','tools/macos/run.sh')
 class StageTests(unittest.TestCase):
+ def test_real_runtime_imports_are_complete(self):
+  stage_prepare.validate_import_closure(TOOLS)
+
  def setUp(self):
   self.temp=Path(tempfile.mkdtemp(prefix='package-author-',dir=E))
   self.project=self.temp/'Shared runtime';self.project.mkdir();(self.project/'state').mkdir()

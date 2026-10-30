@@ -49,7 +49,13 @@ std::unique_ptr<Mapping> Install(State& state,Mapping& image,const Boot& boot,bo
  std::array<std::shared_ptr<HleCallAdapter>,3> adapters={MakeHleCallAdapter(Completed),MakeHleCallAdapter(Before),MakeHleCallAdapter(After)};
  std::array<U,3> targets{};for(unsigned i=0;i<3;++i){if(authored&&i==2)adapters[i]=std::make_shared<ArmResourceRuntime::ClobberInline>(adapters[i]);targets[i]=veneer(state,state.registry.Register(framed(adapters[i]),"resource.extra_heap."+std::to_string(i)));}
  auto plan=BbExtraHeaps::Prepare(std::span(static_cast<const unsigned char*>(image.ptr),size_t(boot.size)),image.at(),mapping->at(),mapping->size,sites,targets);
- memcpy(mapping->ptr,plan.stubs.data(),plan.stubs.size());check(!mprotect(mapping->ptr,mapping->size,PROT_READ),"extra heap stub permission failed");state.ranges.push_back({mapping->at(),mapping->size,true,false});for(auto& p:plan.patches)memcpy(static_cast<unsigned char*>(image.ptr)+p.offset,p.bytes.data(),p.bytes.size());
+ memcpy(mapping->ptr,plan.stubs.data(),plan.stubs.size());check(!mprotect(mapping->ptr,mapping->size,PROT_READ),"extra heap stub permission failed");state.ranges.push_back({mapping->at(),mapping->size,true,false});
+ for(auto& p:plan.patches){
+#ifdef BB_CPU_BACKEND_BBCPU
+  bbcpu_note_patch(p.offset,p.bytes.size(),"extra-heaps");
+#endif
+  memcpy(static_cast<unsigned char*>(image.ptr)+p.offset,p.bytes.data(),p.bytes.size());
+ }
  if(authored){BbGuestHooks::ConfigureFexHooks(true);BbGuestHooks::Install([](U,U){});}
  printf("ARM EXTRA 5/5 actual heap hooks installed, stub=%zu bytes; original guest calls once, completed frees use captured generation, no cache budget change\n",plan.stubs.size());return mapping;
 }

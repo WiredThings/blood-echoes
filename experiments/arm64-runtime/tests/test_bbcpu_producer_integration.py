@@ -55,7 +55,37 @@ def main():
  back=produce(base,'back-to-original');assert back['reused_ready']and back['artifact_key']==repaired['artifact_key']and all(v==0 for v in back['counters'].values())
  (root/'unrelated-resource.txt').write_text('resource-only change')
  unrelated=produce(base,'unrelated-resource');assert unrelated['reused_ready']and all(v==0 for v in unrelated['counters'].values())
+ # An authored real entry detour executes its original prefix + HLE callback
+ # in the translator and returns into a statically compiled middle-of-function
+ # suffix. This verifies actual execution, guest RBP/RSP preservation, and a
+ # changed suffix rejecting BOTH affected table entries without fake hashes.
+ code=bytearray(fixture());code[4096:4108]=bytes.fromhex('554889e54889f84801f05dc3');struct.pack_into('<I',code,8300,12)
+ resume_source=root/'resume-source.elf';resume_source.write_bytes(code)
+ def resume_boot(path,raw):
+  img=bytearray(24576);img[:8192]=raw[:8192];img[16384:]=raw[8192:]
+  path.write_bytes(boot.read_bytes()[:-24576]+img)
+ before=root/'resume-before.boot';resume_boot(before,code)
+ analysis=root/'resume-analysis';run([a.build/'bbcpu-code-preparer','--boot',before,'--elf',resume_source,'--out',analysis],'resume-analysis')
+ stub=bytes.fromhex('554889e54889f850b8260000000f0558e9')+struct.pack('<i',4103-(512+21))
+ code[512:512+len(stub)]=stub;code[4096:4103]=b'\xe9'+struct.pack('<i',512-4101)+b'\x90\x90'
+ after=root/'resume-after.boot';resume_boot(after,code)
+ selected=root/'resume-effective';run([a.build/'bbcpu-code-preparer','--boot',after,'--elf',resume_source,'--out',selected],'resume-effective')
+ (selected/'analysis').mkdir();shutil.copyfile(analysis/'effective.elf',selected/'analysis/effective.elf')
+ descriptor=selected/'effective-input.json';meta=json.loads(descriptor.read_bytes());meta.update(resume_entries=[dict(site=4096,covered=7,resume=4103,phase='resource-hooks')],analysis_elf_sha256=sha(selected/'analysis/effective.elf'));descriptor.write_text(json.dumps(meta))
+ resumed=produce(selected,'resume-produce');run([a.build/'bbcpu-static-admission-probe',after,resumed['artifact']],'resume-final-image-admission')
+ run([a.build/'bbcpu-contract-probe',Path(resumed['artifact'])/'librecomp.dylib','resume'],'resume-actual-static-body')
+ run([a.build/'bbcpu-contract-probe',Path(resumed['artifact'])/'librecomp.dylib','resume-changed'],'resume-changed-body-refused')
+ # A suffix can jump to an out-of-range shared epilogue while its RSP still
+ # contains the original prologue. Its translator boundary must refer to the
+ # ORIGINAL function's return slot, not the suffix's current stack pointer.
+ code=bytearray(fixture());code[4096:4112]=bytes.fromhex('554889e54889f8534801f0e9')+struct.pack('<i',4208-4112);code[4208:4211]=b'\x5b\x5d\xc3';struct.pack_into('<I',code,8300,16)
+ branch_source=root/'branch-source.elf';branch_source.write_bytes(code);branch_before=root/'branch-before.boot';resume_boot(branch_before,code)
+ branch_analysis=root/'branch-analysis';run([a.build/'bbcpu-code-preparer','--boot',branch_before,'--elf',branch_source,'--out',branch_analysis],'branch-analysis')
+ code[512:512+len(stub)]=stub;code[4096:4103]=b'\xe9'+struct.pack('<i',512-4101)+b'\x90\x90';branch_after=root/'branch-after.boot';resume_boot(branch_after,code)
+ branch_effective=root/'branch-effective';run([a.build/'bbcpu-code-preparer','--boot',branch_after,'--elf',branch_source,'--out',branch_effective],'branch-effective')
+ (branch_effective/'analysis').mkdir();shutil.copyfile(branch_analysis/'effective.elf',branch_effective/'analysis/effective.elf');descriptor=branch_effective/'effective-input.json';meta=json.loads(descriptor.read_bytes());meta.update(resume_entries=[dict(site=4096,covered=7,resume=4103,phase='resource-hooks')],analysis_elf_sha256=sha(branch_effective/'analysis/effective.elf'));descriptor.write_text(json.dumps(meta))
+ branch=produce(branch_effective,'branch-produce');run([a.build/'bbcpu-contract-probe',Path(branch['artifact'])/'librecomp.dylib','resume-branch'],'branch-actual-original-stack-boundary')
  assert originals==(sha(boot),sha(source))
- result=dict(status='passed',authored_only=True,game_started=False,formal_data_accessed=False,cold=cold,warm=warm,repaired=repaired,mod=mod,back_to_original=back,unrelated_resource=unrelated,damaged_generation_preserved=True,actual_producer_library_executed=True,sources_unchanged=True)
+ result=dict(status='passed',authored_only=True,game_started=False,formal_data_accessed=False,cold=cold,warm=warm,repaired=repaired,mod=mod,back_to_original=back,unrelated_resource=unrelated,resume_fragment_actual_execution=True,resume_changed_body_refused=True,resumed=resumed,branch_translator_boundary=True,branch=branch,damaged_generation_preserved=True,actual_producer_library_executed=True,sources_unchanged=True)
  (root/'result.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
 if __name__=='__main__':main()

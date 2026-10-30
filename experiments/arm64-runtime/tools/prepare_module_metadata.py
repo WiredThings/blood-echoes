@@ -21,7 +21,7 @@ def formal_code_root(root):
 def declared_code_root(executable):
  """Original CPU roles and the explicitly declared independent QA CPU role."""
  executable=Path(executable).absolute()
- layouts=('bin/bb-probe-metal','bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal','bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal')
+ layouts=('bin/bb-probe-metal','bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal','bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal','bin/bbcpu-tools/bbcpu-code-preparer')
  for relative in layouts:
   parts=Path(relative).parts
   if executable.parts[-len(parts):]!=parts:continue
@@ -56,10 +56,11 @@ def packaged_loader(code_root,executable,*,script=None):
               (not formal and native.get('game_runtime')=='arm64'and native.get('cpu_backends')==['fex','bbcpu']))
  require(native['schema']==1 and cpu_profile and native['production']is formal,'module helper requires declared native runtime profile')
  require(native['frozen_runtime'][role]==digest(Path(executable)),'module helper actual executable identity changed')
- if role=='bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal':
+ if role in('bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal','bin/bbcpu-tools/bbcpu-code-preparer'):
   require(not formal and native.get('game_runtime')=='arm64'and native.get('cpu_backends')==['fex','bbcpu'],'independent CPU metadata role requires explicit QA capabilities')
   cpu=json.loads(owned_file(root/'BBCPU-COMPONENT.json',1024**2).read_bytes())
-  require(cpu.get('schema')==1 and cpu.get('development_only')is True and cpu.get('backend')=='bbcpu'and cpu.get('cpu')==dict(path=role,sha256=digest(Path(executable))),'module helper independent CPU role differs from frozen component')
+  key='preparer'if role.endswith('bbcpu-code-preparer')else'cpu'
+  require(cpu.get('schema')==1 and cpu.get('development_only')is True and cpu.get('backend')=='bbcpu'and cpu.get(key)==dict(path=role,sha256=digest(Path(executable)))and(key=='cpu'or cpu.get('runtime_image_export')==1),'module helper independent CPU role differs from frozen component')
  return root/'vendor/blood_echoes/loader'
 def formal_inputs(code_root,executable,boot,game,out,environment):
  root,role=declared_code_root(executable)

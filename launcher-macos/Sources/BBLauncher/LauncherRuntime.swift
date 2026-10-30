@@ -6,6 +6,14 @@ enum CPUBackend: String, CaseIterable, Hashable, Sendable {
     var label: String { self == .fex ? "FEX" : "bbcpu · Static recompilation" }
 }
 
+enum StaticCompilationConcurrency {
+    static var maximum: Int { max(1, ProcessInfo.processInfo.processorCount) }
+    static func normalized(_ value: String, cpuCount: Int = maximum) -> String {
+        guard let count = Int(value), String(count) == value, (1...max(1, cpuCount)).contains(count) else { return "auto" }
+        return value
+    }
+}
+
 /// Product capabilities declared by the selected engine, not by the machine's CPU.
 /// Runtime launch/signature checks remain authoritative; this only governs UI/policy.
 struct LauncherRuntime: Equatable, Sendable {
@@ -26,15 +34,20 @@ struct LauncherRuntime: Equatable, Sendable {
     /// children. Generate it once per Play, never in saved preferences or per
     /// game process. This is protocol state, not authority to load native code.
     func launchEnvironment(_ original: [String: String], isolatedQA: Bool = false, cpuBackend: CPUBackend = .fex,
+                           compileJobs: String = "auto",
                            nonce: () -> String = { UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased() }) -> [String: String] {
         guard isNativeArm64 else { return original }
         var env = original
         env.removeValue(forKey: "BB_CPU_BACKEND")
         env.removeValue(forKey: "BB_RECOMP_LIB")
+        env.removeValue(forKey: "BB_CPU_COMPILE_JOBS")
         // One immutable intent per original supervisor. UI preference changes
         // after Play do not update the already-started process environment.
         // Actual role/digest admission remains in the existing launch driver.
         if !declaredCPUBackends.isEmpty { env["BB_CPU_BACKEND"] = cpuBackend.rawValue }
+        if cpuBackend == .bbcpu && cpuBackends.contains(.bbcpu) {
+            env["BB_CPU_COMPILE_JOBS"] = StaticCompilationConcurrency.normalized(compileJobs)
+        }
         env["BB_ARM_LAUNCHER_COMPAT"] = "1"
         let keys = ["BB_ARM_SESSION_NONCE", "BB_ARM_RESTART_NONCE"]
         let valid: (String?) -> Bool = { value in
