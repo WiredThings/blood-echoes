@@ -87,7 +87,9 @@ def prepare(executable,arguments,environment,*,stage,project,runner=subprocess.r
             except(OSError,ValueError):pass
     safe={k:v for k,v in env.items()if not k.startswith(('BB_','BBCPU_','DYLD_'))};safe.update(PYTHONDONTWRITEBYTECODE='1',PYTHONNOUSERSITE='1')
     def run(argv,tag):
-        result=runner(list(map(str,argv)),env=safe,capture_output=True,text=True,timeout=3600)
+        # A serial full-game first build can exceed an hour. This is a bounded
+        # preparation deadline, independent from the short live-game QA budget.
+        result=runner(list(map(str,argv)),env=safe,capture_output=True,text=True,timeout=7200 if tag=='static-library'else 3600)
         log=root/(tag+'-'+uuid.uuid4().hex+'.log');log.write_text(result.stdout+result.stderr)
         need(result.returncode==0,'bbcpu '+tag+' failed; isolated diagnostic: '+str(log))
         return result.stdout

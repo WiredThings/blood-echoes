@@ -22,6 +22,7 @@ class LaunchTests(unittest.TestCase):
     def write_doc(self):(self.stage/'BBCPU-COMPONENT.json').write_text(json.dumps(self.doc))
     def child(self,argv,**kw):
         self.calls.append(argv);self.assertNotIn('BB_THD_TOKEN',kw['env'])
+        self.assertEqual(kw['timeout'],3600 if Path(argv[0]).name=='bbcpu-code-preparer'else 7200)
         if Path(argv[0]).name=='bbcpu-code-preparer':
             out=Path(argv[argv.index('--out')+1]);out.mkdir(mode=0o700)
             for name in('effective.elf','pointers.txt','effective-input.json'):(out/name).write_text('mock output')

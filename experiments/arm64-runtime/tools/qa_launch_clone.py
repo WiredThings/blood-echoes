@@ -110,9 +110,12 @@ def create(conditions, cache_admission, *, project, tag, cache_mode='seeded'):
     need(source_case.get('user') == str(source_user) and source_case.get('data') == str(source_data) and
          source_case.get('app') == str(stage.parents[2]) and manifest.get('private_gpu_cache') == str(source_gpu),
          'source roots do not match this admitted QA case')
+    source_built=manifest.get('kind')=='source-built-independent-cpu-qa'
+    renderer_bound=(cache_admission.get('source_renderer_identity_kind')=='source-packaged'if source_built else
+                    cache_admission.get('source_renderer_identity_kind')is None and cache_admission.get('upstream_gpu_library_sha256')==manifest['upstream_inputs']['gpu_library'])
     need(cache_admission.get('source') == str(source_gpu) and cache_admission.get('source_manifest') == str(manifest_path) and
          cache_admission.get('source_manifest_sha256') == conditions['identity']['ARM64-QA-MANIFEST.json'] and
-         cache_admission.get('upstream_gpu_library_sha256') == manifest['upstream_inputs']['gpu_library'] and
+         renderer_bound and
          cache_admission.get('source_packaged_gpu_library_sha256') == conditions['runtime_sha256']['bin/gpu-metal-arm64/libbbgpu.dylib'] and
          cache_admission.get('cache_parts') == list(cache_seed.CACHE_PARTS) and cache_admission.get('cache_only') is True and
          cache_admission.get('formal_data_modified') is False and cache_admission.get('save_config_seed_changed') is False,

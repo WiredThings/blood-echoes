@@ -50,6 +50,27 @@ def validate(manifest,*,project,expected_upstream_gpu_sha256,gpu_verifier=None,c
   upstream_gpu_library_sha256=upstream,source_packaged_gpu_library_sha256=actual['library_sha256'],
   cache_parts=list(CACHE_PARTS),cache_only=True,save_config_seed_changed=False,formal_data_modified=False)
 
+def validate_source_built(manifest,*,project,expected_packaged_gpu_sha256):
+ """Current source-built QA authority, without inventing legacy build records."""
+ from qa_launch_conditions import load
+ from warm_archive_manifest import resolve_gpu_identity
+ from game_pso_component import load as load_component
+ p=directory(project);manifest=Path(manifest).absolute();m=json_file(manifest)
+ need(m.get('kind')=='source-built-independent-cpu-qa'and m.get('host_local_only')is True and m.get('formal_data_modified')is False,'source-built private QA authority required')
+ app=directory(manifest.parents[2]);need(app.parent==p/'apps'and manifest==app/'Contents/Resources/ARM64-QA-MANIFEST.json','source QA manifest location differs')
+ subprocess.run(['/usr/bin/codesign','--verify','--strict',str(app)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+ stage=directory(app/'Contents/Resources/bbport')
+ selected=load(Path(m['private_case']['data'])/'out/launch-conditions.json',stage=stage,project=p)
+ need(selected['runtime_sha256']==m['frozen_runtime'],'source-built QA frozen roles differ from original Swift receipt')
+ exe=stage/'bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu';lib=stage/'bin/gpu-metal-arm64/libbbgpu.dylib'
+ actual=resolve_gpu_identity(exe,stage)
+ need(actual['library']==str(lib)and actual['library_sha256']==m['frozen_runtime']['bin/gpu-metal-arm64/libbbgpu.dylib']==expected_packaged_gpu_sha256,'source-built QA actual renderer differs')
+ component=load_component(stage);need(component is not None and component['library_sha256']==actual['library_sha256'],'source-built preparation/renderer mismatch')
+ source=directory(m['private_gpu_cache']);need(source==selected['cache_root']and source.parent==p/'state'and re.fullmatch(r'gui-gpu-local-aot-[0-9]+',source.name),'source-built private GPU root differs')
+ return dict(source=str(source),source_manifest=str(manifest),source_manifest_sha256=sha(manifest),
+  source_renderer_identity_kind='source-packaged',source_packaged_gpu_library_sha256=actual['library_sha256'],
+  cache_parts=list(CACHE_PARTS),cache_only=True,save_config_seed_changed=False,formal_data_modified=False)
+
 EXTRA_EXCLUSIONS=frozenset(('automatic-game-inputs','captures','log','temp'))
 def _values(info):
  return(info.st_dev,info.st_ino,info.st_mode,info.st_size,info.st_mtime_ns,info.st_uid,info.st_nlink,info.st_ctime_ns)

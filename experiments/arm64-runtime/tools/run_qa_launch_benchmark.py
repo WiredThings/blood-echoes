@@ -159,11 +159,28 @@ def admit(conditions):
   if sha(path)!=conditions['runtime_sha256'][rel]:raise ValueError('packaged runtime changed')
  runtime=conditions['runtime'];hashes=conditions['runtime_sha256']
  gpu=verify(dict(target=str(runtime['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu']),library=str(runtime['bin/gpu-metal-arm64/libbbgpu.dylib']),library_sha256=hashes['bin/gpu-metal-arm64/libbbgpu.dylib']),stage)
- cpu=resolve_gpu_identity(runtime['bin/bb-probe-metal'],stage)
- if cpu['library']!=str(runtime['bin/gpu-metal/libbbgpu.dylib'])or cpu['library_sha256']!=hashes['bin/gpu-metal/libbbgpu.dylib']:raise ValueError('CPU actual host differs')
+ selected_cpu=conditions['environment'].get('BB_CPU_BACKEND','fex')
+ if selected_cpu not in('fex','bbcpu'):raise ValueError('unknown selected CPU backend')
+ cpu_role='bin/bb-probe-metal'
+ host_role='bin/gpu-metal/libbbgpu.dylib'
+ if selected_cpu=='bbcpu':
+  from bbcpu_launch import component
+  cpu_component,cpu_paths=component(stage)
+  cpu_role=cpu_component['cpu']['path']
+  if cpu_role not in runtime or runtime[cpu_role]!=cpu_paths['cpu']:raise ValueError('selected bbcpu host is not in admitted runtime roles')
+  # This host is separately relocated and signed by the same package resolver;
+  # verify its exact declared edge, not the FEX host's different install path.
+  hosts=[role for role in cpu_component['runtime_dependencies']if Path(role).name=='libbbgpu.dylib']
+  if len(hosts)!=1:raise ValueError('selected bbcpu needs one exact frozen host library')
+  host_role=hosts[0]
+ cpu=resolve_gpu_identity(runtime[cpu_role],stage)
+ if cpu['library']!=str(runtime[host_role])or cpu['library_sha256']!=hashes[host_role]:raise ValueError('CPU actual host differs')
  manifest=stage.parent/'ARM64-QA-MANIFEST.json';m=json.loads(manifest.read_text())
- cache=validate(manifest,project=P,expected_upstream_gpu_sha256=m['upstream_inputs']['gpu_library'])
- return dict(cpu=cpu,gpu=gpu),cache
+ if m.get('kind')=='source-built-independent-cpu-qa':
+  from qa_gpu_cache_seed import validate_source_built
+  cache=validate_source_built(manifest,project=P,expected_packaged_gpu_sha256=hashes['bin/gpu-metal-arm64/libbbgpu.dylib'])
+ else:cache=validate(manifest,project=P,expected_upstream_gpu_sha256=m['upstream_inputs']['gpu_library'])
+ return dict(cpu_backend=selected_cpu,cpu=cpu,gpu=gpu),cache
 
 CPU_ROLES=('bin/bb-probe-metal','bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal')
 FORMAL_ROLES=frozenset((*CPU_ROLES,'bin/gpu-metal/libbbgpu.dylib',

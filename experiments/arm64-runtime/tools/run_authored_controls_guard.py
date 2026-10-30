@@ -1,15 +1,18 @@
 """Bounded private native-test supervisor; no game launch or visual polling."""
 from pathlib import Path
-import json, os, signal, subprocess, sys, time
+import argparse, json, os, signal, subprocess, sys, time
 
-P = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(P / 'tools'))
+P = Path('/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype')
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from native_observer import NativeObserver
 from qa_memory_policy import MemoryPolicy
 from qa_build_guard import require_no_games
 
-assert len(sys.argv) > 2
-prefix, command = sys.argv[1], sys.argv[2:]
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--seconds',type=int,default=300)
+parser.add_argument('prefix');parser.add_argument('command',nargs=argparse.REMAINDER)
+args=parser.parse_args();prefix,command=args.prefix,args.command
+assert 1<=args.seconds<=7200 and command
 assert prefix.replace('-', '').isalnum()
 require_no_games()
 observer = NativeObserver()
@@ -29,7 +32,7 @@ with (evidence / 'console.log').open('w') as log:
             sample = observer.system()
             samples.append(dict(seconds=elapsed, **sample))
             failure = policy.observe(elapsed, sample)
-            if failure or elapsed > 300:
+            if failure or elapsed > args.seconds:
                 raise RuntimeError(failure or 'bounded native controls timeout')
             time.sleep(.25)
     except BaseException as error:
@@ -46,7 +49,7 @@ with (evidence / 'console.log').open('w') as log:
         result = dict(command=command, exit=process.returncode, reason=failure,
                       before=before, after=observer.system(),
                       seconds=time.monotonic()-start, samples=samples,
-                      game_launched=False, memory_policy=MemoryPolicy.MANIFEST)
+                      game_launched=False, time_budget_seconds=args.seconds,memory_policy=MemoryPolicy.MANIFEST)
         (evidence / 'result.json').write_text(json.dumps(result, indent=2)+'\n')
         print(evidence, flush=True)
         print(json.dumps({k:v for k,v in result.items()
