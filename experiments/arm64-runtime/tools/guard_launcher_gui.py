@@ -4,14 +4,25 @@ from pathlib import Path
 import argparse,os,sys,time,json,signal
 from native_observer import NativeObserver
 from qa_memory_policy import MemoryPolicy
-P=Path(__file__).resolve().parents[1]
-ap=argparse.ArgumentParser();ap.add_argument('evidence',type=Path);ap.add_argument('pid',type=int);ap.add_argument('--seconds',type=int,default=600);args=ap.parse_args();assert 60<=args.seconds<=1800
+from qa_preparation_budget import PreparationBudget
+P=Path('/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype')
+ap=argparse.ArgumentParser();ap.add_argument('evidence',type=Path);ap.add_argument('pid',type=int);ap.add_argument('--seconds',type=int,default=600)
+ap.add_argument('--preparation-seconds',type=int,default=0)
+ap.add_argument('--continue-preparation',action='store_true')
+args=ap.parse_args();assert 60<=args.seconds<=1800
+budget=PreparationBudget(args.preparation_seconds,args.seconds)if args.preparation_seconds else None
 e=args.evidence;pid=args.pid;assert e.parent==P/'evidence'
 c=json.loads((e/'case.json').read_text());expected=c['app']+'/Contents/MacOS/bbport'
 obs=NativeObserver();assert obs.path(pid)==expected
 before=obs.system();assert not before['locked']and before['pressure']!=4
+if args.continue_preparation:
+ assert budget is not None
+ old=(e/'guard-ready.json').read_text();previous=json.loads(old)
+ assert previous['pid']==pid and previous['path']==expected and not(e/'guard-result.json').exists(),'same live QA guard only'
+ before=previous['before'] # Retain the original swap baseline, not a new allowance.
+ (e/('guard-ready-previous-'+str(time.time_ns())+'.json')).write_text(old)
 policy=MemoryPolicy(before);start=time.monotonic();tracked={};samples=[];reason=None
-(e/'guard-ready.json').write_text(json.dumps(dict(pid=pid,path=expected,before=before,policy=MemoryPolicy.MANIFEST,time_budget_seconds=args.seconds)))
+(e/'guard-ready.json').write_text(json.dumps(dict(pid=pid,path=expected,guard_pid=os.getpid(),before=before,policy=MemoryPolicy.MANIFEST,time_budget_seconds=args.seconds,preparation_budget_seconds=args.preparation_seconds)))
 print('guard ready',flush=True)
 def children():
  pending=[pid];seen=set();result={}
@@ -35,7 +46,8 @@ try:
  while obs.path(pid)==expected:
   s=obs.system();s.update(seconds=time.monotonic()-start,processes=children());samples.append(s)
   reason=policy.observe(s['seconds'],s)
-  if s['seconds']>=args.seconds:reason='time budget'
+  timed=budget.observe(s['seconds'],s['processes'])if budget else('time budget'if s['seconds']>=args.seconds else None)
+  if reason is None and timed:reason=timed
   if (e/'guard-finish').exists():reason='QA finished'
   if reason:break
   time.sleep(.25)

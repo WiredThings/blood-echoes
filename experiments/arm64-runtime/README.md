@@ -1,5 +1,7 @@
 # Isolated ARM64 runtime development snapshot
 
+Current CPU direction: retain FEX and integrate whole bbcpu as a separately selected backend, with default local static compilation and bbcpu-only fallback. No FEX/static-library hybrid. See [the current integration plan and verified boundaries](docs/bbcpu-integration.zh-CN.md). Existing FEX work and evidence below remain preserved; the first full-game bbcpu library is still compiling and does not establish gameplay or performance acceptance.
+
 This is an **unstable development snapshot**, not the production runtime or a Release.
 The goal is to replace the game CPU's Rosetta dependency with FEX while reusing
 the existing launcher, Metal renderer, localization, saves, input, F3 and network bridges.
