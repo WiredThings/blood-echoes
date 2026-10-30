@@ -97,3 +97,11 @@ agent 提供的库构建／像素测试、主代理的 Swift 测试应以各自�
 原生writer每120个flip至少fflush一次，因此允许10秒后批刷新窗口；这是采样有效性容忍，不改变严重内存压力、swap或锁屏保护。源时钟与墙钟整段跨度误差须≤10秒且覆盖≥90%；不再用最近30秒尾部代替整场。FPS按完整帧数／源稳态时钟跨度计算；帧时间取CSV值与相邻时钟差的较大值，中途长卡后恢复仍计入FPS、max frame及最大无推进间隔，不能用后来恢复抹掉卡顿。F3沿用既有流程，允许它有意更换进程／重置帧时钟。
 
 14项新定向测试执行真实 `FrameProgress`、`scene_summary` 及受控actual sample循环，覆盖旧冻结反例、持续推进、尾部短批刷新、中途20秒停顿后恢复、时钟跳变／重置、文件替换／缩短、旧CSV及无证据拒绝。另20项thin harness、9项投影、6项scene、3项tail和5项tool-memory共57项通过，无游戏。确切命令和日志保存在 `evidence/upstream-frame-progress-m9t_aedw/summary.json`；冻结driver SHA256为 `eb52e334a1f92250470775602ec28c844ede64c3b80c81c7b54482fa29ecb098`。该结果只证明控制规则，不是完整ABBA实采通过。
+
+### 保护中止后的窄范围 prepare-A 恢复
+
+`--resume-from` 只允许同一已准入source／八角色应用的same-binary vertex序列，且旧evidence只有被原保护中止的首个prepare-A、无真实场景／F3成绩。旧summary必须逐字绑定result。source receipt、原生身份、配置快照，以及现有同数字tag的owned canonical私有data／user／GPU根、原ARMQA1 marker／nonce均核验；不补写旧case证明。pad须为空且无未完成 `.next`，frames已归档。
+
+源与私有三份配置SHA、savedata逐文件SHA，以及mods／patches相对路径种类和文件SHA必须完全一致；源缺少可选目录时私有目录必须为空。恢复环境从当前已load source构造，只读取原clone ALLOWED_CHANGES内的私有路径／控制值，再由原execution_environment、benchmark_changes和vertex_delta重算，完整env／changes／allowed／experiment／命令须逐字等于旧conditions，不采纳任意旧host变量。GPU图形配置经实际shim `bbgpu.cpp:314` → `BbSettings::Load` → `bbport_settings.cpp` 的BB_CONFIG唯一INI和BB环境读取，本轮source／private GPU根无另一个普通图形配置文件，未遍历或清理GPU编译产物。
+
+旧中止绝不计入样本。新run只复用A的已落盘部分准备产物；B仍原create新空私有case，prepare-A与完整ABBA仍重新执行，内存保护从本次当前系统重新取基线，原保护未改。23项真实临时文件正反例通过，涵盖八角色逐项变化、源／私有配置和存档差异、mod内容／目录新增、路径链接／硬链接、nonce marker、旧帧文件、输入残留、注入环境、错误命令及非保护中止；小测试未启动游戏，不能代替集中验收。

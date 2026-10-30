@@ -1,6 +1,6 @@
-# 上游定向整合（2026-10-30，进行中）
+# 上游定向整合（2026-10-30，本机已更新）
 
-本轮授权为并行移植值得采用的上游更新，先完成源码审阅和定向验证，再运行隔离游戏。bloodborne-recomp 暂不接入；不更改本机正式应用、存档、设置、缓存或 Release。当前基线为开发分支 `00385145`，本机仍为 0.2.58 / `a7087799`。既有两个 FEX/unwind 未提交改动保留，不能混入本轮提交及干净构建。
+本轮授权为并行移植值得采用的上游更新，先完成源码审阅和定向验证，再运行隔离游戏。bloodborne-recomp 暂不接入。起始基线为开发分支 `00385145`、本机0.2.58 / `a7087799`；用户后续授权验证通过后替换本机，并将顶点优化默认开启。已安装0.2.59 / `5b186b81`，不更改正式存档、设置、缓存或Release。既有两个FEX/unwind未提交改动原样保留，没有混入本轮提交或干净构建。
 
 ## 整合范围
 
@@ -11,7 +11,7 @@
 | shadPS4 [#5524](https://github.com/shadps4-emu/shadPS4/pull/5524) | mip/layer 逐维包含判断，并补齐审阅发现的深度重建逐维联合 extent。 |
 | FEX [#6074](https://github.com/FEX-Emu/FEX/pull/6074) | 六类本地尚缺的 guest load 副作用标记；已有两类保持。真实 FEX 归档摘要决定 CPU 缓存身份，不伪造磁盘格式版本。 |
 | DiAvisoo [8e678b6f](https://github.com/DiAvisoo/bbport-mac-optimized/commit/8e678b6f64112accd5af80c64526b4a14b9c7357) | 可选 UI 补丁目的地检查仅在实际安装／恢复时要求；活动与中断恢复仍严格检查，不误阻普通 Play。 |
-| Huax [77a4bf4d](https://github.com/Huax-1839/bloodborne-macos/commit/77a4bf4d6ab5d06c426014322dadd5fed724cb14) | 仅普通光栅顶点的contraction + Position Invariant，接完整编译选项、schema3本机库、捕获与准备身份。同包站桩ABBA约+1.5%；用户决定启动器默认开启，保留明确关闭和已采用实验性标记，补测开启状态F3／死亡后更新本机。 |
+| Huax [77a4bf4d](https://github.com/Huax-1839/bloodborne-macos/commit/77a4bf4d6ab5d06c426014322dadd5fed724cb14) | 仅普通光栅顶点的contraction + Position Invariant，接完整编译选项、schema3本机库、捕获与准备身份。同包站桩ABBA约+1.5%；启动器默认开启，保留明确关闭和已采用实验性标记。开启状态F3／死亡通过，已更新本机。 |
 
 ## 审阅发现与当前边界
 
@@ -41,3 +41,13 @@ QA采样已修正冻结CSV仍被当作完成的问题：以整段场景源时钟
 关闭状态的两次死亡回归已通过：在保留两次失败证据、修正脚本并对齐来源配置后，`upstream-private-death-run-1793352135669906000`完成HP归零、world卸载／加载和两次健康恢复，稳定5.09／10.96秒，最终帧时钟实际推进；压力1、swap净增0、源QA存档不变、正常包前后签名通过。初次QA帧表头异常及之后保护中止均不计通过，不能据此单独归因CPU缓存或飞书。详细条件、实际数据、失败及边界见[游戏回归记录](upstream-game-regression-20261030.zh-CN.md)。
 
 游戏回归复用原Swift冻结启动条件和现有QA控制器；默认开启的追加回归只显式变更已授权的顶点标志，保留完整来源检查和其它条件。性能采样不使用Cua、截图或录屏，保持静音、原画质与缓存容量，保留隔离QA保护。用户已授权补测后替换本机正式应用，暂不发布Release。
+
+## 默认开启与本机交付
+
+GUI默认开启提交为`5b186b81`；完整Swift回归129项、跳过1、失败0。9470项native输入仍与5c构建源相同，仅重建GUI并以正常source assembler复用未变原生产品。新包八个冻结角色均ARM64，严格深签名、布局和源码闭包校验通过；正式准备策略四份脚本与已通过应用/QA作用域反例的当前源码逐字相同，不将隔离测试的swap退出保护带入正式准备。
+
+开启状态F3证据`upstream-refresh-game-1793353687685055000`完成原CPU换代、转离线、自动继续和场景恢复，压力1、swap净增-72MiB。开启状态死亡证据`upstream-private-death-run-1793354249971597000`完成两次HP归零、卸载/loading与健康恢复，稳定5.15/10.06秒，最终确认后实际帧推进；压力1、swap净增-1090.31MiB。两轮源QA存档不变、正常包前后签名通过，不用于FPS或广泛视觉验收。
+
+本机`/Applications/Blood Echoes.app`已以同卷原子交换更新为0.2.59 / `5b186b81597edcf6de182cf87e70e17cadfff5d4`，Bundle ID不变。旧App代码保留在Shared开发根`evidence/upstream-refresh-20261030/installation-plan/install-1793354746521304000/`，安装后完整代码清单、八角色和严格签名匹配，正式偏好及定向正常存档摘要/身份不变。安装过程没有启动GUI/游戏、遍历GPU缓存或写入用户数据。本机没有已存顶点关闭值，新GUI将取默认ON；明确OFF仍保留。
+
+安装包为`Blood-Echoes-0.2.59-5b186b81-macOS.zip`，SHA256 `5ef16d8ff8a9019791832c3814736e54c3005179b9445c10ccc6be3a87725731`。源码/文档同步开发分支，未发布Release。首次开启的新顶点兼容身份会增量生成独立产物；旧缓存不清理。其新建测试缓存的准备时间不代表正式既有缓存的暖启动速度。

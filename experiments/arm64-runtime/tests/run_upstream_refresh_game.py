@@ -39,15 +39,25 @@ def read_object(path):
     return value
 
 
+def vertex_on_f3_request(args):
+    enabled = bool(getattr(args, "vertex_on_f3", False))
+    if enabled and (args.phase != "f3" or args.vertex_ab or getattr(args, "resume_from", None) is not None):
+        raise ValueError("--vertex-on-f3 requires only --phase f3, without --vertex-ab or --resume-from")
+    return enabled
+
+
 def selected_applications(args):
     app = within(args.app, PROJECT / "evidence")
     vertex = bool(getattr(args, "vertex_ab", False))
+    vertex_on_f3 = vertex_on_f3_request(args)
     requested_baseline = args.baseline_app
-    baseline = within(requested_baseline or (app if vertex else POLICY_APP), PROJECT / "evidence")
+    baseline = within(requested_baseline or (app if vertex or vertex_on_f3 else POLICY_APP), PROJECT / "evidence")
     if app.suffix != ".app" or baseline.suffix != ".app":
         raise ValueError("normal-layout staged applications required")
     if vertex and baseline.resolve() != app.resolve():
         raise ValueError("--vertex-ab requires the same candidate app, not a different baseline")
+    if vertex_on_f3 and baseline.resolve() != app.resolve():
+        raise ValueError("--vertex-on-f3 uses only the single candidate app")
     return app, baseline
 
 
@@ -76,24 +86,38 @@ def vertex_delta(source_environment, base, final, variant, *, functional_f3=Fals
                 ordinary_environment_checked_first=True, functional_f3_default_off=functional_f3)
 
 
-def controlled_environment(driver, source, case, formal, variant, *, vertex_ab=False, functional_f3=False):
+def vertex_on_f3_delta(source_environment, base, final, *, functional_f3):
+    if not functional_f3:
+        raise ValueError("explicit vertex-on control is only a functional F3 test")
+    # Reuse the exact one-field validator; do not change old F3/default-off logic.
+    evidence = vertex_delta(source_environment, base, final, "B", functional_f3=False)
+    return dict(evidence, mode="vertex-on-functional-f3", functional_f3_default_off=False,
+                functional_f3_explicit_on=True, comparison_sample=False)
+
+
+def controlled_environment(driver, source, case, formal, variant, *, vertex_ab=False, functional_f3=False,
+                           vertex_on_f3=False):
+    if vertex_on_f3 and (vertex_ab or not functional_f3 or variant != "B"):
+        raise ValueError("explicit vertex-on control requires the single candidate functional F3 path")
     base = driver.execution_environment(source, case, formal, functional_f3=functional_f3)
     # Run the original full allowlist check BEFORE adding the single compiler control.
     changes, allowed = driver.benchmark_changes(source, case, base, formal=formal,
                                                functional_f3=functional_f3)
-    if not vertex_ab:
+    if not vertex_ab and not vertex_on_f3:
         return base, changes, allowed, None
     vertex_source(source["environment"])
     final = dict(base)
-    if variant == "B" and not functional_f3:
+    if vertex_on_f3 or (variant == "B" and not functional_f3):
         final[VERTEX_FLAG] = "1"
-    experiment = vertex_delta(source["environment"], base, final, variant, functional_f3=functional_f3)
+    experiment = (vertex_on_f3_delta(source["environment"], base, final, functional_f3=functional_f3)
+                  if vertex_on_f3 else vertex_delta(source["environment"], base, final, variant, functional_f3=functional_f3))
     changes = dict(changes, **experiment["actual_experiment_changes"])
     return final, changes, sorted(set(allowed) | {VERTEX_FLAG}), experiment
 
 
 def plan(args):
     app, baseline = selected_applications(args)
+    vertex_on_f3 = vertex_on_f3_request(args)
     stage = within(args.source_stage, PROJECT / "apps")
     receipt = within(args.receipt, PROJECT / "state")
     record = read_object(receipt)
@@ -104,7 +128,7 @@ def plan(args):
         raise ValueError("original Swift launch intent required")
     if env.get("BB_AUDIO") != "none" or env.get("BB_ONLINE") != "0":
         raise ValueError("existing silent offline QA selection required")
-    if args.vertex_ab:
+    if args.vertex_ab or vertex_on_f3:
         vertex_source(env)
     source_parity = read_object(stage / "SOURCE-PARITY.json")
     target_stage = app / "Contents/Resources/bbport"
@@ -121,12 +145,16 @@ def plan(args):
         "execution_requires_independent_review_and_explicit_flags": True,
         "admission_performed": False, "production_data_read_or_modified": False,
         "candidate_app": str(app), "baseline_app": str(baseline),
-        "comparison_mode": "same-binary-vertex" if args.vertex_ab else "old-new-app",
-        "vertex_control": (dict(variable=VERTEX_FLAG, source=env.get(VERTEX_FLAG),
+        "comparison_mode": "vertex-on-functional-f3" if vertex_on_f3 else "same-binary-vertex" if args.vertex_ab else "old-new-app",
+        "vertex_control": (dict(variable=VERTEX_FLAG, source=env.get(VERTEX_FLAG), F3="1",
+                                functional_f3_explicit_on=True, comparison_sample=False,
+                                allowed_experiment_variables=[VERTEX_FLAG]) if vertex_on_f3 else
+                           dict(variable=VERTEX_FLAG, source=env.get(VERTEX_FLAG),
                                  A=env.get(VERTEX_FLAG), B="1", F3=env.get(VERTEX_FLAG),
                                  independent_private_cache_roots=True,
                                  allowed_experiment_variables=[VERTEX_FLAG]) if args.vertex_ab else None),
         "source_receipt": str(receipt), "source_stage": str(stage),
+        "resume_from": str(args.resume_from) if getattr(args, "resume_from", None) is not None else None,
         "qa_source_user": env.get("BB_USER_DIR"), "qa_source_gpu": env.get("BB_GPU_USER_DIR"),
         "qa_source_data": env.get("BB_DATA_DIR"),
         "source_receipt_edited": False,
@@ -139,7 +167,9 @@ def plan(args):
         "existing_f2_f3_command_after_review": command + ["--functional-f3"],
         "thin_controller_command_after_review": [sys.executable, str(Path(__file__).resolve()),
             "--execute", "--reviewed-code", "--app", str(app), "--baseline-app", str(baseline),
-            "--phase", args.phase] + (["--vertex-ab"] if args.vertex_ab else []),
+            "--phase", args.phase] + (["--vertex-ab"] if args.vertex_ab else []) +
+            (["--vertex-on-f3"] if vertex_on_f3 else []) +
+            (["--resume-from", str(args.resume_from)] if getattr(args, "resume_from", None) is not None else []),
         "warm_series": {
             "reuse": ["qa_launch_conditions.load", "run_qa_launch_benchmark.admit",
                       "run_qa_launch_benchmark.admit_formal", "qa_launch_clone.create",
@@ -148,8 +178,9 @@ def plan(args):
                       "run_qa_launch_benchmark.benchmark_changes",
                       "run_qa_launch_benchmark.sample"],
             "cache_policy": "Existing formal-stage CLI starts an empty private GPU case. A thin controller must reuse that exact admitted private case for subsequent warm launches; never seed formal caches or edit the receipt.",
-            "sequence": ["baseline private preparation", "candidate private preparation",
-                         "matched warmed A/B/B/A scene samples", "separate candidate F2/F3 session"],
+            "sequence": (["single candidate explicit vertex-on F2/F3 session"] if vertex_on_f3 else
+                         ["baseline private preparation", "candidate private preparation",
+                          "matched warmed A/B/B/A scene samples", "separate candidate F2/F3 session"]),
             "required_observations": ["actual nested CPU/GPU paths and hashes", "whole-app seal before/after",
                                       "source QA savedata digest unchanged", "scene camera and draw count",
                                       "preparation/module/PSO/source-compile counters", "time to real scene",
@@ -219,6 +250,127 @@ def matched_summary(rows):
     return result
 
 
+def resume_prepare_a(root, source, formal, native, driver, *, vertex_ab, phase):
+    """Read-only recovery of one admitted, protection-stopped private preparation.
+
+    No receipt/marker is manufactured. Reconstruct only the existing clone's
+    allowlisted private values, then require the ordinary execution admission to
+    reproduce every recorded environment byte before returning a driver case.
+    """
+    import os
+    import re
+    import stat
+    from qa_launch_conditions import Reader, canonical, CONFIG_NAMES
+    from qa_launch_clone import ALLOWED_CHANGES, inventory_savedata, _tree_inventory
+
+    def need(ok, why):
+        if not ok:
+            raise ValueError("resume prepare-A: " + why)
+
+    need(vertex_ab and phase in ("performance", "all"), "only this same-binary performance sequence may resume")
+    root = canonical(root, directory=True, within=PROJECT / "evidence")
+    need(root.parent == PROJECT / "evidence" and re.fullmatch(r"upstream-refresh-game-[0-9]{1,24}", root.name),
+         "owned original regression evidence root required")
+    need({p.name for p in root.iterdir()} == {"summary.json", "prepare-A"}, "only interrupted first preparation may resume")
+    run = canonical(root / "prepare-A", directory=True, within=root)
+    reader = Reader()
+    summary = reader.json(root / "summary.json")
+    prior = reader.json(run / "result.json")
+    recorded = reader.json(run / "conditions.json")
+    need(summary.get("status") == prior.get("status") == "incomplete" and summary.get("runs") == [prior] and
+         summary.get("comparison_mode") == "same-binary-vertex", "one incomplete prepare-A record required")
+    need(prior.get("phase") == "prepare-A" and prior.get("variant") == "A" and
+         prior.get("scene_ready") is None and "scene_sample" not in prior and
+         prior.get("source_save_unchanged") is True and prior.get("functional_f3_requested") is False and
+         prior.get("performance_sample") is True, "no prior scene/F3 or changed source saves allowed")
+    need(prior.get("stop") in {"screen locked", "unexpected >2GiB swap growth",
+         "unexpected >1GiB swap growth within5s", "severe pressure sustained5s"}, "previous stop was not original protection")
+    from qa_memory_policy import MemoryPolicy
+    need(prior.get("memory_policy") == summary.get("policy") == MemoryPolicy.MANIFEST,
+         "original unchanged protection policy required")
+    receipt_sha = driver.sha(source["receipt"])
+    reader.read(source["receipt"], expected=receipt_sha)
+    need(prior.get("source_receipt_sha256") == summary.get("source_receipt_sha256") == receipt_sha and
+         recorded.get("source_receipt") == str(source["receipt"]), "source receipt changed")
+    need(prior.get("native_identity") == native and prior.get("formal_native_identity") == formal["identity"] and
+         set(formal["identity"]["runtime_sha256"]) == driver.FORMAL_ROLES,
+         "admitted source/native eight-role application identity changed")
+    need(all(prior.get(k) is v for k, v in {"silent": True, "Cua": False, "screen_capture": False,
+         "profiler": False, "formal_data_modified": False, "quality_or_effects_changed": False}.items()),
+         "original isolated silent comparison required")
+    old_env = recorded.get("environment")
+    need(isinstance(old_env, dict) and all(type(k) is str and type(v) is str for k, v in old_env.items()),
+         "recorded string environment required")
+    data = canonical(recorded.get("private_data"), directory=True, within=PROJECT / "state")
+    user = canonical(recorded.get("private_user"), directory=True, within=PROJECT / "state")
+    cache = canonical(recorded.get("private_cache"), directory=True, within=PROJECT / "state")
+    match = re.fullmatch(r"benchmark-data-([0-9]{1,24})", data.name)
+    need(match is not None and data.parent == user.parent == cache.parent == PROJECT / "state",
+         "direct owned private roots required")
+    tag = match[1]
+    need(user.name == "benchmark-user-" + tag and cache.name == "gui-gpu-local-aot-" + tag,
+         "private root tags differ")
+    canonical(data / "out", directory=True, within=data)
+    need(not os.path.lexists(data / "out/frames.csv"), "previous frame log must already be archived")
+    pad = data / "pad.txt"
+    need(reader.read(pad, limit=1024) == b"", "existing private pad must be empty")
+    need(not os.path.lexists(pad.with_name(pad.name + ".next")), "unfinished private pad update exists")
+    for key in ("BB_ARM_SESSION_NONCE", "BB_ARM_RESTART_NONCE"):
+        need(re.fullmatch(r"[0-9a-f]{32}", old_env.get(key, "")) is not None, "existing private nonce required")
+    marker = ("ARMQA1\n" + str(data / "out/boot-linked.bin") + "\n" + str(source["game_root"]) +
+              "\n" + str(data / "out/content.bin") + "\n" + old_env["BB_ARM_SESSION_NONCE"] + "\n").encode()
+    need(reader.read(user / ".arm-runtime-session", limit=4096) == marker, "existing session marker mismatch")
+    expected_private = dict(BB_DATA_DIR=str(data), BB_CONFIG=str(data / "bbport.ini"), BB_USER_DIR=str(user),
+        BB_MODS_DIR=str(data / "mods"), BB_MODS_CONFIG=str(data / "mods.json"),
+        BB_PATCHES_DIR=str(data / "patches"), BB_PATCHES_CONFIG=str(data / "patches.json"), BB_GPU_USER_DIR=str(cache),
+        BB_ARM_SESSION_NONCE=old_env["BB_ARM_SESSION_NONCE"], BB_ARM_RESTART_NONCE=old_env["BB_ARM_RESTART_NONCE"],
+        BB_PAD_FILE=str(pad), BB_ARM_QA_PAD_FILE=str(pad), BB_PAD_FILE_ONLY="1",
+        BB_FRAME_TIMING="1", BB_FRAME_LOG_ONLY="1", BB_BENCHMARK_MUTE="1")
+    need(set(expected_private) == ALLOWED_CHANGES and
+         all(old_env.get(k) == value for k, value in expected_private.items()), "private clone fields changed")
+    config_sha = {key: source["configs"][key].sha256 for key in CONFIG_NAMES}
+    need(prior.get("settings_sha256") == config_sha, "source configuration changed")
+    for key, name in CONFIG_NAMES.items():
+        reader.read(source["configs"][key].path, limit=64 * 1024 * 1024, expected=config_sha[key], retain=False)
+        reader.read(data / name, limit=64 * 1024 * 1024, expected=config_sha[key], retain=False)
+    for name in ("mods", "patches"):
+        original, private = source["data_root"] / name, data / name
+        before = _tree_inventory(original) if os.path.lexists(original) else None
+        private_nodes, private_files = _tree_inventory(private)
+        private_kinds = {str(path.relative_to(private)): stat.S_IFMT(identity[2])
+                         for path, identity in private_nodes.items()}
+        if before is None:
+            need(private_kinds == {".": stat.S_IFDIR} and not private_files,
+                 "private resources differ from absent source " + name)
+            need(not os.path.lexists(original), "source resources appeared: " + name)
+        else:
+            source_nodes, source_files = before
+            source_kinds = {str(path.relative_to(original)): stat.S_IFMT(identity[2])
+                            for path, identity in source_nodes.items()}
+            need(private_kinds == source_kinds and private_files == source_files,
+                 "private/source resource structure or bytes differ: " + name)
+            need(_tree_inventory(original) == before, "source resources changed during resume: " + name)
+    # No historical save digest was recorded. Accept only byte-identical current
+    # private/source QA saves, rather than inventing a retrospective proof.
+    source_saves = inventory_savedata(source["user_root"] / "savedata")
+    need(inventory_savedata(user / "savedata") == source_saves, "private/source savedata differs")
+    clone_env = dict(source["environment"])
+    clone_env.update(expected_private)
+    case = dict(environment=clone_env, data_root=data, user_root=user, cache_root=cache, pad=pad,
+                source_save_manifest=source_saves, config_sha256=config_sha,
+                allowed_changes=sorted(ALLOWED_CHANGES), source_unchanged=True)
+    env, changes, allowed, experiment = controlled_environment(driver, source, case, formal, "A", vertex_ab=True)
+    need(env == old_env and changes == recorded.get("actual_changes") and allowed == recorded.get("allowed_changes") and
+         experiment == recorded.get("experiment") == prior.get("experiment"), "ordinary execution environment no longer matches")
+    execution = driver.execution_conditions(source, formal)
+    command = [source["executable"], str(execution["stage"] / source["arguments"][0]), "--benchmark"]
+    need(recorded.get("command") == command and recorded.get("cwd") == str(execution["stage"]), "execution command changed")
+    reader.unchanged()
+    return case, dict(root=str(root), prior_status="incomplete", prior_stop=prior["stop"],
+                      partial_preparation_reused=True, prior_run_counted_as_sample=False,
+                      source_receipt_sha256=receipt_sha, private_tag=tag)
+
+
 def execute(args):
     if not args.reviewed_code:
         raise ValueError("independent code review is required before --execute --reviewed-code")
@@ -237,12 +389,13 @@ def execute(args):
     if not 60 <= args.startup_seconds <= 1800 or not 45 <= args.scene_seconds <= 180:
         raise ValueError("existing startup/scene budget bounds required")
     candidate, baseline = selected_applications(args)
+    vertex_on_f3 = vertex_on_f3_request(args)
     if not args.vertex_ab and args.phase != "f3" and candidate.resolve() == baseline.resolve():
         raise ValueError("baseline and candidate must be distinct applications")
     receipt = within(args.receipt, PROJECT / "state")
     stage = within(args.source_stage, PROJECT / "apps")
     source = load(receipt, stage=stage, project=PROJECT)
-    if args.vertex_ab:
+    if args.vertex_ab or vertex_on_f3:
         vertex_source(source["environment"])
     require_no_games()
     status = subprocess.run(["/Users/k.d./.local/bin/cua-driver", "status"],
@@ -259,11 +412,17 @@ def execute(args):
         variants = {"B": candidate_admission}
         if args.phase != "f3":
             variants["A"] = driver.admit_formal(baseline, source)
+    resumed = None
+    resume_record = None
+    if getattr(args, "resume_from", None) is not None:
+        resumed, resume_record = resume_prepare_a(args.resume_from, source, variants["A"], native, driver,
+                                                 vertex_ab=args.vertex_ab, phase=args.phase)
     tag = str(time.time_ns())
     root = PROJECT / "evidence" / ("upstream-refresh-game-" + tag)
     root.mkdir(mode=0o700)
-    cases = {key: create(source, cache_admission, project=PROJECT,
-                         tag=str(time.time_ns()), cache_mode="empty") for key in variants}
+    cases = {key: (resumed if key == "A" and resumed is not None else
+                  create(source, cache_admission, project=PROJECT,
+                         tag=str(time.time_ns()), cache_mode="empty")) for key in variants}
     observer = NativeObserver()
     protection_start = time.monotonic()
     before = observer.system()
@@ -272,8 +431,10 @@ def execute(args):
     old_handlers = {sig: signal.signal(sig, driver.stop_signal) for sig in (signal.SIGTERM, signal.SIGINT)}
     summary = dict(schema=1, status="running", source_receipt_sha256=driver.sha(receipt),
                    formal_data_modified=False, silent=True, Cua=False, screen_capture=False,
-                   comparison_mode="same-binary-vertex" if args.vertex_ab else "old-new-app",
+                   comparison_mode="vertex-on-functional-f3" if vertex_on_f3 else "same-binary-vertex" if args.vertex_ab else "old-new-app",
                    policy=MemoryPolicy.MANIFEST, runs=results)
+    if resume_record is not None:
+        summary["resume"] = resume_record
     try:
         if before["locked"] or before["pressure"] == 4:
             raise ValueError("locked or severe pressure before regression")
@@ -282,7 +443,7 @@ def execute(args):
             formal, case = variants[variant], cases[variant]
             execution = driver.execution_conditions(source, formal)
             env, changes, allowed, experiment = controlled_environment(driver, source, case, formal,
-                variant, vertex_ab=args.vertex_ab, functional_f3=functional_f3)
+                variant, vertex_ab=args.vertex_ab, functional_f3=functional_f3, vertex_on_f3=vertex_on_f3)
             command = [source["executable"], str(execution["stage"] / source["arguments"][0])]
             if not functional_f3:
                 command += ["--benchmark"]
@@ -334,6 +495,10 @@ def argument_parser():
                         help="old normal-layout app; in --vertex-ab only the same candidate is permitted")
     parser.add_argument("--vertex-ab", action="store_true",
                         help="same candidate binary, A source default off, B only BB_MTL_RELAX_VERTEX=1")
+    parser.add_argument("--vertex-on-f3", action="store_true",
+                        help="single functional --phase f3 case, explicitly enable only BB_MTL_RELAX_VERTEX=1")
+    parser.add_argument("--resume-from", type=Path,
+                        help="strictly reuse this same-source/app protection-stopped prepare-A private case")
     parser.add_argument("--receipt", type=Path, default=RECEIPT)
     parser.add_argument("--source-stage", type=Path, default=SOURCE_STAGE)
     parser.add_argument("--phase", choices=("performance", "f3", "all"), default="all")

@@ -45,6 +45,8 @@ python3 experiments/arm64-runtime/tests/run_upstream_vertex_native.py
 
 第二条需要主机 Metal 访问权限，默认沙箱 MTLCreateSystemDefaultDevice 可能返回 nil。只使用新建私有测试目录及作者自制数据，不启动游戏、不使用 Cua/截图/录屏，不改正式存档、设置、缓存或应用。
 
+本机交付：0.2.59 / `5b186b81`已默认开启；明确关闭仍使用原OFF身份并保留旧缓存。同包ABBA约+1.53%，开启后的F3和两次死亡回归通过，持续场景视觉仍由后续正常游玩观察，不据此承诺全场景收益。详见[实际游戏回归](upstream-game-regression-20261030.zh-CN.md)。Release未发布。
+
 ## 没有移植的异步池
 
 审阅了 [上游 `694a52252154`](https://github.com/Huax-1839/bloodborne-macos/commit/694a52252154f99421bac3bc14733ff09e85ded1)。当前默认本机准备已避免已覆盖输入在游戏中建库；新池只能补动态遗漏的并行编译，不替代提前准备。

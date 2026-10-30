@@ -6,6 +6,13 @@ Simplified Chinese and Traditional Chinese. The displayed badges are **Verified*
 older badge wording for localization compatibility. Existing object-motion and occlusion controls stay
 in their current sections. No resolution, effects, save state or cache capacity is changed.
 
+The ARM64/FEX development build also has default-ON **Optimize vertex math with
+position invariance**, adopted after a short matched M4 comparison (about 1.5%
+more FPS). It remains separately switchable and Strict math takes precedence.
+An explicit OFF clears inherited values and omits `BB_MTL_RELAX_VERTEX`, preserving
+the native OFF path and its existing cache identity. The counts below describe
+the earlier release; the FEX UI also hides its now-required legacy host switch.
+
 ## Defaults and evidence
 
 The previous 34 controls retain their defaults (21 ON / 13 OFF). Supported native-host packages add the default-ON ARM64 renderer control (22 ON / 13 OFF). A missing preference uses
@@ -25,8 +32,8 @@ the current runtime default; existing explicit preferences remain authoritative.
   benefit, possible numeric changes and the observed memory costs. Binary persistence has a
   separate higher-memory label (about 0.6 GiB in the earlier archive-load experiment).
 
-Environment names and individual notes live in `MetalOptimizations.swift`. Every checkbox
-explicitly sends `0` or `1`. Required parents gate direct-compute precision, half-size texture
+Environment names and individual notes live in `MetalOptimizations.swift`. Controls
+normally send `0` or `1`; vertex OFF uses the omission rule above. Required parents gate direct-compute precision, half-size texture
 tiling and pending-clear folding. Disabling a parent suppresses the child's effective runtime
 flag without losing the child's stored choice.
 
