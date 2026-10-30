@@ -149,6 +149,25 @@ class PackagingCapabilityProfile:
         need(stat.S_IMODE(work.stat().st_mode)==stat.S_IMODE(capabilities.stat().st_mode)==0o700,'packaging scalar scratch must stay private')
         return capabilities
 
+    def native_identity(self,target):
+        """Verify actual frozen code without acquiring a game/runtime data scope."""
+        from warm_archive_manifest import resolve_gpu_identity_full
+        current=self.revalidate();root=current.stage;target=Path(target).absolute()
+        frozen=current.native['frozen_runtime'];library=root/'bin/gpu-metal-arm64/libbbgpu.dylib'
+        need(target.is_relative_to(root),'packaging native target outside admitted code')
+        role=str(target.relative_to(root))
+        need(role in frozen,'packaging native target is not a frozen role')
+        need(target==target.resolve(strict=True),'canonical packaging native target required')
+        code_bytes(target,limit=512*1024*1024,expected=frozen[role],content=False)
+        identity=resolve_gpu_identity_full(target,root,code_owners=(0,os.getuid()))
+        need(identity.get('target')==str(target) and identity.get('target_sha256')==frozen[role]
+             and identity.get('library')==str(library)
+             and identity.get('library_sha256')==frozen[str(library.relative_to(root))]
+             and identity.get('architecture')=='arm64' and identity.get('load_edge_verified') is True
+             and identity.get('strict_signatures') is True,'packaging native identity differs from frozen code')
+        self.revalidate()
+        return identity
+
 
 def packaging_capabilities(stage,*,scratch_parent):
     """Context manager owning fresh disposable packaging data, never P/state."""

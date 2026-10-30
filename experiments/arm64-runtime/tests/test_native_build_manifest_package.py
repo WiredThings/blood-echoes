@@ -14,6 +14,9 @@ class Manifest(unittest.TestCase):
         (self.repo/'tools').mkdir();(self.repo/'tools/build.py').write_text('author source\n')
         (self.repo/'SOURCE-MANIFEST.json').write_text(json.dumps({'source_commit':'a'*40}))
         self.prefix=self.base/'deps';(self.prefix/'lib').mkdir(parents=True)
+        self.python=self.base/'python/Frameworks/Python.framework/Versions/3.11'
+        (self.python/'bin').mkdir(parents=True);interpreter=self.python/'bin/python3.11'
+        interpreter.write_bytes(b'author Python; never executed');interpreter.chmod(0o700)
         self.gui=self.root/'gui/Blood Echoes.app';(self.gui/'Contents/MacOS').mkdir(parents=True)
         (self.gui/'Contents/MacOS/bbport').write_bytes(b'author GUI, not native')
         self.layout=self.root/'evidence/layout/result.json';self.layout.parent.mkdir(parents=True);self.layout.write_text('{}')
@@ -32,7 +35,8 @@ class Manifest(unittest.TestCase):
             source_identity=identity,artifacts=artifacts,renderer=str(self.root/'renderer'),cpu=artifacts['cpu']['path'],
             net=artifacts['net']['path'],library=artifacts['library']['path'],layout_result=str(self.layout),
             layout_result_sha256=package.sha(self.layout),gui_app=str(self.gui),
-            gui_sha256=package.sha(self.gui/'Contents/MacOS/bbport'),python_provider=str(self.prefix),dependency_prefixes=[str(self.prefix)])
+            gui_sha256=package.sha(self.gui/'Contents/MacOS/bbport'),python_provider=str(self.python),
+            tools={'python':{'path':str(interpreter),'sha256':package.sha(interpreter)}},dependency_prefixes=[str(self.prefix)])
         self.receipt=self.root/'build-manifest.json';self.save()
     def save(self):self.receipt.write_text(json.dumps(self.m))
     def arguments(self,**kw):return package.build_manifest_arguments(self.receipt,output=self.base/'Fresh.app',**kw)
@@ -96,6 +100,22 @@ class Manifest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'layout receipt changed'):self.arguments()
     def test_no_implicit_provider_fallback(self):
         self.m['dependency_prefixes']=[];self.reject('providers missing')
+    def test_legacy_package_provider_normalizes_without_changing_receipt(self):
+        declared=self.python.parents[3];(declared/'bin').mkdir()
+        (declared/'bin/python3.11').symlink_to(self.python/'bin/python3.11')
+        self.m['python_provider']=str(declared);self.save();before=self.receipt.read_bytes()
+        args=self.arguments()
+        self.assertEqual(args['python_provider'],self.python)
+        self.assertEqual(self.receipt.read_bytes(),before)
+    def test_changed_or_unrecorded_python_refused(self):
+        old=self.m['tools']['python']
+        for replacement in ({},old|{'sha256':'0'*64},old|{'path':str(self.base/'other-python')}):
+            self.m['tools']['python']=replacement;self.reject('Python interpreter differs')
+        self.m['tools']['python']=old
+        (self.python/'bin/python3.11').write_bytes(b'changed Python')
+        self.reject('Python interpreter differs')
+    def test_manifest_requires_recorded_interpreter(self):
+        self.m.pop('tools');self.reject('incomplete')
     def test_source_change_during_assembly_prevents_success(self):
         def assemble(**args):
             (self.repo/'tools/build.py').write_text('changed while packaging')

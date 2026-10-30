@@ -47,6 +47,23 @@ def executable(path):
     return dict(path=str(path), sha256=digest(path))
 
 
+def python_framework_provider(value):
+    """Normalize only an actual 3.11 Framework or its precise package root.
+
+    Read-only planning: final packaging still validates the Framework library,
+    executable load edges, stdlib and license with native_package_assets.
+    """
+    declared = directory(value)
+    if declared.name == '3.11' and declared.parent.name == 'Versions' and declared.parent.parent.name == 'Python.framework':
+        framework = declared
+    else:
+        framework = directory(declared / 'Frameworks/Python.framework/Versions/3.11')
+    selected = executable(framework / 'bin/python3.11')
+    need(Path(selected['path']).is_relative_to(framework), 'python executable escaped actual Framework provider')
+    need(executable(declared / 'bin/python3.11') == selected, 'declared and Framework Python interpreters differ')
+    return framework, selected
+
+
 def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider,
          version, revision, openssl_root=None, sdk_root=None):
     """Read source/tool identities only: no subprocess, mkdir or QA-state read."""
@@ -72,9 +89,7 @@ def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider
         tools[name] = executable(found)
     tools['protoc'] = executable(protoc)
     need(any(Path(tools['protoc']['path']).is_relative_to(p) for p in prefixes), 'protoc must come from an explicit dependency prefix')
-    provider = directory(python_provider)
-    tools['python'] = executable(provider / 'bin/python3.11')
-    need(Path(tools['python']['path']).is_relative_to(provider), 'python executable escaped explicit provider')
+    provider, tools['python'] = python_framework_provider(python_provider)
     sdk = str(directory(Path(sdk_root).resolve(strict=True))) if sdk_root is not None else '<SDKROOT>'
     openssl = str(directory(openssl_root)) if openssl_root is not None else None
     required = ['tools/macos/build_launcher.sh', 'experiments/arm64-runtime/tools/configure_native_build.py',

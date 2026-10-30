@@ -253,7 +253,7 @@ def build_manifest_arguments(manifest, *, output, search_dirs=()):
     output bytes are rechecked here, then normal assembly checks CMake origins,
     real load edges, layout, architectures and the original bare GUI again.
     """
-    from build_native_source import source_snapshot, identify_source, directory as source_directory
+    from build_native_source import source_snapshot, identify_source, directory as source_directory, python_framework_provider
     receipt=regular(manifest)
     need(receipt.stat().st_size<=16*1024*1024, 'normal build receipt exceeds size bound')
     def unique_pairs(rows):
@@ -266,7 +266,7 @@ def build_manifest_arguments(manifest, *, output, search_dirs=()):
     required={'schema','status','repository','source_root','build_root','revision','version',
               'targets_built','installed','game_started','source_identity','artifacts',
               'renderer','cpu','net','library','layout_result','layout_result_sha256',
-              'gui_app','gui_sha256','python_provider','dependency_prefixes'}
+              'gui_app','gui_sha256','python_provider','dependency_prefixes','tools'}
     need(isinstance(m,dict) and required<=m.keys(), 'incomplete normal build receipt')
     need(m['schema']==1 and m['status']=='source-built-not-packaged' and m['targets_built'] is True
          and m['installed'] is False and m['game_started'] is False, 'successful uninstalled normal build required')
@@ -303,10 +303,13 @@ def build_manifest_arguments(manifest, *, output, search_dirs=()):
     need(layout==root/'evidence/layout/result.json' and sha(layout)==m['layout_result_sha256'], 'normal layout receipt changed')
     prefixes=[source_directory(p) for p in m['dependency_prefixes']]
     need(prefixes and len(prefixes)==len(set(prefixes)), 'normal dependency providers missing or duplicated')
+    provider,interpreter=python_framework_provider(m['python_provider'])
+    need(isinstance(m['tools'],dict) and m['tools'].get('python')==interpreter,
+         'normal Python interpreter differs from build receipt')
     selected=[*prefixes,*(p/'lib' for p in prefixes if (p/'lib').is_dir()),*search_dirs]
     return dict(repository=repo,native_source=Path(m['source_root']),build_root=root,
         renderer_build=root/'renderer',cpu_build=root/'cpu',net_library=roles['net'],
-        layout_result=layout,launcher_app=gui,python_provider=Path(m['python_provider']),
+        layout_result=layout,launcher_app=gui,python_provider=provider,
         output=output,version=m['version'],revision=m['revision'],search_dirs=list(dict.fromkeys(selected)))
 
 def main():

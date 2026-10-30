@@ -20,7 +20,7 @@ class Fixture(unittest.TestCase):
         self.repo = self.base / 'repo'
         self.source = self.repo / 'experiments/arm64-runtime'
         self.prefix = self.base / 'prefix'
-        self.provider = self.base / 'python'
+        self.provider = self.base / 'python/Frameworks/Python.framework/Versions/3.11'
         for name in ('tools/configure_native_build.py', 'tools/build_metadata_layout.py',
                      'vendor/metal_api/CMakeLists.txt', 'vendor/bbnet/CMakeLists.txt', 'targets.cmake'):
             path = self.source / name
@@ -147,8 +147,39 @@ class Fixture(unittest.TestCase):
         path = self.provider / 'bin/python3.11'
         path.unlink()
         path.symlink_to(self.prefix / 'bin/protoc')
-        with self.assertRaisesRegex(ValueError, 'escaped explicit provider'):
+        with self.assertRaisesRegex(ValueError, 'escaped actual Framework provider'):
             self.plan()
+
+    def test_package_provider_normalizes_to_same_framework_and_interpreter(self):
+        declared = self.provider.parents[3]
+        (declared / 'bin').mkdir()
+        (declared / 'bin/python3.11').symlink_to(self.provider / 'bin/python3.11')
+        with patch('subprocess.Popen', side_effect=AssertionError('planning must not execute Python')):
+            direct = self.plan()
+            normalized = self.plan(python_provider=declared)
+        self.assertEqual(normalized, direct)
+        self.assertEqual(normalized['python_provider'], str(self.provider))
+
+    def test_generic_python_root_is_rejected_during_planning(self):
+        generic = self.base / 'generic'
+        (generic / 'bin').mkdir(parents=True)
+        (generic / 'bin/python3.11').symlink_to(self.provider / 'bin/python3.11')
+        with self.assertRaises((ValueError, FileNotFoundError)):
+            self.plan(python_provider=generic)
+
+    def test_package_root_cannot_select_a_different_interpreter(self):
+        declared = self.provider.parents[3]
+        (declared / 'bin').mkdir()
+        (declared / 'bin/python3.11').symlink_to(self.prefix / 'bin/protoc')
+        with self.assertRaisesRegex(ValueError, 'interpreters differ'):
+            self.plan(python_provider=declared)
+
+    def test_framework_path_cannot_escape_declared_package_via_symlink(self):
+        declared = self.base / 'other-package'
+        (declared / 'Frameworks').mkdir(parents=True)
+        (declared / 'Frameworks/Python.framework').symlink_to(self.provider.parent.parent)
+        with self.assertRaisesRegex(ValueError, 'canonical directory'):
+            self.plan(python_provider=declared)
 
     def test_original_gui_work_hook_required(self):
         (self.repo / 'tools/macos/build_launcher.sh').write_text('work=out/launcher-build\n')

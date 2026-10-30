@@ -69,6 +69,41 @@ class Finalize(unittest.TestCase):
    self.assertTrue(result['enabled']);self.assertTrue(result['production']);self.assertEqual(result['fixed_helper_seed_schema'],2);self.assertEqual(len(self.query_calls),1)
    self.assertEqual(json.loads((self.stage/'GAME-PSO-COMPONENT.json').read_text()),result)
   self.assertFalse(data.exists());self.assertFalse((self.root/'state').exists())
+ def native_result(self,target,root,**kwargs):
+  self.assertEqual(Path(root),self.stage);self.assertEqual(kwargs,dict(code_owners=(0,os.getuid())))
+  return dict(target=str(target),target_sha256=component.sha(Path(target)),library=str(self.library),
+              library_sha256=component.sha(self.library),architecture='arm64',load_edge_verified=True,
+              strict_signatures=True,declared_gpu_load_edges=['author-only injected query'],declared_rpaths=[])
+ def test_finalize_then_load_uses_packaging_native_identity_for_both_consumers(self):
+  candidate=self.prepare();self.formal_closure()
+  with profile.packaging_capabilities(self.stage,scratch_parent=self.root)as caps:
+   component.finalize_inputs(self.stage,candidate,admission_root=self.normal,runtime_profile=caps,production=True,capability_runner=self.query)
+   with patch('warm_archive_manifest.resolve_gpu_identity_full',side_effect=self.native_result)as native,patch('subprocess.check_output',return_value='_bb_fetch_companion_configure_v1\n')as exports:
+    loaded=component.load(self.stage,runtime_profile=caps)
+   self.assertEqual([c.args[0]for c in native.call_args_list],[self.stage/'bin/game-pso-preparer',self.stage/'bin/game-module-preparer'])
+   exports.assert_called_once_with(['/usr/bin/nm','-gjU',str(self.library)],text=True,timeout=10)
+   self.assertEqual(loaded['library'],self.library);self.assertEqual(len(self.query_calls),1)
+   for name in('game_root','app0','user','gpu_root','work_root'):self.assertFalse(hasattr(caps,name))
+ def test_packaging_native_rejects_outside_and_nonfrozen_paths_before_native_query(self):
+  self.prepare();self.formal_closure()
+  with profile.packaging_capabilities(self.stage,scratch_parent=self.root)as caps,patch('warm_archive_manifest.resolve_gpu_identity_full',side_effect=AssertionError('not an admitted role')):
+   for target in(self.normal/'worker',self.stage/'unlisted',self.stage/'bin/../bin/game-pso-preparer'):
+    with self.subTest(target=target),self.assertRaisesRegex(ValueError,'outside admitted|not a frozen'):caps.native_identity(target)
+ def test_packaging_native_requires_exact_actual_role_library_and_strict_admission(self):
+  self.prepare();self.formal_closure();target=self.stage/'bin/game-pso-preparer'
+  with profile.packaging_capabilities(self.stage,scratch_parent=self.root)as caps:
+   actual=self.native_result(target,self.stage,code_owners=(0,os.getuid()))
+   for field,bad in [('target',str(self.normal/'worker')),('target_sha256','0'*64),('library',str(self.source_library)),('library_sha256','0'*64),('architecture','x86_64'),('load_edge_verified',False),('strict_signatures',1)]:
+    with self.subTest(field=field),patch('warm_archive_manifest.resolve_gpu_identity_full',return_value=actual|{field:bad}),self.assertRaisesRegex(ValueError,'differs from frozen'):caps.native_identity(target)
+ def test_packaging_native_mutation_during_full_query_is_rejected(self):
+  self.prepare();self.formal_closure();target=self.stage/'bin/game-pso-preparer'
+  with profile.packaging_capabilities(self.stage,scratch_parent=self.root)as caps:
+   for path in(target,self.library):
+    old=path.read_bytes()
+    def mutate(*args,**kwargs):
+     result=self.native_result(*args,**kwargs);path.write_bytes(old+b'changed during actual query');return result
+    with self.subTest(path=path),patch('warm_archive_manifest.resolve_gpu_identity_full',side_effect=mutate),self.assertRaises(ValueError):caps.native_identity(target)
+    path.write_bytes(old)
  def test_no_final_component_is_needed_for_native_and_scalar_admission(self):
   native=(Path(__file__).resolve().parents[1]/'src/bundled_runtime_admission.mm').read_text();self.assertNotIn('GAME-PSO-COMPONENT',native)
   main=(Path(__file__).resolve().parents[1]/'src/game_pso_preparer.mm').read_text().split('int main(',1)[1]
