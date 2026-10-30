@@ -68,6 +68,7 @@ enum MetalOptimizations {
         .init(id: "BB_MTL_LIBRARY_REUSE", title: "Reuse identical Metal libraries", note: "Reuses identical libraries within the running renderer. Separate from automatic disk preparation; benefit is unconfirmed.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_INLINE_UPDATES", title: "Write small parameters with a compute kernel", note: "Removes tiny buffer copies, but adds compute transitions. No repeatable FPS gain; memory was about 37 MiB higher in one comparison.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_RELAXED_MATH", title: "Use relaxed fragment and compute math", note: "May change floating-point results; benefit is unconfirmed. Uses separate compatible shader variants.", defaultOn: false, evidence: .experimental),
+        .init(id: "BB_MTL_RELAX_VERTEX", title: "Optimize vertex math with position invariance", note: "Experimental upstream vertex arithmetic. Uses separate compiled variants; gameplay image and performance validation is pending.", defaultOn: false, evidence: .experimental),
         .init(id: "BB_MTL_PERSIST_WARM_ARCHIVE", title: "Save and load binary pipeline archives", note: "Earlier archive loading used about 0.6 GiB more memory. Off retains files and does not disable automatic local preparation.", defaultOn: false, evidence: .memoryRisk),
         ]
         guard nativeHostAvailable else { return legacy }
@@ -114,6 +115,9 @@ enum MetalOptimizations {
     static func environment(prefs: LauncherPrefs, metalFXActive: Bool = true) -> [String: String] {
         guard prefs.renderer == "metal" else { return [:] }
         var env = Dictionary(uniqueKeysWithValues: all.map { ($0.id, enabled($0, prefs: prefs, metalFXActive: metalFXActive) ? "1" : "0") })
+        // Disabled is the unchanged compiler path. applyingEnvironment removes
+        // stale developer values before this merge, so omission still enforces OFF.
+        if env["BB_MTL_RELAX_VERTEX"] == "0" { env.removeValue(forKey: "BB_MTL_RELAX_VERTEX") }
         if env["BB_MTL_PROXY_LEAN"] == "1" { env["BB_MTL_FULL_USAGE"] = "0" }
         if env["BB_MTL_RELAXED_MATH"] == "1" { env["BB_MTL_STRICT_FLOAT"] = "0" }
         return env

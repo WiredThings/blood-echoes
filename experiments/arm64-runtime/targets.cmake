@@ -34,6 +34,11 @@ target_compile_definitions(test_lookup PRIVATE AETHER_SMOKE_SOURCE="${AETHER}/ru
 target_link_libraries(test_lookup PRIVATE bb_fex_embedding)
 add_executable(test_abi ${BB_ARM64_PROTOTYPE_DIR}/tests/test_abi.cpp)
 target_link_libraries(test_abi PRIVATE bb_fex_embedding)
+add_executable(test_upstream_fex_guest_load_fault
+ ${BB_ARM64_PROTOTYPE_DIR}/tests/test_upstream_fex_guest_load_fault.cpp)
+target_compile_features(test_upstream_fex_guest_load_fault PRIVATE cxx_std_20)
+target_compile_options(test_upstream_fex_guest_load_fault PRIVATE -UNDEBUG)
+target_link_libraries(test_upstream_fex_guest_load_fault PRIVATE bb_fex_embedding)
 add_executable(bb-runtime-arm64 ${BB_ARM64_PROTOTYPE_DIR}/src/runtime.cpp ${BB_ARM64_PROTOTYPE_DIR}/src/metal_peer.cpp)
 target_include_directories(bb-runtime-arm64 PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/vendor/blood_echoes)
 target_compile_definitions(bb-runtime-arm64 PRIVATE BB_PROTOTYPE_ROOT="${BB_ARM64_RUNTIME_ROOT}")

@@ -19,6 +19,7 @@
 #include "common/serdes.h"
 #include "common/hash.h"
 #include "shader_recompiler/compile_snapshot.h"
+#include "shader_recompiler/profile_cache_wire.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
 #include "shader_recompiler/resource.h"
 #include "shader_recompiler/specialization.h"
@@ -161,11 +162,7 @@ void WriteExclusive(const fs::path&p,std::span<const u8>b){
  while(at<b.size()){auto n=write(fd,b.data()+at,b.size()-at);if(n<0&&errno==EINTR)continue;Need(n>0,"module output write");at+=n;}Need(fsync(fd)==0,"module output sync");
 }
 Shader::Profile Profile(const std::vector<u8>&raw){
- Need(raw.size()==16+sizeof(Shader::Profile)&&Word(raw,0)==0x42425043&&Word(raw,4)==10&&Word(raw,8)==7&&Word(raw,12)==5,"profile serialization ABI");
- #define MODULE_PROFILE_BOOL_FIELD(name) Need(raw[16+offsetof(Shader::Profile,name)]<=1,"profile bool representation");
- #include "module_profile_bool_fields.inc"
- #undef MODULE_PROFILE_BOOL_FIELD
- Shader::Profile p{};memcpy(&p,raw.data()+16,sizeof(p));
+ auto p=Shader::ProfileCacheWire::Decode(raw,{0x42425043,10,7,5}).profile;
  Need(p.supported_spirv>=0x10000&&p.supported_spirv<=0x10600&&p.max_viewport_width<=65536&&p.max_viewport_height<=65536&&p.max_shared_memory_size<=1024*1024&&p.sparse_page_shift<64,"profile limits");return p;
 }
 

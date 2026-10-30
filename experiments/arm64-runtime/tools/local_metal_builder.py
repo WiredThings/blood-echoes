@@ -10,6 +10,7 @@ import argparse,fcntl,hashlib,json,os,re,signal,sqlite3,stat,subprocess,sys,temp
 
 PROJECT=Path(__file__).resolve().parents[1]
 RECIPE='bb-metal-local-aot-v1'
+INVARIANT_RECIPE='bb-metal-local-aot-invariant-v1'
 LIBRARY_RECIPE='bb-metal-local-library-v2'
 HEX=re.compile(r'^[0-9a-f]{64}$')
 SOURCE_MAX=1024*1024
@@ -22,14 +23,18 @@ STAGE_TIMEOUT=60.0
 TOTAL_TIMEOUT=1800.0
 REQUEST_FIELDS={'schema','key','cohort','source_sha256','entry','language','math_mode','math_fp32','recipe'}
 LIBRARY_REQUEST_FIELDS=REQUEST_FIELDS-{'entry'}
+INVARIANT_REQUEST_FIELDS=REQUEST_FIELDS|{'preserve_invariance'}
 
 class Refused(RuntimeError):pass
 class Stopped(Refused):pass
+
+def macos_xcrun(*args):return ['/usr/bin/xcrun','--sdk','macosx',*args]
 
 def digest(data):return hashlib.sha256(data).hexdigest()
 def canonical(value):return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
 def derive_key(request):
     fields=[request[k]for k in (('recipe','cohort','source_sha256','language','math_mode','math_fp32') if request.get('schema')==2 else ('recipe','cohort','source_sha256','entry','language','math_mode','math_fp32'))]
+    if request.get('schema')==3:fields.append('preserve-invariance=1')
     encoded=b''.join(str(len(value.encode('utf-8'))).encode()+b':'+value.encode('utf-8')for value in fields)
     return digest(encoded)
 def _identity(st):return st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns
@@ -138,13 +143,15 @@ def request_keys(folder,*,recovery=None,pins=None):
 def load_request(folder,key,cohort,*,pins=None):
     pin=lambda suffix:None if pins is None else pins[key+suffix]
     request=read_json(folder/(key+'.json'),request_pin=pin('.json'))
-    if type(request)is not dict or type(request.get('schema'))is not int or request['schema']not in(1,2):raise Refused('unsupported request schema')
-    fields=REQUEST_FIELDS if request['schema']==1 else LIBRARY_REQUEST_FIELDS
+    if type(request)is not dict or type(request.get('schema'))is not int or request['schema']not in(1,2,3):raise Refused('unsupported request schema')
+    fields={1:REQUEST_FIELDS,2:LIBRARY_REQUEST_FIELDS,3:INVARIANT_REQUEST_FIELDS}[request['schema']]
     if set(request)!=fields:raise Refused('request fields do not match schema')
-    if any(type(request[k])is not str for k in fields-{'schema'}):raise Refused('request field type mismatch')
+    if any(type(request[k])is not str for k in fields-{'schema','preserve_invariance'}):raise Refused('request field type mismatch')
+    if request['schema']==3 and (type(request['preserve_invariance'])is not bool or not request['preserve_invariance']):raise Refused('invariant recipe requires explicit true')
     if request['key']!=key or request['cohort']!=cohort or not HEX.fullmatch(request['source_sha256']):raise Refused('request key/cohort/source identity mismatch')
-    if request['schema']==1:
-        if request['recipe']!=RECIPE or request['language']!='metal3.1' or request['math_mode']not in('safe','relaxed')or request['math_fp32']!='fast':raise Refused('unsupported fixed compile recipe')
+    if request['schema']in(1,3):
+        recipe=INVARIANT_RECIPE if request['schema']==3 else RECIPE
+        if request['recipe']!=recipe or request['language']!='metal3.1' or request['math_mode']not in('safe','relaxed')or request['math_fp32']!='fast':raise Refused('unsupported fixed compile recipe')
         entry=request['entry']
         if not entry or len(entry.encode('utf-8'))>256 or '\0'in entry:raise Refused('invalid entry name')
     else:
@@ -466,7 +473,7 @@ class NativeToolchain:
         return dict(self.registration.stats)if self.registration is not None else {}
     def sdk_identity(self,guard):
         guard.check(preflight=True)
-        raw=self.runner.run(['/usr/bin/xcrun','--show-sdk-path'],10,guard).decode().strip()
+        raw=self.runner.run(macos_xcrun('--show-sdk-path'),10,guard).decode().strip()
         if not raw.startswith('/')or '\n'in raw:raise Refused('invalid selected SDK path')
         selected=Path(raw);sdk=selected.resolve(strict=True)
         if not sdk.is_dir():raise Refused('selected SDK is not a directory')
@@ -491,15 +498,15 @@ class NativeToolchain:
     def _identify_full(self,guard):
         tools={};versions={}
         for name in('metal','metallib'):
-            found=self.runner.run(['/usr/bin/xcrun','--find',name],10,guard).decode().strip()
+            found=self.runner.run(macos_xcrun('--find',name),10,guard).decode().strip()
             if not found.startswith('/')or '\n'in found:raise Refused('invalid resolved tool path')
             tools[name]=self.fingerprint(found)
-            versions[name]=self.runner.run(['/usr/bin/xcrun',name,'--version'],10,guard).decode('utf-8').strip()
+            versions[name]=self.runner.run(macos_xcrun(name,'--version'),10,guard).decode('utf-8').strip()
             if not versions[name]or len(versions[name].encode())>4096:raise Refused('empty or oversized tool version')
         build=self.runner.run(['/usr/bin/sw_vers','-buildVersion'],10,guard).decode().strip()
         if not build or len(build.encode())>256:raise Refused('empty or oversized OS build identity')
         tools['xcrun']=self.fingerprint('/usr/bin/xcrun')
-        versions['xcrun']=self.runner.run(['/usr/bin/xcrun','--version'],10,guard).decode().strip()
+        versions['xcrun']=self.runner.run(macos_xcrun('--version'),10,guard).decode().strip()
         if not versions['xcrun']or len(versions['xcrun'].encode())>1024:raise Refused('empty or oversized xcrun version')
         sdk,self.sdk_selection=self.sdk_identity(guard)
         # Keep the full observed version with the actual invocation pins for
@@ -519,7 +526,7 @@ class NativeToolchain:
     def _unchanged_full(self,guard):
         guard.check(preflight=True)
         for name in('metal','metallib'):
-            found=self.runner.run(['/usr/bin/xcrun','--find',name],10,guard).decode().strip()
+            found=self.runner.run(macos_xcrun('--find',name),10,guard).decode().strip()
             if str(Path(found).resolve(strict=True))!=self.pins[name]['path']:raise Refused('selected toolchain changed during build')
         for row in self.pins.values():
             if list(_identity(Path(row['path']).stat()))!=row['stat']:raise Refused('tool binary changed during build')
@@ -537,7 +544,7 @@ class NativeToolchain:
     def _preparation_environment_full(self,guard):
         # Session invalidation only, never a replacement for artifact/toolchain ID.
         guard.check(preflight=True)
-        raw=self.runner.run(['/usr/bin/xcrun','--show-sdk-path'],10,guard).decode().strip()
+        raw=self.runner.run(macos_xcrun('--show-sdk-path'),10,guard).decode().strip()
         if not raw.startswith('/')or '\n'in raw:raise Refused('invalid selected SDK path')
         selected=Path(raw);sdk=selected.resolve(strict=True)
         if not sdk.is_dir():raise Refused('selected SDK is not a directory')
@@ -559,13 +566,14 @@ class NativeToolchain:
         return dict(sdk_selected=str(selected),sdk=str(sdk),os_build=os_build,pins=pins)
     def compile(self,source,air,library,request,guard):
         self._unchanged_full(guard)
-        command=['/usr/bin/xcrun','metal','-std='+request['language'],
+        command=macos_xcrun('metal','-std='+request['language'],
                  '-fmetal-math-mode='+request['math_mode'],'-fmetal-math-fp32-functions='+request['math_fp32'],
-                 '-c',str(source),'-o',str(air)]
+                 '-c',str(source),'-o',str(air))
+        if request['schema']==3:command.insert(7,'-fpreserve-invariance')
         self.runner.run(command,STAGE_TIMEOUT,guard,cwd=source.parent,outputs=((air,AIR_MAX),))
         row=air.lstat()
         if not stat.S_ISREG(row.st_mode)or row.st_uid!=os.getuid()or row.st_nlink!=1 or not 0<row.st_size<=AIR_MAX:raise Refused('invalid/empty AIR output')
-        self.runner.run(['/usr/bin/xcrun','metallib',str(air),'-o',str(library)],STAGE_TIMEOUT,guard,
+        self.runner.run(macos_xcrun('metallib',str(air),'-o',str(library)),STAGE_TIMEOUT,guard,
                         cwd=source.parent,outputs=((library,LIBRARY_MAX),))
         self._unchanged_full(guard)
 

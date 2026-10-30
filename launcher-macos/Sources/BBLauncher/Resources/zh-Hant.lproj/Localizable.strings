@@ -306,6 +306,8 @@
 "Skip loading fully overwritten copy targets" = "完整覆蓋複製前不加載舊目標";
 "Clear the existing scene copy directly" = "直接清除現有場景副本";
 "Inline strict vertex math" = "內聯嚴格頂點運算";
+"Optimize vertex math with position invariance" = "透過位置不變性最佳化頂點運算";
+"Experimental upstream vertex arithmetic. Uses separate compiled variants; gameplay image and performance validation is pending." = "實驗性上游頂點運算最佳化，使用獨立編譯變體；遊戲畫面與效能尚待驗證。";
 "Preserve scene-texture compression eligibility" = "保留場景紋理的無損壓縮條件";
 "Merge MetalFX alpha upscaling" = "合併 MetalFX Alpha 放大";
 "Reclaim idle staging backing" = "回收閒置暫存內存";

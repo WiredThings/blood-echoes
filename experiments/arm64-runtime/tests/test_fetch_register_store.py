@@ -10,7 +10,12 @@ class FetchStore(unittest.TestCase):
   boolean=re.findall(r'^MODULE_PROFILE_BOOL_FIELD\((\w+)\)',(ROOT/'src/module_profile_bool_fields.inc').read_text(),re.M)
   explicit=['max_viewport_width','max_viewport_height','max_shared_memory_size','supported_spirv','subgroup_size','sparse_page_shift','buffer_copy_shader_hash']
   self.assertEqual([n for t,n in fields if t!='bool'],explicit)
-  self.assertEqual([n for t,n in fields if t=='bool'],boolean)
+  # The last canonical byte has named feature bits; the old false/default
+  # projection remains byte-identical, with no field silently ignored.
+  self.assertEqual([n for t,n in fields if t=='bool'],boolean+['relaxed_vertex_float'])
+  flags=(ROOT/'src/module_profile_feature_flags.h').read_text()
+  self.assertIn('profile.relaxed_vertex_float ? ProfileInvariantVertexBit',flags)
+  self.assertIn('profile.relaxed_vertex_float = (flags & ProfileInvariantVertexBit)',flags)
   self.assertEqual(24+8+len(boolean),74)
   self.assertEqual(boolean[-2:],['relaxed_fragment_compute_float','two_level_bda'])
 

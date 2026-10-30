@@ -26,14 +26,28 @@ def scalar(data,layout,type_name,field):
  at=layout[type_name+'.'+field];size=layout[type_name+'.'+field+'.bytes'];require(0<size<=8,'scalar layout width');return int.from_bytes(span(data,at,size),'little')
 def fields(data,l,t,names):return{n:scalar(data,l,t,n)for n in names}
 def semantic_profile(data,l):
- require(len(data)==16+l['Profile.size']and struct.unpack('<4I',data[:16])==(0x42425043,10,7,5),'profile layout/version')
- raw=data[16:];values={};covered=set()
+ require(len(data)>=16 and struct.unpack('<4I',data[:16])==(0x42425043,10,7,5),'profile layout/version')
+ body=data[16:];size=l['Profile.size'];feature=False;flags=0;prefix=16
+ if len(body)>=4 and struct.unpack_from('<I',body)[0]==0x31504642:
+  require(len(body)==20+size,'profile feature envelope extent')
+  magic,version,width,flags,viewport=struct.unpack_from('<5I',body)
+  require(version==1 and width==size and size==80 and flags&~3==0,'profile feature envelope version/bits')
+  require(viewport<=65536 and struct.unpack_from('<I',body,20)[0]==0x31504642,'profile feature payload marker/viewport')
+  feature=True;body=bytearray(body[20:]);struct.pack_into('<I',body,0,viewport);prefix+=20
+  require('Profile.relaxed_vertex_float'in l and l['Profile.relaxed_vertex_float']==74 and l['Profile.two_level_bda']==73,'complete feature Profile layout')
+ else:require(len(body)==size or(size==80 and len(body)==72),'legacy profile extent')
+ # Legacy byte74 is not a feature: the old format never declared that field.
+ # Zero-extend the two old omitted tail bools, not arbitrary omitted inputs.
+ actual_size=len(body);raw=body+bytes(size-len(body));values={};covered=set()
  for field in l['profile_fields']:
-  name=field['name'];value=scalar(raw,l,'Profile',name)
+  name=field['name'];legacy_feature=name=='relaxed_vertex_float'and not feature
+  value=0 if legacy_feature else scalar(raw,l,'Profile',name)
   if field['type']=='bool':require(value in(0,1),'profile bool')
-  values[name]=value;at=l['Profile.'+name];covered.update(range(at,at+l['Profile.'+name+'.bytes']))
+  values[name]=value;at=l['Profile.'+name]
+  if not legacy_feature:covered.update(range(at,at+l['Profile.'+name+'.bytes']))
+ if feature:require(flags==(values['two_level_bda']|(values['relaxed_vertex_float']<<1)),'profile feature/raw disagreement')
  encoded=json.dumps(values,sort_keys=True,separators=(',',':')).encode()
- return dict(fields=values,semantic_sha256=hashlib.sha256(encoded).hexdigest(),raw_sha256=hashlib.sha256(data).hexdigest(),ignored_padding_offsets=[16+i for i in range(len(raw))if i not in covered],qualification='Field equality matches canonical Profile operator== in this layout/version; not complete renderer/compiler/driver binary compatibility.')
+ return dict(fields=values,semantic_sha256=hashlib.sha256(encoded).hexdigest(),raw_sha256=hashlib.sha256(data).hexdigest(),ignored_padding_offsets=[prefix+i for i in range(actual_size)if i not in covered],qualification='Named fields follow the explicit current feature envelope or the legacy field set; not complete renderer/compiler/driver binary compatibility.')
 
 def decode_meta(data,l):
  r=Reader(data);require((r.u32(),r.u32())==(7,10),'metadata versions');perm_hash=r.u64();index=r.u64();bindings=r.take(l['Backend::Bindings.size']);runtime=r.take(l['RuntimeInfo.size']);bit_count=r.u64();require(bit_count==128,'resource bitset shape');bits=r.take(bit_count);require(set(bits)<=set(b'01'),'invalid resource bitset')

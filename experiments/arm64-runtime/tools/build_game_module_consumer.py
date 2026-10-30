@@ -13,7 +13,9 @@ def main():
     profile=root/'vendor/metal_api/shadps4/shader_recompiler/profile.h'
     bools=re.findall(r'\bbool\s+(\w+)\s*(?:\{|;)',profile.read_text())
     listed=re.findall(r'MODULE_PROFILE_BOOL_FIELD\((\w+)\)',(root/'src/module_profile_bool_fields.inc').read_text())
-    if bools!=listed:raise ValueError('Profile boolean preflight must match canonical header')
+    # Invariant vertex is the second named bit of the final canonical byte;
+    # the native round-trip tests cover this strict compatible extension.
+    if bools!=listed+['relaxed_vertex_float']:raise ValueError('Profile boolean preflight must match canonical header and feature flags')
     baseline=root/'evidence/tiling-library-integration-20261026/native/build.json'
     data=json.loads(baseline.read_text()); old=data['source_root'];lib=pathlib.Path(data['library'])
     if sha(lib)!=data['library_sha256']:raise ValueError('pinned native library changed')
@@ -25,7 +27,8 @@ def main():
     # cannot prove use of the new explicit compilation projection API.
     sources=[root/'src/game_module_preparer.mm',compiler/'recompiler.cpp',
              compiler/'compile_snapshot.cpp',compiler/'frontend/translate/translate.cpp',
-             compiler/'backend/spirv/emit_spirv.cpp',compiler/'backend/spirv/spirv_emit_context.cpp']
+             compiler/'backend/spirv/emit_spirv.cpp',compiler/'backend/spirv/spirv_emit_context.cpp',
+             compiler/'backend/spirv/emit_spirv_floating_point.cpp']
     for i,src in enumerate(sources):
         cmd=[v.replace(old,str(root)) for v in unit['command']]
         cmd[-1]=str(src);cmd[cmd.index('-o')+1]=str(out/f'unit{i}.o')

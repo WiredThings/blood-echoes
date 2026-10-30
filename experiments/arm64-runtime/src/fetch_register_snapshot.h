@@ -2,6 +2,7 @@
 #pragma once
 #include "fetch_register_store.h"
 #include "shader_recompiler/compile_snapshot.h"
+#include "module_profile_feature_flags.h"
 #include <algorithm>
 #include <bit>
 #include <cstring>
@@ -15,7 +16,9 @@ inline std::array<uint8_t,ProfileBytes> CanonicalProfile(const Shader::Profile&p
  auto u32=[&](uint32_t n){for(unsigned i=0;i<4;++i)out.at(at++)=n>>(i*8);};
  for(auto n:{p.max_viewport_width,p.max_viewport_height,p.max_shared_memory_size,p.supported_spirv,p.subgroup_size,p.sparse_page_shift})u32(n);
  for(unsigned i=0;i<8;++i)out.at(at++)=p.buffer_copy_shader_hash>>(i*8);
-#define MODULE_PROFILE_BOOL_FIELD(field) out.at(at++)=p.field?1:0;
+#define MODULE_PROFILE_BOOL_FIELD(field) \
+ if constexpr(std::string_view(#field)=="two_level_bda")out.at(at++)=EncodeProfileBdaFeatures(p); \
+ else out.at(at++)=p.field?1:0;
 #include "module_profile_bool_fields.inc"
 #undef MODULE_PROFILE_BOOL_FIELD
  RequireSnapshot(at==out.size(),"complete Profile field count changed");return out;

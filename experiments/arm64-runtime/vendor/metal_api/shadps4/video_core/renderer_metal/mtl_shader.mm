@@ -92,6 +92,7 @@ struct SpirvScan {
     bool device_address{};  ///< Capability PhysicalStorageBufferAddresses
     bool bda_pagetable{};   ///< a variable named "bda_pagetable"
     bool depth_replacing{}; ///< OpExecutionMode DepthReplacing (a fragment shader exporting depth)
+    bool invariant_position{}; ///< The actual vertex Position carries Invariant, not an env hint.
     std::array<u32, 3> local_size{0, 0, 0}; ///< OpExecutionMode LocalSize
     TessellationInfo tess;                  ///< the tessellation execution modes
 };
@@ -103,6 +104,7 @@ SpirvScan ScanSpirv(std::span<const u32> code) {
     }
     scan.valid = true;
     std::vector<u32> pagetable_candidates;
+    std::vector<u32> invariant_targets, position_targets;
     for (size_t i = 5; i < code.size();) {
         const u32 word = code[i];
         const u32 length = word >> spv::WordCountShift;
@@ -197,6 +199,13 @@ SpirvScan ScanSpirv(std::span<const u32> code) {
             }
             break;
         case spv::OpDecorate:
+            if (length >= 3 && code[i + 2] == spv::DecorationInvariant) {
+                invariant_targets.push_back(code[i + 1]);
+            }
+            if (length >= 4 && code[i + 2] == spv::DecorationBuiltIn &&
+                code[i + 3] == spv::BuiltInPosition) {
+                position_targets.push_back(code[i + 1]);
+            }
             if (length >= 3 && code[i + 2] == spv::DecorationPerVertexKHR) {
                 scan.per_vertex = true;
             }
@@ -205,6 +214,12 @@ SpirvScan ScanSpirv(std::span<const u32> code) {
             break;
         }
         i += length;
+    }
+    for (const auto target : invariant_targets) {
+        if (std::find(position_targets.begin(), position_targets.end(), target) != position_targets.end()) {
+            scan.invariant_position = true;
+            break;
+        }
     }
     return scan;
 }
@@ -961,7 +976,7 @@ std::string FirstMetalError(const std::string& text) {
 /// `relaxed_math`: MTLMathModeRelaxed instead of Safe (macOS 15 and later; below it the library is
 /// always built without fast math). mathFloatingPointFunctions stays at its default (Fast).
 MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const std::string& entry,
-                          std::string_view label, bool relaxed_math, bool inline_vertex=false, unsigned* inlined=nullptr, bool fragment_uniforms=false, unsigned* uniform_buffers=nullptr, bool copy_pair=false, bool* pair_applied=nullptr, LibraryMemo* memo=nullptr) {
+                          std::string_view label, bool relaxed_math, bool inline_vertex=false, unsigned* inlined=nullptr, bool fragment_uniforms=false, unsigned* uniform_buffers=nullptr, bool copy_pair=false, bool* pair_applied=nullptr, LibraryMemo* memo=nullptr, bool preserve_invariance=false) {
     BbAudit::Scope detailed_audit{BbAudit::MetalLibrary,0,100000};
     CompileAudit audit{"library"};
     MetalObjects objects{};
@@ -977,6 +992,7 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
     @autoreleasepool {
         MTLCompileOptions* options = [MTLCompileOptions new];
         options.languageVersion = MTLLanguageVersion3_1;
+        options.preserveInvariance = preserve_invariance;
         if (@available(macOS 15.0, *)) {
             options.mathMode = relaxed_math ? MTLMathModeRelaxed : MTLMathModeSafe;
             options.mathFloatingPointFunctions = MTLMathFloatingPointFunctionsFast;
@@ -1008,7 +1024,7 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
                     // original-source fallback and the weak memo's failure path intact.
                     return {nil, nil, fmt::format("Metal: function '{}' not found in the library", entry)};
                 }
-                auto recorded=LocalAot::Try(device,text,entry,relaxed_math,true,false,function);
+                auto recorded=LocalAot::Try(device,text,entry,relaxed_math,true,false,function,preserve_invariance);
                 if(!recorded.key.empty())std::printf("Metal local AOT: source key=%s recorded=%d\n",recorded.key.c_str(),int(recorded.recorded));
                 library.label = [[NSString alloc] initWithBytes:label.data() length:label.size()
                                                       encoding:NSUTF8StringEncoding];
@@ -1022,7 +1038,7 @@ MetalObjects BuildLibrary(id<MTLDevice> device, const std::string& msl, const st
                 return {library, function, {}, false, identity};
             };
             const auto build = [&]() -> MetalObjects {
-                auto local=LocalAot::Try(device,text,entry,relaxed_math,false);
+                auto local=LocalAot::Try(device,text,entry,relaxed_math,false,true,nil,preserve_invariance);
                 if(local.library&&local.function){
                     std::printf("Metal local AOT: hit key=%s recorded=0\n",local.key.c_str());
                     local.library.label=[[NSString alloc] initWithBytes:label.data() length:label.size() encoding:NSUTF8StringEncoding];
@@ -1200,6 +1216,14 @@ FloatRules ReadFloatRules() {
     return rules;
 }
 
+bool ReadRelaxedVertex() {
+    static const bool enabled = [] {
+        const char* value = std::getenv("BB_MTL_RELAX_VERTEX");
+        return value && std::string_view(value) == "1" && ReadFloatRules() != FloatRules::Strict;
+    }();
+    return enabled;
+}
+
 ShaderCompiler::ShaderCompiler(Device& device_, std::filesystem::path cache_dir_, FloatRules rules_,
                                bool allow_cache_writes_)
     : device{device_}, cache_dir{std::move(cache_dir_)}, rules{rules_},
@@ -1373,6 +1397,10 @@ CompileResult ShaderCompiler::Compile(std::span<const u32> spirv, u64 hash, std:
     const bool fragment_uniforms=uniforms_enabled && scan.stage==ShaderStage::Fragment && variant.kind==VariantKind::Plain;
     const bool inline_vertex=VertexMathInliningEnabled() && scan.stage==ShaderStage::Vertex &&
                              variant.kind==VariantKind::Plain;
+    // Derive options from the complete actual SPIR-V, also for offline captured
+    // inputs. An environment hint alone cannot change a library's compile identity.
+    const bool preserve_invariance=scan.stage==ShaderStage::Vertex &&
+                                   variant.kind==VariantKind::Plain && scan.invariant_position;
     static const bool pair_enabled=[]{const char* e=std::getenv("BB_MTL_COPY_PAIR");return e && e[0]=='1';}();
     const bool merge_pair=pair_enabled && hash==0xfefebf9full && scan.stage==ShaderStage::Compute && variant.kind==VariantKind::Plain;
     MetalObjects objects{};
@@ -1384,7 +1412,7 @@ CompileResult ShaderCompiler::Compile(std::span<const u32> spirv, u64 hash, std:
             CompiledShader parsed;
             std::string cached_msl;
             if (ParseCache(text, parsed, cached_msl) && parsed.stage == scan.stage) {
-                objects = BuildLibrary(mtl_device, cached_msl, parsed.entry, label, relaxed_math, inline_vertex, &shader->strict_vertex_helpers_inlined, fragment_uniforms, &fragment_uniform_buffers, merge_pair, &shader->copy_pair_merged, library_memo.get());
+                objects = BuildLibrary(mtl_device, cached_msl, parsed.entry, label, relaxed_math, inline_vertex, &shader->strict_vertex_helpers_inlined, fragment_uniforms, &fragment_uniform_buffers, merge_pair, &shader->copy_pair_merged, library_memo.get(), preserve_invariance);
                 if (objects.error.empty()) {
                     shader->entry = std::move(parsed.entry);
                     shader->bindings = std::move(parsed.bindings);
@@ -1426,7 +1454,7 @@ CompileResult ShaderCompiler::Compile(std::span<const u32> spirv, u64 hash, std:
         } catch (const std::exception& e) {
             return fail(CompileStatus::Failed, "SPIRV-Cross: " + FirstLine(e.what()));
         }
-        objects = BuildLibrary(mtl_device, msl, shader->entry, label, relaxed_math, inline_vertex, &shader->strict_vertex_helpers_inlined, fragment_uniforms, &fragment_uniform_buffers, merge_pair, &shader->copy_pair_merged, library_memo.get());
+        objects = BuildLibrary(mtl_device, msl, shader->entry, label, relaxed_math, inline_vertex, &shader->strict_vertex_helpers_inlined, fragment_uniforms, &fragment_uniform_buffers, merge_pair, &shader->copy_pair_merged, library_memo.get(), preserve_invariance);
         if (!objects.error.empty()) {
             return fail(CompileStatus::Failed, objects.error);
         }

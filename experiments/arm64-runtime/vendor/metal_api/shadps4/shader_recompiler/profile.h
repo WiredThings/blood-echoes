@@ -67,6 +67,10 @@ struct Profile {
     bool relaxed_fragment_compute_float{};
     /// Metal's two-level BDA ABI; isolated pipeline cache namespace (flat remains available).
     bool two_level_bda{};
+    /// Opt-in Metal raster vertex contraction. Position is also made Invariant;
+    /// the Metal library must be built with preserveInvariance. Remains in the
+    /// existing tail padding: two_level_bda's offset and sizeof(Profile) stay put.
+    bool relaxed_vertex_float{};
 
     bool operator==(const Profile&) const = default;
 };

@@ -36,7 +36,7 @@ EXECUTION_OPTIONS=frozenset(('BB_MTL_PRECISE_RESIDENCY','BB_MTL_COALESCE_BARRIER
 # PsoCache's native compatibility options. Keep concrete values, including unset
 # vs explicitly supplied values; unknown future controls are never dropped.
 COMPILE_OPTIONS=frozenset(('BB_MTL_STRICT_FLOAT','BB_MTL_RELAXED_MATH',
- 'BB_MTL_VERTEX_MATH','BB_MTL_FRAGMENT_UNIFORMS','BB_MTL_COPY_PAIR','BB_GS_DEBUG','BB_MTL_TWO_LEVEL_BDA',
+ 'BB_MTL_VERTEX_MATH','BB_MTL_RELAX_VERTEX','BB_MTL_FRAGMENT_UNIFORMS','BB_MTL_COPY_PAIR','BB_GS_DEBUG','BB_MTL_TWO_LEVEL_BDA',
  'MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES',
  'MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER'))
 
@@ -65,11 +65,12 @@ def library_product_key(request,build_id):
  Preserve native v1 entry semantics and v2 full-library semantics. Verify the
  ORIGINAL native key first; this portable product key never authorizes import.
  """
- from local_metal_builder import REQUEST_FIELDS,LIBRARY_REQUEST_FIELDS,derive_key,RECIPE,LIBRARY_RECIPE
- schema=request.get('schema');expected=REQUEST_FIELDS if type(schema)is int and schema==1 else LIBRARY_REQUEST_FIELDS if type(schema)is int and schema==2 else None
+ from local_metal_builder import REQUEST_FIELDS,LIBRARY_REQUEST_FIELDS,INVARIANT_REQUEST_FIELDS,derive_key,RECIPE,LIBRARY_RECIPE,INVARIANT_RECIPE
+ schema=request.get('schema');expected={1:REQUEST_FIELDS,2:LIBRARY_REQUEST_FIELDS,3:INVARIANT_REQUEST_FIELDS}.get(schema)if type(schema)is int else None
  if expected is None or set(request)!=expected:raise ValueError('complete supported native library request required')
- if any(not isinstance(v,str)for k,v in request.items()if k!='schema'):raise ValueError('concrete native request values required')
- if request['recipe']!=(RECIPE if schema==1 else LIBRARY_RECIPE):raise ValueError('actual native recipe required')
+ if any(not isinstance(v,str)for k,v in request.items()if k not in('schema','preserve_invariance')):raise ValueError('concrete native request values required')
+ if schema==3 and (type(request['preserve_invariance'])is not bool or not request['preserve_invariance']):raise ValueError('explicit native invariant option required')
+ if request['recipe']!={1:RECIPE,2:LIBRARY_RECIPE,3:INVARIANT_RECIPE}[schema]:raise ValueError('actual native recipe required')
  for value in(request['cohort'],request['source_sha256'],build_id):
   if not isinstance(value,str)or not HEX.fullmatch(value):raise ValueError('bounded compilation identity required')
  if derive_key(request)!=request['key']:raise ValueError('original full native key mismatch')

@@ -22,8 +22,12 @@ MAX_FILE = 16 * 1024 * 1024
 
 
 def directory(path):
-    if path.is_symlink() or not path.is_dir():
-        raise ValueError(f'Missing folder or unsupported link: {path.name}')
+    if path.is_symlink():
+        raise ValueError(f'Symbolic links are unsupported for UI file changes: {path}')
+    if not path.exists():
+        raise ValueError(f'Missing folder: {path}')
+    if not path.is_dir():
+        raise ValueError(f'Not a folder: {path}')
     return path
 
 
@@ -141,8 +145,8 @@ def game_folder(path):
     info = sfo((game / 'sce_sys/param.sfo').read_bytes())
     if info.get('TITLE_ID') not in ('CUSA00207', 'CUSA00208', 'CUSA00900', 'CUSA01363', 'CUSA03173', 'CUSA03023') or info.get('APP_VER') != '01.09':
         raise ValueError('UI installation requires a verified Bloodborne 1.09 game folder.')
-    directory(game / 'dvdroot_ps4')
-    directory(game / 'dvdroot_ps4/menu')
+    # Reading optional mod state must not require a writable, unlinked UI tree.
+    # Validate that tree only when installing or checking a managed installation.
     return game
 
 
@@ -168,9 +172,12 @@ class Installation:
         finally:
             os.close(fd)
 
-    def current(self, name):
+    def check_menu(self):
         directory(self.game / 'dvdroot_ps4')
         directory(self.menu)
+
+    def current(self, name):
+        self.check_menu()
         path = self.menu / name
         return fingerprint(read_file(path)) if path.exists() or path.is_symlink() else None
 
@@ -207,6 +214,7 @@ class Installation:
         return current
 
     def backup(self, files):
+        self.check_menu()  # Never follow a linked destination when installing files.
         existing = {p.name.casefold(): p.name for p in self.menu.iterdir()}
         generation = uuid.uuid4().hex
         backup = self.state / generation
@@ -294,7 +302,9 @@ class Installation:
         try:
             _, files = source_folder(folder)
             result['folderValid'] = True
-            result['canEnable'] = not result['needsRecovery'] and not result['enabled']
+            if not result['needsRecovery'] and not result['enabled']:
+                self.check_menu()
+                result['canEnable'] = True
             result['message'] = (f'UI fix enabled · {len(manifest["files"])} files; previous files backed up.' if result['enabled'] else
                                  f'{len(files)} valid .gfx files · ready to enable.')
         except (OSError, ValueError, KeyError, TypeError, zlib.error) as error:

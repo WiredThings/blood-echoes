@@ -23,6 +23,7 @@ class FakeRunner:
   return builder.tool_fingerprint(self.tools['xcrun']if str(path)=='/usr/bin/xcrun'else path)
  def run(self,argv,timeout,guard,**kwargs):
   guard.check(preflight=True);self.calls.append(list(argv))
+  if argv[:3]==['/usr/bin/xcrun','--sdk','macosx']:argv=[argv[0],*argv[3:]]
   if argv[:2]==['/usr/bin/xcrun','--find']:return(str(self.tools[argv[2]])+'\n').encode()
   if argv==['/usr/bin/xcrun','--version']:return b'authored xcrun 1\n'
   if argv==['/usr/bin/xcrun','--show-sdk-path']:return(str(self.sdk)+'\n').encode()
@@ -139,7 +140,7 @@ class BuilderTests(unittest.TestCase):
   self.export();original=self.runner.run
   def run(argv,*args,**kw):
    value=original(argv,*args,**kw)
-   if argv[:2]==['/usr/bin/xcrun','metallib']and '-o'in argv:
+   if argv[:4]==['/usr/bin/xcrun','--sdk','macosx','metallib']and '-o'in argv:
     (self.runner.sdk/'SDKSettings.json').write_text('{"Version":"changed during compile"}')
    return value
   self.runner.run=run;result=self.run_builder()
@@ -147,7 +148,7 @@ class BuilderTests(unittest.TestCase):
   self.assertIn('SDK changed',result['error'])
  def test_relaxed_uses_only_fixed_recipe_argv(self):
   self.export(math_mode='relaxed');result=self.run_builder();self.assertEqual(result['status'],'passed')
-  self.assertEqual(self.runner.compiles()[0][3],'-fmetal-math-mode=relaxed')
+  self.assertEqual(self.runner.compiles()[0][5],'-fmetal-math-mode=relaxed')
  def test_source_digest_mismatch_refused_before_compile(self):
   key,_=self.export();(self.requests/(key+'.metal')).write_bytes(b'changed source')
   result=self.run_builder();self.assertEqual(result['status'],'refused');self.assertFalse(self.runner.compiles())

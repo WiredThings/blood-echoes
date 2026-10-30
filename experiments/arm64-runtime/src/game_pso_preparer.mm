@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include "common/serdes.h"
 #include "shader_recompiler/specialization.h"
+#include "shader_recompiler/profile_cache_wire.h"
 #include "video_core/renderer_metal/mtl_device.h"
 #include "video_core/renderer_metal/mtl_cached_variants.h"
 #include "video_core/renderer_metal/mtl_runtime_impl.h"
@@ -216,7 +217,7 @@ int RunRecipe(const std::string&mode,const fs::path&packet,const fs::path&scratc
   if(geometry_packet)Need(!data.vertex_attributes.empty()||key.vertex_buffer_formats[0]==vk::Format::eUndefined,"geometry pipeline missing original vertex attributes");
   std::string retranslation_profile;
   if(geometry_packet){auto profile=Reference(p.at("retranslation_profile"),packet.parent_path(),total);
-   Need(profile.size()==16+sizeof(Shader::Profile)&&Word(profile,0)==0x42425043&&Word(profile,4)==10&&Word(profile,8)==7&&Word(profile,12)==5,"geometry retranslation profile ABI");
+   (void)Shader::ProfileCacheWire::Decode(profile,{0x42425043,10,7,5});
    retranslation_profile=p.at("retranslation_profile").at("sha256").get<std::string>();}
   Need(p.at("stages").size()>0&&p.at("stages").size()<=6,"stage count");
   std::vector<Stage> stages;std::array<bool,6> present{};

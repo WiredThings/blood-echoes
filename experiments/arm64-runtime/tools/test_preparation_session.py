@@ -15,6 +15,9 @@ class FixedAuthorRunner:
  def __init__(self,owner):self.o=owner
  def run(self,argv,timeout,guard,**kwargs):
   guard.check(preflight=True);self.o.commands+=1
+  if argv[0]=='/usr/bin/xcrun':
+   assert argv[:3]==['/usr/bin/xcrun','--sdk','macosx']
+   argv=[argv[0],*argv[3:]]
   if argv[0]=='/usr/bin/sw_vers':return self.o.os_build.encode()
   if argv[1]=='--find':return str(self.o.tools[argv[2]]).encode()
   if argv[1]=='--show-sdk-path':return str(self.o.sdk).encode()
@@ -122,7 +125,7 @@ class Controls(unittest.TestCase):
   original=FixedAuthorRunner.run;queries=0
   def fail_post(runner,argv,*args,**kwargs):
    nonlocal queries
-   if argv[1:] == ['--show-sdk-path']:
+   if argv[1:] == ['--sdk','macosx','--show-sdk-path']:
     queries+=1
     if queries==2:raise m.Refused('author optional SDK query failure')
    return original(runner,argv,*args,**kwargs)

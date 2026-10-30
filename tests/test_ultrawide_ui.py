@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -203,3 +204,88 @@ class UIFilesTests(unittest.TestCase):
         with self.install.locked():
             with self.assertRaisesRegex(ValueError, 'Another UI operation'):
                 self.enable()
+
+
+class OptionalUIStartupTests(unittest.TestCase):
+    setUp = UIFilesTests.setUp
+    enable = UIFilesTests.enable
+    # Use the same synthetic game/UI data; exercise helper startup, not game code.
+    def unavailable_menu(self, kind):
+        target = self.root / 'original-menu'
+        self.menu.rename(target)
+        if kind == 'linked':
+            self.menu.symlink_to(target, target_is_directory=True)
+        elif kind == 'file':
+            self.menu.write_bytes(b'not a directory')
+        elif kind == 'linked-parent':
+            parent = self.game / 'dvdroot_ps4'
+            parent.rmdir()
+            parent.symlink_to(self.root / 'outside-dvdroot', target_is_directory=True)
+        return target
+
+    def test_cli_inspection_without_mod_does_not_block_missing_menu(self):
+        self.unavailable_menu('missing')
+        result = subprocess.run([sys.executable, str(ROOT / 'scripts/ultrawide_ui.py'),
+                                 'inspect', '--game', str(self.game), '--data', str(self.data)],
+                                text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(json.loads(result.stdout)['blocksPlay'])
+        self.assertFalse(self.data.exists())
+
+    def test_linked_menu_without_managed_install_does_not_block_play(self):
+        target = self.unavailable_menu('linked')
+        fresh = ui.Installation(self.game, self.data)
+        self.assertFalse(fresh.inspect('')['blocksPlay'])
+        self.assertEqual((target / 'fe.gfx').read_bytes(), self.old)
+
+    def test_inactive_backup_does_not_block_later_linked_menu(self):
+        self.enable()
+        self.install.swap(False)
+        self.unavailable_menu('linked')
+        self.assertFalse(ui.Installation(self.game, self.data).inspect('')['blocksPlay'])
+
+    def test_missing_menu_with_active_mod_still_blocks_play(self):
+        self.enable()
+        target = self.unavailable_menu('missing')
+        status = ui.Installation(self.game, self.data).inspect('')
+        self.assertTrue(status['blocksPlay'])
+        self.assertTrue(status['canDisable'])
+        self.assertIn(str(self.menu), status['message'])
+        with self.assertRaisesRegex(ValueError, 'Missing folder'):
+            self.install.swap(False)
+        self.assertEqual((target / 'fe.gfx').read_bytes(), self.new)
+        target.rename(self.menu)
+        self.install.swap(False)
+        self.assertEqual((self.menu / 'fe.gfx').read_bytes(), self.old)
+
+    def test_linked_menu_with_active_mod_cannot_restore_through_link(self):
+        self.enable()
+        target = self.unavailable_menu('linked')
+        self.assertTrue(ui.Installation(self.game, self.data).inspect('')['blocksPlay'])
+        with self.assertRaisesRegex(ValueError, 'Symbolic links'):
+            self.install.swap(False)
+        self.assertEqual((target / 'fe.gfx').read_bytes(), self.new)
+
+    def test_unusable_menu_prevents_install_but_not_ordinary_play(self):
+        for kind, message in [('missing', 'Missing folder'), ('linked', 'Symbolic links'),
+                              ('file', 'Not a folder'), ('linked-parent', 'Symbolic links')]:
+            with self.subTest(kind=kind):
+                # Independent fixture for each destination shape.
+                fixture = UIFilesTests()
+                fixture.setUp()
+                try:
+                    OptionalUIStartupTests.unavailable_menu(fixture, kind)
+                    install = ui.Installation(fixture.game, fixture.data)
+                    status = install.inspect(str(fixture.mod))
+                    self.assertFalse(status['blocksPlay'])
+                    self.assertTrue(status['folderValid'])
+                    self.assertFalse(status['canEnable'])
+                    self.assertIn(message, status['message'])
+                    self.assertIn(str(fixture.game / 'dvdroot_ps4'), status['message'])
+                    with self.assertRaisesRegex(ValueError, message):
+                        _, files = ui.source_folder(fixture.mod)
+                        install.swap(True, files)
+                    self.assertFalse((install.state / 'current.json').exists())
+                    self.assertEqual((fixture.root / 'original-menu/fe.gfx').read_bytes(), fixture.old)
+                finally:
+                    fixture.doCleanups()

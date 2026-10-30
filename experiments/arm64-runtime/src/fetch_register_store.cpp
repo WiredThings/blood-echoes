@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "fetch_register_store.h"
+#include "module_profile_feature_flags.h"
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
@@ -42,8 +43,10 @@ void ValidateExpected(const Expected&e){
  for(size_t i=0;i<e.attributes.size();++i){const auto&a=e.attributes[i].fields;
   Need(a[0]==i&&a[2]>=1&&a[2]<=4&&a[3]<=14&&a[3]%2==0&&a[5]<=3,"fetch attribute fields");
  }
- // Canonical Profile: six u32 fields, one u64, then every current boolean field.
- for(size_t i=32;i<e.profile.size();++i)Need(e.profile[i]<=1,"profile boolean representation");
+ // Canonical Profile: scalar prefix, strict booleans, then the named feature
+ // flags byte. Never treat new values 2/3 as an ordinary bool.
+ for(size_t i=32;i+1<e.profile.size();++i)Need(e.profile[i]<=1,"profile boolean representation");
+ Need((e.profile.back()&~ProfileBdaFeatureMask)==0,"unknown Profile feature bit");
 }
 void PutExpected(Writer&w,const Expected&e){
  ValidateExpected(e);for(auto*d:{&e.environment.game,&e.environment.compiler,&e.environment.abi,&e.environment.compile_inputs})w.Bytes(*d);

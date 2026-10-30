@@ -32,7 +32,9 @@ Shader::RuntimeInfo DecodeRuntime(std::span<const std::byte>bytes){
 Shader::Profile DecodeProfile(std::span<const uint8_t>bytes){
  RequireSnapshot(bytes.size()==BbFetchStore::ProfileBytes,"canonical Profile extent");Shader::Profile p;Reader r{std::as_bytes(bytes)};
  p.max_viewport_width=r.U32();p.max_viewport_height=r.U32();p.max_shared_memory_size=r.U32();p.supported_spirv=r.U32();p.subgroup_size=r.U32();p.sparse_page_shift=r.U32();uint64_t hash=0;for(unsigned i=0;i<8;++i)hash|=uint64_t(r.U8())<<(i*8);p.buffer_copy_shader_hash=hash;
-#define MODULE_PROFILE_BOOL_FIELD(field) p.field=r.Bool();
+#define MODULE_PROFILE_BOOL_FIELD(field) \
+ if constexpr(std::string_view(#field)=="two_level_bda")BbFetchStore::DecodeProfileBdaFeatures(r.U8(),p); \
+ else p.field=r.Bool();
 #include "module_profile_bool_fields.inc"
 #undef MODULE_PROFILE_BOOL_FIELD
  RequireSnapshot(r.at==bytes.size(),"canonical Profile field count");return p;

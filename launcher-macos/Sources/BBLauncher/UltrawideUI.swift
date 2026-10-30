@@ -12,7 +12,7 @@ struct UIModStatus: Decodable, Equatable {
     var message = L10n.key("Choose the extracted UI mod folder (optional).")
 
     var check: Check {
-        Check(level: blocksPlay ? .error : (folderValid ? .ok : .warning), message: message)
+        Check(level: blocksPlay ? .error : (folderValid && (canEnable || enabled) ? .ok : .warning), message: message)
     }
 }
 

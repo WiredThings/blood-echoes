@@ -19,6 +19,13 @@ final class UIModTests: XCTestCase {
         XCTAssertEqual(accepted.check.level, .error)
     }
 
+    func testAcceptedPackWithUnsupportedDestinationIsOnlyAWarning() {
+        let status = UIModStatus(folderValid: true, canEnable: false, blocksPlay: false,
+                                 message: "Missing folder: /game/dvdroot_ps4/menu")
+        XCTAssertEqual(status.check.level, .warning)
+        XCTAssertTrue(status.check.allowsPlay)
+    }
+
     func testHelperUsesLiteralPathsAndReportsValidationErrors() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

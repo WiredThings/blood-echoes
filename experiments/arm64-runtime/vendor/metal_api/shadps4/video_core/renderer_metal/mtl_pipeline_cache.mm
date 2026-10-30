@@ -125,6 +125,7 @@ Shader::Profile MakeShaderProfile(Device& device, const VideoCore::BackendLimits
         // profile, so the disk cache of those rules never meets a strict one.
         .relaxed_fragment_compute_float = ReadFloatRules() != FloatRules::Strict,
         .two_level_bda = limits.two_level_bda,
+        .relaxed_vertex_float = ReadRelaxedVertex(),
     };
 }
 
@@ -189,6 +190,23 @@ bool GraphicsSerialization::Deserialize(Serialization::Archive& ar) {
     return true;
 }
 
+static const char* CoreCacheTag(const VideoCore::BackendLimits& limits) {
+    if (limits.two_level_bda) {
+        if (ReadFloatRules() == FloatRules::Strict) return BB_MTL_HOST_NAMESPACE("metal-pt2-img2d-v2");
+        return ReadRelaxedVertex() ? BB_MTL_HOST_NAMESPACE("metal-relaxed-pt2-img2d-v2-vsinv1")
+                                   : BB_MTL_HOST_NAMESPACE("metal-relaxed-pt2-img2d-v2");
+    }
+    if (ReadFloatRules() == FloatRules::Strict) return BB_MTL_HOST_NAMESPACE("metal-flat2-img2d-v2");
+    return ReadRelaxedVertex() ? BB_MTL_HOST_NAMESPACE("metal-relaxed-flat2-img2d-v2-vsinv1")
+                               : BB_MTL_HOST_NAMESPACE("metal-relaxed-flat2-img2d-v2");
+}
+
+static std::filesystem::path VertexPsoCacheDir(std::filesystem::path dir) {
+    if (!ReadRelaxedVertex()) return dir;
+    if (dir.empty()) dir = ShaderCompiler::DefaultCacheDir();
+    return dir / "vertex-invariant-v1";
+}
+
 PipelineCache::PipelineCache(Device& device_, const VideoCore::BackendLimits& limits,
                              AmdGpu::Liverpool* liverpool_, u32 sparse_page_shift,
                              std::filesystem::path msl_cache_dir, Runtime* host_runtime_)
@@ -197,13 +215,12 @@ PipelineCache::PipelineCache(Device& device_, const VideoCore::BackendLimits& li
                         // 1D lowering changes SPIR-V image types. Preserve old core archives
                         // in their namespace; content-hashed MSL remains reusable.
                         // BDA V1 and V2 share SPIR-V; V0 remains separate.
-                        limits.two_level_bda
-                            ? (ReadFloatRules()==FloatRules::Strict?BB_MTL_HOST_NAMESPACE("metal-pt2-img2d-v2"):BB_MTL_HOST_NAMESPACE("metal-relaxed-pt2-img2d-v2"))
-                            : (ReadFloatRules()==FloatRules::Strict?BB_MTL_HOST_NAMESPACE("metal-flat2-img2d-v2"):BB_MTL_HOST_NAMESPACE("metal-relaxed-flat2-img2d-v2"))},
+                        CoreCacheTag(limits)},
       host_runtime{host_runtime_}, device{device_}, compiler{device_, msl_cache_dir, ReadFloatRules()},
-      pso_cache{device_, msl_cache_dir, ReadFloatRules() == FloatRules::RelaxedMath},
+      pso_cache{device_, VertexPsoCacheDir(msl_cache_dir), ReadFloatRules() == FloatRules::RelaxedMath},
       pass_through{device_} {
-    std::printf("GPU: Metal float rules %s\n", FloatRulesName(ReadFloatRules()));
+    std::printf("GPU: Metal float rules %s%s\n", FloatRulesName(ReadFloatRules()),
+                ReadRelaxedVertex() ? " + experimental invariant vertex" : "");
     bool host_bound=false;
     if(host_runtime){host_runtime->BindHostPsoCache(&pso_cache);host_bound=true;}
     bool construction_complete=false;

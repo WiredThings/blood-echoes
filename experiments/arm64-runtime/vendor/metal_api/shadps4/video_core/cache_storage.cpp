@@ -11,6 +11,7 @@
 
 #include <miniz.h>
 
+#include <atomic>
 #include <condition_variable>
 #include <functional>
 #include <future>
@@ -20,7 +21,7 @@
 namespace {
 
 std::mutex submit_mutex{};
-u32 num_requests{};
+std::atomic<u32> num_requests{};
 std::condition_variable_any request_cv{};
 std::queue<std::packaged_task<void()>> req_queue{};
 std::mutex m_request{};
@@ -46,7 +47,7 @@ void ProcessIO(const std::stop_token& stoken) {
     while (!stoken.stop_requested()) {
         {
             std::unique_lock lk{submit_mutex};
-            Common::CondvarWait(request_cv, lk, stoken, [&] { return num_requests; });
+            Common::CondvarWait(request_cv, lk, stoken, [&] { return num_requests.load() != 0; });
         }
 
         if (stoken.stop_requested()) {

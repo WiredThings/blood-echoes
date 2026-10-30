@@ -100,6 +100,9 @@ const char* FloatRulesName(FloatRules rules);
 /// BB_MTL_STRICT_FLOAT (1: V0, 0: V1 or V2) and BB_MTL_RELAXED_MATH (0: V1, 1: V2); read once.
 /// Default V1.
 FloatRules ReadFloatRules();
+/// Experimental BB_MTL_RELAX_VERTEX=1, ignored under Strict float rules. Off by
+/// default until game pixels/depth/velocity have been accepted on this backend.
+bool ReadRelaxedVertex();
 
 /// How a stage is compiled. Plain is the direct pipeline (vertex function, fragment function,
 /// compute kernel); the others are the stages of a tessellated draw, the way MoltenVK builds them

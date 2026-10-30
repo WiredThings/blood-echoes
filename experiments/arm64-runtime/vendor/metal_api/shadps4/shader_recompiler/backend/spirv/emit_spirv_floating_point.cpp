@@ -3,6 +3,7 @@
 
 #include "shader_recompiler/backend/spirv/emit_spirv_instructions.h"
 #include "shader_recompiler/backend/spirv/spirv_emit_context.h"
+#include "shader_recompiler/vertex_float_rules.h"
 
 namespace Shader::Backend::SPIRV {
 
@@ -13,6 +14,9 @@ namespace Shader::Backend::SPIRV {
 static bool KeepsStrictFloat(const EmitContext& ctx) {
     if (!ctx.profile.relaxed_fragment_compute_float) {
         return true;
+    }
+    if (UsesInvariantVertexFloat(ctx.profile, ctx.sw_stage, ctx.hw_stage)) {
+        return false;
     }
     return !(ctx.sw_stage == SwStage::Compute ||
              (ctx.sw_stage == SwStage::Fragment && !ctx.info.stores.GetAny(IR::Attribute::Depth)));

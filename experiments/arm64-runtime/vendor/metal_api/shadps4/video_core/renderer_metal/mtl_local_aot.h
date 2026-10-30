@@ -23,16 +23,18 @@
 namespace Metal::LocalAot {
 inline constexpr size_t MaxSource=1024*1024,MaxLibrary=32*1024*1024;
 inline constexpr const char* Recipe="bb-metal-local-aot-v1";
+inline constexpr const char* InvariantRecipe="bb-metal-local-aot-invariant-v1";
 inline bool Hex(std::string_view s){if(s.size()!=64)return false;for(char c:s)if(!((c>='0'&&c<='9')||(c>='a'&&c<='f')))return false;return true;}
 inline std::string Sha(const void* bytes,size_t size){
  unsigned char out[CC_SHA256_DIGEST_LENGTH];CC_SHA256(bytes,static_cast<CC_LONG>(size),out);
  constexpr char h[]="0123456789abcdef";std::string result;result.reserve(64);
  for(auto b:out){result+=h[b>>4];result+=h[b&15];}return result;
 }
-inline std::string Key(std::string_view cohort,std::string_view sha,std::string_view entry,bool relaxed){
- std::string value;for(auto field:std::array<std::string_view,7>{Recipe,cohort,sha,entry,"metal3.1",relaxed?"relaxed":"safe","fast"}){
+inline std::string Key(std::string_view cohort,std::string_view sha,std::string_view entry,bool relaxed,bool preserve_invariance=false){
+ std::string value;for(auto field:std::array<std::string_view,7>{preserve_invariance?InvariantRecipe:Recipe,cohort,sha,entry,"metal3.1",relaxed?"relaxed":"safe","fast"}){
   value+=std::to_string(field.size());value+=':';value+=field;
- }return Sha(value.data(),value.size());
+ }if(preserve_invariance){constexpr std::string_view flag="preserve-invariance=1";value+=std::to_string(flag.size());value+=':';value+=flag;}
+ return Sha(value.data(),value.size());
 }
 inline bool Child(const std::filesystem::path& child,const std::filesystem::path& parent){
  auto rel=child.lexically_relative(parent);return !rel.empty()&&rel!="."&&!rel.is_absolute()&&*rel.begin()!="..";
@@ -95,7 +97,7 @@ struct Result{ id<MTLLibrary> library{};id<MTLFunction> function{};std::string k
  // Successful loaded-byte provenance; populated from the same pinned data already verified.
  std::string source_sha256,cohort,build_id,library_sha256;
 };
-inline Result Try(id<MTLDevice> device,const std::string& source,const std::string& entry,bool relaxed,bool allow_record=false,bool allow_lookup=true,id<MTLFunction> accepted_function=nil){
+inline Result Try(id<MTLDevice> device,const std::string& source,const std::string& entry,bool relaxed,bool allow_record=false,bool allow_lookup=true,id<MTLFunction> accepted_function=nil,bool preserve_invariance=false){
  const char* mode_env=std::getenv("BB_MTL_LOCAL_AOT_MODE");
  if(!mode_env)return {};
  std::string_view mode=mode_env;if(mode!="record"&&mode!="load")return {};
@@ -104,13 +106,17 @@ inline Result Try(id<MTLDevice> device,const std::string& source,const std::stri
  if(source.empty()||source.size()>MaxSource||source.find('\0')!=std::string::npos||entry.empty()||entry.size()>256||entry.find('\0')!=std::string::npos){result.reason="source-budget";return result;}
  std::filesystem::path root=root_env,gpu=gpu_env;std::error_code ec;
  if(!root.is_absolute()||!gpu.is_absolute()||!Directory(gpu,false)||!Directory(root,false)||!Child(root,gpu)){result.reason="private-root";return result;}
- std::string cohort=cohort_env;const auto source_sha=Sha(source.data(),source.size());result.key=Key(cohort,source_sha,entry,relaxed);
+ std::string cohort=cohort_env;const auto source_sha=Sha(source.data(),source.size());result.key=Key(cohort,source_sha,entry,relaxed,preserve_invariance);
  result.source_sha256=source_sha;result.cohort=cohort;
  auto folder=root/cohort;auto requests=folder/"requests";
  const auto options=[&](NSDictionary* json){
-  return Integer(json,@"schema",1)&&
+  id invariant=json[@"preserve_invariance"];
+  const bool invariant_matches=preserve_invariance
+      ? invariant&&CFGetTypeID((__bridge CFTypeRef)invariant)==CFBooleanGetTypeID()&&[(NSNumber*)invariant boolValue]
+      : invariant==nil;
+  return invariant_matches&&Integer(json,@"schema",preserve_invariance?3:1)&&
    String(json,@"key",result.key)&&String(json,@"cohort",cohort)&&String(json,@"source_sha256",source_sha)&&String(json,@"entry",entry)&&
-   String(json,@"language","metal3.1")&&String(json,@"math_mode",relaxed?"relaxed":"safe")&&String(json,@"math_fp32","fast")&&String(json,@"recipe",Recipe);
+   String(json,@"language","metal3.1")&&String(json,@"math_mode",relaxed?"relaxed":"safe")&&String(json,@"math_fp32","fast")&&String(json,@"recipe",preserve_invariance?InvariantRecipe:Recipe);
  };
  if(mode=="load"&&allow_lookup){
   const char* build_env=std::getenv("BB_MTL_LOCAL_AOT_BUILD_ID");
@@ -141,7 +147,8 @@ inline Result Try(id<MTLDevice> device,const std::string& source,const std::stri
  // cannot become a supposedly preparable request. OFF still returned above any IO.
  if(!accepted_function||![accepted_function.name isEqualToString:[NSString stringWithUTF8String:entry.c_str()]]){result.reason+="/unvalidated-entry";return result;}
  if(!RequestShard(folder,result.key,requests)){result.reason+="/request-directory";return result;}
- NSDictionary* metadata=@{@"schema":@1,@"key":@(result.key.c_str()),@"cohort":@(cohort.c_str()),@"source_sha256":@(source_sha.c_str()),@"entry":@(entry.c_str()),@"language":@"metal3.1",@"math_mode":relaxed?@"relaxed":@"safe",@"math_fp32":@"fast",@"recipe":@(Recipe)};
+ NSMutableDictionary* metadata=[@{@"schema":@(preserve_invariance?3:1),@"key":@(result.key.c_str()),@"cohort":@(cohort.c_str()),@"source_sha256":@(source_sha.c_str()),@"entry":@(entry.c_str()),@"language":@"metal3.1",@"math_mode":relaxed?@"relaxed":@"safe",@"math_fp32":@"fast",@"recipe":@(preserve_invariance?InvariantRecipe:Recipe)} mutableCopy];
+ if(preserve_invariance)metadata[@"preserve_invariance"]=@YES;
  NSData* encoded=[NSJSONSerialization dataWithJSONObject:metadata options:NSJSONWritingSortedKeys error:nil];
  auto source_path=requests/(result.key+".metal");auto manifest_path=requests/(result.key+".json");
  if(!Publish(source_path,[NSData dataWithBytes:source.data() length:source.size()]))return result;

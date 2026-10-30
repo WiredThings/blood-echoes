@@ -9,6 +9,7 @@
 #include "core/emulator_settings.h"
 #include "shader_recompiler/frontend/fetch_shader.h"
 #include "shader_recompiler/info.h"
+#include "shader_recompiler/profile_cache_wire.h"
 #include "video_core/cache_storage.h"
 #include "video_core/pipeline_cache_core.h"
 #if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
@@ -342,13 +343,9 @@ void PipelineCacheCore::WarmUp() {
     constexpr std::array<u32, 4> cache_versions{0x42425043u, Serialization::ShaderBinaryVersion,
                                                Serialization::ShaderMetaVersion,
                                                Serialization::PipelineKeyVersion};
-    constexpr size_t header_size = sizeof(cache_versions);
     const auto save_profile = [&] {
-        std::vector<u8> current(header_size + sizeof(profile));
-        std::memcpy(current.data(), cache_versions.data(), header_size);
-        std::memcpy(current.data() + header_size, &profile, sizeof(profile));
         Storage::DataBase::Instance().Save(Storage::BlobType::ShaderProfile, "profile",
-                                           std::move(current));
+                                           Shader::ProfileCacheWire::Encode(profile, cache_versions));
     };
     // Check both compiler/cache versions and the device profile.
     std::vector<u8> profile_data{};
@@ -361,18 +358,16 @@ void PipelineCacheCore::WarmUp() {
         save_profile();
         return;
     }
-    // bbport: Shader::Profile gained a trailing field (relaxed_fragment_compute_float). A
-    // profile.bin written without it is the same profile with the field clear: it keeps the
-    // cache of every strict (Vulkan, Metal V0) run and never matches a relaxed profile.
-    constexpr size_t old_profile_size = offsetof(Shader::Profile, relaxed_fragment_compute_float);
-    const bool old_layout = profile_data.size() == header_size + old_profile_size;
-    const bool versions_match =
-        (profile_data.size() == header_size + sizeof(Shader::Profile) || old_layout) &&
-        std::memcmp(profile_data.data(), cache_versions.data(), header_size) == 0;
+    // The old 80-byte Profile had no invariant bool: byte74 was unspecified
+    // padding. Only an explicit feature envelope can declare the new member.
+    // Decode legacy named fields without interpreting that padding as true.
+    bool versions_match = false;
     Shader::Profile cached_profile{};
-    if (versions_match) {
-        std::memcpy(&cached_profile, profile_data.data() + header_size,
-                    old_layout ? old_profile_size : sizeof(cached_profile));
+    try {
+        cached_profile = Shader::ProfileCacheWire::Decode(profile_data, cache_versions).profile;
+        versions_match = true;
+    } catch (const std::exception& e) {
+        LOG_WARNING(Render, "Pipeline cache Profile rejected ({})", e.what());
     }
     if (!versions_match || cached_profile != profile) {
         // bbport: upstream closed the cache for the session here, so it was never rewritten
@@ -384,9 +379,7 @@ void PipelineCacheCore::WarmUp() {
         save_profile();
         return;
     }
-    if (old_layout) {
-        save_profile();
-    }
+    // A compatible legacy profile needs no in-place rewrite or cache clear.
 
     u32 num_pipelines{};
     u32 num_total_pipelines{};
