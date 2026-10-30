@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+"CPU backend" = "CPU backend";
+"bbcpu · Static recompilation" = "bbcpu · Static recompilation";
+"Applies on the next launch. bbcpu prepares static code locally." = "Applies on the next launch. bbcpu prepares static code locally.";
+"The selected CPU backend is not included in this build." = "The selected CPU backend is not included in this build.";
 "%@  ·  Remap" = "%@  ·  Remap";
 "%@ (not connected)" = "%@ (not connected)";
 "%@ has no tools/macos/run.sh: set the repository in Settings" = "%@ has no tools/macos/run.sh: set the repository in Settings";

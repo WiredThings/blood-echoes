@@ -132,7 +132,7 @@ func checkRepository(_ url: URL?) -> Check {
 }
 
 /// The launcher must never silently fall back to the old in-process renderer.
-func checkOptimizedEngine(_ repo: URL?, packaged: Bool, renderer: String = "vulkan", rosettaAvailable: Bool? = nil) -> Check {
+func checkOptimizedEngine(_ repo: URL?, packaged: Bool, renderer: String = "vulkan", rosettaAvailable: Bool? = nil, cpuBackend: CPUBackend = .fex) -> Check {
     guard let repo, isRepository(repo), isFile(repo.appendingPathComponent("tools/macos/run_optimized.sh")) else {
         return Check(level: .error, message: L10n.key("Choose the optimized source checkout in Settings."))
     }
@@ -140,6 +140,9 @@ func checkOptimizedEngine(_ repo: URL?, packaged: Bool, renderer: String = "vulk
             ? repo : repo.appendingPathComponent("out/native-05-checkout").resolvingSymlinksInPath()
     let bin = native.appendingPathComponent(packaged ? "bin" : "out")
     let runtime = LauncherRuntime.load(from: repo)
+    if cpuBackend == .bbcpu && (!packaged || !runtime.cpuBackends.contains(.bbcpu)) {
+        return Check(level: .error, message: L10n.key("The selected CPU backend is not included in this build."))
+    }
     if !runtime.supports(renderer: renderer) {
         return Check(level: .error, message: L10n.key("This ARM64 runtime currently supports Metal only."))
     }
@@ -162,7 +165,10 @@ func checkOptimizedEngine(_ repo: URL?, packaged: Bool, renderer: String = "vulk
         if !FileManager.default.isExecutableFile(atPath: repo.appendingPathComponent("python/bin/python3").path) {
             return Check(level: .error, message: L10n.key("The app is incomplete: its bundled runtime is missing."))
         }
-        if runtime.isFexArm64 {
+        if runtime.isNativeArm64 {
+            if cpuBackend == .bbcpu && !hasBbcpuExecutionRole(repo) {
+                return Check(level: .error, message: L10n.key("The selected CPU backend is not included in this build."))
+            }
             // Metadata alone cannot remove an architecture prerequisite. Confirm
             // the declared native entry/host and mandatory independent renderer.
             for (path, kind) in [("bb-probe-metal", UInt32(2)), ("gpu-metal/libbbgpu.dylib", 6),
@@ -192,6 +198,23 @@ func checkOptimizedEngine(_ repo: URL?, packaged: Bool, renderer: String = "vulk
 
 /// Cheap UI preflight only; the existing signed runtime/component admission still
 /// verifies full artifacts and actual load edges before executing them.
+private func hasBbcpuExecutionRole(_ root: URL) -> Bool {
+    // UI preflight only. The launcher hook still authenticates the complete
+    // role/dependency/source closure before preparation or exec.
+    guard let data = try? Data(contentsOf: root.appendingPathComponent("BBCPU-COMPONENT.json")),
+          let doc = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          doc["schema"] as? Int == 1, doc["backend"] as? String == "bbcpu",
+          doc["development_only"] as? Bool == true,
+          let cpu = doc["cpu"] as? [String: String], let path = cpu["path"],
+          !path.hasPrefix("/"), !path.split(separator: "/").contains("..") else { return false }
+    let base = root.resolvingSymlinksInPath().standardizedFileURL
+    let executable = base.appendingPathComponent(path).standardizedFileURL
+    guard executable.path.hasPrefix(base.path + "/"),
+          executable == executable.resolvingSymlinksInPath(),
+          FileManager.default.isExecutableFile(atPath: executable.path) else { return false }
+    return isThinARM64MachO(executable, kind: 2)
+}
+
 private func isThinARM64MachO(_ url: URL, kind: UInt32) -> Bool {
     if kind == 2 && !FileManager.default.isExecutableFile(atPath: url.path) { return false }
     guard let file = try? FileHandle(forReadingFrom: url) else { return false }

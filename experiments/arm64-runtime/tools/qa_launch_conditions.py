@@ -111,6 +111,39 @@ class ConfigSnapshot:
     sha256: str
 
 
+def _source_qa_proof(reader,stage,project,manifest,parity,original,effective,identities):
+    """Current normal source payload + independent CPU, not a fake old QA stage."""
+    source_app=canonical(manifest['source_app'],directory=True,within=project/'evidence')
+    source=canonical(source_app/'Contents/Resources/bbport',directory=True,within=source_app)
+    source_info=plistlib.loads(reader.read(source_app/'Contents/Info.plist'))
+    need(source_info.get('CFBundleIdentifier')=='io.github.bbport.optimized','original source-built bundle identity required')
+    native=reader.json(source/'NATIVE-METAL.json');source_parity=reader.json(source/'SOURCE-PARITY.json')
+    need(native.get('schema')==1 and native.get('production')is True and native.get('game_runtime')=='fex-arm64','original normal source runtime required')
+    base=native.get('frozen_runtime');base_roles=RUNTIME_FILES|{'bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal'}
+    need(isinstance(base,dict)and set(base)==base_roles and base==manifest.get('original_current_runtime'),'exact current source runtime roles required')
+    for name,digest in base.items():
+        reader.read(canonical(source/name,within=source),expected=digest,retain=False,limit=64*1024*1024)
+        reader.read(canonical(stage/name,within=stage),expected=digest,retain=False,limit=64*1024*1024)
+    need(source_parity.get('original_sources')==original,'source-built original script identities differ')
+    from prepare_local_aot_stage import projected_launcher_scripts
+    source_run=reader.read(source/'run.sh').decode();source_log=reader.read(source/'tools/macos/run_optimized.sh').decode()
+    old_run,new_run,old_log,new_log,_=projected_launcher_scripts(source_run,source_log)
+    bodies={name:reader.read(source/name)for name in original}
+    bodies.update({'run.sh':old_run.encode(),'tools/macos/run_optimized.sh':old_log.encode()})
+    need(all(hashlib.sha256(raw).hexdigest()==original[name]for name,raw in bodies.items()),'source script original projection differs')
+    need(reader.read(stage/'run.sh')==new_run.encode()and reader.read(stage/'tools/macos/run_optimized.sh')==new_log.encode(),'source QA launcher projection changed')
+    for name,digest in effective.items():reader.read(stage/name,expected=digest,retain=False)
+    need(all(identities[name]==effective[name]for name in('run.sh','tools/macos/run_optimized.sh')),'source receipt/effective script identities differ')
+    need(parity.get('image_preparation_reuse')is True and parity.get('previous_stage_read')is False and parity.get('source_repository_modified')is False,'source-closure projection proof required')
+    from bbcpu_launch import component
+    cpu,paths=component(stage)
+    reader.json(stage/'BBCPU-COMPONENT.json')
+    expected=dict(base);expected.update({row['path']:row['sha256']for key,row in cpu.items()if key in('cpu','preparer','scanner','generator','abi')});expected.update(cpu.get('runtime_dependencies',{}))
+    selected=reader.json(stage/'NATIVE-METAL.json')
+    need(selected.get('frozen_runtime')==manifest.get('frozen_runtime')==expected,'independent CPU/native package roles differ')
+    for name,digest in expected.items():reader.read(canonical(stage/name,within=stage),expected=digest,retain=False,limit=64*1024*1024)
+    return frozenset(expected)
+
 def load(path, *, stage, project):
     """Return verified original env and immutable source config bytes.
 
@@ -210,26 +243,32 @@ def load(path, *, stage, project):
     need(isinstance(original, dict) and isinstance(effective, dict) and set(original) == set(effective) == SCRIPTS and
          original == manifest.get('original_scripts') and effective == manifest.get('effective_scripts'), 'source/effective script provenance mismatch')
     need(all(isinstance(v, str) and HEX.fullmatch(v) for mapping in (original, effective) for v in mapping.values()), 'script identity format')
-    need({k for k in original if original[k] != effective[k]} == {'run.sh', 'tools/macos/run_optimized.sh'} and
-         parity.get('final_exec_hook_only') is True and parity.get('runtime_log_only_correction') is True and
-         parity.get('previous_stage_modified') is False, 'controlled two-script delta required')
-    baseline = canonical(project / 'launcher-component-stage', directory=True)
-    need(parity.get('previous_stage') == str(baseline), 'original source stage mismatch')
-    baseline_parity = reader.json(baseline / 'SOURCE-PARITY.json')
-    need(baseline_parity.get('original_sources') == original, 'original baseline identity mismatch')
-    original_bodies = {name: reader.read(baseline / name, expected=identity) for name, identity in original.items()}
-    for name, identity in effective.items():
-        reader.read(stage / name, expected=identity, retain=False)
-    need(all(identities[name] == effective[name] for name in ('run.sh', 'tools/macos/run_optimized.sh')), 'receipt/effective script mismatch')
-    from prepare_local_aot_stage import HOOK, runtime_log_revision
-    new_run = reader.read(stage / 'run.sh')
-    need(new_run.count(HOOK.encode()) == 1 and new_run.replace(HOOK.encode(), b'', 1) == original_bodies['run.sh'], 'run.sh changed beyond original final-exec hook')
-    log_name = 'tools/macos/run_optimized.sh'
-    need(reader.read(stage / log_name).decode() == runtime_log_revision(original_bodies[log_name].decode()), 'run_optimized changed beyond original FEX log correction')
+    if manifest.get('kind')!='source-built-independent-cpu-qa':
+        need({k for k in original if original[k] != effective[k]} == {'run.sh', 'tools/macos/run_optimized.sh'} and
+             parity.get('final_exec_hook_only') is True and parity.get('runtime_log_only_correction') is True and
+             parity.get('previous_stage_modified') is False, 'controlled two-script delta required')
+    source_built=manifest.get('kind')=='source-built-independent-cpu-qa'
+    runtime_roles=RUNTIME_FILES
+    if source_built:
+        runtime_roles=_source_qa_proof(reader,stage,project,manifest,parity,original,effective,identities)
+    else:
+        baseline = canonical(project / 'launcher-component-stage', directory=True)
+        need(parity.get('previous_stage') == str(baseline), 'original source stage mismatch')
+        baseline_parity = reader.json(baseline / 'SOURCE-PARITY.json')
+        need(baseline_parity.get('original_sources') == original, 'original baseline identity mismatch')
+        original_bodies = {name: reader.read(baseline / name, expected=identity) for name, identity in original.items()}
+        for name, identity in effective.items():
+            reader.read(stage / name, expected=identity, retain=False)
+        need(all(identities[name] == effective[name] for name in ('run.sh', 'tools/macos/run_optimized.sh')), 'receipt/effective script mismatch')
+        from prepare_local_aot_stage import HOOK, runtime_log_revision
+        new_run = reader.read(stage / 'run.sh')
+        need(new_run.count(HOOK.encode()) == 1 and new_run.replace(HOOK.encode(), b'', 1) == original_bodies['run.sh'], 'run.sh changed beyond original final-exec hook')
+        log_name = 'tools/macos/run_optimized.sh'
+        need(reader.read(stage / log_name).decode() == runtime_log_revision(original_bodies[log_name].decode()), 'run_optimized changed beyond original FEX log correction')
     # Identity of actual binaries/load edges remains the existing native verifier;
     # expose only the exact packaged paths/declared hashes for that next boundary.
     runtime = manifest.get('frozen_runtime')
-    need(isinstance(runtime, dict) and set(runtime) == RUNTIME_FILES and all(isinstance(k, str) and not Path(k).is_absolute() and
+    need(isinstance(runtime, dict) and set(runtime) == runtime_roles and all(isinstance(k, str) and not Path(k).is_absolute() and
          '..' not in Path(k).parts and str(Path(k)) == k and isinstance(v, str) and HEX.fullmatch(v)
          for k, v in runtime.items()), 'frozen runtime path/identity domain')
     need(case.get('cpu_sha256') == runtime.get('bin/bb-probe-metal'), 'final CPU manifest identity mismatch')

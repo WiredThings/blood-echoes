@@ -477,6 +477,16 @@ struct DisplaySection: View {
 
     var body: some View {
         Section {
+            if model.runtimeCapabilities.cpuBackends.count > 1 ||
+               (model.runtimeCapabilities.isNativeArm64 && !model.runtimeCapabilities.cpuBackends.contains(model.prefs.cpuBackend)) {
+                Picker(L10n.key("CPU backend"), selection: $model.prefs.cpuBackend) {
+                    ForEach(model.runtimeCapabilities.cpuBackends, id: \.self) { backend in
+                        Text(L10n.key(backend.label)).tag(backend)
+                    }
+                }
+                Text(L10n.key("Applies on the next launch. bbcpu prepares static code locally."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Picker(L10n.key("Renderer backend"), selection: $model.prefs.renderer) {
                 ForEach(Catalog.renderers) {
                     Text(L10n.key($0.label)).tag($0.value)
@@ -484,7 +494,7 @@ struct DisplaySection: View {
                 }
             }
             .onChange(of: model.prefs.renderer) { _ in model.normalizeRendererSettings() }
-            if model.runtimeCapabilities.isFexArm64 {
+            if model.runtimeCapabilities.isNativeArm64 {
                 Text(L10n.key("This ARM64 runtime currently supports Metal only."))
                     .font(.caption).foregroundStyle(.secondary)
             }

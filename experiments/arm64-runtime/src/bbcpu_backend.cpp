@@ -36,6 +36,15 @@ BbcpuBackend::BbcpuBackend(Core::GuestCpu::HleCallService& value,HleSiteValidato
   bbcpu_set_guest_code_query(Query);
   bbcpu_set_guest_code_span_query(QuerySpan);
   bbcpu_set_host_call_validator([](uintptr_t){return 0;});
+  // The shared runtime denies remap/protect of its owned image/stubs; menu
+  // detours are finalized before this owner is installed and effect code
+  // changes apply after restart. No current HLE imports this CPU-only API.
+  // Do not pretend upstream's decoded-only unlink also invalidates native
+  // direct links or static slots. A new live-code caller needs that work first.
+  bbcpu_set_invalidation_handler([](uintptr_t address,size_t bytes){
+   std::fprintf(stderr,"STOP: bbcpu: live code invalidation is not admitted by immutable execution contract address=%#lx bytes=%zu\n",address,bytes);
+   std::_Exit(BB_ARM_EXIT_HLE_FAULT);
+  });
   bbcpu_set_fatal_handler([](const char*,uint64_t){std::_Exit(BB_ARM_EXIT_HLE_FAULT);});
   bbcpu_set_syscall_handler([](BbGuestRegs* regs){return Syscall(regs);});
   installed=true;

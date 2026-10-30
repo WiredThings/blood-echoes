@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+"CPU backend" = "CPU 后端";
+"bbcpu · Static recompilation" = "bbcpu · 静态重编译";
+"Applies on the next launch. bbcpu prepares static code locally." = "下次启动生效。bbcpu 会先在本机准备静态代码库。";
+"The selected CPU backend is not included in this build." = "当前程序包未包含所选 CPU 后端。";
 "%@  ·  Remap" = "%@  ·  修改";
 "%@ (not connected)" = "%@（未连接）";
 "%@ has no tools/macos/run.sh: set the repository in Settings" = "%@ 中没有 tools/macos/run.sh，请在设置中指定源码目录。";

@@ -376,6 +376,15 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
         env, diagnostic = texture_diagnostic(env)
         if diagnostic is not None:
             print('Texture binding capture: '+json.dumps(diagnostic,sort_keys=True),flush=True)
+    selected_cpu=env.get('BB_CPU_BACKEND','fex')
+    if selected_cpu not in('fex','bbcpu'):raise ValueError('unsupported selected CPU backend')
+    if selected_cpu=='bbcpu':
+        # All original image/resource/Metal/save/restart preparation stays
+        # above. Admit the independent CPU execution role only at exec; no FEX
+        # execution library is loaded by this path or used as its fallback.
+        from bbcpu_launch import prepare as prepare_cpu
+        executable,env,cpu_report=prepare_cpu(executable,arguments,env,stage=execution_root,project=project)
+        print('CPU local preparation: '+json.dumps(cpu_report,sort_keys=True),flush=True)
     os.execve(executable, [executable, *arguments], env)
 
 

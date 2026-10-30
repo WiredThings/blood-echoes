@@ -2136,6 +2136,15 @@ static int snippets(const char *encodings, const char *path) {
 }
 
 int main(int argc, char **argv) {
+    if (argc == 2 && !strcmp(argv[1], "--abi-identity")) {
+#ifdef BBCPU_ABI_IDENTITY
+        puts(BBCPU_ABI_IDENTITY);
+        return 0;
+#else
+        fputs("generator lacks the compiled Blood Echoes CPU contract\n", stderr);
+        return 1;
+#endif
+    }
     if (argc == 2 && !strcmp(argv[1], "--api")) {
         printf("%u\n", BB_RECOMP_API_VERSION);
         return 0;

@@ -52,7 +52,9 @@ def packaged_loader(code_root,executable,*,script=None):
   path=owned_file(root/relative,2*1024**2,**code_args)
   require(support[relative]==digest(path),'module helper original parser identity changed: '+relative)
  native=json.loads(owned_file(root/'NATIVE-METAL.json',1024**2,**code_args).read_bytes())
- require(native['schema']==1 and native['game_runtime']=='fex-arm64'and native['production']is formal,'module helper requires declared FEX runtime profile')
+ cpu_profile=(native.get('game_runtime')=='fex-arm64' or
+              (not formal and native.get('game_runtime')=='arm64'and native.get('cpu_backends')==['fex','bbcpu']))
+ require(native['schema']==1 and cpu_profile and native['production']is formal,'module helper requires declared native runtime profile')
  require(native['frozen_runtime'][role]==digest(Path(executable)),'module helper actual executable identity changed')
  return root/'vendor/blood_echoes/loader'
 def formal_inputs(code_root,executable,boot,game,out,environment):

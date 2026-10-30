@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bbcpu_backend.h"
+#include "bbcpu.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -67,6 +68,7 @@ int main(int argc,char**argv){
   else if(mode=="--unowned-syscall")run(bb_image_base+96);
   else if(mode=="--bad-pointer"){request.Gpr[7]=1;run(read.second);}
   else if(mode=="--wrong-operation"){request.Gpr[0]=UINT64_MAX;run(seven.second+13);}
+  else if(mode=="--invalidate"){bbcpu_invalidate(bb_image_base,1);}
   else return 2;
   return 98; // every refusal must terminate with the original HLE fault status
  }

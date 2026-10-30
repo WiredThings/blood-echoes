@@ -268,7 +268,7 @@ final class LauncherModel: ObservableObject {
 
     /// Cheap checks, also run when the app becomes active (a build may have finished meanwhile).
     func refreshChecks() {
-        repoCheck = checkOptimizedEngine(repoURL, packaged: usesBuiltInEngine, renderer: prefs.renderer)
+        repoCheck = checkOptimizedEngine(repoURL, packaged: usesBuiltInEngine, renderer: prefs.renderer, cpuBackend: prefs.cpuBackend)
         refreshGameCheck()
         refreshChineseTranslation()
     }
@@ -644,6 +644,9 @@ final class LauncherModel: ObservableObject {
 
     private func startGame() {
         guard !isRunning, !saveBusy else { return }
+        if (runtimeCapabilities.isNativeArm64 || prefs.cpuBackend == .bbcpu) && !runtimeCapabilities.cpuBackends.contains(prefs.cpuBackend) {
+            state = .failed(L10n.key("The selected CPU backend is not included in this build.")); return
+        }
         if prefs.cloudSaves {
             synchronizeCloudSaves { [weak self] in self?.prepareGameSaves() }
         } else { prepareGameSaves() }
@@ -661,7 +664,7 @@ final class LauncherModel: ObservableObject {
         guard process == nil, let repo = repoURL, repoCheck.allowsPlay, gameCheck.allowsPlay else { return }
         let qaID = Bundle.main.bundleIdentifier ?? ""
         let isolatedQA = qaID.range(of: #"^io\.github\.bbport\.optimized\.options-qa\.arm64\.gui\.[0-9]+$"#, options: .regularExpression) != nil
-        var env = runtimeCapabilities.launchEnvironment(environment(), isolatedQA: isolatedQA)
+        var env = runtimeCapabilities.launchEnvironment(environment(), isolatedQA: isolatedQA, cpuBackend: prefs.cpuBackend)
         if prefs.online {
             guard profile.onlineActive else {
                 state = .failed(L10n.key("Online play currently requires the Metal backend.")); return

@@ -11,7 +11,7 @@ def parse_game_processes(text):
         pid=int(fields[0]);path=fields[1]
         if pid<=0 or not path.startswith('/'):continue
         name=PurePath(path).name
-        if name in {'bb-gpu','bb-probe','bb-probe-metal','bb-game-arm64'}or name.startswith('bb-game-arm64-'):
+        if name in {'bb-gpu','bb-probe','bb-probe-metal','bb-game-arm64','bb-game-bbcpu'}or name.startswith(('bb-game-arm64-','bb-game-bbcpu-')):
             games.append((pid,path))
     return games
 

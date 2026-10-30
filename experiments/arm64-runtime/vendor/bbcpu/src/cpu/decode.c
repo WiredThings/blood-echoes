@@ -15,6 +15,8 @@ static ZydisDecoder decoder;
 static uint64_t decoded_blocks, decoded_insns;
 static int (*guest_code_query)(uintptr_t);
 static int (*guest_code_span_query)(uintptr_t, size_t);
+static void (*invalidation_handler)(uintptr_t, size_t);
+void bbcpu_set_invalidation_handler(void (*handler)(uintptr_t, size_t)) { invalidation_handler = handler; }
 void bbcpu_set_guest_code_span_query(int (*query)(uintptr_t, size_t)) { guest_code_span_query = query; }
 void bbcpu_set_guest_code_query(int (*query)(uintptr_t)) {
     guest_code_query = query;
@@ -53,6 +55,8 @@ static void unlink_overlapping(uint32_t h, uint64_t address, uint64_t size) {
  * range starts at most MAX_BLOCK * 15 - 1 bytes before it: only those start addresses' buckets
  * are looked at, not the whole table. */
 void bbcpu_invalidate(uintptr_t address, size_t size) {
+    if (!size) return;
+    if (invalidation_handler) invalidation_handler(address, size);
     const uint64_t reach = MAX_BLOCK * 15 - 1;
     const uint64_t first = address > reach ? address - reach : 0;
     const uint64_t last = address + size; /* exclusive */

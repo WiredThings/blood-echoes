@@ -783,6 +783,12 @@ int game_main(int argc,char** argv){
 }
 
 int main(int argc,char** argv){
+#ifdef BB_CPU_BACKEND_BBCPU
+ if(argc==2&&std::string_view(argv[1])=="--cpu-backend-contract"){
+  std::printf("{\"schema\":1,\"backend\":\"bbcpu\",\"abi\":5,\"native_tsc\":true,\"header_contract_sha256\":\"%s\"}\n",BBCPU_ABI_IDENTITY);
+  return 0;
+ }
+#endif
  setvbuf(stdout,nullptr,_IOLBF,0);setvbuf(stderr,nullptr,_IOLBF,0);
  try {
   std::vector<std::string_view> args;for(int i=1;i<argc;++i)args.emplace_back(argv[i]);

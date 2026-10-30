@@ -113,7 +113,9 @@ def observe(document, *, selection, final_argv, session, uid, project, native_re
     # Reuse the existing bounded JSON/duplicate-field parser, with no expected SHA.
     manifest = reader.json(str(manifest_path), limit=1024 * 1024)
     manifest_sha = regular(manifest_path, limit=1024 * 1024)[1]
-    need(type(manifest.get('schema')) is int and manifest['schema'] == 1 and manifest.get('game_runtime') == 'fex-arm64' and
+    cpu_profile=(manifest.get('game_runtime')=='fex-arm64' or
+                 (manifest.get('game_runtime')=='arm64'and manifest.get('cpu_backends')==['fex','bbcpu']))
+    need(type(manifest.get('schema')) is int and manifest['schema'] == 1 and cpu_profile and
          manifest.get('production') is False, 'actual isolated FEX component manifest required')
     components = {}
     for role, item in document['components'].items():

@@ -80,6 +80,9 @@ void bbcpu_set_tls_displacement(uint32_t displacement);
 int bbcpu_is_guest(uintptr_t address);
 /* Decoded code over [address, address + size) is dropped (guest code patched at run time). */
 void bbcpu_invalidate(uintptr_t address, size_t size);
+/* Embedding policy, before any cache is modified. A runtime that exposes only
+ * immutable published text may explicitly refuse unsupported live mutation. */
+void bbcpu_set_invalidation_handler(void (*handler)(uintptr_t address, size_t size));
 
 /* int3 in guest code (hooks patched into the game): the handler gets the guest's registers as
  * the hardware would after the int3 (rip past it), may change them, and returns 1 if it handled
