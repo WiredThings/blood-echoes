@@ -46,11 +46,12 @@ struct LaunchPreparationProgress: Equatable {
         }
         if cpuPlanned && line.hasPrefix("CPU preparation progress: ") {
             let text = String(line.dropFirst("CPU preparation progress: ".count))
+            let maximum = StaticCompilationConcurrency.maximum
             guard text.utf8.count <= 4096, let data = text.data(using: .utf8),
                   let work = try? JSONDecoder().decode(CPUWork.self, from: data),
                   work.event == "compile-progress", (1...8192).contains(work.total),
-                  (0...work.total).contains(work.done), (0...2).contains(work.active),
-                  (0...2).contains(work.capacity) else { return }
+                  (0...work.total).contains(work.done), (0...maximum).contains(work.active),
+                  (0...maximum).contains(work.capacity) else { return }
             advance(25 + 70 * work.done / work.total,
                     work.capacity == 0 && work.done < work.total ? "Waiting for compiler memory…" : "Compiling CPU code…", cpu: true)
             return

@@ -23,8 +23,22 @@ final class LaunchPreparationProgressTests: XCTestCase {
         let before = p
         for text in ["{}", "{\"event\":\"compile-progress\",\"done\":false,\"total\":2,\"active\":0,\"capacity\":0}",
                      "{\"event\":\"compile-progress\",\"done\":3,\"total\":2,\"active\":0,\"capacity\":0}",
-                     "{\"event\":\"compile-progress\",\"done\":0,\"total\":384,\"active\":3,\"capacity\":3}"] {
+                     "{\"event\":\"compile-progress\",\"done\":0,\"total\":384,\"active\":-1,\"capacity\":0}",
+                     "{\"event\":\"compile-progress\",\"done\":0,\"total\":384,\"active\":\(StaticCompilationConcurrency.maximum + 1),\"capacity\":0}",
+                     "{\"event\":\"compile-progress\",\"done\":0,\"total\":384,\"active\":0,\"capacity\":\(StaticCompilationConcurrency.maximum + 1)}"] {
             p.consume("CPU preparation progress: " + text); XCTAssertEqual(p, before)
+        }
+    }
+
+    func testManualCompilationProgressUsesPickerHardwareCeiling() {
+        let count = min(4, StaticCompilationConcurrency.maximum)
+        for capacity in [count, 0] {
+            var p = LaunchPreparationProgress()
+            p.consume("CPU preparation planned: {\"backend\":\"bbcpu\"}")
+            p.consume("CPU preparation progress: {\"event\":\"compile-progress\",\"done\":192,\"total\":384,\"active\":\(count),\"capacity\":\(capacity)}")
+            XCTAssertEqual(p.percent, 60)
+            // Pressure can stop new dispatch while existing workers finish.
+            XCTAssertEqual(p.stageKey, capacity == 0 ? "Waiting for compiler memory…" : "Compiling CPU code…")
         }
     }
 
