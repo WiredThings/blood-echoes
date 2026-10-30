@@ -190,6 +190,7 @@ void bbcpu_recomp_reset_frame_depth(uint32_t depth) {
 
 /* Statistics for the report: calls into the translator, longjmps to an outer frame, deepest. */
 static uint64_t translated_runs, frame_jumps, deepest_frame, recomp_image_base, host_calls;
+static unsigned deep_frame_notes;
 /* Adds to a shared counter in batches of 4096 per thread, as bbcpu_recomp_counted does: every
  * thread adding one at a time to the same line costs as much as a short call. */
 static void count_batched(uint64_t *total, uint32_t *pending) {
@@ -263,7 +264,15 @@ static void run_translated(BbCpu *cpu, uint64_t slot) {
     const volatile uint32_t depth = frame_depth++;
     count_batched(&translated_runs, &pending_runs);
     note_target(cpu->rip);
-    if (depth + 1 > __atomic_load_n(&deepest_frame, __ATOMIC_RELAXED)) __atomic_store_n(&deepest_frame, depth + 1, __ATOMIC_RELAXED);
+    if (depth + 1 > __atomic_load_n(&deepest_frame, __ATOMIC_RELAXED)) {
+        __atomic_store_n(&deepest_frame, depth + 1, __ATOMIC_RELAXED);
+        /* Eight first high-water observations, not a per-call trace. Distinguish
+         * genuine guest nesting from the same RIP/RSP recurring without progress. */
+        if (depth + 1 >= 32 && __atomic_fetch_add(&deep_frame_notes,1,__ATOMIC_RELAXED)<8)
+            fprintf(stderr,"BBCPU deep fallback depth=%u rip=%#llx rsp=%#llx return_slot=%#llx native_frame=%p\n",
+                depth+1,(unsigned long long)cpu->rip,(unsigned long long)cpu->r[RSP],
+                (unsigned long long)slot,__builtin_frame_address(0));
+    }
     const uint64_t stop = FRAME_BASE + (uint64_t)depth * 16;
     frames[depth].back = bb_load(slot, 8);
     bb_store(slot, 8, stop);

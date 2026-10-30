@@ -101,12 +101,9 @@ static void x86_to_jit(BbCpu *cpu) {
  * dispatcher), printed every 2^24 of them. */
 static uint64_t profile[ZYDIS_MNEMONIC_MAX_VALUE + 1];
 static int profiling = -1;
-static void profile_note(const BbInsn *in) {
-    if (profiling < 0) { const char *env = getenv("BB_JIT_PROFILE"); profiling = env && env[0] == '1'; }
-    if (!profiling) return;
-    __atomic_add_fetch(&profile[in->mnemonic], 1, __ATOMIC_RELAXED);
-    static uint64_t total;
-    if ((__atomic_add_fetch(&total, 1, __ATOMIC_RELAXED) & ((1u << 24) - 1)) == 0) {
+/* Keep the ~14 KiB report scratch off disabled profiling and nested execution
+ * frames. A conditional body alone still reserves it in the function prologue. */
+static __attribute__((noinline,cold)) void profile_report(void) {
         uint64_t copy[ZYDIS_MNEMONIC_MAX_VALUE + 1];
         memcpy(copy, profile, sizeof(copy));
         printf("JIT profile (interpreted instructions):");
@@ -118,7 +115,13 @@ static void profile_note(const BbInsn *in) {
             copy[best] = 0;
         }
         printf("\n");
-    }
+}
+static void profile_note(const BbInsn *in) {
+    if (profiling < 0) { const char *env = getenv("BB_JIT_PROFILE"); profiling = env && env[0] == '1'; }
+    if (!profiling) return;
+    __atomic_add_fetch(&profile[in->mnemonic], 1, __ATOMIC_RELAXED);
+    static uint64_t total;
+    if ((__atomic_add_fetch(&total, 1, __ATOMIC_RELAXED) & ((1u << 24) - 1)) == 0) profile_report();
 }
 
 /* Called from translated code for instructions it does not translate (registers synced). Native
@@ -2500,7 +2503,9 @@ static void map_block(const uint32_t *start, const uint32_t *end, uint64_t guest
     if (++pending >= 256) { fflush(out); pending = 0; }
 }
 
-static void *translate(BbBlock *block) {
+/* Tx contains ~8 KiB of compiler scratch. Outlining keeps that cold storage
+ * out of every nested bbcpu_jit_run, including already-compiled execution. */
+static __attribute__((noinline)) void *translate(BbBlock *block) {
     pthread_mutex_lock(&jit_lock);
     if (block->jit_code || block->jit_failed) {
         void *code = block->jit_code;

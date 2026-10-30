@@ -49,6 +49,19 @@ class BudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'authored compile failure'):
             run(range(4),work,maximum=1,observe=lambda:dict(pressure=1,headroom_mib=8192))
         self.assertEqual(completed,[0,1])
+    def test_manual_limit_can_dispatch_above_automatic_two(self):
+        from bbcpu_compile_schedule import CPU_LIMIT
+        if CPU_LIMIT<3:self.skipTest('requires more than two logical CPUs')
+        maximum=min(4,CPU_LIMIT);barrier=threading.Barrier(maximum);active=peak=0;lock=threading.Lock()
+        def work(index):
+            nonlocal active,peak
+            with lock:active+=1;peak=max(peak,active)
+            barrier.wait(timeout=2)
+            with lock:active-=1
+            return index
+        result=run(range(maximum),work,maximum=maximum,
+            observe=lambda:dict(pressure=1,headroom_mib=16384),poll_seconds=.005)
+        self.assertEqual(result,list(range(maximum)));self.assertEqual(peak,maximum)
     def test_real_child_progress_arrives_before_child_finishes(self):
         with tempfile.TemporaryDirectory(dir='/private/tmp')as temp:
             root=Path(temp);gate=root/'gate';log=root/'child.log'

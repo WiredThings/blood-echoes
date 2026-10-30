@@ -58,6 +58,14 @@ class LaunchTests(unittest.TestCase):
     def test_runtime_hook_context_change_invalidates_only_export_selection(self):
         self.prepare();self.env['BB_GAME_MENU']='0';self.assertTrue(self.prepare()[2]['effective_exported'])
         self.env.pop('BB_GAME_MENU');self.assertFalse(self.prepare()[2]['effective_exported'])
+    def test_ephemeral_views_and_user_argv_do_not_invalidate_code_export(self):
+        self.args+=['--app0','/temporary/original-mod-view','--user','/temporary/user-a','--timeout','0']
+        self.prepare();self.args[self.args.index('--app0')+1]='/temporary/new-mod-view'
+        self.args[self.args.index('--user')+1]='/temporary/user-b';self.args[-1]='1800'
+        self.assertFalse(self.prepare()[2]['effective_exported'])
+        index=next(p for p in(self.data/'bbcpu-preparation/effective').glob('*.json')if p.name!='input-register.json')
+        self.assertIn('/temporary/original-mod-view',launch.read(index)['provenance_arguments'])
+        self.env['BB_ARM_PACKED_VENEERS']='0';self.assertTrue(self.prepare()[2]['effective_exported'])
     def test_runtime_export_uses_original_arguments_and_strips_credentials(self):
         self.doc['runtime_image_export']=1;self.write_doc()
         def child(argv,**kw):

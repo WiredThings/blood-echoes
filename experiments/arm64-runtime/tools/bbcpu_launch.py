@@ -118,10 +118,15 @@ def registered_inputs(root,paths):
     return pins,[[str(path),rows[str(path)]['sha256']]for path in paths]
 def export_context(arguments,environment,mode):
     keys=('BB_ARM_RESOURCE_HOOKS','BB_ARM_EXTRA_HEAPS','BB_ARM_EXTRA_HEAPS_FRESH',
+          'BB_ARM_PACKED_VENEERS',
           'BB_GAME_MENU','BB_ARM_PAYLOAD_GATE','BB_ARM_RESOURCE_FAST','BB_ARM_RESOURCE_LEAF',
           'BB_STUTTER_AUDIT','BB_FREE_CHECK','BB_LABEL_TRAP','BB_GUEST_HOOK_TRAPS',
           'BB_DEV_WORLD_WARPER_DIR','BB_ARM_ALLOCATION_AUDIT','BB_NET_BACKEND')
-    return dict(mode=mode,arguments=list(map(str,arguments)),flags={key:environment[key]for key in keys if key in environment})
+    # The original launcher recreates app0/mod views and carries user/timeout
+    # argv. Those are provenance, not compiler input identity. Real boot/ELF/
+    # patch/startup bytes and the actual installer executable are registered
+    # above; runtime still verifies the final image after all installers.
+    return dict(schema=2,mode=mode,flags={key:environment[key]for key in keys if key in environment})
 def prepare(executable,arguments,environment,*,stage,project,runner=subprocess.run):
     started=time.monotonic();env=dict(environment)
     jobs=env.pop('BB_CPU_COMPILE_JOBS','auto')
@@ -175,7 +180,8 @@ def prepare(executable,arguments,environment,*,stage,project,runner=subprocess.r
             if startup:argv+=['--startup',startup]
             run(argv,'effective-code')
         need([state(Path(row[0]))for row in pins]==pins,'effective CPU sources changed during preparation')
-        publish(index,dict(schema=1,inputs=pins,semantic_inputs=semantic_inputs,context=context,directory=str(selected),products=[state(selected/name)for name in product_names]))
+        publish(index,dict(schema=1,inputs=pins,semantic_inputs=semantic_inputs,context=context,
+            provenance_arguments=list(map(str,arguments)),directory=str(selected),products=[state(selected/name)for name in product_names]))
     toolchain=doc['toolchain']
     products=root/'products';products.mkdir(mode=0o700,exist_ok=True);private(products)
     argv=[sys.executable,paths['producer'],'--effective',selected,'--work',products,'--tools',paths['scanner'].parent,'--abi',paths['abi'],'--jobs',jobs]

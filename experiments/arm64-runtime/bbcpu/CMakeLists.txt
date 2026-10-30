@@ -142,6 +142,9 @@ if(BUILD_TESTING)
   target_compile_options(bbcpu-hle-probe PRIVATE -O2 -UNDEBUG -Wall -Wextra)
   add_test(NAME bbcpu-hle COMMAND bbcpu-hle-probe)
   find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
+  add_test(NAME bbcpu-execution-stack-budget COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_LIST_DIR}/../tests/test_bbcpu_stack_budget.py"
+    --probe $<TARGET_FILE:bbcpu-contract-probe> --objdump "${CMAKE_OBJDUMP}")
   add_test(NAME bbcpu-hle-refusals COMMAND "${Python3_EXECUTABLE}"
     "${CMAKE_CURRENT_LIST_DIR}/../tests/test_bbcpu_hle_refusals.py"
     --probe $<TARGET_FILE:bbcpu-hle-probe>)

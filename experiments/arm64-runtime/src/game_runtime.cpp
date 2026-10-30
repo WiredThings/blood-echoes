@@ -169,6 +169,16 @@ void bbcpu_note_patch(uint64_t offset,size_t covered,const char* phase){
 }
 #endif
 bool graphics_enabled{};
+extern "C" void bbgpu_before_restart(void);
+#ifdef BB_CPU_BACKEND_BBCPU
+[[noreturn]] void finish_cpu_export(int status,const char* error=nullptr){
+ if(error)std::fprintf(stderr,"BBCPU effective runtime export failed: %s\n",error);
+ if(graphics_enabled)bbgpu_before_restart();
+ active=nullptr;
+ if(!status)std::puts("BBCPU effective runtime export complete; owned GPU reaped; no guest execution");
+ std::fflush(nullptr);std::_Exit(status);
+}
+#endif
 thread_local bool guest_running{};
 thread_local unsigned callback_depth{};
 thread_local HleCallFrame* current_guest_frame{};
@@ -650,14 +660,14 @@ int game_main(int argc,char** argv){
   const char* cpu_export=getenv("BB_CPU_EXPORT_ROOT");
   fs::path cpu_analysis;
   std::string cpu_analysis_hash;
-  if(cpu_export){
+  if(cpu_export)try{
    const char* elf_path=getenv("BB_CPU_EXPORT_ELF");
    check(!bundled&&elf_path&&private_path(elf_path)&&private_path(fs::path(cpu_export).parent_path()),"CPU export requires declared private preparation inputs");
    BbCpuArtifact::File source(elf_path);BbCpuArtifact::Map original(source);auto layout=BbCpuImage::ReadLayout(original.Bytes(),b);
    cpu_analysis=std::string(cpu_export)+"-analysis";
    BbCpuImage::Export(cpu_analysis,b,layout,image.ptr,original.Bytes(),BbStaticCode::Hex(BbStaticCode::SourceHash(boot)),BbStaticCode::Hex(source.Hash()));
    source.Unchanged();cpu_analysis_hash=BbStaticCode::Hex(BbStaticCode::SourceHash(cpu_analysis/"effective.elf"));
-  }
+  }catch(const std::exception& error){finish_cpu_export(BB_ARM_EXIT_HLE_FAULT,error.what());}
   if(const char* library=getenv("BB_RECOMP_LIB");!cpu_export&&library&&*library){
    static_library=library;
    try{
@@ -719,15 +729,18 @@ int game_main(int argc,char** argv){
   runtime_quicksave_bind(image.ptr,b.size);
 #ifdef BB_CPU_BACKEND_BBCPU
   static_patch_stage("quicksave-binding");
-  if(cpu_export){
+  if(cpu_export)try{
    const char* elf_path=getenv("BB_CPU_EXPORT_ELF");
    check(!bundled&&elf_path&&private_path(elf_path)&&private_path(fs::path(cpu_export).parent_path()),"CPU export requires declared private preparation inputs");
    BbCpuArtifact::File source(elf_path);BbCpuArtifact::Map original(source);auto layout=BbCpuImage::ReadLayout(original.Bytes(),b);
    const auto exported=BbCpuImage::Export(cpu_export,b,layout,image.ptr,original.Bytes(),BbStaticCode::Hex(BbStaticCode::SourceHash(boot)),BbStaticCode::Hex(source.Hash()),cpu_resume_sites,"runtime-hooks-installed-v1",elf_path,cpu_analysis_hash);
    fs::rename(cpu_analysis,fs::path(cpu_export)/"analysis");
    source.Unchanged();std::printf("BBCPU effective runtime export identity=%s resume_sites=%zu; original installers completed before export\n",exported.identity.c_str(),cpu_resume_sites.size());
-   active=nullptr;std::fflush(nullptr);return 0;
-  }
+   // The original remote frontend owns detached reader/protection threads.
+   // Reuse its child reaping protocol before process termination; returning
+   // would destroy live mappings/global channels while those readers run.
+   finish_cpu_export(0);
+  }catch(const std::exception& error){finish_cpu_export(BB_ARM_EXIT_HLE_FAULT,error.what());}
   if(static_candidate){
    try{static_cpu=BbCpuArtifact::Match(*static_candidate,b,image.ptr);std::printf("BBCPU STATIC admitted effective_identity=%s; actual final startup code verified after runtime hooks\n",static_cpu->effective_identity.c_str());}
    catch(const std::exception& error){std::fprintf(stderr,"BBCPU STATIC rejected reason=%s fallback=bbcpu-own-translator; disk artifact preserved\n",error.what());}
