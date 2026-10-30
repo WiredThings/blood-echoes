@@ -30,13 +30,23 @@ PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 experiments/arm64-runtime
 - opcode 编号、其它表、dispatcher 输出与旧标记版本一致，未扩大到 IR ABI／参数变更。
 - 使用实际 CPU 身份脚本和自造归档输入，验证相同输入稳定复用、仅 FEX 输入变化时 runtime 身份变化、bridge 身份不变，并保留旧缓存 fixture 字节。
 
-## 真实 FEX 额外 fixture：待完整构建后执行
+## 真实 FEX 额外 fixture：已在新归档执行
 
 `tests/test_upstream_fex_guest_load_fault.cpp` 是不含游戏字节的实际 FexGuestCpuBackend fixture，供集中构建后链接到新的 FEX/embedding：
 
-- `valid` 模式执行手写 `cmp rax,[rdi]; add dword ptr [rsi],1; ret`，确认返回且计数变为1。
-- `fault` 模式令输入页 PROT_NONE，要求 SIGBUS/SIGSEGV 指向该页，且后续计数仍为0；预期故障由 fixture 自身处理后退出，不用系统 crash report 作为成功依据。
+- `valid` 模式执行手写 `cmp rax,[rdi]; add dword ptr [rsi],1; mov eax,42; ret`，确认返回且计数变为1。
+- `fault` 模式要求 SIGBUS/SIGSEGV 的实际 `si_addr` 等于输入页首地址，且后续计数仍为0；预期故障由 fixture 自身处理后退出，不用系统 crash report 作为成功依据。
 
-此 CPP 尚未在新的完整 FEX 产物上执行，不能宣称 Darwin guest fault 已通过，也没有把上游 Linux sigtest 当作本机验证。游戏测试须在总代码审阅和集中构建后开展。
+首次 fixture 时序不正确：在 `Run` 前将映射声明为 writable 的页设为 PROT_NONE，被实际 mapping 准入以 `BACHATA_FEX_MAPPING_FAIL reason=host_write_permission ... host_protection=0` 拒绝，counter仍0。此结果只证明没有进入 guest，不是 #6074 实现失败。
 
-该 CPP 已沿用现有 FEX embedding 编译参数完成 `-UNDEBUG -fsyntax-only` 检查（0.49秒、无诊断），没有生成或替换任何原有目标。集中测试时同样须保留断言（`-UNDEBUG`）；语法检查不等于链接或实际运行。
+修正版让输入页在映射准入时保持 RW。guest 先写 gate0，再用有界 `ECX=0x02000000` 的 PAUSE 循环等待 gate1；native helper 仅在看见 gate0后对自有输入页 `mprotect(PROT_NONE)`，随后 release 发布 gate1=1。helper 等待10秒超时或 mprotect 失败发布2，guest返回明确错误值，不假成功。不引入 HLE 回调、重新准入或运行时生产代码变更。普通返回均 join helper；预期故障路径只用 async-safe write／_exit，随 fixture 整个进程退出回收 helper，不从信号处理栈执行 C++ 清理或 longjmp。handler同时核验两个gate为1、实际故障地址以及counter0。
+
+2026-10-30 已使用集中构建 `5c0f2b72bb2f1153513ce018f2a26814d8c61e7e` 的真实 Ninja compile／link 参数，仅替换 fixture 源文件、obj／dep／输出位置，保留 `-UNDEBUG` 和全部新归档依赖。未修改 clean source、生产 build、manifest或本机应用：
+
+- FEXCore SHA256：`ab1734d381994e944705f8ab8fce92d3a5be3fcddb04b5359580123f8b13d06c`。
+- embedding SHA256：`d108aaa265508e313fbbdaa068286bb3870bddbeb56a56f13a7b914981591aaa`。
+- compile／link退出均0，约0.969／0.155秒。
+- valid退出0，约0.584秒：真实guest返回、后续store发生。
+- fault退出0，约0.0076秒：已进入guest、保护在入场后发布、目标读取fault、后续store未发生。
+
+证据目录：`/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/upstream-fex-load-fault-20261030/`，`plan.json` 保存原始与替换后的命令、15个真实输入的大小与SHA256；`result.json` 保存各次退出、耗时、完整stdout／stderr与JSON断言。执行后输入摘要全部未变。该测试只覆盖手写dead-flags guest read和正常路径，未运行游戏、未证明所有七类load的Darwin fault，也不把上游Linux sigtest当成本机验证。

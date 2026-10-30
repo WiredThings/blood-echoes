@@ -4,7 +4,7 @@ Only Continue is automated before a scene camera is observed. No exploration,
 combat, screenshots, profiling or changes to original data are performed.
 """
 from pathlib import Path
-import argparse,collections,csv,hashlib,json,math,os,signal,statistics,struct,subprocess,sys,time
+import argparse,collections,csv,hashlib,json,math,os,signal,stat,statistics,struct,subprocess,sys,time
 from native_observer import NativeObserver
 from qa_memory_policy import MemoryPolicy
 from diagnostic_frame_tail import read_tail
@@ -52,32 +52,103 @@ def tool_memory_summary(path,ready):
   before_scene_peak_mib=before/2**20,role_peaks_mib={k:v/2**20 for k,v in sorted(roles.items())},
   sampled_not_allocator_hwm=True,shared_pages_may_be_counted_more_than_once=True)
 
-def scene_summary(frames,samples,ready,scene_seconds):
- """Bounded post-stop telemetry only; reject menu or broken clocks as results."""
- tail=collections.deque(maxlen=20000)
- previous=None
+# Native videoout logs complete CSV rows and flushes at least every 120 flips.
+# Poll once/second; allow a bounded 10s durable-row lag for batching and polling.
+# This is telemetry admission, not a looser memory/lock/run-stop policy.
+FRAME_LOG_POLL_SECONDS=1.0
+FRAME_LOG_FRESHNESS_SECONDS=10.0
+FRAME_LOG_MIN_WALL_COVERAGE=.90
+FRAME_LOG_MAX_SCENE_FRAMES=20000
+
+class FrameProgress:
+ """Bounded live provenance for the existing CSV; never invent frame counters."""
+ def __init__(self):
+  self.identity=None;self.size=0;self.latest=None;self.last_advance=None
+  self.last_poll=None;self.observations=0;self.scene_start=None;self.scene_wall_start=None
+  self.max_gap=0.0
+ def observe(self,path,seconds,rows):
+  if not math.isfinite(seconds)or seconds<0 or(self.last_poll is not None and seconds<self.last_poll):raise ValueError('frame observation clock moved backwards')
+  self.last_poll=seconds
+  if not path.exists():
+   if self.identity is not None:raise ValueError('frame log disappeared during sample')
+   return
+  info=path.lstat()
+  if not stat.S_ISREG(info.st_mode):raise ValueError('frame log must remain a plain file')
+  identity=(info.st_dev,info.st_ino)
+  if self.identity is not None and(identity!=self.identity or info.st_size<self.size):raise ValueError('frame log was replaced or truncated during sample')
+  self.identity=identity;self.size=info.st_size
+  if not rows:return
+  try:value=float(rows[-1]['t_s'])
+  except(ValueError,TypeError,KeyError)as error:raise ValueError('invalid latest frame clock')from error
+  if not math.isfinite(value)or value<0:raise ValueError('invalid latest frame clock')
+  if self.latest is not None and value<self.latest:raise ValueError('frame clock moved backwards during sample')
+  if self.scene_start is not None:self.max_gap=max(self.max_gap,seconds-self.last_advance)
+  if self.latest is None or value>self.latest:self.latest=value;self.last_advance=seconds
+  self.observations+=1
+ def start_scene(self,seconds):
+  if self.latest is None or self.last_advance is None:raise ValueError('scene has no observed frame clock')
+  self.scene_start=self.latest;self.scene_wall_start=seconds;self.max_gap=0.0
+ def completion_reason(self,seconds,scene_seconds):
+  if self.scene_wall_start is None:return None
+  target=self.scene_wall_start+scene_seconds
+  if seconds<target:return None
+  # A recently frozen tail is insufficient: require a real published advance
+  # AFTER the nominal wall deadline and the whole requested frame-clock span.
+  if self.last_advance is not None and self.last_advance>=target and self.latest-self.scene_start>=scene_seconds-1e-6:return 'scene sample completed'
+  if seconds>=target+FRAME_LOG_FRESHNESS_SECONDS:return 'scene frame progress time budget'
+  return None
+ def summary(self,ended):
+  if self.scene_start is None or self.latest is None or self.last_advance is None:raise ValueError('scene has no bounded frame progress evidence')
+  wall=ended-self.scene_wall_start;clock=self.latest-self.scene_start;age=ended-self.last_advance
+  if not all(math.isfinite(v)for v in(ended,wall,clock,age))or wall<=0 or clock<=0 or age<0:raise ValueError('invalid scene frame progress span')
+  if age>FRAME_LOG_FRESHNESS_SECONDS:raise ValueError('stale frame log at scene completion')
+  if abs(clock-wall)>FRAME_LOG_FRESHNESS_SECONDS or clock<wall*FRAME_LOG_MIN_WALL_COVERAGE:raise ValueError('frame-clock span does not cover observed scene wall time')
+  return dict(clock_start=self.scene_start,clock_end=self.latest,clock_seconds=clock,
+   wall_start=self.scene_wall_start,wall_end=ended,wall_seconds=wall,
+   boundary_difference_seconds=clock-wall,last_advance_seconds=self.last_advance,
+   completion_age_seconds=age,max_observed_no_progress_seconds=max(self.max_gap,age),
+   observations=self.observations,freshness_limit_seconds=FRAME_LOG_FRESHNESS_SECONDS,
+   min_wall_coverage=FRAME_LOG_MIN_WALL_COVERAGE,file_device=self.identity[0],file_inode=self.identity[1],
+   observed_file_bytes=self.size)
+
+def scene_summary(frames,samples,ready,scene_seconds,*,frame_progress=None):
+ """Full observed scene interval, including stalls; never reuse a frozen tail."""
+ if not isinstance(frame_progress,dict):raise ValueError('bounded live frame progress evidence required')
+ progress=frame_progress
+ start,end=progress['clock_start'],progress['clock_end'];wall=progress['wall_seconds'];clock=end-start
+ if (progress['wall_start']!=ready or wall<scene_seconds or clock<scene_seconds-1e-6 or
+     progress['last_advance_seconds']<ready+scene_seconds or
+     progress['completion_age_seconds']>FRAME_LOG_FRESHNESS_SECONDS or
+     abs(clock-wall)>FRAME_LOG_FRESHNESS_SECONDS or clock<wall*FRAME_LOG_MIN_WALL_COVERAGE):raise ValueError('stale or unmatched scene wall/frame progress')
+ info=frames.lstat()
+ if not stat.S_ISREG(info.st_mode)or(info.st_dev,info.st_ino)!=(progress['file_device'],progress['file_inode'])or info.st_size<progress['observed_file_bytes']:raise ValueError('frame log changed after progress observation')
+ selected=[];times=[];previous=None
  with frames.open()as stream:
   reader=csv.DictReader(stream)
   required={'t_s','frame_ms','draws','gpu_ms','cam_x','cam_y','cam_z'}
-  if not required<=set(reader.fieldnames or ()):raise ValueError('incomplete frame schema')
+  if not required<=set(reader.fieldnames or()):raise ValueError('incomplete frame schema')
   for row in reader:
-   try:
-    t=float(row['t_s']);ms=float(row['frame_ms']);gpu=float(row['gpu_ms']);draws=int(row['draws'])
+   try:t=float(row['t_s']);ms=float(row['frame_ms']);gpu=float(row['gpu_ms']);draws=int(row['draws'])
    except(ValueError,TypeError,KeyError):continue
    if not all(math.isfinite(v)for v in(t,ms,gpu))or ms<=0 or gpu<0 or draws<0:continue
    if previous is not None and t<previous:raise ValueError('frame clock moved backwards')
-   previous=t;tail.append(row)
-   while tail and float(tail[0]['t_s'])<t-30:tail.popleft()
- if len(tail)<100:raise ValueError('insufficient complete scene frames')
- if sum(scene_seen([r])for r in tail)<len(tail)*.9:raise ValueError('frame tail is not a stable scene camera')
- times=sorted(float(r['frame_ms'])for r in tail)
- stable=[s for s in samples if s['seconds']>=ready+scene_seconds-30]
- return dict(frames=len(tail),fps=1000/statistics.mean(times),
-  p95_ms=times[int((len(times)-1)*.95)],p99_ms=times[int((len(times)-1)*.99)],
-  gpu_ms=statistics.mean(float(r['gpu_ms'])for r in tail),
-  draws_median=statistics.median(int(r['draws'])for r in tail),
-  camera={k:tail[-1].get(k)for k in('cam_x','cam_y','cam_z')},
-  combined_footprint_mib=statistics.median(sum(u['footprint_bytes']for u in s['usage'])/2**20 for s in stable)if stable else None)
+   interval=(t-previous)*1000 if previous is not None else ms;previous=t
+   if not start<t<=end:continue
+   if len(selected)>=FRAME_LOG_MAX_SCENE_FRAMES:raise ValueError('complete scene frame budget exceeded')
+   selected.append(row);times.append(max(ms,interval))
+ if len(selected)<100:raise ValueError('insufficient complete scene frames')
+ if float(selected[-1]['t_s'])!=end:raise ValueError('observed ending frame is absent from final CSV')
+ if sum(scene_seen([r])for r in selected)<len(selected)*.9:raise ValueError('frame interval is not a stable scene camera')
+ stable=[s for s in samples if ready<=s['seconds']<=progress['wall_end']]
+ if not stable:raise ValueError('missing wall-matched scene memory samples')
+ ordered=sorted(times)
+ return dict(frames=len(selected),fps=len(selected)/clock,
+  p95_ms=ordered[int((len(ordered)-1)*.95)],p99_ms=ordered[int((len(ordered)-1)*.99)],
+  max_frame_ms=max(times),gpu_ms=statistics.mean(float(r['gpu_ms'])for r in selected),
+  draws_median=statistics.median(int(r['draws'])for r in selected),
+  camera={k:selected[-1].get(k)for k in('cam_x','cam_y','cam_z')},
+  combined_footprint_mib=statistics.median(sum(u['footprint_bytes']for u in s['usage'])/2**20 for s in stable),
+  frame_progress=progress,window='complete observed scene clock interval; bounded CSV flush lag against supervisor wall')
 
 def admit(conditions):
  from gpu_candidate_identity import verify
@@ -98,6 +169,13 @@ CPU_ROLES=('bin/bb-probe-metal','bin/Bloodborne Game.app/Contents/MacOS/bb-probe
 FORMAL_ROLES=frozenset((*CPU_ROLES,'bin/gpu-metal/libbbgpu.dylib',
  'bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu','bin/gpu-metal-arm64/libbbgpu.dylib',
  'bin/gpu-net/libbbnet.dylib','bin/game-pso-preparer','bin/game-module-preparer'))
+
+# Exactly one reviewed source transition, not a category of permitted UI edits.
+# The source is 00385145 and the unchanged frozen Swift QA stage; the target is
+# the 2026-10-30 optional-UI validation fix reviewed before game regression.
+REVIEWED_OPTIONAL_UI_SCRIPT='scripts/ultrawide_ui.py'
+REVIEWED_OPTIONAL_UI_SOURCE='5c6619d969e5bd1a8b50afc30baa6d7f3540bd39b628bb133dcdb4146415fefa'
+REVIEWED_OPTIONAL_UI_TARGET='d55933de39172d83b194c61368e955d43df7b39b027b34db0809f6bc04277aff'
 
 def cpu_paths(conditions):
  # Exact independently admitted roles. The shell chooses nested when present;
@@ -148,7 +226,16 @@ def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,ide
  if set(hashes)!=FORMAL_ROLES:raise ValueError('formal stage requires exactly eight frozen actual runtime roles')
  runtime={role:canonical(stage/role,within=stage)for role in hashes}
  parity_record=json.loads(code_bytes(stage/'SOURCE-PARITY.json')[0]);parity=parity_record['effective_sources']
- expected=dict(source['effective_scripts']);image_reuse_projection=False
+ expected=dict(source['effective_scripts']);image_reuse_projection=False;reviewed_script_projections=[]
+ name=REVIEWED_OPTIONAL_UI_SCRIPT
+ if set(parity)==set(expected)==set(SCRIPTS)and expected[name]==REVIEWED_OPTIONAL_UI_SOURCE and parity[name]==REVIEWED_OPTIONAL_UI_TARGET:
+  # Validate both complete files, not only the manifests. The frozen receipt and
+  # its source environment stay unchanged; all other scripts still compare below.
+  original=code_bytes(Path(source['stage'])/name,limit=4*1024*1024,expected=REVIEWED_OPTIONAL_UI_SOURCE)[0]
+  revised=code_bytes(stage/name,limit=4*1024*1024,expected=REVIEWED_OPTIONAL_UI_TARGET)[0]
+  expected[name]=hashlib.sha256(revised).hexdigest()
+  reviewed_script_projections.append(dict(script=name,source_revision='00385145',review='optional-ui-validation-20261030',
+   source_sha256=hashlib.sha256(original).hexdigest(),target_sha256=expected[name],complete_file_bytes_checked=True))
  if parity!=expected and set(parity)==set(expected)==set(SCRIPTS)and{k for k in expected if parity[k]!=expected[k]}=={'run.sh'}and parity_record.get('image_preparation_reuse')is True:
   # One exact source-reviewed addition. Do not edit the original QA receipt,
   # accept arbitrary new script hashes, or skip any of the other 15 bodies.
@@ -172,7 +259,8 @@ def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,ide
  return dict(app=app,stage=stage,runtime=runtime,runtime_sha256=hashes,seal=seal,
   identity=dict(profile='staged-formal-bundle-isolated-CLI',app=str(app),stage=str(stage),
    native_manifest_sha256=sha(stage/'NATIVE-METAL.json'),runtime_sha256=hashes,
-   effective_scripts=parity,image_preparation_exact_projection=image_reuse_projection,cpu=cpus,gpu=gpu,whole_app_pre_seal=seal,formal_GUI_started=False,formal_data_read=False))
+   effective_scripts=parity,image_preparation_exact_projection=image_reuse_projection,
+   reviewed_script_projections=reviewed_script_projections,cpu=cpus,gpu=gpu,whole_app_pre_seal=seal,formal_GUI_started=False,formal_data_read=False))
 
 def reference_image(path):
  """Read actual x86/ARM Mach-O metadata with the existing package parser."""
@@ -294,6 +382,7 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
  from qa_launch_clone import inventory_savedata
  from qa_f3_contract import F3Check,NewLogLines
  f3=F3Check()if functional_f3 else None
+ progress=None if functional_f3 else FrameProgress()
  fresh_logs=NewLogLines()if f3 is not None else None
  before=observer.system()
  if before['locked']or before['pressure']==4:raise RuntimeError('locked or severe pressure before run')
@@ -333,16 +422,23 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
     measured=usage([f'{i} {j} 0 {path}'for i,j,path in rows],**({'include_tools':True}if track_tool_memory else{}))
     s.update(seconds=elapsed,processes=rows,usage=[row for row in measured if row['role']in('bb-probe-metal','bb-gpu','bb-game-arm64')])
     if track_tool_memory:s['tool_usage']=measured
-    samples.append(s);peak_pressure=max(peak_pressure,s['pressure']);sample_log.write(json.dumps(s,separators=(',',':'))+'\n');sample_log.flush()
+    peak_pressure=max(peak_pressure,s['pressure'])
     reason=policy.observe(now-protection_start,s)
     if pressed and now-last_press>=.18:input_('');pressed=False
-    if (ready is None or f3 is not None)and now>=next_frames:
-     next_frames=now+1
+    if now>=next_frames:
+     next_frames=now+FRAME_LOG_POLL_SECONDS
      if frames.exists():
       try:last_frame_rows=read_tail(frames)
       except ValueError:last_frame_rows=[]
+     else:last_frame_rows=[]
+     if progress is not None:
+      progress.observe(frames,elapsed,last_frame_rows)
+      if progress.latest is not None:s['frame_progress']=dict(t_s=progress.latest,last_advance_seconds=progress.last_advance)
      in_scene=scene_seen(last_frame_rows)
-     if in_scene and ready is None:ready=elapsed;print('Scene camera observed:',round(ready,2),flush=True)
+     if in_scene and ready is None:
+      ready=elapsed
+      if progress is not None:progress.start_scene(ready)
+      print('Scene camera observed:',round(ready,2),flush=True)
      if f3 is not None:
       log_text,drained=fresh_logs.read(root/'console.log')
       token=None
@@ -356,19 +452,23 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
      if ready is None and(f3 is None or f3.phase=='entering')and last_frame_rows and elapsed>=12 and now-last_press>=4:
       input_('cross\n');pressed=True;last_press=now
       with(root/'actions.jsonl').open('a')as f:f.write(json.dumps(dict(action='cross',seconds=elapsed,reason='Continue before scene camera'))+'\n')
-    reason=reason or(('functional F3 completed'if f3.phase=='completed'else 'functional F3 time budget'if elapsed>=startup_seconds else None)if f3 is not None else deadline(elapsed,ready,startup_seconds,scene_seconds))
+    reason=reason or(('functional F3 completed'if f3.phase=='completed'else 'functional F3 time budget'if elapsed>=startup_seconds else None)if f3 is not None else(deadline(elapsed,ready,startup_seconds,scene_seconds)if ready is None else progress.completion_reason(elapsed,scene_seconds)))
+    samples.append(s);sample_log.write(json.dumps(s,separators=(',',':'))+'\n');sample_log.flush()
     if reason:break
     time.sleep(.25)
    if reason is None:reason='unexpected process exit'
  except BaseException as error:
   report['error']=str(error)[:512];reason=reason or 'driver exception';raise
  finally:
+  measurement_end=time.monotonic()-started
   input_('');stop();after=observer.system()
   source_same=inventory_savedata(c['user_root']/'savedata')==case['source_save_manifest']
   report.update(status=('functional-checked'if f3 is not None else'sampled')if reason in('scene sample completed','functional F3 completed')and source_same else'incomplete',stop=reason,process_exit=proc.returncode if proc else None,seconds=time.monotonic()-started,scene_ready=ready,before=before,after=after,peak_pressure=peak_pressure,swap_growth_mib=after['swap_mib']-before['swap_mib'],source_save_unchanged=source_same,memory_policy=MemoryPolicy.MANIFEST)
   if f3 is not None:report['functional_f3']={**vars(f3),'scripted_api_not_physical_key_test':True}
   if report['status']=='sampled':
-   try:report['scene_sample']=scene_summary(frames,samples,ready,scene_seconds)
+   try:
+    observed=progress.summary(measurement_end)
+    report['scene_sample']=scene_summary(frames,samples,ready,scene_seconds,frame_progress=observed)
    except ValueError as error:report.update(status='incomplete',error=str(error))
   if track_tool_memory:
    try:report['tool_memory']=tool_memory_summary(root/'samples.jsonl',ready)

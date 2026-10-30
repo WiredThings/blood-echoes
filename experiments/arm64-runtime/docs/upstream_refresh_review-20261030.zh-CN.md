@@ -87,3 +87,13 @@ old_equal=1 new_equal=0 new_vertex_flag=1
 ## 集中验收边界
 
 agent 提供的库构建／像素测试、主代理的 Swift 测试应以各自实际回执为准。此文不把它们改写成独立重复执行结果，也不代替完整引擎编译、隔离游戏对照、F3 与场景视觉验收。
+
+## 集中测试薄层：已修复冻结CSV误认完成
+
+独立复核 `run_upstream_refresh_game.py --vertex-ab`：同一新应用中A保留默认off，B在既有环境准入后仅加入唯一 `BB_MTL_RELAX_VERTEX=1`；F3保持A，A／B有独立私有case。source receipt不改写，可选UI helper只有已审完整旧／新双SHA投影，未开放其它脚本或环境。原生样本字段与 `matched_summary` 对齐，保护中止仍不算采样完成，清理限定已拥有进程。Cua仅运行前status检查，不启动服务，性能阶段无截图／录屏。此项静态审阅不代替实采。
+
+实际找到的阻塞是原driver场景识别后停止读CSV，只等待墙钟超时；末尾冻结的旧30秒尾部仍可能被标记sampled。现由实际 `FrameProgress` 每秒有界读尾，跟踪文件device／inode、大小、单调帧时钟和真实推进观察；要求完整测量墙钟截止后再次推进，且源时钟覆盖完整区间。文件替换、缩短、时钟回退、旧CSV或无有效推进均拒绝。
+
+原生writer每120个flip至少fflush一次，因此允许10秒后批刷新窗口；这是采样有效性容忍，不改变严重内存压力、swap或锁屏保护。源时钟与墙钟整段跨度误差须≤10秒且覆盖≥90%；不再用最近30秒尾部代替整场。FPS按完整帧数／源稳态时钟跨度计算；帧时间取CSV值与相邻时钟差的较大值，中途长卡后恢复仍计入FPS、max frame及最大无推进间隔，不能用后来恢复抹掉卡顿。F3沿用既有流程，允许它有意更换进程／重置帧时钟。
+
+14项新定向测试执行真实 `FrameProgress`、`scene_summary` 及受控actual sample循环，覆盖旧冻结反例、持续推进、尾部短批刷新、中途20秒停顿后恢复、时钟跳变／重置、文件替换／缩短、旧CSV及无证据拒绝。另20项thin harness、9项投影、6项scene、3项tail和5项tool-memory共57项通过，无游戏。确切命令和日志保存在 `evidence/upstream-frame-progress-m9t_aedw/summary.json`；冻结driver SHA256为 `eb52e334a1f92250470775602ec28c844ede64c3b80c81c7b54482fa29ecb098`。该结果只证明控制规则，不是完整ABBA实采通过。
