@@ -72,6 +72,14 @@ def renderer_inputs(source,build):
                 deployment_target=cache.get('CMAKE_OSX_DEPLOYMENT_TARGET',''),sysroot=cache.get('CMAKE_OSX_SYSROOT',''),
                 avplayer_configured_inputs=avplayer,build_tools=tools,generator='Ninja',
                 cache_sha256=sha(build/'CMakeCache.txt'),compile_commands_sha256=sha(build/'compile_commands.json'),target_description_sha256=sha(reply/record['jsonFile']))
+def codegen_commands(source,generated,renderer):
+    """Identical host ABI generators for either independent CPU engine."""
+    native=[sys.executable,str(source/'tools/generate_native.py'),'--source-root',str(source),'--output-dir',str(generated),'--compiler','/usr/bin/clang']
+    for include in renderer['includes']:native+=['--include-dir',include]
+    gpu=[sys.executable,str(source/'tools/generate_gpu.py'),'--source-root',str(source),'--output-dir',str(generated),'--header-manifest',str(source/'config/gpu-adapter-headers.json')]
+    gpu+=['--renderer-source-root',renderer['source']]
+    return [native,gpu]
+
 def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_build,runtime_root=PRIVATE_RUNTIME):
     source=directory(source_root)
     # This literal only selects the unbundled development fallback compiled
@@ -85,9 +93,7 @@ def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_buil
     need(generated!=build,'generated output must be distinct from build')
     prefixes=[directory(p)for p in dependency_prefixes];need(prefixes,'explicit dependency prefixes required')
     renderer=renderer_inputs(source,renderer_build);need(build!=Path(renderer['build']),'separate CPU/renderer builds required')
-    native=[sys.executable,str(source/'tools/generate_native.py'),'--source-root',str(source),'--output-dir',str(generated),'--compiler','/usr/bin/clang']
-    for include in renderer['includes']:native+=['--include-dir',include]
-    gpu=[sys.executable,str(source/'tools/generate_gpu.py'),'--source-root',str(source),'--output-dir',str(generated),'--header-manifest',str(source/'config/gpu-adapter-headers.json')]
+    native,gpu=codegen_commands(source,generated,renderer)
     aether=source/'vendor/aether';harness=[aether/'src/core/fex/fex_guest_engine.cpp',aether/'src/core/guest_cpu/fex_guest_cpu.cpp',aether/'src/core/guest_cpu/hle_call_adapter.cpp',aether/'src/core/guest_cpu/fex_hle_bridge.cpp',aether/'runtime/probes/fexcore-guest-harness.cpp']
     command=[renderer['build_tools']['cmake']['path'],'-S',str(aether/'runtime/sources/fexcore-darwin'),'-B',str(build),'-G','Ninja','-DCMAKE_MAKE_PROGRAM='+renderer['build_tools']['ninja']['path'],'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_OSX_ARCHITECTURES=arm64','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_DISABLE_SOURCE_CHANGES=ON','-DCMAKE_PREFIX_PATH='+';'.join(map(str,prefixes)),'-DTUNE_CPU=none','-DBUILD_FEXCORE_ONLY=ON',
         '-DFEXCORE_PROJECT_SOURCE_DIR='+str(aether/'src'),'-DFEXCORE_SMOKE_SOURCE='+str(aether/'runtime/probes/fexcore-smoke.cpp'),'-DFEXCORE_GUEST_HARNESS_SOURCES='+';'.join(map(str,harness)),
@@ -102,10 +108,11 @@ def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_buil
                 runtime_tree_read_for_build=False,
                 clean_checkout_build_proven=False,ABI_validated=False,targets_built=False)
 def prepare(value):
-    need(renderer_inputs(Path(value['source_root']),Path(value['renderer']['build']))==value['renderer'],'renderer configuration changed after planning')
+    renderer_source=Path(value.get('renderer_source_root',value['source_root']))
+    need(renderer_inputs(renderer_source,Path(value['renderer']['build']))==value['renderer'],'renderer configuration changed after planning')
     output=Path(value['generated_dir']);need(not output.exists()or(output.is_dir()and not any(output.iterdir())),'fresh or empty generated output required');output.mkdir(parents=True,exist_ok=True)
     for command in value['generators']:subprocess.run(command,check=True,timeout=180)
-    need(renderer_inputs(Path(value['source_root']),Path(value['renderer']['build']))==value['renderer'],'renderer configuration changed during generation')
+    need(renderer_inputs(renderer_source,Path(value['renderer']['build']))==value['renderer'],'renderer configuration changed during generation')
     def bracket(item):
         need(']==]'not in item and ';'not in item,'ambiguous CMake scalar');return ' [==['+item+']==]\n'
     renderer=value['renderer'];text='set(BB_GPU_HEADER_FLAGS\n'+''.join(bracket(p)for p in renderer['flags'])+')\n'

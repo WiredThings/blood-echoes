@@ -3,6 +3,7 @@
 
 #include "core/fex/fex_guest_engine.h"
 #include "hle_call_adapter.h"
+#include "hle_call_service.h"
 
 #include <optional>
 #include <atomic>
@@ -32,32 +33,8 @@ public:
     FEXCore::CodeMapOpener* CodeMapOutput() override { return code_output; }
 
 private:
-    struct HostRange final {
-        std::uintptr_t begin{};
-        std::uintptr_t end{};
-        bool writable{};
-    };
-
-    static bool ValidateRange(void* context, std::uintptr_t address, std::size_t size,
-                              bool writable);
-    static bool PublishHostRange(void* context, std::uintptr_t address, std::size_t size,
-                                 bool writable);
-    static bool RevokeHostRange(void* context, std::uintptr_t address);
-    bool ValidatePublishedHostRange(std::uintptr_t address, std::size_t size,
-                                    bool writable) const;
-    void Report(const HleCallFailure& failure) const;
-
-    HleCallRegistry& registry;
-    RangeValidator validator;
-    void* validator_context;
-    FailureReporter reporter;
-    void* reporter_context;
-    ExecutableRangeQuery executable_query;
-    void* executable_query_context;
+    HleCallService service;
     CodeFileQuery code_query{};void* code_context{};FEXCore::CodeMapOpener* code_output{};
-    mutable std::shared_mutex host_range_mutex;
-    std::atomic<size_t> host_range_count{0};
-    std::vector<HostRange> host_ranges;
 };
 
 } // namespace Core::GuestCpu

@@ -1,12 +1,19 @@
 #include "avplayer_bridge.h"
 #include "runtime_exit_codes.h"
 #include "qa_cpu_qos.h"
+#ifndef BB_CPU_BACKEND_BBCPU
 #include "bb_cpu_cache_build.h"
+#endif
 #include "runtime_diagnostic_exit.h"
+#ifndef BB_CPU_BACKEND_BBCPU
 #include "bb_cpu_cache_inputs.h"
+#endif
 #include "bb_fex_map_audit.h"
+#ifndef BB_CPU_BACKEND_BBCPU
 #include "bb_static_code_files.h"
+#endif
 #include "bb_stutter_audit.h"
+#include "bb_source_hash.h"
 #include "startup_patches.h"
 #include "launcher_patch_input.h"
 #include "launcher_game_metadata.h"
@@ -42,9 +49,15 @@
 #include "guest_module_info.h"
 #include "prepare_guest_module_info.h"
 #include "remote/bb_memory_mirror.h"
+#ifdef BB_CPU_BACKEND_BBCPU
+#include "bbcpu_backend.h"
+#include "bbcpu_static_admission.h"
+#include "bbcpu.h"
+#else
 #include "core/guest_cpu/fex_guest_cpu.h"
 #include "core/guest_cpu/fex_hle_bridge.h"
 #include <FEXCore/Core/X86Enums.h>
+#endif
 #include <mach/mach.h>
 #include <mach/mach_vm.h>
 #include <sys/mman.h>
@@ -57,6 +70,9 @@
 #include <signal.h>
 #define BB_LOW_HEAP_IMPL
 extern "C" {
+#ifdef BB_CPU_BACKEND_BBCPU
+uintptr_t bb_image_base;
+#endif
 #include "runtime.h"
 #include "runtime_quicksave.h"
 #include "gpu/bbgpu.h"
@@ -90,18 +106,24 @@ struct Mapping {
  Mapping(const Mapping&)=delete;
  uintptr_t at()const{return reinterpret_cast<uintptr_t>(ptr);}
 };
+#ifndef BB_CPU_BACKEND_BBCPU
 struct CodeMapOutput final:FEXCore::CodeMapOpener {
  fs::path path;bool opened{};explicit CodeMapOutput(fs::path file):path(std::move(file)){}
  int OpenCodeMapFile() override{if(opened)return -1;opened=true;const int fd=open(path.c_str(),O_CREAT|O_EXCL|O_WRONLY,0600);check(fd>=0,"private CPU code map unavailable");return fd;}
 };
+#endif
 struct State {
  HleCallRegistry registry;HleVeneerAllocator veneers;BbGuestModules::Registry module_info;
  std::unique_ptr<BbOrdinaryUnwind::Entry> ordinary_unwind;
  // Published once, before guest entry; fault handling only reads this immutable list.
  std::vector<std::pair<uintptr_t,size_t>> missing_data_ranges;std::atomic<bool> missing_data_ready{false};
  std::map<uintptr_t,std::shared_ptr<HleCallAdapter>> native;
+#ifdef BB_CPU_BACKEND_BBCPU
+ std::unique_ptr<HleCallService> bridge;std::unique_ptr<BbCpu::BbcpuBackend> cpu;
+#else
  std::unique_ptr<BbStaticCode::Files> code_files;std::unique_ptr<CodeMapOutput> code_output;
  std::unique_ptr<HleGuestBridge> bridge;std::unique_ptr<Core::FexGuestCpuBackend> cpu;
+#endif
  std::vector<Core::GuestExecutionRange> ranges;std::shared_mutex mutex;
  StaticRangeIndex permanent;size_t permanent_count{};
  const bool fast_ranges=!getenv("BB_ARM_RANGE_FAST")||std::string_view(getenv("BB_ARM_RANGE_FAST"))!="0";
@@ -170,6 +192,9 @@ public:HleCallResult Invoke(HleCallFrame& f)const override{
  if(callback_depth)return HleCallFailure{ENOTSUP,"nested guest pthread_exit requires propagation"};
  if(std::this_thread::get_id()==active->main_thread)return HleCallFailure{ENOTSUP,"main thread exit"};
  if(!active->valid(f.rsp,8,true))return HleCallFailure{EFAULT,"thread exit stack"};
+#ifdef BB_CPU_BACKEND_BBCPU
+ if(!bbcpu_request_execution_stop(active->halt))return HleCallFailure{ENOTSUP,"thread exit outside owned bbcpu frame"};
+#endif
  thread_exit_value=f.gpr[7];memcpy(reinterpret_cast<void*>(f.rsp),&active->halt,8);f.gpr[0]=f.gpr[7];return true;
 }
 };
@@ -185,7 +210,9 @@ bool immutable_executable(void* context,uintptr_t p,size_t n){
   if(r.Executable&&!r.Writable&&p>=r.Begin&&n<=r.Size&&p-r.Begin<=r.Size-n)found=true;
  }return found;
 }
+#ifndef BB_CPU_BACKEND_BBCPU
 std::optional<FEXCore::ExecutableFileSectionInfo> code_file(void* c,uintptr_t address){auto& s=*static_cast<State*>(c);return s.code_files?s.code_files->Query(address):std::nullopt;}
+#endif
 void failure(void*,const HleCallFailure& f){std::fprintf(stderr,"ARM HLE STOP name=%.*s error=%d\n",int(f.name.size()),f.name.data(),f.error);std::fflush(nullptr);_Exit(BB_ARM_EXIT_HLE_FAULT);}
 void module_start(unsigned index){active->module=index;std::printf("ARM MODULE begin=%u\n",index);}
 int module_end(int result){std::printf("ARM MODULE end=%u result=%d\n",active->module.load(),result);return result;}
@@ -239,14 +266,22 @@ void fault(int sig,siginfo_t* info,void* context){
   }
  }
 
+#ifdef BB_CPU_BACKEND_BBCPU
+ if(sig==SIGBUS&&bbcpu_handle_alignment_fault(context))return;
+#else
  if(AetherPS4::Fex::HandleGuestSignal(sig,info,context))return;
+#endif
  const auto esr=static_cast<ucontext_t*>(context)->uc_mcontext->__es.__esr;
  const bool alignment=sig==SIGBUS&&AetherPS4::Fex::IsDarwinDataAlignmentEsr(esr);
  if(!alignment&&graphics_enabled&&bbgpu_handle_fault(context,info->si_addr))return;
  if((sig==SIGBUS||sig==SIGSEGV)&&runtime_fault_recover){auto* recovery=runtime_fault_recover;runtime_fault_recover=nullptr;siglongjmp(*recovery,1);}
  auto* uc=static_cast<ucontext_t*>(context);auto pc=arm_thread_state64_get_pc(uc->uc_mcontext->__ss);uint64_t rip{};
+#ifdef BB_CPU_BACKEND_BBCPU
+ char detail[1024];if(bbcpu_describe_fault(context,detail,sizeof(detail))){write(2,detail,strlen(detail));write(2,"\n",1);}
+#else
  if(AetherPS4::Fex::PrototypeQueryLiveGuestRip(pc,&rip)){char line[256];int n=snprintf(line,sizeof(line),"ARM FATAL signal=%d esr=%#x fault=%p host_pc=%#llx live_guest=%#llx offset=%#llx\n",sig,esr,info->si_addr,pc,rip,active?rip-active->image:0);write(2,line,n);}
  char regs[1024];if(AetherPS4::Fex::BachataDumpGuestRegisters(regs,sizeof(regs))){write(2,regs,strlen(regs));write(2,"\n",1);}
+#endif
  struct sigaction action{};action.sa_handler=SIG_DFL;sigemptyset(&action.sa_mask);sigaction(sig,&action,nullptr);raise(sig);
 }
 void install_faults(){for(int sig:{SIGBUS,SIGSEGV}){struct sigaction action{};action.sa_sigaction=fault;action.sa_flags=SA_SIGINFO|SA_ONSTACK;sigemptyset(&action.sa_mask);check(sigaction(sig,&action,nullptr)==0,"signal setup failed");}}
@@ -512,6 +547,9 @@ int game_main(int argc,char** argv){
   if((runtime_net_enabled()||getenv("BB_DEV_WORLD_WARPER_DIR"))&&getenv("BB_ARM_AUTO_CONTINUE"))runtime_quicksave_begin_auto_continue();
   bbgpu_register_kernel();
   Mapping image(b.size),halt(Page),driver(Page),params(Page);s.image=image.at();s.image_size=b.size;s.libc=image.at()+b.modules.at(0).base;for(auto segment:b.segments)if(segment.flags&1)s.text_end=std::max<uintptr_t>(s.text_end,image.at()+segment.address+segment.size);s.halt=halt.at();b.load(image.ptr);*static_cast<uint8_t*>(halt.ptr)=0xf4;
+#ifdef BB_CPU_BACKEND_BBCPU
+  bb_image_base=image.at();
+#endif
   // Candidate only. Unknown ABI retains the existing explicit missing-import path.
   constexpr uint64_t context_offset=0x53cd0,context_bytes=166;
   const bool context_candidate=getenv("BB_ARM_CONTEXT_IMPORTS")&&std::string_view(getenv("BB_ARM_CONTEXT_IMPORTS"))=="1";
@@ -587,12 +625,27 @@ int game_main(int argc,char** argv){
   for(auto x:b.relocs){uint64_t value=x.kind?imported[x.value]+x.addend:image.at()+x.value;memcpy(static_cast<uint8_t*>(image.ptr)+x.target,&value,8);}
   if(!startup.empty())BbStartup::Apply(startup,image.ptr,b);
   if(!launcher_patches.empty())BbLauncherPatch::Apply(launcher_patches,image.ptr,b);
+#ifndef BB_CPU_BACKEND_BBCPU
   const bool code_profile=getenv("BB_ARM_CPU_CODEMAP")&&std::string_view(getenv("BB_ARM_CPU_CODEMAP"))=="1";
   const char* cache_path=getenv("BB_ARM_CPU_CACHE");
   const bool cache_identity=code_profile||(cache_path&&*cache_path)||(getenv("BB_ARM_CPU_CACHE_IDENTITY")&&std::string_view(getenv("BB_ARM_CPU_CACHE_IDENTITY"))=="1");
   if(cache_identity){
    s.code_files=std::make_unique<BbStaticCode::Files>(b,image.at(),std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
   }
+#endif
+#ifdef BB_CPU_BACKEND_BBCPU
+  std::optional<BbCpuArtifact::Admitted> static_cpu;
+  fs::path static_library;
+  if(const char* library=getenv("BB_RECOMP_LIB");library&&*library){
+   static_library=library;
+   try{
+    static_cpu=BbCpuArtifact::Admit(b,image.ptr,static_library,private_path);
+    std::printf("BBCPU STATIC admitted effective_identity=%s; original source/patch bytes verified before runtime detours\n",static_cpu->effective_identity.c_str());
+   }catch(const std::exception& error){
+    std::fprintf(stderr,"BBCPU STATIC rejected reason=%s fallback=bbcpu-own-translator; disk artifact preserved\n",error.what());
+   }
+  }
+#endif
   std::unique_ptr<Mapping> resource_stubs;
   if(const char* enabled=getenv("BB_ARM_RESOURCE_HOOKS");enabled&&enabled[0]=='1'){
    check(graphics||heap_fixture,"resource detours require graphics or authored fixture");
@@ -615,12 +668,14 @@ int game_main(int argc,char** argv){
   }
   std::unique_ptr<Mapping> game_menu_stubs;
   if(graphics&&!heap_fixture)ArmGameMenu::Install(b,image,game_menu_stubs);
+#ifndef BB_CPU_BACKEND_BBCPU
   if(s.code_files){
    s.code_files->Finalize(std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
    s.code_files->Report(runtime_work/"cpu-code-manifest.json");
    if(code_profile)s.code_output=std::make_unique<CodeMapOutput>(runtime_work/("cpu-code-"+std::to_string(getpid())+".map"));
    printf("ARM CPU CODEMAP static_bytes=%zu excluded_mutated_pages=%zu relocated_pages=%zu retained_hash_bytes=%zu; profiling only, JIT budget unchanged\n",s.code_files->EligibleBytes(),s.code_files->ModifiedPages(),s.code_files->RelocationPages(),s.code_files->RetainedHashBytes());
   }
+#endif
   runtime_quicksave_bind(image.ptr,b.size);
   std::printf("ARM BOOT image=%#lx bytes=%llu native=%u linked=%u missing=%u\n",image.at(),b.size,native,linked,missing);
   for(auto m:b.modules)if(m.tls_module)runtime_set_module_tls(m.tls_module,static_cast<uint8_t*>(image.ptr)+m.tls_address,m.tls_filesz,m.tls_memsz);
@@ -644,6 +699,27 @@ int game_main(int argc,char** argv){
    bbprototype_configure_heap(image.at(),text_end,image.at()+b.modules.at(0).base,bb_arm_call,bb_arm_heap_publish,bb_arm_heap_valid);
   }
   auto vr=s.veneers.GetExecutableRanges();printf("ARM VENEER layout=%s guest_pages=%zu guest_virtual_bytes=%zu; no native execution of guest stubs\n",s.veneers.LayoutName(),vr.size(),vr.size()*Page);s.ranges.insert(s.ranges.end(),vr.begin(),vr.end());
+#ifdef BB_CPU_BACKEND_BBCPU
+  auto hle_site=[](void* context,uintptr_t address,size_t bytes){
+   auto& state=*static_cast<State*>(context);
+   auto range=state.veneers.QueryExecutableRange(address);
+   if(!range&&state.ordinary_unwind){auto r=state.ordinary_unwind->Range();if(address>=r.Begin&&address-r.Begin<r.Size)range=r;}
+   return range&&bytes<=range->Size&&address-range->Begin<=range->Size-bytes;
+  };
+  s.bridge=std::make_unique<HleCallService>(s.registry,valid,&s,failure,&s,executable,&s,"BBCPU_HLE");
+  bbcpu_set_stack_release(runtime_low_release);
+  s.cpu=std::make_unique<BbCpu::BbcpuBackend>(*s.bridge,hle_site,&s);
+  // The borrowed fd pins the actual bytes admitted above. Never resolve the
+  // original pathname again between digest verification and dlopen.
+  if(static_cpu){
+   static_cpu->library->Unchanged();
+   const auto descriptor=static_cpu->library->FdPath().string();
+   check(!setenv("BB_RECOMP_LIB",descriptor.c_str(),1),"bbcpu static descriptor unavailable");
+   bbcpu_recomp_load(image.at());
+   check(!setenv("BB_RECOMP_LIB",static_library.c_str(),1),"bbcpu static environment restore failed");
+   static_cpu.reset();
+  }else std::puts("BBCPU static input absent; own translator/interpreter retained");
+#else
   s.bridge=std::make_unique<HleGuestBridge>(s.registry,valid,&s,failure,&s,executable,&s,s.code_files?code_file:nullptr,&s,s.code_output.get());auto cpu=Core::FexGuestCpuBackend::Create(*s.bridge);check(std::holds_alternative<std::unique_ptr<Core::FexGuestCpuBackend>>(cpu),"FEX create failed");s.cpu=std::move(std::get<std::unique_ptr<Core::FexGuestCpuBackend>>(cpu));
   if(const char* reserve=getenv("BB_ARM_JIT_RESERVE_MIB")){
    check(std::string_view(reserve)=="16"||std::string_view(reserve)=="128","unsupported startup JIT reserve");
@@ -689,6 +765,7 @@ int game_main(int argc,char** argv){
    }
   }
   s.ranges.push_back(s.cpu->ReturnRange());s.ranges.push_back(s.cpu->CallbackReturnRange());
+#endif
   std::sort(s.ranges.begin(),s.ranges.end(),[](auto a,auto b){return a.Begin<b.Begin;});s.ranges.erase(std::unique(s.ranges.begin(),s.ranges.end(),[](auto a,auto b){return a.Begin==b.Begin&&a.Size==b.Size&&a.Executable==b.Executable&&a.Writable==b.Writable;}),s.ranges.end());
   s.permanent.Build(s.ranges);s.permanent_count=s.ranges.size();std::printf("ARM RANGE static-index=%d bytes=%zu; guest VMAs and temporary stacks retain live validation\n",s.fast_ranges,s.permanent.Bytes());
   std::optional<std::jthread> mapping_status_thread;

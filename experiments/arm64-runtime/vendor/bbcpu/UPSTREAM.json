@@ -1,0 +1,72 @@
+{
+  "generated_game_assets_included": false,
+  "license": "GPL-2.0-or-later",
+  "local_patches": [
+    {
+      "added_files": {
+        "src/recomp/abi.h": "351f92e6afbe71ad3e26ae0bc80bdce3afef3c3a596f2d07359048de3c53552d"
+      },
+      "files": {
+        "src/cpu/bbcpu.h": "8d27551b1a6acea10e4be8501d12f9c3fbf9cd529457c3e1293565172b3651c8",
+        "src/cpu/cpu.c": "854e19c5caaeaa50007bc22c03afbfa2de1eb9efe926f0eac8c8f4274d1e9a84",
+        "src/cpu/cpu_internal.h": "173999b08f7cffd8d70db8861cbedfe314b0cfb5f8c2408ce8d952a691a64e9f",
+        "src/cpu/decode.c": "3a9bee94a6d474ad267b379fa20d44c317904dabe896c0a1d925e7fe34b532b1",
+        "src/cpu/interp.c": "16803883e5f4368c5dae40c15923b75e5812ac79a45cca2cf51f4afe8a386475",
+        "src/cpu/recomp.c": "4d197b9350c30b08bc203eae26049742c73b5560116ea88619511625730542fd",
+        "src/recomp/rc.h": "9006722564d916de55050b620704c7734768a6863c89621560f0377568c4b1e7",
+        "tools/recomp/bbrecomp.c": "ff04c3ebcb409a4a71809327671557736d2575132bdd6abbde8f4565f41d8d7b",
+        "tools/recomp/build_library.py": "d78e9a9e9fc36c402407bcc8a01beb0f5b9baf8581321cec62cb24bddb8ff9f2"
+      },
+      "purpose": "Independent CPU embedding and static runtime: owned complete frames, seven SysV arguments, bounded HLE admission, authoritative executable spans, native TSC ABI5, generated ABI refusal, static-function span checks, owned stop propagation and thread resource cleanup; no FEX execution dependency"
+    }
+  ],
+  "repository": "https://github.com/bloodborne-native/bloodborne-recomp",
+  "revision": "56f8f91a31b311c01233a00ba572545d4c3f4ecb",
+  "schema": 1,
+  "upstream_files": {
+    "LICENSE": "edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6",
+    "README.md": "0af86176f977927b049dc09657a85a3f5c477c70c8974ce3e80111e9eedee6da",
+    "annotations/functions.tsv": "47fc3e41fda9e0a3792bcbd2628633eed93574fb2dbb6e999046d4992616c70c",
+    "annotations/structs.h": "02fbadf81daeb3472fff6a878b4cad84420660b890f194332b199fb7da714030",
+    "build.sh": "31c678fbc5e2242c2566aa3274a73237dfba122532cc35ac335265a0260c6101",
+    "src/cpu/a64.h": "0009339909bd2b65cfb094f406da6abb6c0284016b8cce02c7e6a5eefc4992bc",
+    "src/cpu/bbcpu.h": "b8a90fa38af145cdbd34a85c8a0a026841631ab8ed5c8a286ad0b43496c78828",
+    "src/cpu/cpu.c": "5399b8bf741933b0502ae4312601b4c2692419344af5200ac4afd886a9bd96b2",
+    "src/cpu/cpu_internal.h": "994b58c11590c9c433110d2eb0a4b6a26e390c6e9cb55812f06e926cd7fd3d52",
+    "src/cpu/decode.c": "da9047f7b3f5979824bc63053ddcb72d3db69960b9cc688ff777d3c6f92d4498",
+    "src/cpu/hostcall.S": "7ebaa2d4e83d648dc41476fe3c0877ddef7087c24a0fd4fa889347d52042871e",
+    "src/cpu/interp.c": "3baa61441cb06cdeda4483ff847ecc95d9d6c30eaad6ffab72b0a91f52de9d03",
+    "src/cpu/interp_vec.c": "306ccf19dcbbc9bbe5c0b9ef23e45cfebde1fd12336d75e0190cbc1ff7606d7e",
+    "src/cpu/interp_x87.c": "9fd8195b70265469289539b3a7fc7e71939d2132113d590059b281d4e9ad52d0",
+    "src/cpu/jit_arm64.c": "796ddc6b506cc9283d477a974f1e383ab7181087f51a3b9406d58f72db764261",
+    "src/cpu/native.c": "a4b226882ac25cd33498fb9900b009f8c9ef3b4c61b59b0da6c04210713a3e90",
+    "src/cpu/recomp.c": "b64c606d2d7a7b43aaf6a8bce9e1e7fcea48c501905871dea1927448fedb2392",
+    "src/cpu/record.c": "090c9422c8590564324887aa562966c9ee2724a6392c1043daa063746cf5a4cb",
+    "src/cpu/record.h": "356984f10f72688e7f4399219633ee2666fd697430cb85f57c2019245e3347e7",
+    "src/cpu/trace.h": "6c79f2b37c60199312581442ecc218d7900ca005788c864fe318bc34f0063b4f",
+    "src/native/bbnative.h": "4bb74ff1c42ce0e449b7b39d095d3caf2c4667ccdabeb432f8b3d933fcfd617b",
+    "src/recomp/rc.h": "091a181ad23134839526a9ce182245ac4e36d41e011f510ddbab76829aa9c142",
+    "tools/recomp/bbrecomp.c": "3f897fe5f096148945487b4f60f5eabd73fec8c035354c211c4437841d11a992",
+    "tools/recomp/build_library.py": "d022b7bf7729dbef5d64f66f1f6ee63b7c69651c19224c9c5fbadc557d2b026b",
+    "tools/recomp/fuzz.sh": "1e2de37ce6c5bb954016b56c30665cca6a107909f4592149cf45a0a771367ee5",
+    "tools/recomp/ghidra/Decompile.java": "39d89bfb183387419efd8f01736ef914cd81b57c3f0daeb5f1a4890c1559a7f1",
+    "tools/recomp/import_names.inc": "46fed8987aa85efb3a853a45755be955474feb99d812a0994bdecc38109775f9",
+    "tools/recomp/imports.py": "ebacc6baa0bb94f722134bd230294432e7a4997d8f43b82abb7ce74b5f074c34",
+    "tools/recomp/inspect.sh": "d42578ce0bda6e60011d6394bf4ccb375481b2217438ae10a2c5f5977252790e",
+    "tools/recomp/label.py": "e4a710fe701e28f5e6db4393a01b7409a2b93fe0f364f47cceddfe0fe40db74b",
+    "tools/recomp/native.sh": "078666c0a17b2298c8c086959342d979fe7528cb2a7e851aa8ef0b8b7c00a129",
+    "tools/recomp/pointers.py": "eb1a428b0d5280d8d562a07a90d4ba127d49c148b1b03f84332cee0972782e64",
+    "tools/recomp/profile.py": "74c58292865b47dd1d3dda53c598d6f5c22d9fbcee683029ff2373c10b45f490",
+    "tools/recomp/ps4elf.py": "a241d86c0813cb7aff786c09f2d01917574a066a5e6028ef3e1a76dbc85672ae",
+    "tools/recomp/recomp.sh": "c6d0992b66c831af6684d458f683a7359948b62496050c8dee67b44bffff2036",
+    "tools/recomp/replay.c": "77afa95ef7125d63cbf7f69d531b796d12c2de2bb0a33fac9843a9d42aa02c3f",
+    "tools/recomp/replay.sh": "a60ef978b2e802d9ddcfdaa6395b7399e7608a7ac07aeb7e385ef26f5b1ddb34",
+    "tools/recomp/sample_guest.py": "ed80fb0144931a90c1dfafc772dc38a8156dd8d851daf76e8d71ebdd44aa60b9",
+    "tools/recomp/scan.c": "973693284739ab97e19926230b2657260e5ef673eb5e0d94122125c98afc71b1",
+    "tools/recomp/sdkless/assert.h": "52c845d4abce205fc89e6ae18286ce3a02d09e01db19d761c147b14c0d61593c",
+    "tools/recomp/sdkless/setjmp.h": "f72c182f00b571785efb8ba77c6406ba87599b2d2e2e6f8bdd0505e8522b3cc6",
+    "tools/recomp/sdkless/stdlib.h": "f72c182f00b571785efb8ba77c6406ba87599b2d2e2e6f8bdd0505e8522b3cc6",
+    "tools/recomp/sdkless/string.h": "c9771fbf89d03006a15f9a8193011a256e044688cd0f22e34795cd9cccb24eb6",
+    "tools/recomp/toolchain.sh": "6a7798d58b423a23587b896636b70fee1b15238b34952e7ebf4a37c75ed7d3f9"
+  }
+}

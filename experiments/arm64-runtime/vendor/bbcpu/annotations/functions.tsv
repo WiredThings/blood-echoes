@@ -1,0 +1,222 @@
+# The project's own names for the game's functions (docs/RECOMPILATION.md, "Annotations"), by
+# offset in the 1.09 executable's image. Columns: offset, name, confidence, evidence, signature.
+# Sorted by offset, one row per function; no tabs and no "*/".
+# Name: Namespace::Class::method, #variant for a second copy of one method. Gnm:: is Sony's
+# libGnm (linked into the game); CG:: is Dantelion2's CoreGraphics2, whose own classes use a CG
+# prefix; FD4:: is FromSoftware's engine above it (the libraries of tools/recomp/label.py). FX:: is the visual effects
+# (the project's guess for a family of renderers that write their vertices each frame).
+# DL:: is Dantelion2's core library (its DL-prefixed classes); FMOD::, Scaleform:: and hk:: (Havok) are
+# the middleware the game links.
+# Class names are the project's unless the evidence is "source".
+# Confidence: sure (what the function does is established) or guess.
+# Evidence: pm4 (a libGnm function, from the packets it writes; bloodborne-runtime's
+# gpu/shim/bbport_gnm_table.inc), calls (the functions it calls and how its arguments reach them),
+# source (a source path in its messages names the class).
+# message (a message or label in it names the function or its class: an error text, a profiler
+# label, the singletons it asserts on).
+# Signature: the arguments in register order, in the project's types (empty: not worked out yet).
+# Types named CG:: are described in annotations/structs.h (CG::DrawState: CgDrawState).
+0x658d0	Scaleform::Mutex::lock	sure	calls
+0x65930	Scaleform::Mutex::unlock	sure	calls
+0x422270	hk::CriticalSection::enter	sure	calls
+0x422340	hk::CriticalSection::leave	sure	source
+0x43b7e0	hk::Matrix4::setTransform	sure	calls	void (const float (*transform)[16], float (*matrix)[16])
+0x43d4d0	hk::QsTransform::toMatrix	sure	calls	void (const hk::QsTransform *, float (*matrix)[16])
+0x44b9d0	hk::Matrix3::multiply	sure	calls	void (float (*result)[12], const float (*a)[12], const float (*b)[12])
+0x76b150	hk::Cloth::meshDeform	guess	message	void (void *deformer, void *buffers, uint64_t)
+0x9b3a10	hk::AnimatedSkeleton::samplePose	guess	calls	void (float time, void *, void *character, void *animation, const float *reference_pose, void *, void *, int32_t bone_count, int32_t float_count, int32_t, void **pose)
+0xd1acd0	FMOD::CriticalSection::enter	sure	calls
+0xd1acf0	FMOD::CriticalSection::leave	sure	calls
+0xe4b060	FD4::ConstantBuffer::setVectors	sure	calls	void (FD4::ConstantBuffer *, uint32_t first_register, uint32_t count, const float (*)[4])
+0xe553b0	FD4::MaterialTextures::bind	guess	calls	bool (FD4::MaterialTextures *, void *pass)
+0xe571d0	FD4::Material::begin	guess	calls	void (FD4::Material *, int32_t technique, void *pass)
+0xe573d0	FD4::Material::apply	guess	calls	bool (FD4::Material *, void *, int32_t technique, void *pass)
+0xe57ad0	FD4::Material::end	guess	calls	void (FD4::Material *, void *pass)
+0xec9000	CG::CullVolume::testBox	guess	calls	bool (const CG::CullVolume *, const float (*box)[8])
+0xedca60	FD4::Material::applyInstanceParameters	guess	calls
+0x1070960	Gnm::Buffer::initAsConstantBuffer	sure	pm4	void (Gnm::Buffer *, uint64_t address, uint32_t size)
+0x1072ed0	Gnm::DrawCommandBuffer::setScratchSize	sure	pm4
+0x1072fd0	Gnm::DrawCommandBuffer::setRenderTargetMask	sure	pm4
+0x1073030	Gnm::DrawCommandBuffer::setAlphaToMaskControl	sure	pm4
+0x1073090	Gnm::DrawCommandBuffer::setBlendControl	sure	pm4
+0x1073100	Gnm::DrawCommandBuffer::setBlendColor	sure	pm4
+0x1073190	Gnm::DrawCommandBuffer::setStencil	sure	pm4
+0x1073320	Gnm::DrawCommandBuffer::setCbControl	sure	pm4
+0x10733a0	Gnm::DrawCommandBuffer::setDepthStencilControl	sure	pm4
+0x1073400	Gnm::DrawCommandBuffer::setStencilOpControl	sure	pm4
+0x1073460	Gnm::DrawCommandBuffer::setDepthEqaaControl	sure	pm4
+0x10734c0	Gnm::DrawCommandBuffer::setDepthStencilDisable	sure	pm4
+0x1073520	Gnm::DrawCommandBuffer::setDepthBoundsRange	sure	pm4
+0x1073590	Gnm::DrawCommandBuffer::setDepthClearValue	sure	pm4
+0x10735f0	Gnm::DrawCommandBuffer::setStencilClearValue	sure	pm4
+0x1073650	Gnm::DrawCommandBuffer::setHardwareScreenOffset	sure	pm4
+0x10736d0	Gnm::DrawCommandBuffer::setGuardBandClip	guess	pm4
+0x1073750	Gnm::DrawCommandBuffer::setGuardBandDiscard	guess	pm4
+0x1073840	Gnm::DrawCommandBuffer::setRenderTargetClearColor	guess	pm4
+0x10738b0	Gnm::DrawCommandBuffer::setRenderTarget	sure	pm4
+0x10739b0	Gnm::DrawCommandBuffer::setDepthRenderTarget	sure	pm4
+0x1073e60	Gnm::DrawCommandBuffer::dmaData	sure	pm4
+0x1073f50	Gnm::DrawCommandBuffer::prefetchIntoL2	sure	pm4
+0x1073fe0	Gnm::DrawCommandBuffer::setPrimitiveType	sure	pm4
+0x1074040	Gnm::DrawCommandBuffer::setIndexOffset	sure	pm4
+0x10740a0	Gnm::DrawCommandBuffer::drawIndex#inline	guess	pm4
+0x10741b0	Gnm::DrawCommandBuffer::drawIndexAuto	sure	pm4
+0x10742f0	Gnm::DrawCommandBuffer::setBaseIndirectArgs	sure	pm4	void (Gnm::DrawCommandBuffer *, uint64_t address)
+0x1074360	Gnm::DrawCommandBuffer::drawIndex	sure	pm4
+0x1074420	Gnm::DrawCommandBuffer::drawIndexOffset	sure	pm4
+0x10744d0	Gnm::DrawCommandBuffer::drawIndirect	sure	pm4
+0x10746f0	Gnm::DrawCommandBuffer::drawIndexIndirect	sure	pm4
+0x1074c50	Gnm::DrawCommandBuffer::dispatch	sure	pm4
+0x1074de0	Gnm::DrawCommandBuffer::dispatchIndirect	sure	pm4
+0x1074f90	Gnm::DrawCommandBuffer::setVertexReuseEnable	sure	pm4
+0x1075270	Gnm::DrawCommandBuffer::setIndexSize	sure	pm4
+0x10752c0	Gnm::DrawCommandBuffer::setIndexBuffer	sure	pm4
+0x1075370	Gnm::DrawCommandBuffer::setNumInstances	sure	pm4
+0x1075960	Gnm::DrawCommandBuffer::setVgtControl	sure	pm4
+0x1075da0	Gnm::DrawCommandBuffer::triggerEvent	sure	pm4
+0x1075e10	Gnm::DrawCommandBuffer::flushShaderCachesAndWait	guess	pm4
+0x1076030	Gnm::DrawCommandBuffer::setActiveShaderStages	sure	pm4
+0x10760c0	Gnm::DrawCommandBuffer::allocateFromCommandBuffer	sure	pm4
+0x10761a0	Gnm::DrawCommandBuffer::setVsharpInUserData	sure	pm4
+0x1076240	Gnm::DrawCommandBuffer::setTsharpInUserData	sure	pm4
+0x10762f0	Gnm::DrawCommandBuffer::setSsharpInUserData	sure	pm4
+0x1076390	Gnm::DrawCommandBuffer::setPointerInUserData	sure	pm4
+0x1076560	Gnm::DrawCommandBuffer::setVertexQuantization	sure	pm4
+0x10765e0	Gnm::DrawCommandBuffer::setViewport	sure	pm4
+0x10766d0	Gnm::DrawCommandBuffer::setViewportScissor	sure	pm4	void (Gnm::DrawCommandBuffer *, uint32_t viewport, int32_t left, int32_t top, int32_t right, int32_t bottom, uint32_t window_offset_disable)
+0x1076790	Gnm::DrawCommandBuffer::setScreenScissor	sure	pm4
+0x1076980	Gnm::DrawCommandBuffer::setViewportTransformControl	sure	pm4
+0x10769e0	Gnm::DrawCommandBuffer::setDbRenderControl	sure	pm4
+0x1076ab0	Gnm::DrawCommandBuffer::setDbCountControl	sure	pm4
+0x1076b30	Gnm::DrawCommandBuffer::setClipControl	sure	pm4
+0x1076e00	Gnm::DrawCommandBuffer::setPrimitiveSetup	sure	pm4
+0x1076e60	Gnm::DrawCommandBuffer::setLineWidth	sure	pm4
+0x1076fa0	Gnm::DrawCommandBuffer::setPolygonOffsetClamp	sure	pm4
+0x1077000	Gnm::DrawCommandBuffer::setPolygonOffsetZFormat	sure	pm4
+0x1077070	Gnm::DrawCommandBuffer::setPolygonOffsetFront	sure	pm4
+0x10770e0	Gnm::DrawCommandBuffer::setPolygonOffsetBack	sure	pm4
+0x1077150	Gnm::DrawCommandBuffer::setScanModeControl	sure	pm4
+0x10771c0	Gnm::DrawCommandBuffer::setAaSampleCount	sure	pm4
+0x1077240	Gnm::DrawCommandBuffer::setAaSampleCount#internal	sure	pm4
+0x1077350	Gnm::DrawCommandBuffer::setCentroidPriority	sure	pm4
+0x10773b0	Gnm::DrawCommandBuffer::setCentroidPriority#internal	sure	pm4
+0x10778f0	Gnm::DrawCommandBuffer::writeAtEndOfPipe	sure	pm4
+0x1077b30	Gnm::DrawCommandBuffer::waitOnAddress	sure	pm4
+0x1077f40	Gnm::DrawCommandBuffer::waitForGraphicsWrites	guess	pm4
+0x10781d0	Gnm::DrawCommandBuffer::waitOnCe	sure	pm4
+0x1078220	Gnm::DrawCommandBuffer::incrementDeCounter	sure	pm4
+0x10784a0	Gnm::DrawCommandBuffer::prepareFlip	sure	pm4
+0x108a350	Gnm::DispatchCommandBuffer::dispatch	sure	pm4
+0x108aad0	Gnm::DispatchCommandBuffer::setVsharpInUserData	guess	pm4
+0x108ab60	Gnm::DispatchCommandBuffer::setTsharpInUserData	guess	pm4
+0x108ac90	Gnm::DispatchCommandBuffer::setPointerInUserData	guess	pm4
+0x108b0f0	Gnm::DispatchCommandBuffer::writeReleaseMemEvent	guess	pm4
+0x108b330	Gnm::DispatchCommandBuffer::callCommandBuffer	guess	pm4
+0x11fd190	Gnm::ConstantCommandBuffer::incrementCeCounter	sure	pm4
+0x11fd1e0	Gnm::ConstantCommandBuffer::incrementCeCounterForDispatchDraw	guess	pm4
+0x11fd230	Gnm::ConstantCommandBuffer::waitOnDeCounterDiff	sure	pm4
+0x11fd280	Gnm::ConstantCommandBuffer::writeToCpRam	guess	pm4
+0x11fd320	Gnm::ConstantCommandBuffer::cpRamDump	guess	pm4
+0x12acfa0	Sprj::ParamList::selectActive	guess	calls	void *(void *)
+0x1399bf0	Sprj::EventFlagManager::getFlag	sure	message	bool (void *, uint32_t flag)
+0x193ac10	Sprj::World::update	guess	message	void (float frame_time, void *world)
+0x1d34880	FD4::Skeleton::getBoneMatrices	guess	calls	uint32_t (const FD4::Skeleton *, float (*matrices)[12], uint32_t count, uint32_t first)
+0x1d37400	FD4::ModelInstance::updateBoundsAndSkinning	guess	calls	void (FD4::ModelInstance *, void *)
+0x1d3ae20	FD4::Skeleton::getWorldBoneMatrices	guess	calls	int (const FD4::Skeleton *, float (*matrices)[12], uint32_t count, uint32_t first)
+0x1d6f9d0	FD4::ModelInstance::submit	guess	calls	void (FD4::ModelInstance *, void *, void *render_parameters)
+0x207e780	DL::ConditionSignal::signal	sure	source
+0x207e8f0	DL::ConditionSignal::reset	guess	source
+0x207ee90	DL::LightMutex::lock	sure	source
+0x207f070	DL::LightMutex::unlock	sure	source
+0x207f1f0	DL::ReadWriteLock::destroy	sure	source
+0x207f250	DL::ReadWriteLock::destroy#2	guess	source
+0x207f2b0	DL::ReadWriteLock::init	sure	source
+0x207f3d0	DL::ReadWriteLock::writeLock	sure	source
+0x207f4a0	DL::ReadWriteLock::tryWriteLock	sure	source
+0x207f540	DL::ReadWriteLock::unlock#3	guess	source
+0x207f5c0	DL::ReadWriteLock::unlock#2	guess	source
+0x207f640	DL::ReadWriteLock::readLock	sure	source
+0x207f710	DL::ReadWriteLock::unlock	sure	source
+0x2084110	DL::PthreadMutex::lock	sure	source
+0x2084290	DL::PthreadMutex::unlock	sure	source
+0x2168a20	CG::GraphicsContext::updateConstantBuffer	guess	calls
+0x2168ca0	CG::GraphicsContext::setTopology	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, uint32_t topology)
+0x2168cb0	CG::GraphicsContext::setIndexBuffer	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, const CG::Buffer *, uint32_t format, uint32_t offset)
+0x2168cc0	CG::GraphicsContext::setVertexBuffers	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, uint32_t first_slot, uint32_t count, const CG::Buffer *const *buffers, const uint32_t *strides, const uint32_t *offsets)
+0x2168e00	CG::GraphicsContext::setVertexShader	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, const CG::Shader *)
+0x2168f30	CG::GraphicsContext::setHullShader	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, const CG::Shader *)
+0x2168f60	CG::GraphicsContext::setDomainTextures	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, uint32_t first_slot, uint32_t count, const CG::Texture *const *)
+0x2168ff0	CG::GraphicsContext::setDomainConstantBuffers	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, uint32_t first_slot, uint32_t count, const CG::ConstantBuffer *const *)
+0x2169060	CG::GraphicsContext::setDomainShader	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, const CG::Shader *)
+0x2169190	CG::GraphicsContext::setGeometryShader	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, const CG::Shader *)
+0x21692e0	CG::GraphicsContext::setPixelTextures	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, uint32_t first_slot, uint32_t count, const CG::Texture *const *)
+0x2169370	CG::GraphicsContext::setPixelConstantBuffers	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, uint32_t first_slot, uint32_t count, const CG::ConstantBuffer *const *)
+0x21693e0	CG::GraphicsContext::setPixelShader	sure	calls	void (CG::GraphicsContext *, CG::DrawState *, const CG::Shader *)
+0x21695c0	CG::GraphicsContext::dispatch	sure	calls	void (CG::GraphicsContext *, const CG::ComputeState *, uint32_t x, uint32_t y, uint32_t z)
+0x21696c0	CG::GraphicsContext::draw	sure	calls	void (CG::GraphicsContext *, const CG::DrawState *, uint32_t vertex_count, uint32_t base_vertex)
+0x2169780	CG::GraphicsContext::drawIndexed	sure	calls	void (CG::GraphicsContext *, const CG::DrawState *, uint32_t index_count, uint32_t first_index, uint32_t base_vertex)
+0x2169840	CG::GraphicsContext::drawInstanced	sure	calls	void (CG::GraphicsContext *, const CG::DrawState *, uint32_t vertex_count, uint32_t instances, uint32_t base_vertex)
+0x2169900	CG::GraphicsContext::drawIndexedInstanced	sure	calls	void (CG::GraphicsContext *, const CG::DrawState *, uint32_t index_count, uint32_t instances, uint32_t first_index, uint32_t base_vertex)
+0x21699d0	CG::GraphicsContext::drawIndirect	sure	calls	void (CG::GraphicsContext *, const CG::DrawState *, const CG::Buffer *arguments, uint32_t offset)
+0x2169ab0	CG::GraphicsContext::drawIndexedIndirect	sure	calls	void (CG::GraphicsContext *, const CG::DrawState *, const CG::Buffer *arguments, uint32_t offset)
+0x2190be0	CG::ImmediateDraw::drawUserPrimitives	sure	calls	void (CG::ImmediateDraw *, uint32_t topology, uint32_t vertex_count, const void *vertices, uint32_t stride)
+0x2190d30	CG::ImmediateDraw::drawIndexedUserPrimitives	sure	calls	void (CG::ImmediateDraw *, uint32_t topology, uint32_t min_index, uint32_t max_index, uint32_t index_count, const void *indices, uint32_t index_format, const void *vertices, uint32_t stride)
+0x21b8710	FD4::JobSystem::runAndWait	guess	calls	void (FD4::JobGroup *)
+0x21c3f60	FD4::MaterialParameters::begin	guess	calls	void (FD4::MaterialParameters *, void *state_cache, void *pass)
+0x21c41a0	FD4::MaterialParameters::end	guess	calls	void (FD4::MaterialParameters *, void *state_cache, void *pass)
+0x21c8c50	CG::SkinningBuffer::update	guess	calls	void (CG::SkinningBuffer *, const float (*current)[12], const float (*previous)[12], uint32_t)
+0x21cfb30	CG::ModelRenderer::drawModel	sure	calls	void (const CG::Model *model, void *materials, void *pass, uint32_t instance_count, void **instances, bool)
+0x21d0640	CG::MeshRenderer::drawMesh	sure	calls	void (const CG::Model *model, void *pass, const CG::Mesh *mesh, const void *, const void *, uint32_t instances)
+0x227e230	FD4::SceneNode::collect	guess	calls	void (FD4::SceneNode *, void *pass)
+0x22bc720	FD4::LightRenderer::drawLightBatches	sure	calls
+0x22bd110	FD4::LightRenderer::drawLightBatches#2	guess	calls
+0x22bdb00	FD4::LightRenderer::drawLightBatches#3	guess	calls
+0x22be4f0	FD4::LightRenderer::drawLightBatches#4	guess	calls
+0x2382eb0	FD4::TextRenderer::drawString	guess	calls
+0x261a1b0	memcpy	sure	calls	void *(void *destination, const void *source, size_t size)
+0x261af30	memcpy#blocks	sure	calls	void (void *destination, const void *source, size_t size)
+0x263abe0	DL::Semaphore::destroy#2	guess	source
+0x263ac50	DL::Semaphore::destroy	sure	source
+0x263acc0	DL::Semaphore::create	sure	source
+0x263ae00	DL::Semaphore::wait	sure	source
+0x263af90	DL::Semaphore::tryWait	sure	source
+0x263b050	DL::Semaphore::signal#2	guess	source
+0x263b0d0	DL::Semaphore::signal	sure	source
+0x26adb90	CG::ResourceBinder::uploadConstants	guess	calls	void (void *, CG::ResourceBinder *, CG::DrawState *, const CG::ConstantBuffer *, const void *data)
+0x26b2670	CG::SurfaceOps::copyBuffer	sure	calls
+0x26b2810	CG::SurfaceOps::copyBuffers	sure	calls
+0x26b2f40	CG::SurfaceOps::copyTexture	sure	calls
+0x26b4ef0	CG::SurfaceOps::clearTexture	sure	calls
+0x26b5380	CG::SurfaceOps::fillBuffer	sure	calls
+0x26b55a0	CG::SurfaceOps::resolve	sure	calls
+0x26b5a70	CG::SurfaceOps::eliminateFastClear	sure	calls
+0x26b5f50	CG::SurfaceOps::clearDepthStencil	guess	calls
+0x26b6810	CG::SurfaceOps::decompressDepth	sure	calls
+0x26b7b60	CG::toGnmPrimitiveType	sure	calls	uint32_t (uint32_t topology)
+0x26b9850	CG::ResourceSyncContext::synchronize	guess	source	void (CG::ResourceSyncContext *, Gnm::DrawCommandBuffer *)
+0x26bba30	CG::InputAssemblyState::apply	sure	calls	void (CG::InputAssemblyState *, CG::GraphicsContext *, const CG::DrawState *, bool indexed)
+0x26bc2e0	CG::ResourceBinder::beforeDraw	guess	calls	void (CG::ResourceBinder *, CG::GraphicsContext *, const CG::DrawState *)
+0x26bc320	CG::ResourceBinder::commitGraphics	guess	calls	void (CG::ResourceBinder *, CG::GraphicsContext *, const CG::DrawState *)
+0x26cbd50	CG::ResourceBinder::afterDraw	guess	calls	void (CG::ResourceBinder *, CG::GraphicsContext *)
+0x26cbe50	CG::ResourceBinder::beforeDispatch	sure	calls	void (CG::ResourceBinder *, CG::GraphicsContext *, const CG::ComputeState *)
+0x26cbe90	CG::ResourceBinder::commitCompute	sure	calls	void (CG::ResourceBinder *, CG::GraphicsContext *, const CG::ComputeState *)
+0x26ccf20	CG::ResourceBinder::afterDispatch	guess	calls	void (CG::ResourceBinder *, CG::GraphicsContext *, const CG::ComputeState *)
+0x26cd400	CG::ResourceBinder::setComputeShader	guess	calls
+0x26cd5d0	CG::ResourceBinder::commitComputePass	guess	calls
+0x26ce110	CG::ResourceBinder::endComputePass	guess	calls
+0x26d2230	CG::OutputMergerState::apply	sure	calls	void (CG::OutputMergerState *, CG::GraphicsContext *, const CG::DrawState *)
+0x26d3370	CG::RasterizerState::apply	sure	calls	void (CG::RasterizerState *, CG::GraphicsContext *, const CG::DrawState *)
+0x26db1b0	CG::UploadRing::allocate	guess	calls	int (CG::UploadRing *, void **memory, CG::GraphicsContext *, uint32_t size)
+0x26db300	CG::UploadRing::finish	guess	calls	void (CG::UploadRing *, const CG::Buffer **buffer, uint32_t *offset, CG::GraphicsContext *)
+0x28ec760	FX::PrimitiveRenderer::draw#1	guess	calls
+0x28efc10	FX::PrimitiveRenderer::draw#2	guess	calls
+0x28f05f0	FX::PrimitiveRenderer::draw#3	guess	calls
+0x28f14b0	FX::PrimitiveRenderer::draw#4	guess	calls
+0x28f1dc0	FX::PrimitiveRenderer::draw#5	guess	calls
+0x28f40a0	FX::PrimitiveRenderer::draw#6	guess	calls
+0x28f51c0	FX::PrimitiveRenderer::draw#7	guess	calls
+0x28f83e0	FX::PrimitiveRenderer::draw#8	guess	calls
+0x28f89a0	CG::UploadRing::map	guess	calls
+0x28f8a30	CG::UploadRing::draw	guess	calls	void (CG::GraphicsContext *, CG::UploadRing *, uint32_t primitive, uint32_t index_count, uint32_t vertex_count, uint32_t stride, const int32_t *, const int32_t *)
+0x292f510	CG::ShaderProgram::bind	sure	calls	void (const CG::ShaderProgram *, void *draw_state_builder)
+0x2ba84a0	Lua::luaV_execute	sure	message	void (lua_State *, int)

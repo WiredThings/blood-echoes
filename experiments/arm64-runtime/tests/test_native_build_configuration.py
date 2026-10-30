@@ -142,6 +142,20 @@ class Configuration(unittest.TestCase):
         manifest=self.root/'bad.json';manifest.write_text(json.dumps({'../outside.h':['x']}))
         result=subprocess.run([sys.executable,str(D/'tools/generate_gpu.py'),'--source-root',str(D),'--output-dir',str(self.root/'bad-generated'),'--header-manifest',str(manifest)],capture_output=True,text=True,timeout=10)
         self.assertNotEqual(result.returncode,0);self.assertFalse((self.root/'bad-generated/gpu_adapters.cpp').exists())
+    def test_independent_bbcpu_uses_shared_generators_and_exact_renderer(self):
+        from configure_bbcpu_build import plan as bbcpu_plan
+        value=bbcpu_plan(source_root=D,renderer_source_root=D,renderer_build=self.build,
+            build_dir=self.root/'bbcpu',generated_dir=self.root/'bbcpu-generated',dependency_prefixes=[self.prefix])
+        normal=self.make_plan()
+        self.assertEqual(value['renderer'],normal['renderer'])
+        self.assertEqual(value['cpu_backend'],'bbcpu')
+        self.assertFalse(value['fex_linkage'])
+        self.assertFalse(any('FEXCORE' in item or 'bb_fex_embedding' in item for item in value['configure']))
+        self.assertIn('-DBB_ARM64_CPU_HOST_LIBRARY='+str(self.build/'libbbgpu.dylib'),value['configure'])
+        gpu=value['generators'][1]
+        self.assertEqual(gpu[gpu.index('--renderer-source-root')+1],str(self.renderer))
+        self.assertEqual(value['generators'][0][:3],normal['generators'][0][:3])
+        self.assertFalse((self.root/'bbcpu-generated').exists())
     def test_native_generator_preserves_algorithm_with_authored_ast(self):
         source=self.root/'source';runtime=source/'vendor/bb_runtime/src';runtime.mkdir(parents=True);(source/'src').mkdir()
         tree=ast.parse((D/'tools/generate_native.py').read_text())

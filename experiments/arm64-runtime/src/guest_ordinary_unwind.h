@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "core/guest_cpu/hle_call_adapter.h"
+#ifdef BB_CPU_BACKEND_BBCPU
+#include "bbcpu.h"
+#else
 #include "core/fex/fex_guest_engine.h"
+#endif
 #include "static_range_index.h"
 #include "bb_darwin_veneer_slab.h"
 #include "bb_cpu_cache_identity.h"
@@ -50,7 +54,13 @@ public:
  Core::GuestCpu::HleCallResult Invoke(Core::GuestCpu::HleCallFrame&frame)const override{
   using Core::GuestCpu::HleCallFailure;
   uintptr_t owner{},rsp{};unsigned depth{};
-  if(!observed_||!AetherPS4::Fex::PrototypeQueryUnwindBoundary(&owner,&depth,&rsp)||!owner||depth!=1||rsp!=frame.rsp)
+  if(!observed_)return HleCallFailure{ENOTSUP,"ordinary unwind boundary"};
+#ifdef BB_CPU_BACKEND_BBCPU
+  const bool boundary=bbcpu_query_boundary(&owner,&depth,&rsp)!=0;
+#else
+  const bool boundary=AetherPS4::Fex::PrototypeQueryUnwindBoundary(&owner,&depth,&rsp);
+#endif
+  if(!observed_||!boundary||!owner||depth!=1||rsp!=frame.rsp)
    return HleCallFailure{ENOTSUP,"ordinary unwind boundary"};
   const auto source=frame.gpr[7];
   // The existing scope is tied to the owning host thread and stack mapping.
