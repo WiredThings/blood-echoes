@@ -63,6 +63,8 @@ inline void Mach(const File& file){
 struct Admitted {
  std::unique_ptr<File> library;
  std::string effective_identity;
+ std::unique_ptr<File> input;
+ BbCpuImage::Layout layout;
 };
 // Must run on the real patched image BEFORE runtime detours. The caller's
 // existing private/bundle authority is still required; a receipt/env is not it.
@@ -70,13 +72,13 @@ template<class Allowed>Admitted Admit(const BbBoot::Boot& boot,const void* image
  Require(library_path.filename()=="librecomp.dylib"&&allowed(library_path),"static library outside selected code authority");
  const auto root=library_path.parent_path(),elf_path=root/"effective.elf",receipt_path=root/"bbcpu.aot-receipt";
  Require(allowed(elf_path)&&allowed(receipt_path),"static descriptor/input outside selected code authority");
- File receipt_file(receipt_path),elf(elf_path);auto library=std::make_unique<File>(library_path);
+ File receipt_file(receipt_path);auto elf=std::make_unique<File>(elf_path);auto library=std::make_unique<File>(library_path);
  Require(receipt_file.Size()==sizeof(Receipt),"static receipt has wrong length");Receipt receipt{};receipt_file.Read(0,&receipt,sizeof(receipt));
  Require(!memcmp(receipt.magic,"BBAOT005",8)&&receipt.abi==5&&receipt.architecture==CPU_TYPE_ARM64&&BbStaticCode::Hex(receipt.header_contract)==BBCPU_ABI_IDENTITY,"static CPU ABI/header contract mismatch");
- Require(elf.Hash()==receipt.elf_sha256&&library->Hash()==receipt.library_sha256,"static input/library digest mismatch");Mach(*library);
- Map map(elf);auto layout=BbCpuImage::ReadLayout(map.Bytes(),boot);
+ Require(elf->Hash()==receipt.elf_sha256&&library->Hash()==receipt.library_sha256,"static input/library digest mismatch");Mach(*library);
+ Map map(*elf);auto layout=BbCpuImage::ReadLayout(map.Bytes(),boot);
  auto observed=BbCpuImage::Normalize(boot,layout,image,[](auto,auto,auto){});
  Require(observed.identity==BbStaticCode::Hex(receipt.effective_identity),"static effective-code identity mismatch");
- receipt_file.Unchanged();elf.Unchanged();library->Unchanged();return {std::move(library),std::move(observed.identity)};
+ receipt_file.Unchanged();elf->Unchanged();library->Unchanged();return {std::move(library),std::move(observed.identity),std::move(elf),std::move(layout)};
 }
 }

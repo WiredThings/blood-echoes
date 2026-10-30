@@ -583,3 +583,7 @@
 "Preparation failed" = "启动准备失败";
 "Launch preparation" = "启动准备";
 "Progress follows preparation stages, not elapsed time." = "进度按准备阶段显示，不代表已耗用时间。";
+
+"Compiling CPU code…" = "正在编译 CPU 代码…";
+
+"Waiting for compiler memory…" = "等待编译所需的内存余量…";

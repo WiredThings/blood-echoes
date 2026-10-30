@@ -52,6 +52,7 @@
 #ifdef BB_CPU_BACKEND_BBCPU
 #include "bbcpu_backend.h"
 #include "bbcpu_static_admission.h"
+#include "bbcpu_static_patch_audit.h"
 #include "bbcpu.h"
 #else
 #include "core/guest_cpu/fex_guest_cpu.h"
@@ -635,6 +636,7 @@ int game_main(int argc,char** argv){
 #endif
 #ifdef BB_CPU_BACKEND_BBCPU
   std::optional<BbCpuArtifact::Admitted> static_cpu;
+  std::unique_ptr<BbCpuPatchAudit::Audit> static_patch_audit;
   fs::path static_library;
   if(const char* library=getenv("BB_RECOMP_LIB");library&&*library){
    static_library=library;
@@ -645,29 +647,48 @@ int game_main(int argc,char** argv){
     std::fprintf(stderr,"BBCPU STATIC rejected reason=%s fallback=bbcpu-own-translator; disk artifact preserved\n",error.what());
    }
   }
+  if(static_cpu&&getenv("BB_CPU_STATIC_PATCH_AUDIT")&&std::string_view(getenv("BB_CPU_STATIC_PATCH_AUDIT"))=="1")
+   static_patch_audit=std::make_unique<BbCpuPatchAudit::Audit>(image.ptr,*static_cpu,runtime_work/"bbcpu-static-mismatches.jsonl");
+  const bool static_patch_audit_active=bool(static_patch_audit);
+  auto static_patch_stage=[&](const char* phase){if(static_patch_audit)static_patch_audit->Step(phase);};
 #endif
   std::unique_ptr<Mapping> resource_stubs;
   if(const char* enabled=getenv("BB_ARM_RESOURCE_HOOKS");enabled&&enabled[0]=='1'){
    check(graphics||heap_fixture,"resource detours require graphics or authored fixture");
    resource_stubs=ArmResourceRuntime::Install(s,image,b,heap_fixture);
   }
+#ifdef BB_CPU_BACKEND_BBCPU
+  static_patch_stage("resource-hooks");
+#endif
   std::unique_ptr<Mapping> extra_heap_stubs;
   if(const char* extra=getenv("BB_ARM_EXTRA_HEAPS");extra&&extra[0]=='1'){
    check(heap_fixture||bool(resource_stubs),"extra heaps require original resource hooks");
    extra_heap_stubs=ArmExtraHeaps::Install(s,image,b,heap_fixture);
   }
+#ifdef BB_CPU_BACKEND_BBCPU
+  static_patch_stage("extra-heaps");
+#endif
   std::unique_ptr<Mapping> travel_stubs;
   if(getenv("BB_DEV_WORLD_WARPER_DIR")||(heap_fixture&&getenv("BB_ARM_TRAVEL_FIXTURE"))){
    check(graphics||heap_fixture,"travel requires graphics or authored fixture");
    travel_stubs=ArmTravel::Install(s,image,b,state,heap_fixture);
   }
+#ifdef BB_CPU_BACKEND_BBCPU
+  static_patch_stage("development-travel");
+#endif
   std::unique_ptr<Mapping> allocation_probe;
   if((getenv("BB_ARM_ALLOCATION_AUDIT")&&graphics)||(heap_fixture&&getenv("BB_ARM_ALLOCATION_AUDIT_FIXTURE"))){
    check(heap_fixture||bool(travel_stubs),"allocation audit requires private validated travel session");
    allocation_probe=ArmAllocation::Install(s,image,b,heap_fixture);
   }
   std::unique_ptr<Mapping> game_menu_stubs;
+#ifdef BB_CPU_BACKEND_BBCPU
+  static_patch_stage("allocation-probe");
+#endif
   if(graphics&&!heap_fixture)ArmGameMenu::Install(b,image,game_menu_stubs);
+#ifdef BB_CPU_BACKEND_BBCPU
+  static_patch_stage("game-menu");
+#endif
 #ifndef BB_CPU_BACKEND_BBCPU
   if(s.code_files){
    s.code_files->Finalize(std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
@@ -677,6 +698,9 @@ int game_main(int argc,char** argv){
   }
 #endif
   runtime_quicksave_bind(image.ptr,b.size);
+#ifdef BB_CPU_BACKEND_BBCPU
+  static_patch_stage("quicksave-binding");
+#endif
   std::printf("ARM BOOT image=%#lx bytes=%llu native=%u linked=%u missing=%u\n",image.at(),b.size,native,linked,missing);
   for(auto m:b.modules)if(m.tls_module)runtime_set_module_tls(m.tls_module,static_cast<uint8_t*>(image.ptr)+m.tls_address,m.tls_filesz,m.tls_memsz);
   runtime_set_main_tls(static_cast<uint8_t*>(image.ptr)+b.main_tls[0],b.main_tls[1],b.main_tls[2],b.main_tls[3]);runtime_thread_attach_main();runtime_set_procparam(static_cast<uint8_t*>(image.ptr)+b.procparam);
@@ -714,11 +738,18 @@ int game_main(int argc,char** argv){
   if(static_cpu){
    static_cpu->library->Unchanged();
    const auto descriptor=static_cpu->library->FdPath().string();
+   static_patch_stage("cpu-owner-before-function-check");
    check(!setenv("BB_RECOMP_LIB",descriptor.c_str(),1),"bbcpu static descriptor unavailable");
+   if(static_patch_audit)bbcpu_recomp_set_mismatch_reporter(BbCpuPatchAudit::Audit::Callback,static_patch_audit.get());
    bbcpu_recomp_load(image.at());
+   bbcpu_recomp_set_mismatch_reporter(nullptr,nullptr);static_patch_audit.reset();
    check(!setenv("BB_RECOMP_LIB",static_library.c_str(),1),"bbcpu static environment restore failed");
    static_cpu.reset();
   }else std::puts("BBCPU static input absent; own translator/interpreter retained");
+  if(getenv("BB_CPU_STATIC_PATCH_AUDIT_ONLY")&&std::string_view(getenv("BB_CPU_STATIC_PATCH_AUDIT_ONLY"))=="1"){
+   check(!bundled&&private_path(runtime_work)&&static_patch_audit_active&&bbcpu_recomp_functions(),"static audit-only requires admitted private startup evidence");
+   std::puts("BBCPU STATIC audit-only complete before guest entry; no save loaded");std::fflush(nullptr);active=nullptr;return 0;
+  }
 #else
   s.bridge=std::make_unique<HleGuestBridge>(s.registry,valid,&s,failure,&s,executable,&s,s.code_files?code_file:nullptr,&s,s.code_output.get());auto cpu=Core::FexGuestCpuBackend::Create(*s.bridge);check(std::holds_alternative<std::unique_ptr<Core::FexGuestCpuBackend>>(cpu),"FEX create failed");s.cpu=std::move(std::get<std::unique_ptr<Core::FexGuestCpuBackend>>(cpu));
   if(const char* reserve=getenv("BB_ARM_JIT_RESERVE_MIB")){

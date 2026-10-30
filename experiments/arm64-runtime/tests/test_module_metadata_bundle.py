@@ -36,6 +36,17 @@ class BundleControls(unittest.TestCase):
  def test_nested_role_must_have_its_own_frozen_runtime_hash(self):
   nested=self.root/'bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal';nested.parent.mkdir(parents=True);nested.write_bytes(self.exe.read_bytes())
   with self.assertRaises(KeyError):self.select(executable=nested)
+ def test_independent_cpu_requires_its_exact_component_and_capabilities(self):
+  role='bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal'
+  self.exe=self.root/role;self.exe.parent.mkdir(parents=True);self.exe.write_bytes(b'authored independent CPU')
+  self.freeze(role)
+  with self.assertRaisesRegex(ValueError,'explicit QA capabilities'):self.select()
+  native=self.root/'NATIVE-METAL.json';model=json.loads(native.read_bytes());model.update(game_runtime='arm64',cpu_backends=['fex','bbcpu']);native.write_text(json.dumps(model))
+  component=self.root/'BBCPU-COMPONENT.json';doc=dict(schema=1,development_only=True,backend='bbcpu',cpu=dict(path=role,sha256=m.digest(self.exe)));component.write_text(json.dumps(doc))
+  self.assertEqual(self.select(),self.root/'vendor/blood_echoes/loader')
+  for change in({'backend':'fex'},{'development_only':False},{'cpu':dict(path='bin/bb-probe-metal',sha256=m.digest(self.exe))},{'cpu':dict(path=role,sha256='0'*64)}):
+   component.write_text(json.dumps({**doc,**change}))
+   with self.subTest(change=change),self.assertRaisesRegex(ValueError,'frozen component'):self.select()
  def test_no_bundle_failure_falls_back_to_developer_tools(self):
   dev=self.project/'tools/prepare_module_metadata.py';dev.parent.mkdir();dev.write_text('# available old developer helper\n')
   self.helper.unlink()

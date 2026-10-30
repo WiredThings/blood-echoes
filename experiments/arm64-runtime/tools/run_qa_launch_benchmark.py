@@ -523,7 +523,7 @@ def main():
  if formal is not None:report.update(formal_native_identity=formal['identity'],execution_profile='staged-formal-bundle-isolated-CLI',source_QA_only_for_clone=True,cache_namespace_policy='empty-base-to-new-namespace-by-original-bootstrap')
  if reference is not None:report.update(reference_native_identity=reference['identity'],execution_profile='original-0.2.51-Rosetta-isolated-CLI',source_QA_only_for_clone=True,cache_namespace_policy='empty-isolated-root-original-reference-policy')
  if a.functional_f3:report.update(original_benchmark_flag_added=False,benchmark_control_overrides={'BB_FRAME_STATS':'1','BB_ARM_QA_PAD_FILE':'isolated existing native QA API'},performance_sample=False,functional_f3_requested=True,incremental_log_events=True,scripted_actions=['Continue before first scene','quicksave API','quickload API','automatic continue observed; no scripted Continue after F3'])
- write(root/'conditions.json',dict(command=command,cwd=str(execution['stage']),environment=env,source_receipt=str(a.receipt),data=str(case['data_root']),user=str(case['user_root']),cache=str(case['cache_root']),pad=str(case['pad']),allowed_changes=allowed_changes,actual_changes=actual_changes,cache_clone=case['cache_clone']))
+ write(root/'conditions.json',dict(command=command,cwd=str(execution['stage']),environment=env,source_receipt=str(a.receipt),data=str(case['data_root']),user=str(case['user_root']),cache=str(case['cache_root']),pad=str(case['pad']),allowed_changes=allowed_changes,actual_changes=actual_changes,cache_clone=case['cache_clone'],cpu_object_seed=case.get('cpu_object_seed')))
  write(root/'result.json',report);print('Evidence:',root,flush=True)
  protection_start=time.monotonic();policy=MemoryPolicy(before)
  reports=[]

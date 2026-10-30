@@ -8,6 +8,14 @@ struct LaunchPreparationProgress: Equatable {
     private(set) var stageKey = "Preparing game…"
     private(set) var failed = false
     private(set) var finished = false
+    private var cpuPlanned = false
+    private struct CPUWork: Decodable {
+        let event: String
+        let done: Int
+        let total: Int
+        let active: Int
+        let capacity: Int
+    }
 
     private static let phases: [String: (Int, Int, String)] = [
         "archive-policy": (2, 5, "Checking preparation cache…"),
@@ -30,6 +38,29 @@ struct LaunchPreparationProgress: Equatable {
             return
         }
         guard !failed, !finished else { return }
+        if line.hasPrefix("CPU preparation planned: "),
+           let value = Self.record(String(line.dropFirst("CPU preparation planned: ".count))),
+           value["backend"] as? String == "bbcpu" {
+            cpuPlanned = true
+            return
+        }
+        if cpuPlanned && line.hasPrefix("CPU preparation progress: ") {
+            let text = String(line.dropFirst("CPU preparation progress: ".count))
+            guard text.utf8.count <= 4096, let data = text.data(using: .utf8),
+                  let work = try? JSONDecoder().decode(CPUWork.self, from: data),
+                  work.event == "compile-progress", (1...8192).contains(work.total),
+                  (0...work.total).contains(work.done), (0...2).contains(work.active),
+                  (0...2).contains(work.capacity) else { return }
+            advance(25 + 70 * work.done / work.total,
+                    work.capacity == 0 && work.done < work.total ? "Waiting for compiler memory…" : "Compiling CPU code…", cpu: true)
+            return
+        }
+        if cpuPlanned && line.hasPrefix("CPU local preparation: "),
+           let value = Self.record(String(line.dropFirst("CPU local preparation: ".count))),
+           value["backend"] as? String == "bbcpu" {
+            advance(100, "Starting game…", cpu: true)
+            return
+        }
         if Self.isFailure(line) {
             fail()
             return
@@ -75,9 +106,10 @@ struct LaunchPreparationProgress: Equatable {
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
-    private mutating func advance(_ value: Int, _ label: String) {
-        guard value >= percent else { return }
-        percent = value
+    private mutating func advance(_ value: Int, _ label: String, cpu: Bool = false) {
+        let adjusted = cpuPlanned && !cpu ? min(25, value / 4) : value
+        guard adjusted >= percent else { return }
+        percent = adjusted
         stageKey = label
     }
 

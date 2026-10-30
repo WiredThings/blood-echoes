@@ -5,10 +5,11 @@ No game selection, saves, UI, FEX execution or renderer implementation lives
 here. The existing launcher supplies the effective input and selected tools.
 """
 from pathlib import Path
-import argparse, concurrent.futures, fcntl, hashlib, importlib.util, json, os
+import argparse, fcntl, hashlib, importlib.util, json, os
 import shlex, shutil, stat, struct, subprocess, tempfile, threading, time, uuid
 from local_metal_builder import canonical, child_directory, regular_bytes, tool_fingerprint
 from native_package_assets import Relocator, commands, loads, _system
+from bbcpu_compile_schedule import Memory as CompileMemory,run as compile_schedule
 
 SOURCE=Path(__file__).resolve().parents[1]
 VENDOR=SOURCE/'vendor/bbcpu'
@@ -51,6 +52,8 @@ def work_root(path):
  return root
 def content_closure(rows,entry):
  return dict(executable=rows[str(entry.resolve())],dependencies=sorted(value for path,value in rows.items()if path!=str(entry.resolve())))
+def compile_flags(resource,includes):
+ return [*original.CFLAGS,'-DBBCPU_NATIVE_TSC=1','-isystem',str(resource),'-isystem',str(VENDOR/'tools/recomp/sdkless'),*[value for path in includes for value in('-I',str(path))]]
 
 class Producer:
  def __init__(self,args):
@@ -59,7 +62,11 @@ class Producer:
   self.logs=child_directory(self.root,'logs',create=True)
   self.session=uuid.uuid4().hex;self.log_sequence=0
  def pin(self,path):
-  row=snapshot(path);self.pins[row['path']]=row;return row
+  row=snapshot(path)
+  with self.mutex:self.pins[row['path']]=row
+  return row
+ def increment(self,name):
+  with self.mutex:self.count[name]+=1
  def run(self,argv,name,*,env=None,timeout=900):
   with self.mutex:self.log_sequence+=1;sequence=self.log_sequence
   result=subprocess.run(list(map(str,argv)),env=env or self.env,capture_output=True,text=True,timeout=timeout)
@@ -93,11 +100,12 @@ class Producer:
   # cannot masquerade as machine-code dependencies.
   tag=source.stem;preprocessed=scratch/(tag+'.i');deps=scratch/(tag+'.d')
   self.run([self.a.compiler,*flags,'-E','-P','-MD','-MF',deps,'-MT','bbcpu',source,'-o',preprocessed],'preprocess-'+tag)
-  self.count['preprocessor_processes']+=1
+  self.increment('preprocessor_processes')
   deptext=deps.read_text().replace('\\\n','');need(deptext.startswith('bbcpu:'),'unexpected CPU dependency output')
   for name in shlex.split(deptext[len('bbcpu:'):]):
    path=Path(name).resolve(strict=True);self.pin(path)
-   if not path.is_relative_to(self.root):self.pins[str(path.parent)]=snapshot(path.parent,True)
+   if not path.is_relative_to(self.root):
+    with self.mutex:self.pins[str(path.parent)]=snapshot(path.parent,True)
   fingerprint=key(dict(schema=1,compiler=salt,options=original.CFLAGS,clock='native-tsc-abi5',preprocessed_sha256=digest(preprocessed)))
   index=objects/(fingerprint+'.json')
   if index.exists():
@@ -107,11 +115,11 @@ class Producer:
    if file.parent==objects and file.is_file()and old.get('key')==fingerprint:
     before=snapshot(file)
     if digest(file)==old.get('sha256')and snapshot(file)==before:
-     self.count['object_reuses']+=1;return file,fingerprint
+     self.increment('object_reuses');return file,fingerprint
    shutil.copyfile(index,objects/(fingerprint+'-old-index-'+uuid.uuid4().hex+'.json'))
   output=objects/(fingerprint+'-'+uuid.uuid4().hex+'.o')
   self.run([self.a.compiler,*flags,'-x','c','-c',preprocessed,'-o',output],'compile-'+tag)
-  self.count['object_compiles']+=1
+  self.increment('object_compiles')
   write_json(index,dict(schema=1,key=fingerprint,file=output.name,sha256=digest(output)))
   return output,fingerprint
  def prepare(self):
@@ -167,7 +175,7 @@ class Producer:
    resource=Path(self.run([a.compiler,'-print-resource-dir'],'resource',timeout=15).strip()).resolve(strict=True)/'include'
    need(resource.is_dir(),'selected compiler resource headers absent')
    include=[VENDOR/'src',*a.include];sdkless=VENDOR/'tools/recomp/sdkless'
-   flags=[*original.CFLAGS,'-DBBCPU_NATIVE_TSC=1','-isystem',str(resource),'-isystem',str(sdkless),*[value for path in include for value in('-I',str(path))]]
+   flags=compile_flags(resource,include)
    compiler_key=key(compiler)
    for directory in [resource,sdkless,*include]:
     directory=directory.resolve(strict=True);self.pins[str(directory)]=snapshot(directory,True)
@@ -186,8 +194,12 @@ class Producer:
    self.run([a.tools/'bbrecomp',effective/'effective.elf',functions,gen/'recomp.c','@'+str(listing)],'generate',env=env);self.count['generator_processes']+=1
    sources=sorted(gen.glob('recomp*.c'));need(sources and len(sources)<=8192,'invalid generated source count')
    # Limit concurrent compilers; no game/GPU runs alongside this producer.
-   with concurrent.futures.ThreadPoolExecutor(max_workers=a.jobs)as pool:
-    compiled=list(pool.map(lambda source:self.object(source,flags,compiler_key,objects,scratch),sources))
+   memory=CompileMemory()
+   try:
+    compiled=compile_schedule(sources,lambda source:self.object(source,flags,compiler_key,objects,scratch),
+      maximum=2 if a.jobs=='auto'else int(a.jobs),observe=memory,
+      progress=lambda **row:emit('compile-progress',**row))
+   finally:memory.close()
    function_count=len(offsets);source_count=len(sources)
   else:
    compiled=reusable_compiled;linker=saved['linker'];self.count['object_reuses']=len(compiled)
@@ -230,7 +242,7 @@ def main():
  p=argparse.ArgumentParser(description=__doc__)
  for name in('effective','work','tools','abi','compiler','linker','sdk'):p.add_argument('--'+name,type=Path,required=True)
  p.add_argument('--dependency-root',type=Path,action='append',required=True);p.add_argument('--include',type=Path,action='append',default=[])
- p.add_argument('--jobs',type=int,choices=(1,2),default=1);a=p.parse_args()
+ p.add_argument('--jobs',choices=('auto','1','2'),default='auto');a=p.parse_args()
  a.compiler=a.compiler.resolve(strict=True);a.linker=a.linker.resolve(strict=True);a.sdk=a.sdk.resolve(strict=True);a.tools=a.tools.resolve(strict=True);a.abi=a.abi.resolve(strict=True);a.work=work_root(a.work)
  lock=os.open(a.work/'.bbcpu-writer.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
  try:

@@ -583,3 +583,7 @@
 "Preparation failed" = "Preparation failed";
 "Launch preparation" = "Launch preparation";
 "Progress follows preparation stages, not elapsed time." = "Progress follows preparation stages, not elapsed time.";
+
+"Compiling CPU code…" = "Compiling CPU code…";
+
+"Waiting for compiler memory…" = "Waiting for compiler memory…";

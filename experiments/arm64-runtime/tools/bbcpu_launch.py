@@ -4,7 +4,7 @@ Development authority is explicit. This never creates/selects a save, starts
 FEX, changes restart codes, or implements a second supervisor.
 """
 from pathlib import Path
-import hashlib,json,os,plistlib,shutil,stat,subprocess,sys,tempfile,time,uuid
+import hashlib,json,os,plistlib,selectors,shutil,signal,stat,subprocess,sys,tempfile,time,uuid
 
 PRIVATE=(Path('/private/tmp'),Path('/Users/Shared/BloodEchoesDevelopment'))
 def need(value,reason):
@@ -27,6 +27,39 @@ def publish(path,value):
     fd,name=tempfile.mkstemp(prefix=path.name+'-',dir=path.parent)
     with os.fdopen(fd,'w')as stream:json.dump(value,stream,sort_keys=True);stream.write('\n')
     os.replace(name,path)
+def stream_cpu_command(argv,*,environment,log,timeout):
+    """Stream bounded progress to the existing launcher's output collector."""
+    process=subprocess.Popen(list(map(str,argv)),env=environment,stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,start_new_session=True)
+    selector=selectors.DefaultSelector();selector.register(process.stdout,selectors.EVENT_READ)
+    started=time.monotonic();output=bytearray();pending=bytearray()
+    try:
+        with log.open('wb')as trace:
+            while selector.get_map():
+                if time.monotonic()-started>timeout:raise TimeoutError('CPU preparation deadline; completed objects retained')
+                for key,_ in selector.select(.25):
+                    raw=os.read(key.fd,65536)
+                    if not raw:selector.unregister(key.fileobj);continue
+                    trace.write(raw);trace.flush();output.extend(raw);pending.extend(raw)
+                    need(len(output)<=16*1024*1024 and len(pending)<=1024*1024,'CPU preparation output bound')
+                    while b'\n'in pending:
+                        line,_,rest=pending.partition(b'\n');pending=bytearray(rest)
+                        if line.startswith(b'{'):
+                            event=json.loads(line)
+                            if event.get('event')=='compile-progress':
+                                print('CPU preparation progress: '+json.dumps(event),flush=True)
+            code=process.wait(timeout=5)
+        return subprocess.CompletedProcess(argv,code,output.decode(errors='replace'),'')
+    finally:
+        selector.close();process.stdout.close()
+        # Only this new preparation process group, never a game/supervisor.
+        try:os.killpg(process.pid,signal.SIGTERM)
+        except ProcessLookupError:pass
+        try:process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            try:os.killpg(process.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+            process.wait()
 def private(path):
     p=owned(path,True);need(any(p.is_relative_to(root)and p!=root for root in PRIVATE),'bbcpu development authority must stay isolated')
     return p
@@ -89,8 +122,12 @@ def prepare(executable,arguments,environment,*,stage,project,runner=subprocess.r
     def run(argv,tag):
         # A serial full-game first build can exceed an hour. This is a bounded
         # preparation deadline, independent from the short live-game QA budget.
-        result=runner(list(map(str,argv)),env=safe,capture_output=True,text=True,timeout=7200 if tag=='static-library'else 3600)
-        log=root/(tag+'-'+uuid.uuid4().hex+'.log');log.write_text(result.stdout+result.stderr)
+        log=root/(tag+'-'+uuid.uuid4().hex+'.log')
+        if tag=='static-library'and runner is subprocess.run:
+            result=stream_cpu_command(argv,environment=safe,log=log,timeout=7200)
+        else:
+            result=runner(list(map(str,argv)),env=safe,capture_output=True,text=True,timeout=7200 if tag=='static-library'else 3600)
+            log.write_text(result.stdout+result.stderr)
         need(result.returncode==0,'bbcpu '+tag+' failed; isolated diagnostic: '+str(log))
         return result.stdout
     exported=selected is None
@@ -103,7 +140,7 @@ def prepare(executable,arguments,environment,*,stage,project,runner=subprocess.r
         publish(index,dict(schema=1,inputs=pins,directory=str(selected),products=[state(selected/name)for name in('effective.elf','pointers.txt','effective-input.json')]))
     toolchain=doc['toolchain']
     products=root/'products';products.mkdir(mode=0o700,exist_ok=True);private(products)
-    argv=[sys.executable,paths['producer'],'--effective',selected,'--work',products,'--tools',paths['scanner'].parent,'--abi',paths['abi'],'--jobs','1']
+    argv=[sys.executable,paths['producer'],'--effective',selected,'--work',products,'--tools',paths['scanner'].parent,'--abi',paths['abi'],'--jobs','auto']
     for name in('compiler','linker','sdk'):argv+=['--'+name,toolchain[name]]
     roots={str(Path(path).resolve(strict=True))for path in toolchain['dependency_roots']}
     # Admit the final relocated tool closure as well as the explicit original

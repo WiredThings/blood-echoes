@@ -24,7 +24,11 @@ inline HelperSelection SelectHelper(const std::filesystem::path&actual){
  const auto project=fs::path(BB_PROTOTYPE_ROOT);
  bool application=false;for(const auto&part:executable)if(part.extension()==".app")application=true;
  if(application){
- for(const auto&role:{fs::path("bin/bb-probe-metal"),fs::path("bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal")}){
+ for(const auto&role:{fs::path("bin/bb-probe-metal"),fs::path("bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal")
+#ifdef BB_CPU_BACKEND_BBCPU
+  ,fs::path("bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal")
+#endif
+ }){
   auto root=executable;for(const auto&part:role){(void)part;root=root.parent_path();}
   if(root/role!=executable)continue;
   const auto app=root.parent_path().parent_path().parent_path();

@@ -7,6 +7,26 @@ final class LaunchPreparationProgressTests: XCTestCase {
         "Metal preparation phase: {\"phase\":\"\(name)\",\"event\":\"\(event)\",\"outcome\":\"\(outcome)\"}"
     }
     private let done = "Metal local preparation: {\"status\":\"prepared\"}"
+    func testCPUUsesOriginalProgressWithoutPrematureMetalCompletion() {
+        var p = LaunchPreparationProgress()
+        p.consume("CPU preparation planned: {\"backend\":\"bbcpu\"}")
+        p.consume(done); XCTAssertEqual(p.percent, 25)
+        p.consume("CPU preparation progress: {\"event\":\"compile-progress\",\"done\":192,\"total\":384,\"active\":2,\"capacity\":2}")
+        XCTAssertEqual(p.percent, 60); XCTAssertEqual(p.stageKey, "Compiling CPU code…")
+        p.consume("CPU preparation progress: {\"event\":\"compile-progress\",\"done\":200,\"total\":384,\"active\":1,\"capacity\":0}")
+        XCTAssertEqual(p.stageKey, "Waiting for compiler memory…")
+        p.consume("CPU local preparation: {\"backend\":\"bbcpu\"}"); XCTAssertEqual(p.percent, 100)
+        p.consume("ARM GPU frontend ready symbols=327"); XCTAssertTrue(p.finished)
+    }
+    func testBadCPUProgressDoesNotBypassBounds() {
+        var p = LaunchPreparationProgress(); p.consume("CPU preparation planned: {\"backend\":\"bbcpu\"}")
+        let before = p
+        for text in ["{}", "{\"event\":\"compile-progress\",\"done\":false,\"total\":2,\"active\":0,\"capacity\":0}",
+                     "{\"event\":\"compile-progress\",\"done\":3,\"total\":2,\"active\":0,\"capacity\":0}",
+                     "{\"event\":\"compile-progress\",\"done\":0,\"total\":384,\"active\":3,\"capacity\":3}"] {
+            p.consume("CPU preparation progress: " + text); XCTAssertEqual(p, before)
+        }
+    }
 
     func testNestedPhasesNeverReverseOrPrematurelyFinish() {
         var p = LaunchPreparationProgress()

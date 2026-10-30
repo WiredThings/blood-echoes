@@ -77,6 +77,23 @@ def _write_new(path, raw):
         stream.write(raw); stream.flush(); os.fsync(stream.fileno())
     need(cache_seed._hash_plain(path) == hashlib.sha256(raw).hexdigest(), 'new copied configuration changed')
 
+def seed_cpu_objects(source_data,data):
+    """Copy owned object-cache bytes only; the real producer revalidates them.
+
+    Do not transplant absolute ready receipts or pretend that the fresh clone
+    is fully prepared. Its own effective export and final admission still run.
+    """
+    source=conditions_reader.canonical(source_data/'bbcpu-preparation/products',directory=True,within=source_data)
+    marker=conditions_reader.canonical(source/'.bbcpu-local-v1',within=source)
+    need(marker.read_bytes()==b'BloodEchoes.bbcpu.local.v1\n','source CPU object cache marker differs')
+    root=data/'bbcpu-preparation';root.mkdir(mode=0o700);target=root/'products';target.mkdir(mode=0o700)
+    _write_new(target/'.bbcpu-local-v1',b'BloodEchoes.bbcpu.local.v1\n')
+    before,hashes=_copy_tree(source/'objects',target/'objects')
+    return dict(source=str(source/'objects'),destination=str(target/'objects'),files=len(hashes),
+                bytes=sum(row[3]for path,row in before.items()if stat.S_ISREG(row[2])),
+                copied_only=True,source_modified=False,ready_receipts_copied=False,
+                real_producer_must_revalidate=True)
+
 
 def create(conditions, cache_admission, *, project, tag, cache_mode='seeded'):
     """Clone only a verified QA selection; original Swift options remain intact.
@@ -145,6 +162,7 @@ def create(conditions, cache_admission, *, project, tag, cache_mode='seeded'):
     cache_result = cache_seed.clone(cache_admission, gpu, project=project, baseline_root=source_gpu,
                                     extra_exclusions=EXCLUSIONS, cache_mode=cache_mode)
     user.mkdir(mode=0o700); data.mkdir(mode=0o700); (data / 'out').mkdir(mode=0o700)
+    cpu_objects=seed_cpu_objects(source_data,data)if source_env.get('BB_CPU_BACKEND')=='bbcpu'else None
     copied_save_nodes, copied_save_hashes = _copy_tree(save_root, user / 'savedata')
     need(copied_save_nodes == save_before and copied_save_hashes == source_save_manifest, 'source save changed after preflight')
     for key, name in conditions_reader.CONFIG_NAMES.items():
@@ -185,5 +203,5 @@ def create(conditions, cache_admission, *, project, tag, cache_mode='seeded'):
         unchanged_environment_sha256=hashlib.sha256(json.dumps(unchanged, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
         source_unchanged=True, source_snapshot=dict(user=str(source_user), savedata=str(save_root),
             savedata_manifest=source_save_manifest, config_sha256=config_sha, input_sha256=dict(inputs.inputs)),
-        cache_clone=cache_result, cache_mode=cache_mode, formal_data_modified=False, game_started=False,
+        cache_clone=cache_result, cpu_object_seed=cpu_objects,cache_mode=cache_mode, formal_data_modified=False, game_started=False,
         source_launch_id=conditions['launch_id'], source_pid=conditions['source_pid'])

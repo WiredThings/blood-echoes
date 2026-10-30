@@ -487,6 +487,14 @@ static int in_set(const OffsetSet *set, uint64_t offset) {
 }
 
 static size_t recomp_used;
+/* Startup-only diagnostics; no ABI/table change and no per-draw/per-call cost. */
+typedef void (*MismatchReporter)(void *, uint64_t, uint64_t, uint64_t, uint64_t);
+static MismatchReporter mismatch_reporter;
+static void *mismatch_context;
+void bbcpu_recomp_set_mismatch_reporter(MismatchReporter reporter, void *context) {
+    mismatch_reporter = reporter;
+    mismatch_context = context;
+}
 
 /* Code the runtime rewrites while the game runs (live switches): the functions that hold it stay
  * with the translator, whose blocks bbcpu_invalidate drops. */
@@ -553,9 +561,15 @@ void bbcpu_recomp_load(uint64_t image_base) {
             continue;
         }
         RcFn fn = functions[i].fn;
-        if (bbcpu_recomp_hash(image_base + functions[i].offset, functions[i].size) != functions[i].hash) {
+        const uint64_t runtime_hash = bbcpu_recomp_hash(image_base + functions[i].offset, functions[i].size);
+        if (runtime_hash != functions[i].hash) {
             fn = hooked_entry(image_base + functions[i].offset, functions[i].size, functions[i].hash, fn);
             if (!fn) {
+                fprintf(stderr, "BBCPU STATIC mismatch offset=%#llx address=%#llx size=%llu compiled_fnv64=%016llx runtime_fnv64=%016llx\n",
+                        (unsigned long long)functions[i].offset, (unsigned long long)(image_base + functions[i].offset),
+                        (unsigned long long)functions[i].size, (unsigned long long)functions[i].hash, (unsigned long long)runtime_hash);
+                if (mismatch_reporter) mismatch_reporter(mismatch_context, functions[i].offset, functions[i].size,
+                                                         functions[i].hash, runtime_hash);
                 ++changed; /* patched since (game patches, hooks elsewhere): the translator runs it */
                 continue;
             }

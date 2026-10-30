@@ -583,3 +583,7 @@
 "Preparation failed" = "啟動準備失敗";
 "Launch preparation" = "啟動準備";
 "Progress follows preparation stages, not elapsed time." = "進度依準備階段顯示，不代表已耗用時間。";
+
+"Compiling CPU code…" = "正在編譯 CPU 程式碼…";
+
+"Waiting for compiler memory…" = "等待編譯所需的記憶體餘量…";

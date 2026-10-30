@@ -322,6 +322,9 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
 
 
 def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None):
+    selected_cpu=os.environ.get('BB_CPU_BACKEND','fex')
+    if selected_cpu not in('fex','bbcpu'):raise ValueError('unsupported selected CPU backend')
+    if selected_cpu=='bbcpu':print('CPU preparation planned: '+json.dumps(dict(backend='bbcpu')),flush=True)
     argv = sys.argv[1:] if argv is None else argv
     if len(argv)<2:
         raise ValueError('expected original executable and native launcher arguments')
