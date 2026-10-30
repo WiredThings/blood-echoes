@@ -4,7 +4,7 @@
 
 ## 当前采用边界
 
-- `BB_MTL_RELAX_VERTEX=1` 精确值才启用；默认关闭，Strict float 模式下仍关闭。现有严格顶点 helper 内联继续保留。
+- 正常启动器默认开启，并传入`BB_MTL_RELAX_VERTEX=1`；底层仍只接受精确值1，未传入时保持原关闭路径。显式关闭会清除继承值并省略该变量，保留旧false缓存身份；已有明确关闭偏好继续生效。Strict float模式仍优先关闭此优化，现有严格顶点helper内联继续保留。
 - 仅 SW Vertex + HW Vertex 且原片元/计算松绑 profile 开启时，移除浮点运算的 NoContraction，并在同一判定下装饰 Position Invariant。ES、LS、GS、TCS、TES 和深度输出不扩展。
 - Metal 编库的 `preserveInvariance` 从实际 SPIR-V 的 Position/Invariant 装饰关联推导；读取捕获输入或 MSL 磁盘缓存时使用同一算法，不依赖一个环境变量冒充输入等价。
 - 上游报告的帧率变化不是本机收益。尚未完成本游戏的画面、深度、速度图和内存 A/B；不得默认启用或声明已采用。
@@ -19,7 +19,7 @@
 - 其它真正不兼容／损坏缓存的原有Clear路径本轮不扩展重构；测试使用内存stub和新私有数据，未拿正式缓存试清理。
 - 本机 game-AOT 增加 schema3、`bb-metal-local-aot-invariant-v1`、显式 `preserve_invariance: true` 和独立键。实际离线命令增加 `-fpreserve-invariance`；收据、源摘要、工具身份和库摘要仍严格绑定。
 - schema1/2 原请求与键不变。完整 helper-library wrapper 继续拒绝 preserveInvariance，未把 helper 的支持范围一并扩展。
-- opt-in 才使用独立核心缓存标签和 `vertex-invariant-v1` PSO 子目录；关闭时保留原目录/标签。旧缓存不删除、不清空、不覆盖；实际 MSL/选项相同的产物仍走已有跨 cohort 验证复用。
+- 启用时使用独立核心缓存标签和 `vertex-invariant-v1` PSO 子目录；关闭时保留原目录/标签。旧缓存不删除、不清空、不覆盖；实际 MSL/选项相同的产物仍走已有跨 cohort 验证复用。
 
 ## 工具链选择修复
 

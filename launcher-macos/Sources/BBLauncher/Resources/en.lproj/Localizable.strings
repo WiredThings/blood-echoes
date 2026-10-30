@@ -307,7 +307,7 @@
 "Clear the existing scene copy directly" = "Clear the existing scene copy directly";
 "Inline strict vertex math" = "Inline strict vertex math";
 "Optimize vertex math with position invariance" = "Optimize vertex math with position invariance";
-"Experimental upstream vertex arithmetic. Uses separate compiled variants; gameplay image and performance validation is pending." = "Experimental upstream vertex arithmetic. Uses separate compiled variants; gameplay image and performance validation is pending.";
+"About 1.5% faster in matched standing-scene tests. Uses separate variants; Strict math still takes precedence. Broader visual validation is pending." = "About 1.5% faster in matched standing-scene tests. Uses separate variants; Strict math still takes precedence. Broader visual validation is pending.";
 "Preserve scene-texture compression eligibility" = "Preserve scene-texture compression eligibility";
 "Merge MetalFX alpha upscaling" = "Merge MetalFX alpha upscaling";
 "Reclaim idle staging backing" = "Reclaim idle staging backing";

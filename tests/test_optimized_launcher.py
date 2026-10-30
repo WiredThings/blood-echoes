@@ -37,6 +37,23 @@ class OptimizedLauncherTests(unittest.TestCase):
         return subprocess.run(['bash', str(self.repo / 'tools/macos/run_optimized.sh')],
                               env=self.env, text=True, capture_output=True, timeout=10)
 
+    def test_vertex_choice_passes_through_without_a_shell_default_or_strict_override(self):
+        for name in ['out/bb-probe-metal', 'out/gpu-metal/libbbgpu.dylib']:
+            path = self.repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+            path.chmod(0o755)
+        self.env.update(BB_RENDERER='metal', BB_MTL_RELAX_VERTEX='1', BB_MTL_STRICT_FLOAT='1')
+        result = self.run_launcher()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        env = json.loads(self.capture.read_text())
+        self.assertEqual(env['BB_MTL_RELAX_VERTEX'], '1')
+        self.assertEqual(env['BB_MTL_STRICT_FLOAT'], '1')
+        self.env.pop('BB_MTL_RELAX_VERTEX')  # The frontend clears this managed OFF key.
+        result = self.run_launcher()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('BB_MTL_RELAX_VERTEX', json.loads(self.capture.read_text()))
+
     def test_native_runtime_paths_and_quicksave_on_off(self):
         for on in ['1', '0']:
             with self.subTest(quicksave=on):

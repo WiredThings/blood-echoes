@@ -11,13 +11,13 @@
 | shadPS4 [#5524](https://github.com/shadps4-emu/shadPS4/pull/5524) | mip/layer 逐维包含判断，并补齐审阅发现的深度重建逐维联合 extent。 |
 | FEX [#6074](https://github.com/FEX-Emu/FEX/pull/6074) | 六类本地尚缺的 guest load 副作用标记；已有两类保持。真实 FEX 归档摘要决定 CPU 缓存身份，不伪造磁盘格式版本。 |
 | DiAvisoo [8e678b6f](https://github.com/DiAvisoo/bbport-mac-optimized/commit/8e678b6f64112accd5af80c64526b4a14b9c7357) | 可选 UI 补丁目的地检查仅在实际安装／恢复时要求；活动与中断恢复仍严格检查，不误阻普通 Play。 |
-| Huax [77a4bf4d](https://github.com/Huax-1839/bloodborne-macos/commit/77a4bf4d6ab5d06c426014322dadd5fed724cb14) | 仅普通光栅顶点的 contraction + Position Invariant，接完整编译选项、schema3 本机库、捕获与准备身份；默认关闭，并在原前端标为实验性。游戏画面／速度图／性能尚未验收。 |
+| Huax [77a4bf4d](https://github.com/Huax-1839/bloodborne-macos/commit/77a4bf4d6ab5d06c426014322dadd5fed724cb14) | 仅普通光栅顶点的contraction + Position Invariant，接完整编译选项、schema3本机库、捕获与准备身份。同包站桩ABBA约+1.5%；用户决定启动器默认开启，保留明确关闭和已采用实验性标记，补测开启状态F3／死亡后更新本机。 |
 
 ## 审阅发现与当前边界
 
 1. 深度重建不能继续对整个 extent 使用 `std::max`：更多 mip 却更少 layer 会仍建出缺层对象。已改为逐维联合并增加生产表达式原生反例。
 2. Canonical Profile 末字节扩展为有界 feature flags 后，低层 store 仍按 bool 拒绝2/3。已修正实际 codec，普通 bool 仍只接受0/1，未知 feature 位拒绝，实际 Store／typed companion 写读有正反例。
-3. 旧 raw Profile 的74偏移原为 padding。已采用明确116字节的新 feature envelope，默认关闭仍使用旧96字节格式，旧88／96只读取原有命名字段。实际 WarmUp 判定前缀验证256种旧 padding 均复用且 Clear／Save 为0；截断、删前缀、错位、未知位拒绝。独立复核已关闭此问题，不能把新模式当作旧 padding 静默归零。
+3. 旧 raw Profile 的74偏移原为 padding。已采用明确116字节的新 feature envelope，关闭时仍使用旧96字节格式，旧88／96只读取原有命名字段。实际 WarmUp 判定前缀验证256种旧 padding 均复用且 Clear／Save 为0；截断、删前缀、错位、未知位拒绝。独立复核已关闭此问题，不能把新模式当作旧 padding 静默归零。
 4. Metal 跨颜色／深度复制的多 mip、增长层数能力限制原已存在；旧合法成功域在逐维联合后仍满足原断言。本轮不扩写转换 scratch 或伪造支持。
 
 ## 不直接移植的候选
@@ -36,4 +36,8 @@
 
 QA采样已修正冻结CSV仍被当作完成的问题：以整段场景源时钟与宿主wall时钟核对，必须观察到截止时间后的真实推进；保留中间停顿，允许有界的原日志批刷新延迟。57项相关控制通过，父代理统一执行本轮87项控制通过。它们都不代替实际游戏结果。
 
-隔离游戏对照及 F3／死亡回归尚未完成。游戏回归须复用原 Swift 冻结启动条件和现有 QA 控制器；若脚本字节改变，只允许经过审阅的一对精确源投影，不能伪造 receipt 或放宽所有脚本校验。性能采样不使用 Cua、截图或录屏，保持静音、原画质与缓存容量，保留隔离 QA 保护。
+正常隔离运行、同包顶点开关A/B/B/A和独立F2/F3共7轮已完成，压力均为正常级、swap无正增长、源QA存档不变、正常包前后签名通过。顶点关闭49.31FPS、开启50.06FPS，约+1.53%，合计footprint统计差约6.37MiB。用户随后决定启动器默认开启，仍保留关闭选项；它只比较该开关，不能当作其余上游修复的旧版整包收益。
+
+关闭状态的两次死亡回归已通过：在保留两次失败证据、修正脚本并对齐来源配置后，`upstream-private-death-run-1793352135669906000`完成HP归零、world卸载／加载和两次健康恢复，稳定5.09／10.96秒，最终帧时钟实际推进；压力1、swap净增0、源QA存档不变、正常包前后签名通过。初次QA帧表头异常及之后保护中止均不计通过，不能据此单独归因CPU缓存或飞书。详细条件、实际数据、失败及边界见[游戏回归记录](upstream-game-regression-20261030.zh-CN.md)。
+
+游戏回归复用原Swift冻结启动条件和现有QA控制器；默认开启的追加回归只显式变更已授权的顶点标志，保留完整来源检查和其它条件。性能采样不使用Cua、截图或录屏，保持静音、原画质与缓存容量，保留隔离QA保护。用户已授权补测后替换本机正式应用，暂不发布Release。

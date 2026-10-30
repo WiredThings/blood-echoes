@@ -2,12 +2,12 @@ import XCTest
 @testable import BBLauncher
 
 final class MetalOptimizationTests: XCTestCase {
-    func testInvariantVertexChoiceIsOffAndDoesNotAddAnUnchangedCompileOption() {
+    func testInvariantVertexDefaultsOnAndClearsInheritedOnWhenDisabled() {
         let option = MetalOptimizations.all.first { $0.id == "BB_MTL_RELAX_VERTEX" }
-        XCTAssertEqual(option?.defaultOn, false)
-        XCTAssertEqual(option?.evidence, .experimental)
+        XCTAssertEqual(option?.defaultOn, true)
+        XCTAssertEqual(option?.evidence, .adoptedExperimental)
         var prefs = LauncherPrefs()
-        XCTAssertNil(MetalOptimizations.environment(prefs: prefs)["BB_MTL_RELAX_VERTEX"])
+        XCTAssertEqual(MetalOptimizations.environment(prefs: prefs)["BB_MTL_RELAX_VERTEX"], "1")
         prefs.extraEnv = "BB_MTL_RELAX_VERTEX=1"
         prefs.metalOptimizations["BB_MTL_RELAX_VERTEX"] = false
         let off = OptimizedProfile(prefs: prefs, game: GameSettings())
@@ -15,6 +15,33 @@ final class MetalOptimizationTests: XCTestCase {
         XCTAssertNil(off["BB_MTL_RELAX_VERTEX"])
         prefs.metalOptimizations["BB_MTL_RELAX_VERTEX"] = true
         XCTAssertEqual(MetalOptimizations.environment(prefs: prefs)["BB_MTL_RELAX_VERTEX"], "1")
+    }
+
+    func testInvariantVertexDoesNotOverrideStrictMath() {
+        let env = OptimizedProfile(prefs: LauncherPrefs(), game: GameSettings())
+            .applyingEnvironment(to: ["BB_MTL_STRICT_FLOAT": "1"])
+        XCTAssertEqual(env["BB_MTL_RELAX_VERTEX"], "1")
+        XCTAssertEqual(env["BB_MTL_STRICT_FLOAT"], "1")
+    }
+
+    func testInvariantVertexLegacyPreferencesRemainReadOnlyAndPreserveOff() throws {
+        let name = "bbport.vertex-default.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(["BB_MTL_DIRECT_COPY": true], forKey: "metalOptimizations")
+        var prefs = LauncherPrefs.load(from: defaults)
+        XCTAssertEqual(MetalOptimizations.environment(prefs: prefs)["BB_MTL_RELAX_VERTEX"], "1")
+        XCTAssertNil(defaults.dictionary(forKey: "metalOptimizations")?["BB_MTL_RELAX_VERTEX"])
+        defaults.set("BB_MTL_RELAX_VERTEX=0", forKey: "extraEnv")
+        prefs = LauncherPrefs.load(from: defaults)
+        XCTAssertEqual(prefs.metalOptimizations["BB_MTL_RELAX_VERTEX"], false)
+        XCTAssertNil(MetalOptimizations.environment(prefs: prefs)["BB_MTL_RELAX_VERTEX"])
+        defaults.set(["BB_MTL_RELAX_VERTEX": false], forKey: "metalOptimizations")
+        defaults.set("BB_MTL_RELAX_VERTEX=1", forKey: "extraEnv")
+        prefs = LauncherPrefs.load(from: defaults)
+        XCTAssertEqual(prefs.metalOptimizations["BB_MTL_RELAX_VERTEX"], false)
+        prefs.save(to: defaults)
+        XCTAssertEqual(LauncherPrefs.load(from: defaults).metalOptimizations["BB_MTL_RELAX_VERTEX"], false)
     }
 
     func testRequiredNativeHostIsNotAnOptionalFexToggle() {
@@ -66,13 +93,13 @@ final class MetalOptimizationTests: XCTestCase {
         let optionalHost = MetalOptimizations.nativeHostAvailable ? 1 : 0
         XCTAssertEqual(MetalOptimizations.all.count, 37 + optionalHost)
         XCTAssertEqual(Set(MetalOptimizations.all.map(\.id)).count, 37 + optionalHost)
-        XCTAssertEqual(MetalOptimizations.adopted.count, 21 + optionalHost)
-        XCTAssertEqual(MetalOptimizations.optionalExperiments.count, 16)
+        XCTAssertEqual(MetalOptimizations.adopted.count, 22 + optionalHost)
+        XCTAssertEqual(MetalOptimizations.optionalExperiments.count, 15)
         let prefs = LauncherPrefs()
         var game = GameSettings(); game.upscaler = "metalfx"
         let env = OptimizedProfile(prefs: prefs, game: game).environment
         for option in MetalOptimizations.visibleOptions(MetalOptimizations.all, runtime: .legacy) {
-            let expected: String? = option.id == "BB_MTL_RELAX_VERTEX" ? nil : (option.defaultOn ? "1" : "0")
+            let expected: String? = option.defaultOn ? "1" : "0"
             XCTAssertEqual(env[option.id], expected, option.id)
             XCTAssertEqual(option.defaultOn, [.adopted, .adoptedExperimental, .bundle].contains(option.evidence))
             for parent in option.requires { XCTAssertTrue(MetalOptimizations.all.contains { $0.id == parent }) }
@@ -93,7 +120,8 @@ final class MetalOptimizationTests: XCTestCase {
                 var game = GameSettings(); game.upscaler = "metalfx"
                 for parent in option.requires { prefs.metalOptimizations[parent] = true }
                 let env = OptimizedProfile(prefs: prefs, game: game, runtime: runtime).environment
-                XCTAssertEqual(env[option.id], option.defaultOn ? "0" : "1", option.id)
+                let expected: String? = option.id == "BB_MTL_RELAX_VERTEX" ? nil : (option.defaultOn ? "0" : "1")
+                XCTAssertEqual(env[option.id], expected, option.id)
             }
         }
     }

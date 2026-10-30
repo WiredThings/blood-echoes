@@ -2,7 +2,7 @@
 
 [English](README.md) · [下载 Latest](https://github.com/WiredThings/blood-echoes/releases/latest) · [使用指南](docs/USER_GUIDE.zh-CN.md) · [分支改动与第三方来源](docs/THIRD_PARTY_CHANGES.md)
 
-开发分支的 ARM64 版本默认增量准备本机 Metal 库和管线；普通暖启动可复用未变化的已完成准备，F3 保留原会话快速恢复。它与下文的 Latest Release 分开，见[复用规则与验收记录](experiments/arm64-runtime/docs/ordinary-warm-reuse.zh-CN.md)。
+开发分支的macOS 27+ ARM64版本使用FEX游戏运行时和原生Metal后端，无需Rosetta 2；默认增量准备本机Metal库和管线，普通暖启动复用未变化的已完成准备，F3保留原会话快速恢复。最新整合加入缓存／纹理范围修复及默认开启、可关闭的顶点运算优化。它与下文的Latest Release分开，见[复用规则](experiments/arm64-runtime/docs/ordinary-warm-reuse.zh-CN.md)和[本轮来源与验收](experiments/arm64-runtime/docs/upstream-refresh-20261030.zh-CN.md)。
 
 这是 [DiAvisoo/bbport-mac-optimized](https://github.com/DiAvisoo/bbport-mac-optimized) 的
 **WiredThings 分支**，提供独立 macOS 启动器、**直接 Metal 渲染**、**MetalFX 时域升频**，

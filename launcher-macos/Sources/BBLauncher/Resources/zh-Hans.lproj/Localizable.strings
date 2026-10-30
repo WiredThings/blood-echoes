@@ -307,7 +307,7 @@
 "Clear the existing scene copy directly" = "直接清除现有场景副本";
 "Inline strict vertex math" = "内联严格顶点运算";
 "Optimize vertex math with position invariance" = "通过位置不变性优化顶点运算";
-"Experimental upstream vertex arithmetic. Uses separate compiled variants; gameplay image and performance validation is pending." = "实验性上游顶点运算优化，使用独立编译变体；游戏画面与性能尚待验证。";
+"About 1.5% faster in matched standing-scene tests. Uses separate variants; Strict math still takes precedence. Broader visual validation is pending." = "站桩对照约快 1.5%，使用独立编译变体；Strict 严格运算仍优先，更多场景画面待验证。";
 "Preserve scene-texture compression eligibility" = "保留场景纹理的无损压缩条件";
 "Merge MetalFX alpha upscaling" = "合并 MetalFX Alpha 放大";
 "Reclaim idle staging backing" = "回收闲置暂存内存";

@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Download Latest](https://github.com/WiredThings/blood-echoes/releases/latest) · [User guide](docs/USER_GUIDE.md) · [Changes and third-party credits](docs/THIRD_PARTY_CHANGES.md)
 
-The development ARM64 runtime incrementally prepares local Metal libraries and pipelines by default. Ordinary warm starts reuse unchanged completed preparation; F3 retains its original session recovery. This remains separate from the Latest Release described below. See [reuse rules and validation](experiments/arm64-runtime/docs/ordinary-warm-reuse.zh-CN.md).
+The macOS 27+ development build uses an ARM64 FEX game runtime and native Metal host without Rosetta 2. It incrementally prepares local Metal libraries and pipelines; warm starts reuse unchanged preparation and F3 retains session recovery. The latest integration adds cache/texture-range fixes and default-ON vertex math with an OFF control. This remains separate from the Latest Release below. See [reuse rules](experiments/arm64-runtime/docs/ordinary-warm-reuse.zh-CN.md) and [upstream provenance and validation](experiments/arm64-runtime/docs/upstream-refresh-20261030.zh-CN.md).
 
 A standalone macOS launcher and Bloodborne compatibility runtime with **direct Metal rendering**,
 **temporal MetalFX**, and English, Simplified Chinese and Traditional Chinese launcher interfaces.
@@ -27,7 +27,7 @@ The ARM64 Metal host defaults on in supported macOS 27+ packages; macOS 26 retai
 the in-process renderer. Advanced options provide a fallback switch. See the
 [ownership, measurements and build notes](docs/release/ARM64-METAL-EXPERIMENT.md).
 
-The `dev/arm64-runtime-audit` branch also contains an [isolated FEX CPU prototype](experiments/arm64-runtime/README.md). This unstable source checkpoint is separate from the production runtime and Release; see its [validation and remaining gaps](experiments/arm64-runtime/NIGHT-HANDOFF.zh-CN.md). It is not yet a standalone clean-checkout build target.
+The `dev/arm64-runtime-audit` branch contains the [ARM64/FEX source](experiments/arm64-runtime/README.md), including normal [source-build](experiments/arm64-runtime/tools/build_native_source.py) and [packaging](experiments/arm64-runtime/tools/package_native_from_source.py) entry points. Its development package and local installation remain separate from the published Release; current boundaries are recorded in the [integration report](experiments/arm64-runtime/docs/upstream-refresh-20261030.zh-CN.md).
 
 ## Install and play
 

@@ -335,7 +335,7 @@ struct LauncherPrefs: Equatable {
         // optimization dictionary already exists. A saved checkbox remains authoritative.
         let laterControls: Set<String> = ["BB_TEXTURE_INVALID_RECLAIM", "BB_MTL_CONTINUE_CLEARS", "BB_MTL_DEPTH_LAYOUT",
             "BB_MTL_NATIVE_CLEAR_BATCH", "BB_MTL_MERGE_OVERLAY", "BB_MTL_FILL_UPDATES",
-            "BB_LAYER_USE_CACHE", "BB_MTL_COPY_PAIR", "BB_MTL_RENDER_UPDATES", "BB_MTL_LIBRARY_REUSE", "BB_MTL_HOT_STAGING_REUSE"]
+            "BB_LAYER_USE_CACHE", "BB_MTL_COPY_PAIR", "BB_MTL_RENDER_UPDATES", "BB_MTL_LIBRARY_REUSE", "BB_MTL_HOT_STAGING_REUSE", "BB_MTL_RELAX_VERTEX"]
         for token in p.extraEnv.split(whereSeparator: { $0.isWhitespace }) {
             let pair = token.split(separator: "=", maxSplits: 1)
             if pair.count == 2, laterControls.contains(String(pair[0])),

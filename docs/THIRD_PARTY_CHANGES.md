@@ -10,9 +10,10 @@ Metal engine, community patches or every optimization it integrates.
 Development branch, 2026-10-30 (not a published Release): ports shadPS4 #5570 (LRU early stop),
 #5524 (per-dimension texture extents), the reviewed open #5577 (cache IO counter), FEX #6074
 (observable guest loads), and DiAvisoo 8e678b6f (optional UI validation). Huax's 77a4bf4d
-invariant vertex optimization is integrated as an explicit default-off experiment, including
-local library compilation and versioned profile compatibility. Game/performance acceptance
-remains separate from source/unit review. Sources, review fixes and current verification
+invariant vertex optimization includes local library compilation and versioned profile
+compatibility. A matched stationary M4 ABBA measured about 1.5% more FPS with about
+6 MiB difference in summed process-footprint statistics. The owner selected default ON
+with an explicit OFF control; broader visual validation remains limited. Sources, review fixes and current verification
 limits: [development integration record](../experiments/arm64-runtime/docs/upstream-refresh-20261030.zh-CN.md).
 
 0.2.49 adds local depth/stencil-only pass diagnostics and guarded read-only-to-write continuation (0082–0083), default OFF. These are local adaptations, not an upstream import. Pixel/query validation passes; no M4 FPS benefit is established. See [evidence](release/METAL-DEPTH-LAYOUT.md).
