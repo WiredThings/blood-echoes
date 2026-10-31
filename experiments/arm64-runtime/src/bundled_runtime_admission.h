@@ -9,7 +9,7 @@
 #include <string_view>
 
 namespace BbBundledRuntime {
-enum class Role { CpuTop, CpuNested, Gpu, PsoWorker, ModuleWorker };
+enum class Role { CpuTop, CpuNested, Gpu, PsoWorker, ModuleWorker, BbcpuCpu, BbcpuPreparer };
 struct Admission {
     Role role{};
     std::filesystem::path executable, app, code_root;
@@ -19,7 +19,13 @@ struct Admission {
     bool static_load_edges_verified=false;
     // Existing external signature/dyld validation remains a separate boundary.
     bool dynamic_load_edges_verified=false, signatures_verified=false;
-    bool IsCpu() const { return role==Role::CpuTop || role==Role::CpuNested; }
+    bool IsCpu() const { return role==Role::CpuTop || role==Role::CpuNested || role==Role::BbcpuCpu; }
+    bool IsCpuPreparer() const { return role==Role::BbcpuPreparer; }
+    std::string_view CpuBackend() const {
+        if(role==Role::CpuTop || role==Role::CpuNested)return "fex";
+        if(role==Role::BbcpuCpu || role==Role::BbcpuPreparer)return "bbcpu";
+        return {};
+    }
     bool IsWorker() const { return role==Role::PsoWorker || role==Role::ModuleWorker; }
     const std::filesystem::path& Runtime(std::string_view relative) const { return runtime.at(std::string(relative)); }
 };

@@ -71,7 +71,31 @@ std::map<std::string,std::string> Hashes(id value,size_t limit){
  for(id key in object){auto name=Text(key),digest=Text(object[key]);Need(IsHex(digest),"package SHA256 required");result.emplace(std::move(name),std::move(digest));}return result;
 }
 struct RolePath {Role role;const char*relative;};
-constexpr RolePath Roles[]={{Role::CpuTop,"bin/bb-probe-metal"},{Role::CpuNested,"bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal"},{Role::Gpu,"bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu"},{Role::PsoWorker,"bin/game-pso-preparer"},{Role::ModuleWorker,"bin/game-module-preparer"}};
+constexpr const char* BbcpuCpuPath="bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal";
+constexpr const char* BbcpuPreparerPath="bin/bbcpu-tools/bbcpu-code-preparer";
+constexpr RolePath Roles[]={{Role::CpuTop,"bin/bb-probe-metal"},{Role::CpuNested,"bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal"},{Role::Gpu,"bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu"},{Role::PsoWorker,"bin/game-pso-preparer"},{Role::ModuleWorker,"bin/game-module-preparer"},{Role::BbcpuCpu,BbcpuCpuPath},{Role::BbcpuPreparer,BbcpuPreparerPath}};
+struct CpuKit {
+ std::map<std::string,std::string> files;std::string host;
+ static constexpr const char* Abi="bin/bbcpu-tools/bbcpu-abi-identity.json";
+};
+CpuKit BbcpuKit(NSDictionary*native,const fs::path&code,Ledger&ledger){
+ CpuKit kit;auto mode=Text(At(native,@"game_runtime"));
+ if(mode=="fex-arm64")return kit;
+ Need(mode=="arm64","unknown formal CPU runtime");id names=At(native,@"cpu_backends");
+ Need([names isKindOfClass:[NSArray class]]&&[(NSArray*)names isEqualToArray:@[@"fex",@"bbcpu"]],"explicit independent CPU backends required");
+ auto raw=ledger.Read(code/"BBCPU-COMPONENT.json",Small,true);Need(raw.sha256==Text(At(native,@"cpu_component_sha256")),"CPU component descriptor SHA mismatch");
+ auto doc=Json(raw);Need(One(At(doc,@"schema"))&&!Boolean(At(doc,@"development_only"))&&Text(At(doc,@"backend"))=="bbcpu"&&Text(At(doc,@"default_execution"))=="static"&&One(At(doc,@"runtime_image_export")),"formal static bbcpu component required");
+ for(auto [key,name]:std::initializer_list<std::pair<NSString*,const char*>>{{@"cpu",BbcpuCpuPath},{@"preparer",BbcpuPreparerPath},{@"scanner","bin/bbcpu-tools/bbcpu-scan"},{@"generator","bin/bbcpu-tools/bbrecomp"},{@"abi",CpuKit::Abi}}){
+  auto role=Object(At(doc,key));auto path=Text(At(role,@"path")),sha=Text(At(role,@"sha256"));
+  Need(path==name&&IsHex(sha),"CPU role path/digest mismatch");kit.files.emplace(path,sha);
+ }
+ for(const auto&[name,sha]:Hashes(At(doc,@"runtime_dependencies"),64)){
+  const auto path=fs::path(name);Relative(code,name);
+  Need(name.starts_with("bbcpu-deps/lib/")&&path.extension()==".dylib"&&kit.files.emplace(name,sha).second,"CPU dependency role mismatch");
+  if(path.filename()=="libbbgpu.dylib"){Need(kit.host.empty(),"duplicate CPU renderer host");kit.host=name;}
+ }
+ Need(!kit.host.empty(),"CPU renderer host dependency missing");return kit;
+}
 std::optional<std::pair<RolePath,fs::path>> Locate(const fs::path&executable){
  const auto text=executable.string();for(auto item:Roles){const auto suffix="/"+std::string(item.relative);if(!text.ends_with(suffix))continue;auto code=executable;for(const auto&part:fs::path(item.relative)){(void)part;code=code.parent_path();}
   if(code.filename()=="bbport"&&code.parent_path().filename()=="Resources"&&code.parent_path().parent_path().filename()=="Contents"&&code.parent_path().parent_path().parent_path().extension()==".app")return std::pair(item,code);
@@ -116,8 +140,11 @@ std::optional<Admission> TryAdmit(const fs::path&actual_executable,const fs::pat
  const auto identifier=InfoId(app,ledger);if(identifier!="io.github.bbport.optimized")return std::nullopt;
  Admission result;result.role=selected.role;result.relative_role=selected.relative;result.executable=executable;result.app=app;result.code_root=code;result.bundle_id=identifier;
  auto native=ledger.Read(code/"NATIVE-METAL.json",Small,true);result.native_manifest_sha256=native.sha256;auto object=Json(native);
- Need(One(At(object,@"schema"))&&Text(At(object,@"game_runtime"))=="fex-arm64"&&Boolean(At(object,@"production")),"formal FEX component manifest required");
- result.runtime_sha256=Hashes(At(object,@"frozen_runtime"),32);std::set<std::string> allowed={"bin/gpu-metal/libbbgpu.dylib","bin/gpu-metal-arm64/libbbgpu.dylib","bin/gpu-net/libbbnet.dylib"};for(auto role:Roles)allowed.insert(role.relative);
+ Need(One(At(object,@"schema"))&&Boolean(At(object,@"production")),"formal component manifest required");
+ const auto kit=BbcpuKit(object,code,ledger);
+ if(selected.role==Role::BbcpuCpu||selected.role==Role::BbcpuPreparer)Need(!kit.files.empty(),"selected bbcpu role is not declared");
+ result.runtime_sha256=Hashes(At(object,@"frozen_runtime"),64);std::set<std::string> allowed={"bin/gpu-metal/libbbgpu.dylib","bin/gpu-metal-arm64/libbbgpu.dylib","bin/gpu-net/libbbnet.dylib"};for(size_t i=0;i<5;++i)allowed.insert(Roles[i].relative);
+ for(const auto&[name,sha]:kit.files){allowed.insert(name);Need(result.runtime_sha256.contains(name)&&result.runtime_sha256.at(name)==sha,"frozen CPU kit descriptor differs");}
  for(const auto&[name,digest]:result.runtime_sha256){Need(allowed.contains(name),"unknown frozen runtime role");auto file=Relative(code,name);Need(ledger.Read(file,Large,false).sha256==digest,"frozen runtime SHA mismatch");result.runtime[name]=file;}
  for(auto name:{"bin/gpu-metal/libbbgpu.dylib","bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu","bin/gpu-metal-arm64/libbbgpu.dylib","bin/game-pso-preparer","bin/game-module-preparer"})Need(result.runtime.contains(name),"formal runtime component missing");
  Need(result.runtime.contains("bin/bb-probe-metal")||result.runtime.contains("bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal"),"formal CPU role missing");Need(result.runtime.contains(result.relative_role)&&result.runtime.at(result.relative_role)==executable,"actual executable is not in frozen runtime");
@@ -128,7 +155,18 @@ std::optional<Admission> TryAdmit(const fs::path&actual_executable,const fs::pat
  for(const auto&[name,digest]:result.support_sha256){Need(support.contains(name),"unknown parser closure path");auto file=Relative(code,name);Need(ledger.Read(file,2*Small,false).sha256==digest,"bundled parser SHA mismatch");result.support[name]=file;}
  const auto bootstrap=Text(At(local,@"startup_bootstrap_sha256"));Need(IsHex(bootstrap)&&ledger.Read(code/"tools/macos/local_metal_startup.py",2*Small,false).sha256==bootstrap,"bundled startup SHA mismatch");
  auto parity=Json(ledger.Read(code/"SOURCE-PARITY.json",Small,true));const auto scripts=Hashes(At(parity,@"effective_sources"),32);Need(scripts.size()==16,"complete original script closure required");for(const auto&[name,digest]:scripts)Need(ledger.Read(Relative(code,name),2*Small,false).sha256==digest,"effective script SHA mismatch");
- for(const auto&[name,file]:result.runtime){const auto image=MachO(file,file.extension()==".dylib"?MH_DYLIB:MH_EXECUTE,ledger);
+ for(const auto&[name,file]:result.runtime){
+  if(name==CpuKit::Abi&&kit.files.contains(name)){Json(ledger.Read(file,Small,true));continue;}
+  const auto image=MachO(file,file.extension()==".dylib"?MH_DYLIB:MH_EXECUTE,ledger);
+  if(kit.files.contains(name)){
+   bool host=false;
+   for(const auto&edge:image.edges){const auto resolved=Resolve(file,edge,image.rpaths);bool declared=false;
+    for(const auto&[role,sha]:kit.files)if(role!=CpuKit::Abi&&result.Runtime(role)==resolved){declared=true;break;}
+    Need(declared,"CPU dependency edge escaped frozen kit");host=host||resolved==result.Runtime(kit.host);
+   }
+   if(name==BbcpuCpuPath||name==BbcpuPreparerPath)Need(host,"CPU actual renderer host edge missing");
+   continue;
+  }
   const fs::path*expected=nullptr;if(name=="bin/bb-probe-metal"||name=="bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal")expected=&result.Runtime("bin/gpu-metal/libbbgpu.dylib");
   else if(name=="bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu"||name=="bin/game-pso-preparer"||name=="bin/game-module-preparer")expected=&result.Runtime("bin/gpu-metal-arm64/libbbgpu.dylib");
   if(expected)Need(image.edges.size()==1&&Resolve(file,image.edges.front(),image.rpaths)==*expected,"actual static executable/GPU load edge mismatch");

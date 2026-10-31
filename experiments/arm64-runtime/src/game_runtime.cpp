@@ -463,6 +463,11 @@ int game_main(int argc,char** argv){
   install_faults();
   const auto& bundled=BbBundledRuntime::Actual();
   check(!bundled||bundled->IsCpu(),"runtime executable is not an admitted CPU role");
+#ifdef BB_CPU_BACKEND_BBCPU
+  check(!bundled||bundled->CpuBackend()=="bbcpu","bundled CPU role does not match compiled bbcpu backend");
+#else
+  check(!bundled||bundled->CpuBackend()=="fex","bundled CPU role does not match compiled FEX backend");
+#endif
   fs::path boot,state,app0,content,seed_user,startup,settings_template;bool modules_only=false,graphics=false,heap_fixture=false,resume=false;
   fs::path launcher_patches,launcher_config;const bool launcher_compat=argc>1&&!std::string_view(argv[1]).starts_with("--");unsigned launcher_timeout=0;bool launcher_strict_imports=false;
   if(launcher_compat){
