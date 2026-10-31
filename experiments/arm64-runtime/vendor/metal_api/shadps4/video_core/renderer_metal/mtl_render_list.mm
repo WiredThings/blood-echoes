@@ -482,6 +482,73 @@ struct RenderList::Impl {
     void* last_replayed_encoder = nullptr;
     RenderList::BarrierCounts barriers{};
 
+    // Applied state, not the recording filter (which describes the END of a held list).
+    // No GPU resources are retained. Existing tick retirement owns all object lifetimes.
+    void* barrier_owner = nullptr;
+    RenderList::BarrierEncoder barrier_encoder = nullptr;
+    static constexpr size_t BufferBase = 32;
+    static constexpr size_t TextureBase = BufferBase + 2 * kMaxBuffers;
+    static constexpr size_t SamplerBase = TextureBase + 2 * kMaxTextures;
+    struct NativeState {
+        std::array<std::vector<u8>, SamplerBase + 2 * kMaxSamplers> slots;
+        std::vector<std::string> groups;
+    };
+    std::unique_ptr<NativeState> native_state;
+    bool restoring = false;
+    void* native_state_encoder = nullptr;
+
+    template<class Cmd>
+    void Remember(const Cmd& c, const void* extra) {
+        if (!barrier_encoder || restoring) return;
+        if (!native_state) native_state = std::make_unique<NativeState>();
+        if constexpr (Cmd::op == Op::PushDebugGroup) {
+            assert(native_state->groups.size() < 64);
+            native_state->groups.emplace_back(static_cast<const char*>(extra));
+            return;
+        } else if constexpr (Cmd::op == Op::PopDebugGroup) {
+            assert(!native_state->groups.empty());
+            native_state->groups.pop_back();
+            return;
+        } else if constexpr (Cmd::op >= Op::DrawPrimitives) {
+            return; // draws, dependencies and signposts are never replayed as state
+        } else {
+            size_t key = static_cast<size_t>(Cmd::op), bytes = 0;
+            if constexpr (Cmd::op == Op::SetBuffer || Cmd::op == Op::SetBytes || Cmd::op == Op::SetBufferOffset) {
+                assert(c.index < kMaxBuffers);
+                key = BufferBase + unsigned(c.stage) * kMaxBuffers + c.index;
+            } else if constexpr (Cmd::op == Op::SetVertexBufferWithStride) {
+                assert(c.index < kMaxBuffers); key = BufferBase + c.index;
+            } else if constexpr (Cmd::op == Op::SetTexture) {
+                assert(c.index < kMaxTextures); key = TextureBase + unsigned(c.stage) * kMaxTextures + c.index;
+            } else if constexpr (Cmd::op == Op::SetSampler) {
+                assert(c.index < kMaxSamplers); key = SamplerBase + unsigned(c.stage) * kMaxSamplers + c.index;
+            }
+            auto& saved = native_state->slots[key];
+            if constexpr (Cmd::op == Op::SetBufferOffset) {
+                // Offset-only setters depend on the last real buffer binding. Materialize
+                // that binding, including its dynamic attribute stride, rather than saving
+                // an offset-only command for a fresh encoder.
+                assert(saved.size() >= sizeof(Header));
+                auto* header = reinterpret_cast<Header*>(saved.data());
+                if (header->op == Op::SetBuffer) {
+                    reinterpret_cast<CmdBuffer*>(saved.data()+sizeof(Header))->offset=c.offset;
+                } else {
+                    assert(header->op == Op::SetVertexBufferWithStride);
+                    reinterpret_cast<CmdVertexBuffer*>(saved.data()+sizeof(Header))->offset=c.offset;
+                }
+                return;
+            }
+            if constexpr (Cmd::op == Op::SetBytes) { assert(c.length <= 4096); bytes = c.length; }
+            if constexpr (Cmd::op == Op::SetViewports) { assert(c.count <= kMaxViewports); bytes = c.count*sizeof(RenderList::Viewport); }
+            if constexpr (Cmd::op == Op::SetScissorRects) { assert(c.count <= kMaxViewports); bytes = c.count*sizeof(RenderList::Scissor); }
+            saved.resize(sizeof(Header)+sizeof(Cmd)+bytes);
+            Header header{Cmd::op, static_cast<u32>(saved.size())};
+            std::memcpy(saved.data(), &header, sizeof(header));
+            std::memcpy(saved.data()+sizeof(header), &c, sizeof(c));
+            if (bytes) std::memcpy(saved.data()+sizeof(header)+sizeof(c), extra, bytes);
+        }
+    }
+
     // The redundancy filter (reset by the Begin* calls).
     void* pipeline = kUnset;
     void* depth_stencil = kUnset;
@@ -559,7 +626,7 @@ struct RenderList::Impl {
     // draws. This filter applies only within ONE physical render encoder. Scheduler fences,
     // hoisted compute barriers, pass load/store actions and recorded HasBarrier are unchanged.
     template <class Cmd>
-    void Execute(id<MTLRenderCommandEncoder> enc, const Cmd& c, const void* extra) {
+    void Execute(id<MTLRenderCommandEncoder> __strong& enc, const Cmd& c, const void* extra) {
         if constexpr (Cmd::op == Op::MemoryBarrier) {
             ++barriers.requested;
             if (coalesce_barriers && barrier_since_draw) {
@@ -567,6 +634,23 @@ struct RenderList::Impl {
                 return;
             }
             barrier_since_draw = true;
+            if (barrier_encoder) {
+                // Local debug groups must end before the owner closes its outer groups.
+                if (native_state) for (size_t i=0;i<native_state->groups.size();++i) [enc popDebugGroup];
+                auto replacement = (__bridge id<MTLRenderCommandEncoder>)barrier_encoder(barrier_owner, (__bridge void*)enc);
+                assert(replacement);
+                const bool changed = replacement != enc;
+                enc = replacement;
+                native_state_encoder = (__bridge void*)enc;
+                if (changed && native_state) {
+                    restoring = true;
+                    for (const auto& saved : native_state->slots) if (!saved.empty()) RunRecord(enc, saved.data());
+                    restoring = false;
+                }
+                if (native_state) for (const auto& group : native_state->groups)
+                    [enc pushDebugGroup:[NSString stringWithUTF8String:group.c_str()]];
+                return;
+            }
         } else if constexpr (Cmd::op == Op::DrawPrimitives ||
                              Cmd::op == Op::DrawIndexedPrimitives ||
                              Cmd::op == Op::DrawPrimitivesIndirect ||
@@ -575,6 +659,7 @@ struct RenderList::Impl {
             barrier_since_draw = false;
         }
         Apply(enc, c, extra);
+        Remember(c, extra);
     }
 
     // ---- Direct or recorded ----
@@ -617,20 +702,16 @@ struct RenderList::Impl {
     // ---- Replay ----
 
     template <class Cmd>
-    void Run(id<MTLRenderCommandEncoder> enc, const u8* record) {
+    void Run(id<MTLRenderCommandEncoder> __strong& enc, const u8* record) {
         Cmd c;
         std::memcpy(&c, record + sizeof(Header), sizeof(Cmd));
-        Execute(enc, c, record + sizeof(Header) + sizeof(Cmd));
+        if (restoring) Apply(enc, c, record + sizeof(Header) + sizeof(Cmd));
+        else Execute(enc, c, record + sizeof(Header) + sizeof(Cmd));
     }
 
-    void Replay(id<MTLRenderCommandEncoder> enc) {
-        barrier_since_draw = false;
-        barriers = {};
-        const u8* data = arena.data();
-        for (size_t at = 0; at < arena.size();) {
-            Header header;
-            std::memcpy(&header, data + at, sizeof(header));
-            const u8* record = data + at;
+    void RunRecord(id<MTLRenderCommandEncoder> __strong& enc, const u8* record) {
+        Header header;
+        std::memcpy(&header, record, sizeof(header));
             switch (header.op) {
 #define BB_RL_CASE(O, Cmd) \
     case Op::O:            \
@@ -666,6 +747,19 @@ struct RenderList::Impl {
                 BB_RL_CASE(InsertDebugSignpost, CmdSignpost)
 #undef BB_RL_CASE
             }
+    }
+
+    void Replay(id<MTLRenderCommandEncoder> enc) {
+        barrier_since_draw = false;
+        barriers = {};
+        native_state.reset();
+        native_state_encoder = (__bridge void*)enc;
+        const u8* data = arena.data();
+        for (size_t at = 0; at < arena.size();) {
+            Header header;
+            std::memcpy(&header, data + at, sizeof(header));
+            const u8* record = data + at;
+            RunRecord(enc, record);
             at += header.size;
         }
         arena.clear();
@@ -677,6 +771,12 @@ RenderList::RenderList() : impl{std::make_unique<Impl>()} {}
 
 RenderList::~RenderList() = default;
 
+void RenderList::SetBarrierEncoder(void* owner, BarrierEncoder barrier) {
+    assert(impl->mode==Impl::Mode::None && impl->arena.empty());
+    impl->barrier_owner=owner;
+    impl->barrier_encoder=barrier;
+}
+
 void RenderList::BeginDirect(void* encoder) {
     impl->mode = Impl::Mode::Direct;
     impl->encoder = (__bridge id<MTLRenderCommandEncoder>)encoder;
@@ -687,6 +787,8 @@ void RenderList::BeginDirect(void* encoder) {
     impl->last_replayed_encoder = nullptr;
     impl->barriers = {};
     impl->ResetFilter();
+    impl->native_state.reset();
+    impl->native_state_encoder = nullptr;
 }
 
 void RenderList::BeginRecording() {
@@ -699,11 +801,15 @@ void RenderList::BeginRecording() {
     impl->last_replayed_encoder = nullptr;
     impl->barriers = {};
     impl->ResetFilter();
+    impl->native_state.reset();
+    impl->native_state_encoder = nullptr;
 }
 void RenderList::ContinueDirect(void* encoder) {
     assert(impl->mode==Impl::Mode::Recording && impl->arena.empty());
     const bool same_encoder_coverage = encoder && impl->last_replayed_encoder==encoder &&
                                        impl->barrier_since_draw;
+    const bool same_encoder = encoder && impl->native_state_encoder==encoder;
+    auto applied = same_encoder ? std::move(impl->native_state) : nullptr;
     auto guard=std::move(impl->fragment_guard);
     const bool safe = impl->consumed_clear_safe;
     BeginDirect(encoder);
@@ -711,6 +817,8 @@ void RenderList::ContinueDirect(void* encoder) {
     // Bindings perform no GPU accesses; every draw still clears this bit in
     // Execute(). Do not retain counts: Scheduler captured the replay segment.
     impl->barrier_since_draw = same_encoder_coverage;
+    impl->native_state = std::move(applied);
+    impl->native_state_encoder = encoder;
     impl->consumed_clear_safe = safe;
     impl->fragment_guard=std::move(guard);
 }
@@ -723,6 +831,8 @@ void RenderList::Replay(void* encoder) {
 void RenderList::TakeRecording(RenderList& into) {
     assert(impl->mode == Impl::Mode::Recording);
     assert(into.impl->mode == Impl::Mode::None && into.impl->arena.empty());
+    into.impl->barrier_owner = impl->barrier_owner;
+    into.impl->barrier_encoder = impl->barrier_encoder;
     into.impl->mode = Impl::Mode::Recording;
     into.impl->last_replayed_encoder = impl->last_replayed_encoder = nullptr;
     into.impl->encoder = nil;
@@ -736,6 +846,8 @@ void RenderList::TakeRecording(RenderList& into) {
 void RenderList::End() {
     assert(impl->arena.empty());
     impl->mode = Impl::Mode::None;
+    impl->native_state.reset();
+    impl->native_state_encoder = nullptr;
     impl->encoder = nil;
     impl->arena.clear();
     impl->last_replayed_encoder = nullptr;

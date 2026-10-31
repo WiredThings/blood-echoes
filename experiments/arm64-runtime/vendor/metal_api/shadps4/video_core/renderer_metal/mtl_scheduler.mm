@@ -226,6 +226,12 @@ id<MTLCommandBuffer> Scheduler::Impl::EnsureCommandBuffer() {
 Scheduler::Scheduler(Device& device_, const char* name_)
     : device{device_}, impl{std::make_unique<Impl>(device_.GetImpl(), @(name_), current_tick)},
       name{name_} {
+    impl->fragment_pass_barriers = [impl->dev.device supportsFamily:MTLGPUFamilyApple1];
+    if (impl->fragment_pass_barriers) {
+        commands.SetBarrierEncoder(this, [](void* owner, void* encoder) {
+            return static_cast<Scheduler*>(owner)->RenderBarrierEncoder(encoder);
+        });
+    }
     impl->profile = std::make_shared<GpuProfile>(impl->dev.device);
     impl->event = [impl->dev.device newSharedEvent];
     ASSERT_MSG(impl->event, "Could not create the Metal shared event");
@@ -314,7 +320,7 @@ void Scheduler::BeginEncoder(EncoderKind kind, const void* pass_descriptor, bool
     open_encoder = kind;
 }
 
-void Scheduler::OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool wait_all, bool guest, bool bound_only) {
+void Scheduler::OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool wait_all, bool guest, bool bound_only, bool fragment_continuation) {
     id<MTLCommandBuffer> cmdbuf = impl->EnsureCommandBuffer();
     const auto encode_start = impl->profile->Enabled() ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     impl->profile->Open(static_cast<unsigned>(kind), guest);
@@ -323,13 +329,38 @@ void Scheduler::OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool
     switch (kind) {
     case EncoderKind::Render: {
         MTLRenderPassDescriptor* descriptor = (__bridge MTLRenderPassDescriptor*)pass_descriptor;
-        if (impl->profile->HasSample()) descriptor = [descriptor copy];
-        impl->profile->Render(descriptor);
+        // Never mutate the caller's descriptor or replay it with a consumed Clear.
+        if (impl->fragment_pass_barriers || impl->profile->HasSample()) descriptor = [descriptor copy];
         std::pair<void*, u64> query{};
-        if (guest && visibility_query) {
+        if (fragment_continuation) {
+            query = impl->render_query;
+            if (query.first) {
+                ASSERT_MSG([impl->dev.device supportsFamily:MTLGPUFamilyApple7],
+                           "Fragment pass continuation needs visibility count accumulation");
+                if (@available(macOS 26.0, *)) descriptor.visibilityResultType = MTLVisibilityResultTypeAccumulate;
+                else UNREACHABLE_MSG("Visibility count accumulation requires macOS 26");
+            }
+        } else if (guest && visibility_query) {
             query = visibility_query(pass_descriptor);
-            descriptor.visibilityResultBuffer = (__bridge id<MTLBuffer>)query.first;
         }
+        if (query.first) descriptor.visibilityResultBuffer = (__bridge id<MTLBuffer>)query.first;
+        impl->render_query = query;
+        impl->render_guest = guest;
+        impl->render_bound_only = bound_only;
+        if (impl->fragment_pass_barriers) {
+            // Defer only the choice of store action. Keep the original actions for the
+            // logical pass's final segment; an intermediate segment stores ALL samples.
+            impl->render_pass = [descriptor copy];
+            for (unsigned i=0;i<8;++i) if (descriptor.colorAttachments[i].texture) {
+                ASSERT_MSG(descriptor.colorAttachments[i].storeAction != MTLStoreActionUnknown, "Unknown final color store action");
+                descriptor.colorAttachments[i].storeAction = MTLStoreActionUnknown;
+            }
+            for (auto attachment : std::array<MTLRenderPassAttachmentDescriptor*,2>{descriptor.depthAttachment, descriptor.stencilAttachment}) if (attachment.texture) {
+                ASSERT_MSG(attachment.storeAction != MTLStoreActionUnknown, "Unknown final depth/stencil store action");
+                attachment.storeAction = MTLStoreActionUnknown;
+            }
+        }
+        impl->profile->Render(descriptor);
         impl->render = [cmdbuf renderCommandEncoderWithDescriptor:descriptor];
         ASSERT_MSG(impl->render, "Could not create a Metal render encoder");
         if (query.first) {
@@ -871,7 +902,7 @@ void Scheduler::ClosePhysical(EncoderKind kind) {
     CloseNative(kind);
 }
 
-void Scheduler::CloseNative(EncoderKind kind) {
+void Scheduler::CloseNative(EncoderKind kind, bool preserve_render_attachments) {
     if(VideoCore::FrameCapture::NativeRecording())VideoCore::FrameCapture::Native(std::format("{{\"op\":\"close\",\"queue\":{},\"kind\":{}}}",(uintptr_t)this,unsigned(kind)));
     const auto encode_start = impl->profile->Enabled() ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     // Every encoder updates the next fence of the ring at its end (see MemoryBarrier).
@@ -879,14 +910,33 @@ void Scheduler::CloseNative(EncoderKind kind) {
     id<MTLFence> fence = impl->fences[slot];
     switch (kind) {
     case EncoderKind::Render:
+        if (impl->fragment_pass_barriers) {
+            const auto store = [&](MTLRenderPassAttachmentDescriptor* a) {
+                if (preserve_render_attachments) {
+                    ASSERT_MSG(a.texture.storageMode != MTLStorageModeMemoryless,
+                               "Cannot preserve a memoryless attachment across a fragment dependency");
+                    // A descriptor carrying a resolve target may not select Store-only.
+                    // Keep the multisample surface AND resolve it; the final segment still
+                    // uses the caller's original final-store/resolve action.
+                    return a.resolveTexture ? MTLStoreActionStoreAndMultisampleResolve : MTLStoreActionStore;
+                }
+                return a.storeAction;
+            };
+            for (unsigned i=0;i<8;++i) if (auto a=impl->render_pass.colorAttachments[i]; a.texture)
+                [impl->render setColorStoreAction:store(a) atIndex:i];
+            if (auto a=impl->render_pass.depthAttachment; a.texture) [impl->render setDepthStoreAction:store(a)];
+            if (auto a=impl->render_pass.stencilAttachment; a.texture) [impl->render setStencilStoreAction:store(a)];
+        }
+
         for (size_t i = 0; labels_enabled && i < debug_groups.size(); ++i) {
             [impl->render popDebugGroup];
         }
-        if (FencesEnabled()) {
+        if (FencesEnabled() || preserve_render_attachments) {
             [impl->render updateFence:fence afterStages:MTLRenderStageFragment];
         }
         [impl->render endEncoding];
         impl->render = nil;
+        impl->render_pass = nil;
         break;
     case EncoderKind::Compute:
         for (size_t i = 0; labels_enabled && i < debug_groups.size(); ++i) {
@@ -942,7 +992,32 @@ void Scheduler::OrderAfterHostCompute() {
     need_fence_wait = true; // preserved until a NEW physical encoder consumes it
 }
 
-void Scheduler::MemoryBarrier() {
+void* Scheduler::RenderBarrierEncoder(void* encoder) {
+    // May run on the replay thread. No JoinReplay/EndEncoder, submission, tail execution,
+    // tick advancement or retirement is allowed inside a recording's native execution.
+    ASSERT_MSG(encoder == (__bridge void*)impl->render && impl->render_pass,
+               "Render barrier owner/encoder mismatch");
+    MTLRenderPassDescriptor* next = [impl->render_pass copy];
+    NSString* label = impl->render.label;
+    const bool guest = impl->render_guest;
+    // RequireGuestRender may have upgraded a previously bound-only encoder. Preserve
+    // its ACTUAL residency union, while retaining the immutable guest/host query tag.
+    const bool bound_only = impl->render_bound_only && !impl->render_guest_declared;
+    id<MTLFence> boundary = impl->fences[impl->next_fence];
+    for (unsigned i=0;i<8;++i) if(next.colorAttachments[i].texture) next.colorAttachments[i].loadAction=MTLLoadActionLoad;
+    for (auto a : std::array<MTLRenderPassAttachmentDescriptor*,2>{next.depthAttachment,next.stencilAttachment}) if(a.texture) a.loadAction=MTLLoadActionLoad;
+    // CloseNative uses the ring's real after-fragment producer fence. OpenPhysical waits
+    // before vertex, redeclares the same guest/residency ownership, and reopens profiling.
+    CloseNative(EncoderKind::Render, true);
+    OpenPhysical(EncoderKind::Render, (__bridge void*)next, true, guest, bound_only, true);
+    // The unsafe no-fence experiment must not erase this required intra-logical-pass edge.
+    if (!FencesEnabled()) [impl->render waitForFence:boundary beforeStages:MTLRenderStageVertex];
+    impl->render.label=label;
+    if(label) impl->profile->Label(label.UTF8String);
+    return (__bridge void*)impl->render;
+}
+
+void Scheduler::MemoryBarrier(bool proven_empty_raw_pass) {
     InvalidatePreparedCompute();
     if(VideoCore::FrameCapture::NativeRecording())VideoCore::FrameCapture::Native(std::format("{{\"op\":\"barrier\",\"kind\":{},\"holding\":{},\"hoisting\":{}}}",unsigned(open_encoder),holding?"true":"false",hoisting?"true":"false"));
     impl->profile->Barrier();
@@ -979,9 +1054,15 @@ void Scheduler::MemoryBarrier() {
             // whether a draw occurred since the last identical render-only barrier.
             commands.MemoryBarrier();
         } else {
-            [impl->render memoryBarrierWithScope:MTLBarrierScopeBuffers | MTLBarrierScopeTextures
-                                     afterStages:MTLRenderStageVertex | MTLRenderStageFragment
-                                    beforeStages:MTLRenderStageVertex | MTLRenderStageFragment];
+            if (impl->fragment_pass_barriers) {
+                ASSERT_MSG(proven_empty_raw_pass,
+                    "Raw render state is not tracked: generic fragment barriers require RenderList, or an explicitly proven empty raw pass");
+                RenderBarrierEncoder((__bridge void*)impl->render);
+            } else {
+                [impl->render memoryBarrierWithScope:MTLBarrierScopeBuffers | MTLBarrierScopeTextures
+                                         afterStages:MTLRenderStageVertex | MTLRenderStageFragment
+                                        beforeStages:MTLRenderStageVertex | MTLRenderStageFragment];
+            }
         }
         WaitOutstandingFences(*impl, EncoderKind::Render);
         break;

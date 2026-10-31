@@ -75,7 +75,8 @@ public:
         return *impl;
     }
 
-    // A physical guest render pass (also on the replay thread) may count its samples.
+    // A logical guest pass (also on the replay thread) may count its samples. Internal
+    // fragment-fence segments accumulate into the SAME slot before density scaling.
     // Host copies, resolves and postprocessing are excluded. Replacing the hook joins replay.
     using VisibilityQuery = std::function<std::pair<void*, u64>(const void*)>;
     enum class VisibilityMergePolicy { Forbidden, Additive, NativeDensity };
@@ -149,10 +150,12 @@ public:
     // and calls FlushBarriers, which ends up here.
 
     /// Makes the writes of everything recorded so far visible to what is recorded next: inside a
-    /// compute or render encoder a memory barrier (plus a wait on the fences of earlier encoders
-    /// still outstanding), a blit encoder is ended. Earlier encoders are ordered through fences,
+    /// compute encoder a memory barrier (plus waits for earlier encoders); Apple render
+    /// encoders use a real after-fragment fence between preserved passes. Raw native render
+    /// callers must use RenderList, or explicitly prove no bindings/draw exist in this pass.
+    /// A blit encoder is ended. Earlier encoders are ordered through fences,
     /// which every encoder updates at its end.
-    void MemoryBarrier();
+    void MemoryBarrier(bool proven_empty_raw_pass = false);
     /// The next NEW encoder must wait for earlier fences, including an ordered host-compute
     /// encoder deliberately kept open. Reusing the current compute encoder retains this flag.
     [[nodiscard]] bool NeedFenceWait() const noexcept {
@@ -285,12 +288,13 @@ private:
     void BeginEncoder(EncoderKind kind, const void* pass_descriptor, bool guest = false, bool bound_only = false);
     /// Creates the encoder of `kind` (none may be open): fence waits, guest chunk use, groups.
     /// `wait_all`: wait for the fences of every earlier encoder still outstanding first.
-    void OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool wait_all, bool guest = false, bool bound_only = false);
+    void OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool wait_all, bool guest = false, bool bound_only = false, bool fragment_continuation = false);
     /// Ends the physical encoder of `kind` (fence update, groups).
     void ClosePhysical(EncoderKind kind);
     void PriorityPendingOpsThread(std::stop_token stoken);
     /// ClosePhysical without the rasterizer's RenderList (the replay thread's part).
-    void CloseNative(EncoderKind kind);
+    void* RenderBarrierEncoder(void* encoder);
+    void CloseNative(EncoderKind kind, bool preserve_render_attachments = false);
     void FlushColorClears();
     /// Consume only an exact, full-surface pending clear batch. No unknown lifetime inference.
     const void* FoldColorClears(const void* descriptor);

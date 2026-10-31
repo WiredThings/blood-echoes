@@ -1,0 +1,770 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_render_list.h
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_render_list.h
+@@ -51,6 +51,10 @@
+     /// Calls go to `encoder` (id<MTLRenderCommandEncoder>) from now on; the redundancy filter
+     /// starts empty.
+     void BeginDirect(void* encoder);
++    /// Owner-supplied full V|F dependency. Apple GPUs require a physical pass boundary;
++    /// returns its replacement encoder. The owner preserves attachments, queries and fences.
++    using BarrierEncoder = void* (*)(void* owner, void* encoder);
++    void SetBarrierEncoder(void* owner, BarrierEncoder barrier);
+     /// Continue the SAME physical pass after Replay; preserve diagnostic access history.
+     void ContinueDirect(void* encoder);
+     /// Calls are recorded from now on; the redundancy filter starts empty.
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_render_list.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_render_list.mm
+@@ -482,6 +482,73 @@
+     void* last_replayed_encoder = nullptr;
+     RenderList::BarrierCounts barriers{};
+ 
++    // Applied state, not the recording filter (which describes the END of a held list).
++    // No GPU resources are retained. Existing tick retirement owns all object lifetimes.
++    void* barrier_owner = nullptr;
++    RenderList::BarrierEncoder barrier_encoder = nullptr;
++    static constexpr size_t BufferBase = 32;
++    static constexpr size_t TextureBase = BufferBase + 2 * kMaxBuffers;
++    static constexpr size_t SamplerBase = TextureBase + 2 * kMaxTextures;
++    struct NativeState {
++        std::array<std::vector<u8>, SamplerBase + 2 * kMaxSamplers> slots;
++        std::vector<std::string> groups;
++    };
++    std::unique_ptr<NativeState> native_state;
++    bool restoring = false;
++    void* native_state_encoder = nullptr;
++
++    template<class Cmd>
++    void Remember(const Cmd& c, const void* extra) {
++        if (!barrier_encoder || restoring) return;
++        if (!native_state) native_state = std::make_unique<NativeState>();
++        if constexpr (Cmd::op == Op::PushDebugGroup) {
++            assert(native_state->groups.size() < 64);
++            native_state->groups.emplace_back(static_cast<const char*>(extra));
++            return;
++        } else if constexpr (Cmd::op == Op::PopDebugGroup) {
++            assert(!native_state->groups.empty());
++            native_state->groups.pop_back();
++            return;
++        } else if constexpr (Cmd::op >= Op::DrawPrimitives) {
++            return; // draws, dependencies and signposts are never replayed as state
++        } else {
++            size_t key = static_cast<size_t>(Cmd::op), bytes = 0;
++            if constexpr (Cmd::op == Op::SetBuffer || Cmd::op == Op::SetBytes || Cmd::op == Op::SetBufferOffset) {
++                assert(c.index < kMaxBuffers);
++                key = BufferBase + unsigned(c.stage) * kMaxBuffers + c.index;
++            } else if constexpr (Cmd::op == Op::SetVertexBufferWithStride) {
++                assert(c.index < kMaxBuffers); key = BufferBase + c.index;
++            } else if constexpr (Cmd::op == Op::SetTexture) {
++                assert(c.index < kMaxTextures); key = TextureBase + unsigned(c.stage) * kMaxTextures + c.index;
++            } else if constexpr (Cmd::op == Op::SetSampler) {
++                assert(c.index < kMaxSamplers); key = SamplerBase + unsigned(c.stage) * kMaxSamplers + c.index;
++            }
++            auto& saved = native_state->slots[key];
++            if constexpr (Cmd::op == Op::SetBufferOffset) {
++                // Offset-only setters depend on the last real buffer binding. Materialize
++                // that binding, including its dynamic attribute stride, rather than saving
++                // an offset-only command for a fresh encoder.
++                assert(saved.size() >= sizeof(Header));
++                auto* header = reinterpret_cast<Header*>(saved.data());
++                if (header->op == Op::SetBuffer) {
++                    reinterpret_cast<CmdBuffer*>(saved.data()+sizeof(Header))->offset=c.offset;
++                } else {
++                    assert(header->op == Op::SetVertexBufferWithStride);
++                    reinterpret_cast<CmdVertexBuffer*>(saved.data()+sizeof(Header))->offset=c.offset;
++                }
++                return;
++            }
++            if constexpr (Cmd::op == Op::SetBytes) { assert(c.length <= 4096); bytes = c.length; }
++            if constexpr (Cmd::op == Op::SetViewports) { assert(c.count <= kMaxViewports); bytes = c.count*sizeof(RenderList::Viewport); }
++            if constexpr (Cmd::op == Op::SetScissorRects) { assert(c.count <= kMaxViewports); bytes = c.count*sizeof(RenderList::Scissor); }
++            saved.resize(sizeof(Header)+sizeof(Cmd)+bytes);
++            Header header{Cmd::op, static_cast<u32>(saved.size())};
++            std::memcpy(saved.data(), &header, sizeof(header));
++            std::memcpy(saved.data()+sizeof(header), &c, sizeof(c));
++            if (bytes) std::memcpy(saved.data()+sizeof(header)+sizeof(c), extra, bytes);
++        }
++    }
++
+     // The redundancy filter (reset by the Begin* calls).
+     void* pipeline = kUnset;
+     void* depth_stencil = kUnset;
+@@ -559,7 +626,7 @@
+     // draws. This filter applies only within ONE physical render encoder. Scheduler fences,
+     // hoisted compute barriers, pass load/store actions and recorded HasBarrier are unchanged.
+     template <class Cmd>
+-    void Execute(id<MTLRenderCommandEncoder> enc, const Cmd& c, const void* extra) {
++    void Execute(id<MTLRenderCommandEncoder> __strong& enc, const Cmd& c, const void* extra) {
+         if constexpr (Cmd::op == Op::MemoryBarrier) {
+             ++barriers.requested;
+             if (coalesce_barriers && barrier_since_draw) {
+@@ -567,6 +634,23 @@
+                 return;
+             }
+             barrier_since_draw = true;
++            if (barrier_encoder) {
++                // Local debug groups must end before the owner closes its outer groups.
++                if (native_state) for (size_t i=0;i<native_state->groups.size();++i) [enc popDebugGroup];
++                auto replacement = (__bridge id<MTLRenderCommandEncoder>)barrier_encoder(barrier_owner, (__bridge void*)enc);
++                assert(replacement);
++                const bool changed = replacement != enc;
++                enc = replacement;
++                native_state_encoder = (__bridge void*)enc;
++                if (changed && native_state) {
++                    restoring = true;
++                    for (const auto& saved : native_state->slots) if (!saved.empty()) RunRecord(enc, saved.data());
++                    restoring = false;
++                }
++                if (native_state) for (const auto& group : native_state->groups)
++                    [enc pushDebugGroup:[NSString stringWithUTF8String:group.c_str()]];
++                return;
++            }
+         } else if constexpr (Cmd::op == Op::DrawPrimitives ||
+                              Cmd::op == Op::DrawIndexedPrimitives ||
+                              Cmd::op == Op::DrawPrimitivesIndirect ||
+@@ -575,6 +659,7 @@
+             barrier_since_draw = false;
+         }
+         Apply(enc, c, extra);
++        Remember(c, extra);
+     }
+ 
+     // ---- Direct or recorded ----
+@@ -617,20 +702,16 @@
+     // ---- Replay ----
+ 
+     template <class Cmd>
+-    void Run(id<MTLRenderCommandEncoder> enc, const u8* record) {
++    void Run(id<MTLRenderCommandEncoder> __strong& enc, const u8* record) {
+         Cmd c;
+         std::memcpy(&c, record + sizeof(Header), sizeof(Cmd));
+-        Execute(enc, c, record + sizeof(Header) + sizeof(Cmd));
+-    }
+-
+-    void Replay(id<MTLRenderCommandEncoder> enc) {
+-        barrier_since_draw = false;
+-        barriers = {};
+-        const u8* data = arena.data();
+-        for (size_t at = 0; at < arena.size();) {
+-            Header header;
+-            std::memcpy(&header, data + at, sizeof(header));
+-            const u8* record = data + at;
++        if (restoring) Apply(enc, c, record + sizeof(Header) + sizeof(Cmd));
++        else Execute(enc, c, record + sizeof(Header) + sizeof(Cmd));
++    }
++
++    void RunRecord(id<MTLRenderCommandEncoder> __strong& enc, const u8* record) {
++        Header header;
++        std::memcpy(&header, record, sizeof(header));
+             switch (header.op) {
+ #define BB_RL_CASE(O, Cmd) \
+     case Op::O:            \
+@@ -666,6 +747,19 @@
+                 BB_RL_CASE(InsertDebugSignpost, CmdSignpost)
+ #undef BB_RL_CASE
+             }
++    }
++
++    void Replay(id<MTLRenderCommandEncoder> enc) {
++        barrier_since_draw = false;
++        barriers = {};
++        native_state.reset();
++        native_state_encoder = (__bridge void*)enc;
++        const u8* data = arena.data();
++        for (size_t at = 0; at < arena.size();) {
++            Header header;
++            std::memcpy(&header, data + at, sizeof(header));
++            const u8* record = data + at;
++            RunRecord(enc, record);
+             at += header.size;
+         }
+         arena.clear();
+@@ -676,6 +770,12 @@
+ RenderList::RenderList() : impl{std::make_unique<Impl>()} {}
+ 
+ RenderList::~RenderList() = default;
++
++void RenderList::SetBarrierEncoder(void* owner, BarrierEncoder barrier) {
++    assert(impl->mode==Impl::Mode::None && impl->arena.empty());
++    impl->barrier_owner=owner;
++    impl->barrier_encoder=barrier;
++}
+ 
+ void RenderList::BeginDirect(void* encoder) {
+     impl->mode = Impl::Mode::Direct;
+@@ -687,6 +787,8 @@
+     impl->last_replayed_encoder = nullptr;
+     impl->barriers = {};
+     impl->ResetFilter();
++    impl->native_state.reset();
++    impl->native_state_encoder = nullptr;
+ }
+ 
+ void RenderList::BeginRecording() {
+@@ -699,11 +801,15 @@
+     impl->last_replayed_encoder = nullptr;
+     impl->barriers = {};
+     impl->ResetFilter();
++    impl->native_state.reset();
++    impl->native_state_encoder = nullptr;
+ }
+ void RenderList::ContinueDirect(void* encoder) {
+     assert(impl->mode==Impl::Mode::Recording && impl->arena.empty());
+     const bool same_encoder_coverage = encoder && impl->last_replayed_encoder==encoder &&
+                                        impl->barrier_since_draw;
++    const bool same_encoder = encoder && impl->native_state_encoder==encoder;
++    auto applied = same_encoder ? std::move(impl->native_state) : nullptr;
+     auto guard=std::move(impl->fragment_guard);
+     const bool safe = impl->consumed_clear_safe;
+     BeginDirect(encoder);
+@@ -711,6 +817,8 @@
+     // Bindings perform no GPU accesses; every draw still clears this bit in
+     // Execute(). Do not retain counts: Scheduler captured the replay segment.
+     impl->barrier_since_draw = same_encoder_coverage;
++    impl->native_state = std::move(applied);
++    impl->native_state_encoder = encoder;
+     impl->consumed_clear_safe = safe;
+     impl->fragment_guard=std::move(guard);
+ }
+@@ -723,6 +831,8 @@
+ void RenderList::TakeRecording(RenderList& into) {
+     assert(impl->mode == Impl::Mode::Recording);
+     assert(into.impl->mode == Impl::Mode::None && into.impl->arena.empty());
++    into.impl->barrier_owner = impl->barrier_owner;
++    into.impl->barrier_encoder = impl->barrier_encoder;
+     into.impl->mode = Impl::Mode::Recording;
+     into.impl->last_replayed_encoder = impl->last_replayed_encoder = nullptr;
+     into.impl->encoder = nil;
+@@ -736,6 +846,8 @@
+ void RenderList::End() {
+     assert(impl->arena.empty());
+     impl->mode = Impl::Mode::None;
++    impl->native_state.reset();
++    impl->native_state_encoder = nullptr;
+     impl->encoder = nil;
+     impl->arena.clear();
+     impl->last_replayed_encoder = nullptr;
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_scheduler.h
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_scheduler.h
+@@ -75,7 +75,8 @@
+         return *impl;
+     }
+ 
+-    // A physical guest render pass (also on the replay thread) may count its samples.
++    // A logical guest pass (also on the replay thread) may count its samples. Internal
++    // fragment-fence segments accumulate into the SAME slot before density scaling.
+     // Host copies, resolves and postprocessing are excluded. Replacing the hook joins replay.
+     using VisibilityQuery = std::function<std::pair<void*, u64>(const void*)>;
+     enum class VisibilityMergePolicy { Forbidden, Additive, NativeDensity };
+@@ -149,10 +150,12 @@
+     // and calls FlushBarriers, which ends up here.
+ 
+     /// Makes the writes of everything recorded so far visible to what is recorded next: inside a
+-    /// compute or render encoder a memory barrier (plus a wait on the fences of earlier encoders
+-    /// still outstanding), a blit encoder is ended. Earlier encoders are ordered through fences,
++    /// compute encoder a memory barrier (plus waits for earlier encoders); Apple render
++    /// encoders use a real after-fragment fence between preserved passes. Raw native render
++    /// callers must use RenderList, or explicitly prove no bindings/draw exist in this pass.
++    /// A blit encoder is ended. Earlier encoders are ordered through fences,
+     /// which every encoder updates at its end.
+-    void MemoryBarrier();
++    void MemoryBarrier(bool proven_empty_raw_pass = false);
+     /// The next NEW encoder must wait for earlier fences, including an ordered host-compute
+     /// encoder deliberately kept open. Reusing the current compute encoder retains this flag.
+     [[nodiscard]] bool NeedFenceWait() const noexcept {
+@@ -285,12 +288,13 @@
+     void BeginEncoder(EncoderKind kind, const void* pass_descriptor, bool guest = false, bool bound_only = false);
+     /// Creates the encoder of `kind` (none may be open): fence waits, guest chunk use, groups.
+     /// `wait_all`: wait for the fences of every earlier encoder still outstanding first.
+-    void OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool wait_all, bool guest = false, bool bound_only = false);
++    void OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool wait_all, bool guest = false, bool bound_only = false, bool fragment_continuation = false);
+     /// Ends the physical encoder of `kind` (fence update, groups).
+     void ClosePhysical(EncoderKind kind);
+     void PriorityPendingOpsThread(std::stop_token stoken);
+     /// ClosePhysical without the rasterizer's RenderList (the replay thread's part).
+-    void CloseNative(EncoderKind kind);
++    void* RenderBarrierEncoder(void* encoder);
++    void CloseNative(EncoderKind kind, bool preserve_render_attachments = false);
+     void FlushColorClears();
+     /// Consume only an exact, full-surface pending clear batch. No unknown lifetime inference.
+     const void* FoldColorClears(const void* descriptor);
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_scheduler.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_scheduler.mm
+@@ -226,6 +226,12 @@
+ Scheduler::Scheduler(Device& device_, const char* name_)
+     : device{device_}, impl{std::make_unique<Impl>(device_.GetImpl(), @(name_), current_tick)},
+       name{name_} {
++    impl->fragment_pass_barriers = [impl->dev.device supportsFamily:MTLGPUFamilyApple1];
++    if (impl->fragment_pass_barriers) {
++        commands.SetBarrierEncoder(this, [](void* owner, void* encoder) {
++            return static_cast<Scheduler*>(owner)->RenderBarrierEncoder(encoder);
++        });
++    }
+     impl->profile = std::make_shared<GpuProfile>(impl->dev.device);
+     impl->event = [impl->dev.device newSharedEvent];
+     ASSERT_MSG(impl->event, "Could not create the Metal shared event");
+@@ -314,7 +320,7 @@
+     open_encoder = kind;
+ }
+ 
+-void Scheduler::OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool wait_all, bool guest, bool bound_only) {
++void Scheduler::OpenPhysical(EncoderKind kind, const void* pass_descriptor, bool wait_all, bool guest, bool bound_only, bool fragment_continuation) {
+     id<MTLCommandBuffer> cmdbuf = impl->EnsureCommandBuffer();
+     const auto encode_start = impl->profile->Enabled() ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+     impl->profile->Open(static_cast<unsigned>(kind), guest);
+@@ -323,13 +329,38 @@
+     switch (kind) {
+     case EncoderKind::Render: {
+         MTLRenderPassDescriptor* descriptor = (__bridge MTLRenderPassDescriptor*)pass_descriptor;
+-        if (impl->profile->HasSample()) descriptor = [descriptor copy];
++        // Never mutate the caller's descriptor or replay it with a consumed Clear.
++        if (impl->fragment_pass_barriers || impl->profile->HasSample()) descriptor = [descriptor copy];
++        std::pair<void*, u64> query{};
++        if (fragment_continuation) {
++            query = impl->render_query;
++            if (query.first) {
++                ASSERT_MSG([impl->dev.device supportsFamily:MTLGPUFamilyApple7],
++                           "Fragment pass continuation needs visibility count accumulation");
++                if (@available(macOS 26.0, *)) descriptor.visibilityResultType = MTLVisibilityResultTypeAccumulate;
++                else UNREACHABLE_MSG("Visibility count accumulation requires macOS 26");
++            }
++        } else if (guest && visibility_query) {
++            query = visibility_query(pass_descriptor);
++        }
++        if (query.first) descriptor.visibilityResultBuffer = (__bridge id<MTLBuffer>)query.first;
++        impl->render_query = query;
++        impl->render_guest = guest;
++        impl->render_bound_only = bound_only;
++        if (impl->fragment_pass_barriers) {
++            // Defer only the choice of store action. Keep the original actions for the
++            // logical pass's final segment; an intermediate segment stores ALL samples.
++            impl->render_pass = [descriptor copy];
++            for (unsigned i=0;i<8;++i) if (descriptor.colorAttachments[i].texture) {
++                ASSERT_MSG(descriptor.colorAttachments[i].storeAction != MTLStoreActionUnknown, "Unknown final color store action");
++                descriptor.colorAttachments[i].storeAction = MTLStoreActionUnknown;
++            }
++            for (auto attachment : std::array<MTLRenderPassAttachmentDescriptor*,2>{descriptor.depthAttachment, descriptor.stencilAttachment}) if (attachment.texture) {
++                ASSERT_MSG(attachment.storeAction != MTLStoreActionUnknown, "Unknown final depth/stencil store action");
++                attachment.storeAction = MTLStoreActionUnknown;
++            }
++        }
+         impl->profile->Render(descriptor);
+-        std::pair<void*, u64> query{};
+-        if (guest && visibility_query) {
+-            query = visibility_query(pass_descriptor);
+-            descriptor.visibilityResultBuffer = (__bridge id<MTLBuffer>)query.first;
+-        }
+         impl->render = [cmdbuf renderCommandEncoderWithDescriptor:descriptor];
+         ASSERT_MSG(impl->render, "Could not create a Metal render encoder");
+         if (query.first) {
+@@ -871,7 +902,7 @@
+     CloseNative(kind);
+ }
+ 
+-void Scheduler::CloseNative(EncoderKind kind) {
++void Scheduler::CloseNative(EncoderKind kind, bool preserve_render_attachments) {
+     if(VideoCore::FrameCapture::NativeRecording())VideoCore::FrameCapture::Native(std::format("{{\"op\":\"close\",\"queue\":{},\"kind\":{}}}",(uintptr_t)this,unsigned(kind)));
+     const auto encode_start = impl->profile->Enabled() ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+     // Every encoder updates the next fence of the ring at its end (see MemoryBarrier).
+@@ -879,14 +910,33 @@
+     id<MTLFence> fence = impl->fences[slot];
+     switch (kind) {
+     case EncoderKind::Render:
++        if (impl->fragment_pass_barriers) {
++            const auto store = [&](MTLRenderPassAttachmentDescriptor* a) {
++                if (preserve_render_attachments) {
++                    ASSERT_MSG(a.texture.storageMode != MTLStorageModeMemoryless,
++                               "Cannot preserve a memoryless attachment across a fragment dependency");
++                    // A descriptor carrying a resolve target may not select Store-only.
++                    // Keep the multisample surface AND resolve it; the final segment still
++                    // uses the caller's original final-store/resolve action.
++                    return a.resolveTexture ? MTLStoreActionStoreAndMultisampleResolve : MTLStoreActionStore;
++                }
++                return a.storeAction;
++            };
++            for (unsigned i=0;i<8;++i) if (auto a=impl->render_pass.colorAttachments[i]; a.texture)
++                [impl->render setColorStoreAction:store(a) atIndex:i];
++            if (auto a=impl->render_pass.depthAttachment; a.texture) [impl->render setDepthStoreAction:store(a)];
++            if (auto a=impl->render_pass.stencilAttachment; a.texture) [impl->render setStencilStoreAction:store(a)];
++        }
++
+         for (size_t i = 0; labels_enabled && i < debug_groups.size(); ++i) {
+             [impl->render popDebugGroup];
+         }
+-        if (FencesEnabled()) {
++        if (FencesEnabled() || preserve_render_attachments) {
+             [impl->render updateFence:fence afterStages:MTLRenderStageFragment];
+         }
+         [impl->render endEncoding];
+         impl->render = nil;
++        impl->render_pass = nil;
+         break;
+     case EncoderKind::Compute:
+         for (size_t i = 0; labels_enabled && i < debug_groups.size(); ++i) {
+@@ -942,7 +992,32 @@
+     need_fence_wait = true; // preserved until a NEW physical encoder consumes it
+ }
+ 
+-void Scheduler::MemoryBarrier() {
++void* Scheduler::RenderBarrierEncoder(void* encoder) {
++    // May run on the replay thread. No JoinReplay/EndEncoder, submission, tail execution,
++    // tick advancement or retirement is allowed inside a recording's native execution.
++    ASSERT_MSG(encoder == (__bridge void*)impl->render && impl->render_pass,
++               "Render barrier owner/encoder mismatch");
++    MTLRenderPassDescriptor* next = [impl->render_pass copy];
++    NSString* label = impl->render.label;
++    const bool guest = impl->render_guest;
++    // RequireGuestRender may have upgraded a previously bound-only encoder. Preserve
++    // its ACTUAL residency union, while retaining the immutable guest/host query tag.
++    const bool bound_only = impl->render_bound_only && !impl->render_guest_declared;
++    id<MTLFence> boundary = impl->fences[impl->next_fence];
++    for (unsigned i=0;i<8;++i) if(next.colorAttachments[i].texture) next.colorAttachments[i].loadAction=MTLLoadActionLoad;
++    for (auto a : std::array<MTLRenderPassAttachmentDescriptor*,2>{next.depthAttachment,next.stencilAttachment}) if(a.texture) a.loadAction=MTLLoadActionLoad;
++    // CloseNative uses the ring's real after-fragment producer fence. OpenPhysical waits
++    // before vertex, redeclares the same guest/residency ownership, and reopens profiling.
++    CloseNative(EncoderKind::Render, true);
++    OpenPhysical(EncoderKind::Render, (__bridge void*)next, true, guest, bound_only, true);
++    // The unsafe no-fence experiment must not erase this required intra-logical-pass edge.
++    if (!FencesEnabled()) [impl->render waitForFence:boundary beforeStages:MTLRenderStageVertex];
++    impl->render.label=label;
++    if(label) impl->profile->Label(label.UTF8String);
++    return (__bridge void*)impl->render;
++}
++
++void Scheduler::MemoryBarrier(bool proven_empty_raw_pass) {
+     InvalidatePreparedCompute();
+     if(VideoCore::FrameCapture::NativeRecording())VideoCore::FrameCapture::Native(std::format("{{\"op\":\"barrier\",\"kind\":{},\"holding\":{},\"hoisting\":{}}}",unsigned(open_encoder),holding?"true":"false",hoisting?"true":"false"));
+     impl->profile->Barrier();
+@@ -979,9 +1054,15 @@
+             // whether a draw occurred since the last identical render-only barrier.
+             commands.MemoryBarrier();
+         } else {
+-            [impl->render memoryBarrierWithScope:MTLBarrierScopeBuffers | MTLBarrierScopeTextures
+-                                     afterStages:MTLRenderStageVertex | MTLRenderStageFragment
+-                                    beforeStages:MTLRenderStageVertex | MTLRenderStageFragment];
++            if (impl->fragment_pass_barriers) {
++                ASSERT_MSG(proven_empty_raw_pass,
++                    "Raw render state is not tracked: generic fragment barriers require RenderList, or an explicitly proven empty raw pass");
++                RenderBarrierEncoder((__bridge void*)impl->render);
++            } else {
++                [impl->render memoryBarrierWithScope:MTLBarrierScopeBuffers | MTLBarrierScopeTextures
++                                         afterStages:MTLRenderStageVertex | MTLRenderStageFragment
++                                        beforeStages:MTLRenderStageVertex | MTLRenderStageFragment];
++            }
+         }
+         WaitOutstandingFences(*impl, EncoderKind::Render);
+         break;
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_scheduler_impl.h
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_scheduler_impl.h
+@@ -26,6 +26,12 @@
+     id<MTLCommandBuffer> cmdbuf; ///< open command buffer, nil until something is recorded
+     /// The open encoder (the one of Scheduler::OpenEncoder(), the others are nil).
+     id<MTLRenderCommandEncoder> render;
++    // Original final-store actions, plus the exact query identity of this logical pass.
++    // A required fragment barrier may split encoders without submitting or advancing the tick.
++    MTLRenderPassDescriptor* render_pass = nil;
++    std::pair<void*, u64> render_query{};
++    bool render_guest = false, render_bound_only = false;
++    bool fragment_pass_barriers = false;
+     bool render_guest_declared = false;
+     id<MTLComputeCommandEncoder> compute;
+     bool compute_guest_declared = false; ///< upgrades reused host compute encoders before indirect access
+--- a/tests/test_mtl_render_list.mm
++++ b/tests/test_mtl_render_list.mm
+@@ -109,9 +109,38 @@
+     return pixels;
+ }
+ 
++// A minimal lawful native owner for command-list-only tests. Production uses the
++// Scheduler's existing ring and descriptor lifecycle; this fixture owns one color
++// attachment (Store) and verifies the same after-fragment -> before-vertex API edge.
++struct NativeBarrierOwner {
++    id<MTLCommandBuffer> command;
++    id<MTLRenderCommandEncoder> encoder;
++    id<MTLFence> fence;
++    MTLRenderPassDescriptor* pass;
++    unsigned boundaries = 0;
++    NativeBarrierOwner(const Fixture& f, id<MTLCommandBuffer> cmd) : command(cmd), fence([f.device newFence]), pass(Pass(f)) {
++        encoder = [command renderCommandEncoderWithDescriptor:pass];
++    }
++    void Attach(RenderList& list) {
++        if (![command.device supportsFamily:MTLGPUFamilyApple1]) return;
++        list.SetBarrierEncoder(this, [](void* raw, void* previous) -> void* {
++            auto& self=*static_cast<NativeBarrierOwner*>(raw);
++            CHECK(previous==Raw(self.encoder));
++            [self.encoder updateFence:self.fence afterStages:MTLRenderStageFragment];
++            [self.encoder endEncoding];
++            MTLRenderPassDescriptor* next=[self.pass copy]; next.colorAttachments[0].loadAction=MTLLoadActionLoad;
++            self.encoder=[self.command renderCommandEncoderWithDescriptor:next];
++            [self.encoder waitForFence:self.fence beforeStages:MTLRenderStageVertex];
++            ++self.boundaries;
++            return Raw(self.encoder);
++        });
++    }
++};
++
+ static std::array<uint32_t, kWidth> Run(const Fixture& f, RenderList& list, bool recorded) {
+     id<MTLCommandBuffer> cmd = [f.queue commandBuffer];
+-    id<MTLRenderCommandEncoder> encoder = [cmd renderCommandEncoderWithDescriptor:Pass(f)];
++    NativeBarrierOwner owner(f,cmd); owner.Attach(list);
++    id<MTLRenderCommandEncoder> encoder = owner.encoder;
+     if (recorded) {
+         list.BeginRecording();
+         CHECK(list.Recording() && list.Empty() && !list.HasBarrier());
+@@ -126,7 +155,7 @@
+         CHECK(list.Empty() && list.HasBarrier());
+     }
+     list.End();
+-    [encoder endEncoding];
++    [owner.encoder endEncoding];
+     [cmd commit];
+     [cmd waitUntilCompleted];
+     CHECK(cmd.status == MTLCommandBufferStatusCompleted);
+@@ -161,6 +190,29 @@
+ - (void)drawPatches:(NSUInteger)n patchStart:(NSUInteger)s patchCount:(NSUInteger)c patchIndexBuffer:(id<MTLBuffer>)b patchIndexBufferOffset:(NSUInteger)o instanceCount:(NSUInteger)i baseInstance:(NSUInteger)a { ++_draws; }
+ @end
+ 
++@interface ResumeEncoder : BarrierEncoder
++@property void* firstBuffer;
++@property void* vertexBuffer;
++@property void* fragmentBuffer;
++@property NSUInteger vertexOffset;
++@property NSUInteger vertexStride;
++@property NSUInteger fragmentOffset;
++@property uint32_t vertexBytes;
++@property uint32_t fragmentBytes;
++@property NSUInteger groups;
++@end
++@implementation ResumeEncoder
++- (void)setVertexBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o atIndex:(NSUInteger)i { if(!_firstBuffer)_firstBuffer=Raw(b);_vertexBuffer=Raw(b);_vertexOffset=o; }
++- (void)setVertexBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o attributeStride:(NSUInteger)s atIndex:(NSUInteger)i { [self setVertexBuffer:b offset:o atIndex:i];_vertexStride=s; }
++- (void)setVertexBufferOffset:(NSUInteger)o atIndex:(NSUInteger)i {_vertexOffset=o;}
++- (void)setFragmentBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o atIndex:(NSUInteger)i {_fragmentBuffer=Raw(b);_fragmentOffset=o;}
++- (void)setFragmentBufferOffset:(NSUInteger)o atIndex:(NSUInteger)i {_fragmentOffset=o;}
++- (void)setVertexBytes:(const void*)b length:(NSUInteger)n atIndex:(NSUInteger)i {CHECK(n==4);std::memcpy(&_vertexBytes,b,4);}
++- (void)setFragmentBytes:(const void*)b length:(NSUInteger)n atIndex:(NSUInteger)i {CHECK(n==4);std::memcpy(&_fragmentBytes,b,4);}
++- (void)pushDebugGroup:(NSString*)s {++_groups;}
++- (void)popDebugGroup {CHECK(_groups>0);--_groups;}
++@end
++
+ static bool Coalescing() {
+     const char* flag=std::getenv("BB_MTL_COALESCE_BARRIERS");return flag&&flag[0]=='1';
+ }
+@@ -177,6 +229,42 @@
+     l.DrawPatches(3,0,0,1,0);
+     l.MemoryBarrier();l.MemoryBarrier();
+ }
++static void TestBarrierStateResume() {
++    for(unsigned mode=0;mode<3;++mode) {
++        struct Owner {std::array<ResumeEncoder*,3> enc;unsigned at=0;};
++        Owner owner{{[ResumeEncoder new],[ResumeEncoder new],[ResumeEncoder new]}};
++        RenderList source,moved;
++        source.SetBarrierEncoder(&owner,[](void* raw,void* previous)->void* {
++            auto& o=*static_cast<Owner*>(raw);CHECK(previous==Raw(o.enc[o.at]));CHECK(o.enc[o.at].groups==0);
++            CHECK(o.at<2);return Raw(o.enc[++o.at]);
++        });
++        if(mode)source.BeginRecording();else source.BeginDirect(Raw(owner.enc[0]));
++        auto a=[NSObject new],b=[NSObject new],f=[NSObject new];
++        uint32_t v=123,x=456;
++        source.PushDebugGroup("resume");
++        source.SetVertexBufferWithStride(Raw(a),16,32,0);
++        source.SetVertexBufferWithStride(Raw(a),48,32,0); // materialized offset-only setter
++        source.SetBuffer(RenderList::Stage::Fragment,Raw(f),64,0);
++        source.SetBuffer(RenderList::Stage::Fragment,Raw(f),96,0);
++        source.SetBytes(RenderList::Stage::Vertex,&v,4,1);source.SetBytes(RenderList::Stage::Fragment,&x,4,1);
++        source.MemoryBarrier();source.DrawPrimitives(MTLPrimitiveTypeTriangle,0,3,1,0);
++        source.SetVertexBufferWithStride(Raw(b),80,64,0);
++        source.MemoryBarrier();
++        if(mode==1)source.Replay(Raw(owner.enc[0]));
++        if(mode==2){source.TakeRecording(moved);source.End();moved.Replay(Raw(owner.enc[0]));}
++        auto& active=mode==2?moved:source;
++        if(mode)active.ContinueDirect(Raw(owner.enc[owner.at]));
++        CHECK(owner.at==2);
++        CHECK(owner.enc[1].firstBuffer==Raw(a)); // never apply the recording's future/final state early
++        CHECK(owner.enc[2].vertexBuffer==Raw(b)&&owner.enc[2].vertexOffset==80&&owner.enc[2].vertexStride==64);
++        CHECK(owner.enc[2].fragmentBuffer==Raw(f)&&owner.enc[2].fragmentOffset==96);
++        CHECK(owner.enc[2].vertexBytes==123&&owner.enc[2].fragmentBytes==456&&owner.enc[2].groups==1);
++        active.PopDebugGroup();active.End();
++        CHECK(owner.enc[0].groups==0&&owner.enc[1].groups==0&&owner.enc[2].groups==0);
++    }
++    std::puts("barrier state: direct/replay/moved/continue, prefix-only state, offsets, strides, both bytes stages, groups passed");
++}
++
+ static void TestBarrierControlFlow() {
+     for(unsigned mode=0;mode<3;++mode) {
+         RenderList source,destination;auto enc=[BarrierEncoder new];
+@@ -268,8 +356,8 @@
+     auto counter=[f.device newBufferWithLength:256 options:MTLResourceStorageModeShared];
+     for(unsigned mode=0;mode<3;++mode) {
+         *static_cast<uint32_t*>(counter.contents)=0;
+-        auto cmd=[f.queue commandBuffer];auto enc=[cmd renderCommandEncoderWithDescriptor:Pass(f)];
+-        RenderList l,moved;if(!mode)l.BeginDirect(Raw(enc));else l.BeginRecording();
++        auto cmd=[f.queue commandBuffer];NativeBarrierOwner owner(f,cmd);auto enc=owner.encoder;
++        RenderList l,moved;owner.Attach(l);if(!mode)l.BeginDirect(Raw(enc));else l.BeginRecording();
+         l.SetRenderPipelineState(Raw(pipeline));const auto stage=vertex?RenderList::Stage::Vertex:RenderList::Stage::Fragment;l.SetBuffer(stage,Raw(counter),0,0);
+         RenderList::Viewport viewport{0,0,double(kWidth),1,0,1};l.SetViewports(&viewport,1);
+         RenderList::Scissor scissor{0,0,1,1};l.SetScissorRects(&scissor,1);
+@@ -280,7 +368,7 @@
+         RenderList* active=&l;if(mode==2){l.TakeRecording(moved);l.End();active=&moved;}
+         if(mode)active->Replay(Raw(enc));
+         auto stats=active->BarrierSnapshot();CHECK(stats.requested==21 && stats.dropped==(Coalescing()?14:0));active->End();
+-        [enc endEncoding];[cmd commit];[cmd waitUntilCompleted];CHECK(cmd.status==MTLCommandBufferStatusCompleted);
++        [owner.encoder endEncoding];[cmd commit];[cmd waitUntilCompleted];CHECK(cmd.status==MTLCommandBufferStatusCompleted);
+         CHECK(*static_cast<uint32_t*>(counter.contents)==6);CHECK(Read(f)[0]==0xff000006);
+     }
+     std::puts("barrier filter: atomic write/read dependencies and exact pixels direct/recorded/moved passed");
+@@ -289,7 +377,7 @@
+ int main(int argc,char**argv) {
+     @autoreleasepool {
+         if(argc==2&&!std::strcmp(argv[1],"--controls-only")) {
+-            TestBarrierControlFlow();TestBarrierContinuation();
++            TestBarrierControlFlow();TestBarrierStateResume();TestBarrierContinuation();
+             std::printf(failures?"FAILED controls: %d\n":"all controls passed; Metal device not created\n",failures);return failures?1:0;
+         }
+         if(argc!=1)return 2;
+@@ -335,7 +423,7 @@
+                            kWhite = 0xffffffff;
+         const std::array<uint32_t, kWidth> expected{kGreen, kGreen, kRed,  kGreen,
+                                                     kBlue,  kWhite, 0,     0};
+-        TestBarrierControlFlow();
++        TestBarrierControlFlow();TestBarrierStateResume();
+         TestBarrierContinuation();
+         TestBarrierAtomicOrdering(f,false);
+         TestBarrierAtomicOrdering(f,true);
+--- a/tests/test_mtl_scheduler.mm
++++ b/tests/test_mtl_scheduler.mm
+@@ -375,7 +375,7 @@
+     scheduler.EndEncoder();
+     scheduler.RenderEncoder((__bridge const void*)pass);
+     CHECK(scheduler.IsRendering());
+-    scheduler.MemoryBarrier();
++    scheduler.MemoryBarrier(true); // explicit contract: no native binding or draw in this pass
+     CHECK(scheduler.IsRendering());
+     scheduler.EndRendering();
+     CHECK(!scheduler.IsRendering());
+@@ -1198,9 +1198,119 @@
+     puts("depth-layout pixels, depth/stencil decisions, visibility sum and shader/feedback/barrier/tail guards passed");
+ }
+ 
++// A real fragment->vertex/fragment dependency with opaque device-address memory.
++// Exact pixel/depth/stencil/MSAA/query results, not just encoder or cache counters.
++static void TestFragmentPassBoundary(Metal::Device& device) {
++    auto& dev=device.GetImpl();auto gpu=dev.device;
++    NSError* error=nil;
++    auto lib=[gpu newLibraryWithSource:@R"(
++#include <metal_stdlib>
++using namespace metal;
++struct V {float4 p [[position]];};
++vertex V vs(uint id [[vertex_id]],constant float& z [[buffer(0)]]) {
++ float2 p=float2((id<<1u)&2u,id&2u);return {float4(p*2-1,z,1)};
++}
++fragment float4 fs(V in [[stage_in]],uint sample [[sample_id]],constant float4& c [[buffer(0)]],
++ constant uint& read [[buffer(1)]],constant ulong& address [[buffer(2)]]) {
++ auto counter=reinterpret_cast<device atomic_uint*>(address);
++ if(!read && uint(in.p.x)==0 && uint(in.p.y)==0 && sample==0) atomic_fetch_add_explicit(counter,1u,memory_order_relaxed);
++ if(read && atomic_load_explicit(counter,memory_order_relaxed)!=1u) return float4(0,0,1,1);
++ return c;
++}
++)" options:nil error:&error];CHECK(lib);if(!lib){std::printf("fragment barrier shader: %s\n",error.localizedDescription.UTF8String);return;}
++    for(unsigned samples : {1u,4u}) {
++        if(![gpu supportsTextureSampleCount:samples])continue;
++        auto make=[&](MTLPixelFormat format,unsigned count) {
++            auto d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format width:4 height:4 mipmapped:NO];
++            d.storageMode=MTLStorageModePrivate;d.usage=MTLTextureUsageRenderTarget;
++            if(count>1){d.textureType=MTLTextureType2DMultisample;d.sampleCount=count;}
++            return [gpu newTextureWithDescriptor:d];
++        };
++        auto color=make(MTLPixelFormatRGBA8Unorm,samples),depth=make(MTLPixelFormatDepth32Float_Stencil8,samples);
++        auto resolved=samples>1?make(MTLPixelFormatRGBA8Unorm,1):color;
++        auto p=[MTLRenderPassDescriptor renderPassDescriptor];
++        p.colorAttachments[0].texture=color;p.colorAttachments[0].loadAction=MTLLoadActionClear;
++        p.colorAttachments[0].clearColor=MTLClearColorMake(0,0,0,1);
++        p.colorAttachments[0].storeAction=samples>1?MTLStoreActionMultisampleResolve:MTLStoreActionStore;
++        if(samples>1)p.colorAttachments[0].resolveTexture=resolved;
++        p.depthAttachment.texture=p.stencilAttachment.texture=depth;
++        p.depthAttachment.loadAction=p.stencilAttachment.loadAction=MTLLoadActionClear;
++        p.depthAttachment.clearDepth=1;p.stencilAttachment.clearStencil=3;
++        p.depthAttachment.storeAction=p.stencilAttachment.storeAction=MTLStoreActionDontCare;
++        auto pd=[MTLRenderPipelineDescriptor new];pd.vertexFunction=[lib newFunctionWithName:@"vs"];pd.fragmentFunction=[lib newFunctionWithName:@"fs"];
++        pd.colorAttachments[0].pixelFormat=MTLPixelFormatRGBA8Unorm;pd.rasterSampleCount=samples;
++        pd.depthAttachmentPixelFormat=pd.stencilAttachmentPixelFormat=MTLPixelFormatDepth32Float_Stencil8;
++        auto pso=[gpu newRenderPipelineStateWithDescriptor:pd error:&error];CHECK(pso);if(!pso)return;
++        auto dd=[MTLDepthStencilDescriptor new];dd.depthCompareFunction=MTLCompareFunctionLess;dd.depthWriteEnabled=YES;
++        dd.frontFaceStencil.stencilCompareFunction=dd.backFaceStencil.stencilCompareFunction=MTLCompareFunctionEqual;
++        auto ds=[gpu newDepthStencilStateWithDescriptor:dd];CHECK(ds);
++        auto queries=[gpu newBufferWithLength:32 options:MTLResourceStorageModeShared];
++        auto raw=[gpu newBufferWithLength:4096 options:MTLResourceStorageModeShared|MTLResourceHazardTrackingModeUntracked];
++        auto pixels=[gpu newBufferWithLength:1024 options:MTLResourceStorageModeShared];
++        CHECK(color&&depth&&resolved&&queries&&raw&&pixels);if(!raw)return;
++        *static_cast<u64*>(queries.contents)=0xface;
++        *static_cast<uint32_t*>(raw.contents)=0;
++        const size_t old_guest_count=dev.guest_count.load();dev.AddGuestBuffer(raw);
++        {
++            Scheduler q(device,"test-fragment-boundary");unsigned query_calls=0;
++            q.SetVisibilityQuery([&](const void*) -> std::pair<void*,u64> {++query_calls;return {(__bridge void*)queries,8};});
++            VideoCore::RenderState state{};state.width=state.height=4;state.num_layers=1;state.num_color_attachments=1;
++            state.color_attachments[0].image_view=(uintptr_t)(__bridge void*)color;
++            state.depth_stencil_attachment.image_view=(uintptr_t)(__bridge void*)depth;
++            auto retired=std::make_shared<std::atomic<bool>>(false);q.DeferOperation([retired]{retired->store(true);});
++            const auto tick=q.CurrentTick();const bool upgrade=std::getenv("BB_TEST_FRAGMENT_UPGRADE")!=nullptr;
++            q.RenderEncoder((__bridge void*)p,state,true,upgrade);if(upgrade)q.RequireGuestRender();
++            auto& l=q.Commands();l.SetRenderPipelineState((__bridge void*)pso);l.SetDepthStencilState((__bridge void*)ds);
++            l.SetStencilReference(3,3);l.SetCullMode(MTLCullModeNone);l.SetFrontFacingWinding(MTLWindingClockwise);
++            l.SetDepthClipMode(MTLDepthClipModeClip);l.SetTriangleFillMode(MTLTriangleFillModeFill);l.SetDepthBias(0,0,0);
++            l.SetBlendColor(1,1,1,1);const Metal::RenderList::Viewport view{0,0,4,4,0,1};l.SetViewports(&view,1);
++            Metal::RenderList::Scissor left{0,0,2,4},full{0,0,4,4};l.SetScissorRects(&left,1);
++            float z=.5f;std::array<float,4> c{1,0,0,1};uint32_t read=0;u64 address=raw.gpuAddress;
++            l.SetBytes(Metal::RenderList::Stage::Vertex,&z,4,0);l.SetBytes(Metal::RenderList::Stage::Fragment,c.data(),16,0);
++            l.SetBytes(Metal::RenderList::Stage::Fragment,&read,4,1);l.SetBytes(Metal::RenderList::Stage::Fragment,&address,8,2);
++            l.PushDebugGroup("fragment producer");l.DrawPrimitives(MTLPrimitiveTypeTriangle,0,3,1,0);
++            q.MemoryBarrier(); // held recording or direct: same API, exact dependency, no rebind
++            CHECK(q.CurrentTick()==tick);
++            z=.75f;c={0,1,0,1};read=1;l.SetScissorRects(&full,1);
++            l.SetBytes(Metal::RenderList::Stage::Vertex,&z,4,0);l.SetBytes(Metal::RenderList::Stage::Fragment,c.data(),16,0);
++            l.SetBytes(Metal::RenderList::Stage::Fragment,&read,4,1);
++            l.DrawPrimitives(MTLPrimitiveTypeTriangle,0,3,1,0);l.PopDebugGroup();
++            if(std::getenv("BB_TEST_FRAGMENT_POST_REPLAY")) {
++                // Taking/moving the first list to the real replay thread must carry the
++                // same owner, physical state and lifetime; the following empty host pass
++                // neither resets the guest query nor changes its counting density.
++                auto empty=[MTLRenderPassDescriptor renderPassDescriptor];
++                empty.renderTargetWidth=empty.renderTargetHeight=1;empty.defaultRasterSampleCount=1;
++                VideoCore::RenderState host{};host.width=host.height=host.num_layers=1;
++                q.RenderEncoder((__bridge void*)empty,host,false,true);
++            }
++            q.EndEncoder();CHECK(q.CurrentTick()==tick);CHECK(query_calls==1);CHECK(!retired->load());
++            q.BlitEncoder();[q.GetImpl().blit copyFromTexture:resolved sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0,0,0) sourceSize:MTLSizeMake(4,4,1) toBuffer:pixels destinationOffset:0 destinationBytesPerRow:256 destinationBytesPerImage:1024];
++            q.Finish();CHECK(!q.HasFailed());for(unsigned i=0;i<1000&&!retired->load();++i){q.PopPendingOperations();std::this_thread::sleep_for(std::chrono::microseconds(100));}CHECK(retired->load());
++            CHECK(static_cast<const u64*>(queries.contents)[0]==0xface);
++            CHECK(static_cast<const u64*>(queries.contents)[1]==16*samples);
++            CHECK(*static_cast<const uint32_t*>(raw.contents)==1);
++            auto bytes=static_cast<const unsigned char*>(pixels.contents);
++            for(unsigned y=0;y<4;++y)for(unsigned x=0;x<4;++x){auto px=bytes+y*256+x*4;CHECK(px[0]==(x<2?255:0)&&px[1]==(x<2?0:255)&&px[2]==0&&px[3]==255);}
++            q.SetVisibilityQuery({});
++        }
++        dev.guest_count.store(old_guest_count);dev.guest_buffers[old_guest_count]=nil;
++        std::printf("fragment boundary: %ux MSAA exact pixels, depth/stencil, untracked BDA, query accumulation, unchanged tick passed\n",samples);
++    }
++}
++
+ int main() {
+     @autoreleasepool {
+         Metal::Device device;
++        if(std::getenv("BB_TEST_REJECT_RAW_BARRIER")) {
++            auto p=[MTLRenderPassDescriptor renderPassDescriptor];p.renderTargetWidth=p.renderTargetHeight=1;p.defaultRasterSampleCount=1;
++            Scheduler q(device,"reject-unknown-raw-state");q.HostRenderEncoder((__bridge void*)p);
++            auto b=[device.GetImpl().device newBufferWithLength:256 options:MTLResourceStorageModeShared];
++            [q.GetImpl().render setVertexBuffer:b offset:0 atIndex:0];
++            q.MemoryBarrier(); // MUST diagnose; no empty contract, cannot reconstruct raw bindings
++            return 99;
++        }
++        if(std::getenv("BB_TEST_FRAGMENT_BARRIER_ONLY")){TestFragmentPassBoundary(device);return failures?1:0;}
+         if(std::getenv("BB_TEST_DEPTH_LAYOUT_ONLY")){TestDepthLayoutContinuation(device);return failures?1:0;}
+         if(std::getenv("BB_TEST_CONSUMED_CLEAR_ONLY")){TestConsumedClearContinuation(device);return failures?1:0;}
+         if(std::getenv("BB_TEST_CLEAR_BLEND_ONLY")){TestClearFoldBlending(device);return failures?1:0;}
+@@ -1226,6 +1336,7 @@
+             std::printf(failures ? "FAILED: %d check(s)\n" : "all checks passed\n", failures);
+             return failures ? 1 : 0;
+         }
++        TestFragmentPassBoundary(device);
+         TestTicks(device, k);
+         const uint32_t spin_n = Calibrate(device, k, 20.0);
+         TestDeferred(device, k, spin_n);

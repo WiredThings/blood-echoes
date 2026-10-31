@@ -109,9 +109,38 @@ static std::array<uint32_t, kWidth> Read(const Fixture& f) {
     return pixels;
 }
 
+// A minimal lawful native owner for command-list-only tests. Production uses the
+// Scheduler's existing ring and descriptor lifecycle; this fixture owns one color
+// attachment (Store) and verifies the same after-fragment -> before-vertex API edge.
+struct NativeBarrierOwner {
+    id<MTLCommandBuffer> command;
+    id<MTLRenderCommandEncoder> encoder;
+    id<MTLFence> fence;
+    MTLRenderPassDescriptor* pass;
+    unsigned boundaries = 0;
+    NativeBarrierOwner(const Fixture& f, id<MTLCommandBuffer> cmd) : command(cmd), fence([f.device newFence]), pass(Pass(f)) {
+        encoder = [command renderCommandEncoderWithDescriptor:pass];
+    }
+    void Attach(RenderList& list) {
+        if (![command.device supportsFamily:MTLGPUFamilyApple1]) return;
+        list.SetBarrierEncoder(this, [](void* raw, void* previous) -> void* {
+            auto& self=*static_cast<NativeBarrierOwner*>(raw);
+            CHECK(previous==Raw(self.encoder));
+            [self.encoder updateFence:self.fence afterStages:MTLRenderStageFragment];
+            [self.encoder endEncoding];
+            MTLRenderPassDescriptor* next=[self.pass copy]; next.colorAttachments[0].loadAction=MTLLoadActionLoad;
+            self.encoder=[self.command renderCommandEncoderWithDescriptor:next];
+            [self.encoder waitForFence:self.fence beforeStages:MTLRenderStageVertex];
+            ++self.boundaries;
+            return Raw(self.encoder);
+        });
+    }
+};
+
 static std::array<uint32_t, kWidth> Run(const Fixture& f, RenderList& list, bool recorded) {
     id<MTLCommandBuffer> cmd = [f.queue commandBuffer];
-    id<MTLRenderCommandEncoder> encoder = [cmd renderCommandEncoderWithDescriptor:Pass(f)];
+    NativeBarrierOwner owner(f,cmd); owner.Attach(list);
+    id<MTLRenderCommandEncoder> encoder = owner.encoder;
     if (recorded) {
         list.BeginRecording();
         CHECK(list.Recording() && list.Empty() && !list.HasBarrier());
@@ -126,7 +155,7 @@ static std::array<uint32_t, kWidth> Run(const Fixture& f, RenderList& list, bool
         CHECK(list.Empty() && list.HasBarrier());
     }
     list.End();
-    [encoder endEncoding];
+    [owner.encoder endEncoding];
     [cmd commit];
     [cmd waitUntilCompleted];
     CHECK(cmd.status == MTLCommandBufferStatusCompleted);
@@ -161,6 +190,29 @@ static std::array<uint32_t, kWidth> Run(const Fixture& f, RenderList& list, bool
 - (void)drawPatches:(NSUInteger)n patchStart:(NSUInteger)s patchCount:(NSUInteger)c patchIndexBuffer:(id<MTLBuffer>)b patchIndexBufferOffset:(NSUInteger)o instanceCount:(NSUInteger)i baseInstance:(NSUInteger)a { ++_draws; }
 @end
 
+@interface ResumeEncoder : BarrierEncoder
+@property void* firstBuffer;
+@property void* vertexBuffer;
+@property void* fragmentBuffer;
+@property NSUInteger vertexOffset;
+@property NSUInteger vertexStride;
+@property NSUInteger fragmentOffset;
+@property uint32_t vertexBytes;
+@property uint32_t fragmentBytes;
+@property NSUInteger groups;
+@end
+@implementation ResumeEncoder
+- (void)setVertexBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o atIndex:(NSUInteger)i { if(!_firstBuffer)_firstBuffer=Raw(b);_vertexBuffer=Raw(b);_vertexOffset=o; }
+- (void)setVertexBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o attributeStride:(NSUInteger)s atIndex:(NSUInteger)i { [self setVertexBuffer:b offset:o atIndex:i];_vertexStride=s; }
+- (void)setVertexBufferOffset:(NSUInteger)o atIndex:(NSUInteger)i {_vertexOffset=o;}
+- (void)setFragmentBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o atIndex:(NSUInteger)i {_fragmentBuffer=Raw(b);_fragmentOffset=o;}
+- (void)setFragmentBufferOffset:(NSUInteger)o atIndex:(NSUInteger)i {_fragmentOffset=o;}
+- (void)setVertexBytes:(const void*)b length:(NSUInteger)n atIndex:(NSUInteger)i {CHECK(n==4);std::memcpy(&_vertexBytes,b,4);}
+- (void)setFragmentBytes:(const void*)b length:(NSUInteger)n atIndex:(NSUInteger)i {CHECK(n==4);std::memcpy(&_fragmentBytes,b,4);}
+- (void)pushDebugGroup:(NSString*)s {++_groups;}
+- (void)popDebugGroup {CHECK(_groups>0);--_groups;}
+@end
+
 static bool Coalescing() {
     const char* flag=std::getenv("BB_MTL_COALESCE_BARRIERS");return flag&&flag[0]=='1';
 }
@@ -177,6 +229,42 @@ static void BarrierSequence(RenderList& l) {
     l.DrawPatches(3,0,0,1,0);
     l.MemoryBarrier();l.MemoryBarrier();
 }
+static void TestBarrierStateResume() {
+    for(unsigned mode=0;mode<3;++mode) {
+        struct Owner {std::array<ResumeEncoder*,3> enc;unsigned at=0;};
+        Owner owner{{[ResumeEncoder new],[ResumeEncoder new],[ResumeEncoder new]}};
+        RenderList source,moved;
+        source.SetBarrierEncoder(&owner,[](void* raw,void* previous)->void* {
+            auto& o=*static_cast<Owner*>(raw);CHECK(previous==Raw(o.enc[o.at]));CHECK(o.enc[o.at].groups==0);
+            CHECK(o.at<2);return Raw(o.enc[++o.at]);
+        });
+        if(mode)source.BeginRecording();else source.BeginDirect(Raw(owner.enc[0]));
+        auto a=[NSObject new],b=[NSObject new],f=[NSObject new];
+        uint32_t v=123,x=456;
+        source.PushDebugGroup("resume");
+        source.SetVertexBufferWithStride(Raw(a),16,32,0);
+        source.SetVertexBufferWithStride(Raw(a),48,32,0); // materialized offset-only setter
+        source.SetBuffer(RenderList::Stage::Fragment,Raw(f),64,0);
+        source.SetBuffer(RenderList::Stage::Fragment,Raw(f),96,0);
+        source.SetBytes(RenderList::Stage::Vertex,&v,4,1);source.SetBytes(RenderList::Stage::Fragment,&x,4,1);
+        source.MemoryBarrier();source.DrawPrimitives(MTLPrimitiveTypeTriangle,0,3,1,0);
+        source.SetVertexBufferWithStride(Raw(b),80,64,0);
+        source.MemoryBarrier();
+        if(mode==1)source.Replay(Raw(owner.enc[0]));
+        if(mode==2){source.TakeRecording(moved);source.End();moved.Replay(Raw(owner.enc[0]));}
+        auto& active=mode==2?moved:source;
+        if(mode)active.ContinueDirect(Raw(owner.enc[owner.at]));
+        CHECK(owner.at==2);
+        CHECK(owner.enc[1].firstBuffer==Raw(a)); // never apply the recording's future/final state early
+        CHECK(owner.enc[2].vertexBuffer==Raw(b)&&owner.enc[2].vertexOffset==80&&owner.enc[2].vertexStride==64);
+        CHECK(owner.enc[2].fragmentBuffer==Raw(f)&&owner.enc[2].fragmentOffset==96);
+        CHECK(owner.enc[2].vertexBytes==123&&owner.enc[2].fragmentBytes==456&&owner.enc[2].groups==1);
+        active.PopDebugGroup();active.End();
+        CHECK(owner.enc[0].groups==0&&owner.enc[1].groups==0&&owner.enc[2].groups==0);
+    }
+    std::puts("barrier state: direct/replay/moved/continue, prefix-only state, offsets, strides, both bytes stages, groups passed");
+}
+
 static void TestBarrierControlFlow() {
     for(unsigned mode=0;mode<3;++mode) {
         RenderList source,destination;auto enc=[BarrierEncoder new];
@@ -268,8 +356,8 @@ static void TestBarrierAtomicOrdering(const Fixture& f, bool vertex) {
     auto counter=[f.device newBufferWithLength:256 options:MTLResourceStorageModeShared];
     for(unsigned mode=0;mode<3;++mode) {
         *static_cast<uint32_t*>(counter.contents)=0;
-        auto cmd=[f.queue commandBuffer];auto enc=[cmd renderCommandEncoderWithDescriptor:Pass(f)];
-        RenderList l,moved;if(!mode)l.BeginDirect(Raw(enc));else l.BeginRecording();
+        auto cmd=[f.queue commandBuffer];NativeBarrierOwner owner(f,cmd);auto enc=owner.encoder;
+        RenderList l,moved;owner.Attach(l);if(!mode)l.BeginDirect(Raw(enc));else l.BeginRecording();
         l.SetRenderPipelineState(Raw(pipeline));const auto stage=vertex?RenderList::Stage::Vertex:RenderList::Stage::Fragment;l.SetBuffer(stage,Raw(counter),0,0);
         RenderList::Viewport viewport{0,0,double(kWidth),1,0,1};l.SetViewports(&viewport,1);
         RenderList::Scissor scissor{0,0,1,1};l.SetScissorRects(&scissor,1);
@@ -280,7 +368,7 @@ static void TestBarrierAtomicOrdering(const Fixture& f, bool vertex) {
         RenderList* active=&l;if(mode==2){l.TakeRecording(moved);l.End();active=&moved;}
         if(mode)active->Replay(Raw(enc));
         auto stats=active->BarrierSnapshot();CHECK(stats.requested==21 && stats.dropped==(Coalescing()?14:0));active->End();
-        [enc endEncoding];[cmd commit];[cmd waitUntilCompleted];CHECK(cmd.status==MTLCommandBufferStatusCompleted);
+        [owner.encoder endEncoding];[cmd commit];[cmd waitUntilCompleted];CHECK(cmd.status==MTLCommandBufferStatusCompleted);
         CHECK(*static_cast<uint32_t*>(counter.contents)==6);CHECK(Read(f)[0]==0xff000006);
     }
     std::puts("barrier filter: atomic write/read dependencies and exact pixels direct/recorded/moved passed");
@@ -289,7 +377,7 @@ static void TestBarrierAtomicOrdering(const Fixture& f, bool vertex) {
 int main(int argc,char**argv) {
     @autoreleasepool {
         if(argc==2&&!std::strcmp(argv[1],"--controls-only")) {
-            TestBarrierControlFlow();TestBarrierContinuation();
+            TestBarrierControlFlow();TestBarrierStateResume();TestBarrierContinuation();
             std::printf(failures?"FAILED controls: %d\n":"all controls passed; Metal device not created\n",failures);return failures?1:0;
         }
         if(argc!=1)return 2;
@@ -335,7 +423,7 @@ int main(int argc,char**argv) {
                            kWhite = 0xffffffff;
         const std::array<uint32_t, kWidth> expected{kGreen, kGreen, kRed,  kGreen,
                                                     kBlue,  kWhite, 0,     0};
-        TestBarrierControlFlow();
+        TestBarrierControlFlow();TestBarrierStateResume();
         TestBarrierContinuation();
         TestBarrierAtomicOrdering(f,false);
         TestBarrierAtomicOrdering(f,true);

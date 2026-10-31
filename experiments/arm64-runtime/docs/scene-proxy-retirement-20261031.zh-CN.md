@@ -58,3 +58,7 @@ python3 experiments/arm64-runtime/tests/test_scene_proxy_retirement.py \
 ## 本轮不改的范围
 
 没有实际证据说明普通 sampled-texture 缓存、held staging、共享 guest chunk 或 GPU-only 内容存在新的可回收缺口，均保持现有所有权/fence/代次逻辑。Imported wrapper 的集合是否会遇到同一 native 对象多重 wrapper，只找到 API 层理论风险；当前 `chunk_buffers` 为每 chunk 单槽复用，未找到游戏中的重复 wrapper 路径，不据此改实现。
+
+### 0090 合并后的生命周期边界
+
+最终只读审阅确认0090仅同command buffer/tick拆encoder，提交前仍排空held/replay/render-tail；状态快照不retain GPU payload，原view/backing/sampler继续当前tick的deferred retirement。另有既有安全空tick分支：Submit已排空工作、没有command buffer且前序全部退休时，可直接退休空tick；0090拆段已有command buffer，不经过这个分支。不能将“通常由completed handler退休”误写成唯一分支。

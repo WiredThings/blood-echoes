@@ -52,8 +52,16 @@ def run(build):
     result=subprocess.run([str(mutated),'--controls-only'],env={**safe,'BB_MTL_COALESCE_BARRIERS':'1'},capture_output=True,text=True,timeout=15)
     (output/'mutation.log').write_text(result.stdout+result.stderr)
     need(result.returncode==1 and'FAILED controls'in result.stdout,'history-reset mutation was not detected')
+    resume_anchor='if (changed && native_state)'
+    need(body.count(resume_anchor)==1,'exact native-state restore anchor absent')
+    no_restore=output/'missing-state-restore.mm';no_restore.write_text(body.replace(resume_anchor,'if (false && changed && native_state)'))
+    no_restore_binary=output/'missing-state-restore';changed=list(command);changed[changed.index(str(source))]=str(no_restore);changed[-1]=str(no_restore_binary)
+    compile_command(changed,'compile-missing-state-restore.log')
+    result=subprocess.run([str(no_restore_binary),'--controls-only'],env={**safe,'BB_MTL_COALESCE_BARRIERS':'1'},capture_output=True,text=True,timeout=15)
+    (output/'missing-state-restore.log').write_text(result.stdout+result.stderr)
+    need(result.returncode==1 and'FAILED controls'in result.stdout,'missing native-state restore was not detected')
     need(all(digest(Path(path))==want for path,want in before.items()),'source changed during control run')
-    report=dict(status='controls-passed',source_sha256=before[str(source)],test_sha256=before[str(test)],results=results,history_reset_mutation_detected=True,game_started=False,Metal_device_created=False,GUI_or_capture_used=False,
+    report=dict(status='controls-passed',source_sha256=before[str(source)],test_sha256=before[str(test)],results=results,history_reset_mutation_detected=True,missing_state_restore_mutation_detected=True,game_started=False,Metal_device_created=False,GUI_or_capture_used=False,
                 qualification='Real command-list control flow only, not GPU pixels, GPU execution-time, FPS or full-scene memory acceptance.')
     (output/'result.json').write_text(json.dumps(report,indent=2)+'\n');print(output);return report
 

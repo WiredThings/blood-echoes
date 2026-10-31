@@ -283,21 +283,23 @@ option(BB_DEV_FETCH_CAPTURE "Automatic validated local compiler-input capture" O
 option(BB_BUILD_GAME_PREPARATION "Build the native game preparation helpers" OFF)
 set(BB_GAME_PREPARATION_SOURCE_ROOT "" CACHE PATH
     "Compile-time ARM runtime source root; does not select runtime data directories")
+# The scheduler also uses the real header-only audit scope (disabled unless requested).
+# Its include path must not depend on whether automatic shader capture is built.
+if(BB_GAME_PREPARATION_SOURCE_ROOT)
+    set(BB_FETCH_CAPTURE_SRC "${BB_GAME_PREPARATION_SOURCE_ROOT}/src")
+else()
+    set(BB_FETCH_CAPTURE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
+endif()
+target_include_directories(bbgpu PRIVATE ${BB_FETCH_CAPTURE_SRC})
 if(BB_DEV_FETCH_CAPTURE AND APPLE AND
    (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64" OR
     (NOT CMAKE_OSX_ARCHITECTURES AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")))
-    if(BB_GAME_PREPARATION_SOURCE_ROOT)
-        set(BB_FETCH_CAPTURE_SRC "${BB_GAME_PREPARATION_SOURCE_ROOT}/src")
-    else()
-        set(BB_FETCH_CAPTURE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
-    endif()
     target_sources(bbgpu PRIVATE
         ${BB_FETCH_CAPTURE_SRC}/fetch_compile_observer.cpp
         ${BB_FETCH_CAPTURE_SRC}/fetch_compile_producer.cpp
         ${BB_FETCH_CAPTURE_SRC}/fetch_compile_canonical.cpp
         ${BB_FETCH_CAPTURE_SRC}/fetch_companion_store.cpp
         ${BB_FETCH_CAPTURE_SRC}/fetch_register_store.cpp)
-    target_include_directories(bbgpu PRIVATE ${BB_FETCH_CAPTURE_SRC})
     target_compile_definitions(bbgpu PRIVATE BB_DEV_FETCH_CAPTURE=1)
 endif()
 # bbport: the Linux interfaces used here, for macOS (shim/bbport_platform.h), in every source.
@@ -536,7 +538,7 @@ if (APPLE)
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-Wno-unguarded-availability-new")
     target_compile_options(mtl-scheduler-test PRIVATE -UNDEBUG
         -include ${CMAKE_CURRENT_SOURCE_DIR}/shim/bbport_platform.h)
-    target_include_directories(mtl-scheduler-test PRIVATE shim shadps4)
+    target_include_directories(mtl-scheduler-test PRIVATE shim shadps4 ${BB_FETCH_CAPTURE_SRC})
     target_link_libraries(mtl-scheduler-test PRIVATE Vulkan::Headers fmt::fmt Boost::headers
         magic_enum::magic_enum PkgConfig::XXHASH "-framework Metal" "-framework Foundation" "-framework QuartzCore")
 endif()

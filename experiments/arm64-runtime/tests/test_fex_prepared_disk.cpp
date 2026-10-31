@@ -5,6 +5,7 @@
 #include "cpu_cache_identity_inputs.h"
 #include <FEXCore/HLE/SourcecodeResolver.h>
 #include <cassert>
+#include <thread>
 using namespace Core::GuestCpu;
 namespace fs=std::filesystem;
 static unsigned calls;
@@ -51,11 +52,37 @@ int main(int argc,char**argv){
   if(mode=="reject-key"||mode=="reject-index")assert(!admitted);
   else assert(admitted);
   assert(impl->LatestOffset==0&&t->LookupCache->FindBlock(t,address)==0); // no eager payload copy
+  if(mode=="load"){
+   // Descriptor-bound range reads retain the original ownership/no-link rules
+   // and detect writes between admission and consumption.
+   const auto name="range-io-"+std::to_string(getpid())+".bin";const auto link=name+".link";std::array<std::byte,8> bytes{};BbFexDisk::Publish(root/name,bytes);BbFexDisk::OwnedDirectory dir(root);
+   auto reject=[](auto operation){bool caught=false;try{operation();}catch(const std::exception&){caught=true;}assert(caught);};
+   reject([&]{dir.Open("../escape",16);});fs::create_symlink(root/name,root/link);reject([&]{dir.Open(link,16);});fs::remove(root/link);
+   fs::create_hard_link(root/name,root/link);reject([&]{dir.Open(name,16);});fs::remove(root/link);
+   {auto file=dir.Open(name,16);auto old=file.OpenedStamp();const int fd=open((root/name).c_str(),O_WRONLY);assert(fd>=0);unsigned char value=1;assert(pwrite(fd,&value,1,0)==1&&!fsync(fd));close(fd);reject([&]{file.ReadRange(0,8,old);});}
+   fs::remove(root/name);
+   BbFexDisk::ShardProofs bounded;for(size_t i=0;i<512;++i)bounded.Put(i,std::make_shared<BbFexDisk::VerifiedShard>());assert(bounded.Bytes()<=BbFexDisk::ShardProofs::MaxBytes&&bounded.Churn()[0]>0);
+   assert(!bounded.Find(0,{}));auto newest=bounded.Find(511,{});assert(newest);auto changed=newest->stamp;changed.value.st_size=1;assert(!bounded.Find(511,changed)&&bounded.Churn()[1]==1);
+   // Hold the real JIT write lock: complete disk read + checksum + structural
+   // admission must finish on another thread before it can publish any code.
+   std::unique_lock invalidation{ctx->GetCodeInvalidationMutex()};std::unique_lock held{impl->CodeBufferWriteMutex};std::atomic<bool> finished{};uintptr_t prepared{};
+   std::thread io([&]{prepared=handler->PreparedDisk->Load(t,address);finished=true;});
+   const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+   while(!handler->PreparedDisk->ProofBytes()&&!finished&&std::chrono::steady_clock::now()<until)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+   const bool verified_before_writer=handler->PreparedDisk->ProofBytes()>0&&!finished;held.unlock();invalidation.unlock();io.join();assert(verified_before_writer&&prepared);
+  }
   auto execute=[&](uint64_t off,uint64_t expected){
    AetherPS4::Fex::BridgeSyscallHandler::InvocationState call;AetherPS4::Fex::BridgeSyscallHandler::InvocationScope invoke(*handler,call,t);AetherPS4::Fex::FexExecutionSignalScope signal(*ctx,t,&signals,handler.get());
    t->CurrentFrame->State.rip=address+off;t->CurrentFrame->State.gregs[FEXCore::X86State::REG_RSP]=rsp;ctx->ExecuteThread(t);assert(!handler->FailureResult(call)&&t->CurrentFrame->State.gregs[FEXCore::X86State::REG_RAX]==expected);
   };
   execute(0,22);execute(8192,57);assert(calls==1);
+  if(mode=="load-file-changed"){
+   auto d=BbFexDisk::Decode(BbFexDisk::Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),32768);
+   auto e=std::find_if(d.entries.begin(),d.entries.end(),[](auto e){return e.guest==8192;});assert(e!=d.entries.end());auto name=root/BbFexDisk::Filename(d.shards[e->shard].seeds);
+   const int fd=open(name.c_str(),O_RDWR|O_NOFOLLOW|O_CLOEXEC);assert(fd>=0);unsigned char byte{};const auto at=off_t(d.shards[e->shard].file_bytes-1);assert(pread(fd,&byte,1,at)==1);byte^=1;assert(pwrite(fd,&byte,1,at)==1&&!fsync(fd));close(fd);
+   {FEXCore::Allocator::ScopedJITWriteProtect write;ctx->ClearCodeCache(t);}execute(8192,57);assert(handler->PreparedDisk->WholeReads()==3);
+   std::puts("FEX_PREPARED changed-file invalidates-proof=1 full-revalidation=1 safe-own-JIT=1");
+  }
   if(mode=="load"){
    // Validate the original emitted unit boundaries, not inferred guest spans.
    const auto directory=BbFexDisk::Decode(BbFexDisk::Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),32768);
@@ -74,7 +101,8 @@ int main(int argc,char**argv){
    assert(handler->PreparedDisk->CopiedBytes()<4096); // no whole-shard payload inflation
    assert(!t->LookupCache->FindBlock(t,address+0x600)); // same shard, unused unit stays unloaded
    execute(0,22);execute(8192,57);assert(impl->LatestOffset==before);
-   execute(0x700,85);execute(0x600,85);const auto linked=impl->LatestOffset;execute(0x700,85);execute(0x600,85);assert(impl->LatestOffset==linked);
+   const auto reads_before_unit=handler->PreparedDisk->ReadBytes();execute(0x700,85);assert(handler->PreparedDisk->ReadBytes()-reads_before_unit==216); // two 108-byte units, not two full shards
+   execute(0x600,85);const auto linked=impl->LatestOffset;execute(0x700,85);execute(0x600,85);assert(impl->LatestOffset==linked);
    // Existing whole-buffer clear removes both cached and newly JIT'd links.
    {FEXCore::Allocator::ScopedJITWriteProtect write;ctx->ClearCodeCache(t);}assert(!t->LookupCache->FindBlock(t,address)&&!t->LookupCache->FindBlock(t,address+0x6600));
    code[0x6601]=102;execute(0x600,102);
@@ -88,6 +116,7 @@ int main(int argc,char**argv){
    const auto copied=handler->PreparedDisk->CopiedBytes();assert(handler->PreparedDisk->Load(t,address+8192));assert(handler->PreparedDisk->CopiedBytes()-copied==136);execute(8192,57);
    {FEXCore::Allocator::ScopedJITWriteProtect write;ctx->ClearCodeCache(t);}buffer=impl->GetLatest();impl->LatestOffset=buffer->UsableSize()-32;
    assert(!handler->PreparedDisk->Load(t,address+8192));execute(8192,57);
+   assert(handler->PreparedDisk->WholeReads()==2&&handler->PreparedDisk->ProofBytes()<=BbFexDisk::ShardProofs::MaxBytes);
    std::puts("FEX_PREPARED authored normal-budget=1 relocated=1 actual-HLE=1 demand-copy=1 warm-no-codegen=1 backpatch=1 clear=1 changed-page-own-JIT=1 unit-boundary-negatives=1 unit-fits-shard-does-not=1 own-JIT-budget-fallback=1");
   }else std::printf("FEX_PREPARED authored refusal-safe-own-JIT=1 mode=%s\n",mode.c_str());
  }

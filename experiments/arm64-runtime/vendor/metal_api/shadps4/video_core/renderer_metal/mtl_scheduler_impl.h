@@ -26,6 +26,12 @@ struct Scheduler::Impl {
     id<MTLCommandBuffer> cmdbuf; ///< open command buffer, nil until something is recorded
     /// The open encoder (the one of Scheduler::OpenEncoder(), the others are nil).
     id<MTLRenderCommandEncoder> render;
+    // Original final-store actions, plus the exact query identity of this logical pass.
+    // A required fragment barrier may split encoders without submitting or advancing the tick.
+    MTLRenderPassDescriptor* render_pass = nil;
+    std::pair<void*, u64> render_query{};
+    bool render_guest = false, render_bound_only = false;
+    bool fragment_pass_barriers = false;
     bool render_guest_declared = false;
     id<MTLComputeCommandEncoder> compute;
     bool compute_guest_declared = false; ///< upgrades reused host compute encoders before indirect access

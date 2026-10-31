@@ -375,7 +375,7 @@ static void TestFenceChain(Metal::Device& device, const Kernels& k) {
     scheduler.EndEncoder();
     scheduler.RenderEncoder((__bridge const void*)pass);
     CHECK(scheduler.IsRendering());
-    scheduler.MemoryBarrier();
+    scheduler.MemoryBarrier(true); // explicit contract: no native binding or draw in this pass
     CHECK(scheduler.IsRendering());
     scheduler.EndRendering();
     CHECK(!scheduler.IsRendering());
@@ -1198,9 +1198,119 @@ fragment float4 fs(constant float4& c [[buffer(0)]]) {return c;}
     puts("depth-layout pixels, depth/stencil decisions, visibility sum and shader/feedback/barrier/tail guards passed");
 }
 
+// A real fragment->vertex/fragment dependency with opaque device-address memory.
+// Exact pixel/depth/stencil/MSAA/query results, not just encoder or cache counters.
+static void TestFragmentPassBoundary(Metal::Device& device) {
+    auto& dev=device.GetImpl();auto gpu=dev.device;
+    NSError* error=nil;
+    auto lib=[gpu newLibraryWithSource:@R"(
+#include <metal_stdlib>
+using namespace metal;
+struct V {float4 p [[position]];};
+vertex V vs(uint id [[vertex_id]],constant float& z [[buffer(0)]]) {
+ float2 p=float2((id<<1u)&2u,id&2u);return {float4(p*2-1,z,1)};
+}
+fragment float4 fs(V in [[stage_in]],uint sample [[sample_id]],constant float4& c [[buffer(0)]],
+ constant uint& read [[buffer(1)]],constant ulong& address [[buffer(2)]]) {
+ auto counter=reinterpret_cast<device atomic_uint*>(address);
+ if(!read && uint(in.p.x)==0 && uint(in.p.y)==0 && sample==0) atomic_fetch_add_explicit(counter,1u,memory_order_relaxed);
+ if(read && atomic_load_explicit(counter,memory_order_relaxed)!=1u) return float4(0,0,1,1);
+ return c;
+}
+)" options:nil error:&error];CHECK(lib);if(!lib){std::printf("fragment barrier shader: %s\n",error.localizedDescription.UTF8String);return;}
+    for(unsigned samples : {1u,4u}) {
+        if(![gpu supportsTextureSampleCount:samples])continue;
+        auto make=[&](MTLPixelFormat format,unsigned count) {
+            auto d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format width:4 height:4 mipmapped:NO];
+            d.storageMode=MTLStorageModePrivate;d.usage=MTLTextureUsageRenderTarget;
+            if(count>1){d.textureType=MTLTextureType2DMultisample;d.sampleCount=count;}
+            return [gpu newTextureWithDescriptor:d];
+        };
+        auto color=make(MTLPixelFormatRGBA8Unorm,samples),depth=make(MTLPixelFormatDepth32Float_Stencil8,samples);
+        auto resolved=samples>1?make(MTLPixelFormatRGBA8Unorm,1):color;
+        auto p=[MTLRenderPassDescriptor renderPassDescriptor];
+        p.colorAttachments[0].texture=color;p.colorAttachments[0].loadAction=MTLLoadActionClear;
+        p.colorAttachments[0].clearColor=MTLClearColorMake(0,0,0,1);
+        p.colorAttachments[0].storeAction=samples>1?MTLStoreActionMultisampleResolve:MTLStoreActionStore;
+        if(samples>1)p.colorAttachments[0].resolveTexture=resolved;
+        p.depthAttachment.texture=p.stencilAttachment.texture=depth;
+        p.depthAttachment.loadAction=p.stencilAttachment.loadAction=MTLLoadActionClear;
+        p.depthAttachment.clearDepth=1;p.stencilAttachment.clearStencil=3;
+        p.depthAttachment.storeAction=p.stencilAttachment.storeAction=MTLStoreActionDontCare;
+        auto pd=[MTLRenderPipelineDescriptor new];pd.vertexFunction=[lib newFunctionWithName:@"vs"];pd.fragmentFunction=[lib newFunctionWithName:@"fs"];
+        pd.colorAttachments[0].pixelFormat=MTLPixelFormatRGBA8Unorm;pd.rasterSampleCount=samples;
+        pd.depthAttachmentPixelFormat=pd.stencilAttachmentPixelFormat=MTLPixelFormatDepth32Float_Stencil8;
+        auto pso=[gpu newRenderPipelineStateWithDescriptor:pd error:&error];CHECK(pso);if(!pso)return;
+        auto dd=[MTLDepthStencilDescriptor new];dd.depthCompareFunction=MTLCompareFunctionLess;dd.depthWriteEnabled=YES;
+        dd.frontFaceStencil.stencilCompareFunction=dd.backFaceStencil.stencilCompareFunction=MTLCompareFunctionEqual;
+        auto ds=[gpu newDepthStencilStateWithDescriptor:dd];CHECK(ds);
+        auto queries=[gpu newBufferWithLength:32 options:MTLResourceStorageModeShared];
+        auto raw=[gpu newBufferWithLength:4096 options:MTLResourceStorageModeShared|MTLResourceHazardTrackingModeUntracked];
+        auto pixels=[gpu newBufferWithLength:1024 options:MTLResourceStorageModeShared];
+        CHECK(color&&depth&&resolved&&queries&&raw&&pixels);if(!raw)return;
+        *static_cast<u64*>(queries.contents)=0xface;
+        *static_cast<uint32_t*>(raw.contents)=0;
+        const size_t old_guest_count=dev.guest_count.load();dev.AddGuestBuffer(raw);
+        {
+            Scheduler q(device,"test-fragment-boundary");unsigned query_calls=0;
+            q.SetVisibilityQuery([&](const void*) -> std::pair<void*,u64> {++query_calls;return {(__bridge void*)queries,8};});
+            VideoCore::RenderState state{};state.width=state.height=4;state.num_layers=1;state.num_color_attachments=1;
+            state.color_attachments[0].image_view=(uintptr_t)(__bridge void*)color;
+            state.depth_stencil_attachment.image_view=(uintptr_t)(__bridge void*)depth;
+            auto retired=std::make_shared<std::atomic<bool>>(false);q.DeferOperation([retired]{retired->store(true);});
+            const auto tick=q.CurrentTick();const bool upgrade=std::getenv("BB_TEST_FRAGMENT_UPGRADE")!=nullptr;
+            q.RenderEncoder((__bridge void*)p,state,true,upgrade);if(upgrade)q.RequireGuestRender();
+            auto& l=q.Commands();l.SetRenderPipelineState((__bridge void*)pso);l.SetDepthStencilState((__bridge void*)ds);
+            l.SetStencilReference(3,3);l.SetCullMode(MTLCullModeNone);l.SetFrontFacingWinding(MTLWindingClockwise);
+            l.SetDepthClipMode(MTLDepthClipModeClip);l.SetTriangleFillMode(MTLTriangleFillModeFill);l.SetDepthBias(0,0,0);
+            l.SetBlendColor(1,1,1,1);const Metal::RenderList::Viewport view{0,0,4,4,0,1};l.SetViewports(&view,1);
+            Metal::RenderList::Scissor left{0,0,2,4},full{0,0,4,4};l.SetScissorRects(&left,1);
+            float z=.5f;std::array<float,4> c{1,0,0,1};uint32_t read=0;u64 address=raw.gpuAddress;
+            l.SetBytes(Metal::RenderList::Stage::Vertex,&z,4,0);l.SetBytes(Metal::RenderList::Stage::Fragment,c.data(),16,0);
+            l.SetBytes(Metal::RenderList::Stage::Fragment,&read,4,1);l.SetBytes(Metal::RenderList::Stage::Fragment,&address,8,2);
+            l.PushDebugGroup("fragment producer");l.DrawPrimitives(MTLPrimitiveTypeTriangle,0,3,1,0);
+            q.MemoryBarrier(); // held recording or direct: same API, exact dependency, no rebind
+            CHECK(q.CurrentTick()==tick);
+            z=.75f;c={0,1,0,1};read=1;l.SetScissorRects(&full,1);
+            l.SetBytes(Metal::RenderList::Stage::Vertex,&z,4,0);l.SetBytes(Metal::RenderList::Stage::Fragment,c.data(),16,0);
+            l.SetBytes(Metal::RenderList::Stage::Fragment,&read,4,1);
+            l.DrawPrimitives(MTLPrimitiveTypeTriangle,0,3,1,0);l.PopDebugGroup();
+            if(std::getenv("BB_TEST_FRAGMENT_POST_REPLAY")) {
+                // Taking/moving the first list to the real replay thread must carry the
+                // same owner, physical state and lifetime; the following empty host pass
+                // neither resets the guest query nor changes its counting density.
+                auto empty=[MTLRenderPassDescriptor renderPassDescriptor];
+                empty.renderTargetWidth=empty.renderTargetHeight=1;empty.defaultRasterSampleCount=1;
+                VideoCore::RenderState host{};host.width=host.height=host.num_layers=1;
+                q.RenderEncoder((__bridge void*)empty,host,false,true);
+            }
+            q.EndEncoder();CHECK(q.CurrentTick()==tick);CHECK(query_calls==1);CHECK(!retired->load());
+            q.BlitEncoder();[q.GetImpl().blit copyFromTexture:resolved sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0,0,0) sourceSize:MTLSizeMake(4,4,1) toBuffer:pixels destinationOffset:0 destinationBytesPerRow:256 destinationBytesPerImage:1024];
+            q.Finish();CHECK(!q.HasFailed());for(unsigned i=0;i<1000&&!retired->load();++i){q.PopPendingOperations();std::this_thread::sleep_for(std::chrono::microseconds(100));}CHECK(retired->load());
+            CHECK(static_cast<const u64*>(queries.contents)[0]==0xface);
+            CHECK(static_cast<const u64*>(queries.contents)[1]==16*samples);
+            CHECK(*static_cast<const uint32_t*>(raw.contents)==1);
+            auto bytes=static_cast<const unsigned char*>(pixels.contents);
+            for(unsigned y=0;y<4;++y)for(unsigned x=0;x<4;++x){auto px=bytes+y*256+x*4;CHECK(px[0]==(x<2?255:0)&&px[1]==(x<2?0:255)&&px[2]==0&&px[3]==255);}
+            q.SetVisibilityQuery({});
+        }
+        dev.guest_count.store(old_guest_count);dev.guest_buffers[old_guest_count]=nil;
+        std::printf("fragment boundary: %ux MSAA exact pixels, depth/stencil, untracked BDA, query accumulation, unchanged tick passed\n",samples);
+    }
+}
+
 int main() {
     @autoreleasepool {
         Metal::Device device;
+        if(std::getenv("BB_TEST_REJECT_RAW_BARRIER")) {
+            auto p=[MTLRenderPassDescriptor renderPassDescriptor];p.renderTargetWidth=p.renderTargetHeight=1;p.defaultRasterSampleCount=1;
+            Scheduler q(device,"reject-unknown-raw-state");q.HostRenderEncoder((__bridge void*)p);
+            auto b=[device.GetImpl().device newBufferWithLength:256 options:MTLResourceStorageModeShared];
+            [q.GetImpl().render setVertexBuffer:b offset:0 atIndex:0];
+            q.MemoryBarrier(); // MUST diagnose; no empty contract, cannot reconstruct raw bindings
+            return 99;
+        }
+        if(std::getenv("BB_TEST_FRAGMENT_BARRIER_ONLY")){TestFragmentPassBoundary(device);return failures?1:0;}
         if(std::getenv("BB_TEST_DEPTH_LAYOUT_ONLY")){TestDepthLayoutContinuation(device);return failures?1:0;}
         if(std::getenv("BB_TEST_CONSUMED_CLEAR_ONLY")){TestConsumedClearContinuation(device);return failures?1:0;}
         if(std::getenv("BB_TEST_CLEAR_BLEND_ONLY")){TestClearFoldBlending(device);return failures?1:0;}
@@ -1226,6 +1336,7 @@ int main() {
             std::printf(failures ? "FAILED: %d check(s)\n" : "all checks passed\n", failures);
             return failures ? 1 : 0;
         }
+        TestFragmentPassBoundary(device);
         TestTicks(device, k);
         const uint32_t spin_n = Calibrate(device, k, 20.0);
         TestDeferred(device, k, spin_n);

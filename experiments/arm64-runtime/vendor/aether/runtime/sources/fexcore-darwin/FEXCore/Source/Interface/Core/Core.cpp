@@ -907,6 +907,25 @@ uintptr_t ContextImpl::CompileBlock(FEXCore::Core::CpuStateFrame* Frame, uint64_
 
   static_cast<ContextImpl*>(Thread->CTX)->SyscallHandler->PreCompile();
 
+  if (!MaxInst && !Frame->State.flags[X86State::RFLAG_TF_RAW_LOC] && SyscallHandler->HasPreparedCode()) {
+    {
+      // Preserve the L3 fast hit before consulting disk. Do not hold this guard
+      // across I/O: the consumer re-enters it only for source check/publication.
+      auto lookup_guard = GuardSignalDeferringSection<std::shared_lock>(CodeInvalidationMutex, Thread);
+      if (auto HostCode = Thread->LookupCache->FindBlock(Thread, GuestRIP)) {
+        CodeCache.RecordStartupCacheResolution(HostCode);
+        return HostCode;
+      }
+    }
+    if (auto Cached = SyscallHandler->TryLoadPreparedCode(Thread, GuestRIP)) return Cached;
+  }
+
+  // Declare timing before the lock so even a periodic fallback report happens
+  // after releasing the shared invalidation guard.
+  struct PreparedFallbackTiming {
+    FEXCore::HLE::SyscallHandler* Handler;uint64_t Start;
+    ~PreparedFallbackTiming(){if(Start)Handler->EndPreparedCompilation(Start);}
+  } prepared_fallback{SyscallHandler,0};
   // Invalidate might take a unique lock on this, to guarantee that during invalidation no code gets compiled
   BbAudit::Scope lock_audit{BbAudit::FexInvalidationLock,GuestRIP,100000};
   auto lk = GuardSignalDeferringSection<std::shared_lock>(CodeInvalidationMutex, Thread);
@@ -920,13 +939,7 @@ uintptr_t ContextImpl::CompileBlock(FEXCore::Core::CpuStateFrame* Frame, uint64_
   }
 
   // Accumulate a JIT count now, as even if another thread raced us, it should count as a compile.
-  if (!MaxInst && !Frame->State.flags[X86State::RFLAG_TF_RAW_LOC]) {
-    if (auto Cached = SyscallHandler->TryLoadPreparedCode(Thread,GuestRIP)) return Cached;
-  }
-  struct PreparedFallbackTiming {
-    FEXCore::HLE::SyscallHandler* Handler;uint64_t Start;
-    ~PreparedFallbackTiming(){if(Start)Handler->EndPreparedCompilation(Start);}
-  } prepared_fallback{SyscallHandler,SyscallHandler->BeginPreparedCompilation()};
+  prepared_fallback.Start=SyscallHandler->BeginPreparedCompilation();
   FEXCORE_PROFILE_INSTANT_INCREMENT(Thread, AccumulatedJITCount, 1);
 
   auto [CompiledCode, DebugData, StartAddr, Length, NeedsAddGuestCodeRanges] = CompileCode(Thread, GuestRIP, MaxInst);

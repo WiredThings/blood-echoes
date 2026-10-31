@@ -66,8 +66,9 @@ public:
   virtual std::optional<ExecutableFileSectionInfo> LookupExecutableFileSection(Core::InternalThreadState* Thread, uint64_t GuestAddr) = 0;
 
   virtual void PreCompile() {}
-  // Optional prepared-code consumer. Called only after a normal lookup miss,
-  // under the existing shared invalidation guard. Zero keeps the original JIT.
+  // Optional prepared-code consumer. File I/O is outside FEX invalidation and
+  // JIT write locks; consumers must guard/recheck live source before publishing.
+  virtual bool HasPreparedCode() const { return false; }
   virtual uintptr_t TryLoadPreparedCode(Core::InternalThreadState*,uint64_t) { return 0; }
   virtual uint64_t BeginPreparedCompilation(){return 0;}
   virtual void EndPreparedCompilation(uint64_t){}

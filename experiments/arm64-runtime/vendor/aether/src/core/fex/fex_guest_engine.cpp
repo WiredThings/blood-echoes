@@ -760,6 +760,7 @@ private:
 class BridgeSyscallHandler final : public FEXCore::HLE::SyscallHandler {
 public:
   std::unique_ptr<BbFexDisk::Loader> PreparedDisk;
+  bool HasPreparedCode()const override{return PreparedDisk!=nullptr;}
   uintptr_t TryLoadPreparedCode(FEXCore::Core::InternalThreadState* thread,uint64_t rip) override {
     return PreparedDisk?PreparedDisk->Load(thread,rip):0;
   }

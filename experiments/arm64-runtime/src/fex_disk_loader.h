@@ -3,6 +3,7 @@
 #include "fex_disk_io.h"
 #include "bb_cpu_cache_validation.h"
 #include "fex_compiled_units.h"
+#include "fex_verified_shard.h"
 #include "git_version.h"
 #include "Interface/Context/Context.h"
 #include "Interface/Core/LookupCache.h"
@@ -17,23 +18,54 @@ namespace BbFexDisk {
 class Loader {
  fs::path root;BbCpuCache::Identity identity;Directory index;
  std::vector<std::pair<uint64_t,uint64_t>> sections;uintptr_t base;
- std::mutex mutex;std::vector<bool> bad;
+ std::mutex status_mutex,first_read_mutex;std::vector<bool> bad;
+ std::unique_ptr<OwnedDirectory> files;ShardProofs proofs;
  std::atomic<uint64_t> hits{},misses{},rejected{},copied{},budget{};
  std::atomic<uint64_t> load_ns{},jit_count{},jit_ns{};
+ std::atomic<uint64_t> whole_reads{},read_bytes{},hash_bytes{},proof_hits{},writer_wait_ns{},writer_hold_ns{},raced{};
+ bool Bad(size_t shard){std::scoped_lock guard{status_mutex};return bad[shard];}
  void Reject(size_t shard,const char* reason){
-  bad[shard]=true;++rejected;
+  {std::scoped_lock guard{status_mutex};if(bad[shard])return;bad[shard]=true;}++rejected;
   std::fprintf(stderr,"FEX DISK rejected shard=%zu reason=%s; own JIT retained\n",shard,reason);
   // A bounded append requests local repair on the next normal preparation.
   int fd=open((root/"repair-requests.bin").c_str(),O_WRONLY|O_CREAT|O_APPEND|O_NOFOLLOW|O_CLOEXEC,0600);
   if(fd>=0){struct stat st{};if(!fstat(fd,&st)&&S_ISREG(st.st_mode)&&st.st_uid==getuid()&&st.st_size<65536){uint64_t n=shard;(void)write(fd,&n,8);}close(fd);}
  }
+ struct Input {
+  // At most one retained full payload exists. Hot range reads do not acquire
+  // this gate; it is separate from every FEX JIT/lookup/invalidation lock.
+  std::unique_lock<std::mutex> first_read;
+  std::shared_ptr<const VerifiedShard> proof;std::vector<std::byte> bytes;size_t offset{},unit{};
+ };
+ Input Prepare(size_t shard,uint64_t guest){
+  const auto& meta=index.shards[shard];Input in;auto file=files->Open(Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));auto stamp=file.OpenedStamp();
+  Require(uint64_t(stamp.value.st_size)==meta.file_bytes,"shard file size");in.proof=proofs.Find(shard,stamp);
+  if(!in.proof){
+   in.first_read=std::unique_lock{first_read_mutex};stamp=file.Stamp();in.proof=proofs.Find(shard,stamp);
+   if(!in.proof){
+    in.bytes=file.ReadRange(0,size_t(stamp.value.st_size),stamp);++whole_reads;read_bytes+=in.bytes.size();hash_bytes+=in.bytes.size();
+    Require(BbCpuCache::Hash(in.bytes)==meta.hash,"shard checksum");
+    auto raw=BbCpuCache::Check(in.bytes,identity);hash_bytes+=raw.size();auto checked=BbCacheValidation::Validate(raw,{index.image_bytes,sections,GIT_HASH});
+    Require(checked&&checked->code_bytes==meta.code_bytes,"shard compatibility/structure");auto source=raw.subspan(checked->code_offset,checked->code_bytes);
+    auto verified=std::make_shared<VerifiedShard>();verified->stamp=stamp;verified->units=CompiledUnits(source,*checked);verified->metadata=std::move(*checked);verified->unit_hashes.reserve(verified->units.size());
+    for(const auto& u:verified->units){auto bytes=source.subspan(u.begin,u.end-u.begin);verified->unit_hashes.push_back(BbCpuCache::Hash(bytes));hash_bytes+=bytes.size();}
+    in.proof=std::move(verified);in.unit=in.proof->Select(guest);in.offset=BbCpuCache::PrefixBytes+in.proof->metadata.code_offset+in.proof->units[in.unit].begin;
+    proofs.Put(shard,in.proof);return in;
+   }
+   in.first_read.unlock();
+  }
+  ++proof_hits;in.unit=in.proof->Select(guest);const auto& u=in.proof->units[in.unit];
+  in.bytes=file.ReadRange(BbCpuCache::PrefixBytes+in.proof->metadata.code_offset+u.begin,u.end-u.begin,stamp);read_bytes+=in.bytes.size();hash_bytes+=in.bytes.size();
+  Require(BbCpuCache::Hash(in.bytes)==in.proof->unit_hashes[in.unit],"verified compiled unit checksum");return in;
+ }
 public:
  static uint64_t Now(){return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();}
- void Report()const{std::printf("FEX DISK totals hits=%llu misses=%llu rejected=%llu copied_bytes=%llu budget_fallbacks=%llu load_ms=%.3f fallback_compiles=%llu fallback_path_ms=%.3f\n",(unsigned long long)hits.load(),(unsigned long long)misses.load(),(unsigned long long)rejected.load(),(unsigned long long)copied.load(),(unsigned long long)budget.load(),load_ns.load()/1e6,(unsigned long long)jit_count.load(),jit_ns.load()/1e6);}
+ void Report(){std::printf("FEX DISK totals hits=%llu misses=%llu rejected=%llu copied_bytes=%llu budget_fallbacks=%llu load_ms=%.3f fallback_compiles=%llu fallback_path_ms=%.3f whole_reads=%llu read_bytes=%llu hash_bytes=%llu proof_hits=%llu proof_bytes=%zu writer_wait_ms=%.3f writer_hold_ms=%.3f\n",(unsigned long long)hits.load(),(unsigned long long)misses.load(),(unsigned long long)rejected.load(),(unsigned long long)copied.load(),(unsigned long long)budget.load(),load_ns.load()/1e6,(unsigned long long)jit_count.load(),jit_ns.load()/1e6,(unsigned long long)whole_reads.load(),(unsigned long long)read_bytes.load(),(unsigned long long)hash_bytes.load(),(unsigned long long)proof_hits.load(),proofs.Bytes(),writer_wait_ns.load()/1e6,writer_hold_ns.load()/1e6);const auto churn=proofs.Churn();std::printf("FEX DISK proof-cache evictions=%zu invalidations=%zu oversized=%zu raced_publications=%llu\n",churn[0],churn[1],churn[2],(unsigned long long)raced.load());}
  void EndCompilation(uint64_t start){jit_ns.fetch_add(Now()-start,std::memory_order_relaxed);if((jit_count.fetch_add(1,std::memory_order_relaxed)+1)%256==0)Report();}
  Loader(fs::path directory,const BbCpuCache::Identity& expected,std::span<const std::pair<uint64_t,uint64_t>> ranges,uintptr_t image,uint64_t bytes)
  :root(std::move(directory)),identity(expected),sections(ranges.begin(),ranges.end()),base(image){
   Require(root.is_absolute()&&fs::canonical(root)==root&&root.string().starts_with("/Users/Shared/BloodEchoesDevelopment/"),"FEX prepared directory must stay private");
+  files=std::make_unique<OwnedDirectory>(root);
   index=Decode(Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),bytes);bad.resize(index.shards.size());
   BbCacheValidation::Policy policy{bytes,sections,GIT_HASH};
   for(auto& e:index.entries)Require(BbCacheValidation::Inside(policy,e.guest),"FEX directory entry outside registered code");
@@ -43,34 +75,38 @@ public:
  ~Loader(){Report();}
  uint64_t Hits()const{return hits.load(std::memory_order_relaxed);}
  uint64_t CopiedBytes()const{return copied.load(std::memory_order_relaxed);}
+ uint64_t WholeReads()const{return whole_reads.load(std::memory_order_relaxed);}
+ uint64_t ReadBytes()const{return read_bytes.load(std::memory_order_relaxed);}
+ size_t ProofBytes(){return proofs.Bytes();}
  uintptr_t Load(FEXCore::Core::InternalThreadState* thread,uint64_t rip){
   if(rip<base)return 0;const auto offset=rip-base;
   const auto entry=std::lower_bound(index.entries.begin(),index.entries.end(),offset,[](auto& e,uint64_t n){return e.guest<n;});
   if(entry==index.entries.end()||entry->guest!=offset){++misses;return 0;}
   auto& ctx=*static_cast<FEXCore::Context::ContextImpl*>(thread->CTX);
   struct Timing{Loader& self;uint64_t start=Now();~Timing(){self.load_ns.fetch_add(Now()-start,std::memory_order_relaxed);}} timing{*this};
-  std::scoped_lock guard{mutex};const auto shard=entry->shard;if(bad[shard])return 0;
-  // Match the normal compiler's buffer -> lookup lock order. Never rotate or
-  // shrink a code cache here; its original compiler handles a full/stale buffer.
-  std::unique_lock writer{ctx.CodeBufferWriteMutex};auto buffer=ctx.GetLatest();
-  if(thread->LookupCache->Shared!=buffer->LookupCache.get())return 0;
-  if(auto existing=thread->LookupCache->FindBlock(thread,rip))return existing;
-  const auto start=(ctx.LatestOffset+15)&~size_t{15};const auto& meta=index.shards[shard];
-  if(start>=buffer->UsableSize()){++budget;return 0;}
+  const auto shard=entry->shard;if(Bad(shard))return 0;
   try{
-   auto file=Read(root/Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));
-   Require(file.size()==meta.file_bytes&&BbCpuCache::Hash(file)==meta.hash,"shard checksum/size");
-   auto raw=BbCpuCache::Check(file,identity);auto checked=BbCacheValidation::Validate(raw,{index.image_bytes,sections,GIT_HASH});
-   Require(checked&&checked->code_bytes==meta.code_bytes,"shard compatibility/structure");
-   auto source_code=raw.subspan(checked->code_offset,checked->code_bytes);const auto units=CompiledUnits(source_code,*checked);
-   const auto target_block=std::find_if(checked->blocks.begin(),checked->blocks.end(),[&](auto& b){return b.guest==offset;});
-   Require(target_block!=checked->blocks.end(),"directory target absent from shard");
-   auto selected=std::find_if(units.begin(),units.end(),[&](const auto& u){return target_block->host>=u.begin&&target_block->host<u.end;});Require(selected!=units.end(),"target compiled unit absent");
-   const auto unit=*selected;const auto needed=unit.end-unit.begin;
-   if(needed>buffer->UsableSize()-start){++budget;return 0;}
+   auto input=Prepare(shard,offset);const auto& checked=input.proof->metadata;const auto unit=input.proof->units[input.unit];const auto needed=unit.end-unit.begin;
    bool target=false;std::set<uint64_t> pages;
-   for(auto& b:checked->blocks)if(b.host>=unit.begin&&b.host<unit.end){target|=b.guest==offset;pages.insert(b.pages.begin(),b.pages.end());}
+   for(auto& b:checked.blocks)if(b.host>=unit.begin&&b.host<unit.end){target|=b.guest==offset;pages.insert(b.pages.begin(),b.pages.end());}
    Require(target,"directory target absent from shard");
+   std::vector<FEXCore::CPU::Relocation> relocations;
+   for(auto r:checked.relocs)if(r.offset>=unit.begin&&r.offset<unit.end){
+    auto out=FEXCore::CPU::Relocation::Default();out.Header.Offset=r.offset;out.Header.Type=FEXCore::CPU::RelocationTypes(r.kind);
+    if(r.kind==0)out.NamedSymbolLiteral.Symbol=FEXCore::CPU::RelocNamedSymbolLiteral::NamedSymbol::SYMBOL_LITERAL_EXITFUNCTION_LINKER;
+    else{out.GuestRIP.RegisterIndex=uint8_t(r.reg);out.GuestRIP.GuestRIP=r.rip;}relocations.push_back(out);
+   }
+   // I/O, checksums, complete FXCC parsing and relocation selection precede the
+   // JIT write lock. Another compiler may have published/rotated meanwhile.
+   bool installed=false;const auto result=[&]() -> uintptr_t {
+   auto invalidation=FEXCore::GuardSignalDeferringSection<std::shared_lock>(ctx.GetCodeInvalidationMutex(),thread);
+   const auto wait=Now();std::unique_lock writer{ctx.CodeBufferWriteMutex};writer_wait_ns+=Now()-wait;
+   struct HoldTiming{Loader& self;uint64_t start=Now();bool active=true;void Finish(){if(active){self.writer_hold_ns+=Now()-start;active=false;}}~HoldTiming(){Finish();}} hold{*this};
+   auto buffer=ctx.GetLatest();if(thread->LookupCache->Shared!=buffer->LookupCache.get())return 0;
+   if(auto existing=thread->LookupCache->FindBlock(thread,rip))return existing;
+   const auto start=(ctx.LatestOffset+15)&~size_t{15};
+   if(start>buffer->UsableSize()||needed>buffer->UsableSize()-start){++budget;return 0;}
+   if(Bad(shard))return 0;
    // This also prevents a precise invalidation from re-publishing an old block
    // after code changed. Source-page checks occur on a disk miss, never per draw.
    for(auto page:pages){auto p=std::lower_bound(index.pages.begin(),index.pages.end(),page,[](auto& p,uint64_t n){return p.guest<n;});
@@ -78,24 +114,29 @@ public:
    auto destination=std::span{reinterpret_cast<std::byte*>(buffer->Ptr)+start,needed};
    {
     FEXCore::Allocator::ScopedJITWriteProtect write;
-    std::memcpy(destination.data(),source_code.data()+unit.begin,needed);
-    const auto* all=reinterpret_cast<const FEXCore::CPU::Relocation*>(raw.data()+checked->relocation_offset);std::vector<FEXCore::CPU::Relocation> relocations;
-    for(size_t n=0;n<checked->relocs.size();++n)if(all[n].Header.Offset>=unit.begin&&all[n].Header.Offset<unit.end)relocations.push_back(all[n]);
+    std::memcpy(destination.data(),input.bytes.data()+input.offset,needed);
     Require(ctx.GetCodeCache().ApplyCodeRelocations(base,destination,relocations,uint32_t(unit.begin),false),"compiled-unit relocations");
     __builtin___clear_cache(reinterpret_cast<char*>(destination.data()),reinterpret_cast<char*>(destination.data()+destination.size()));
    }
    ctx.LatestOffset=start+destination.size();
    // Publish only after all bytes and relocations are ready. These entries use
    // the NORMAL buffer's lifetime, backpatching, delinking and invalidation.
-   for(auto& b:checked->blocks)if(b.host>=unit.begin&&b.host<unit.end&&!thread->LookupCache->FindBlock(thread,base+b.guest)){
+   for(auto& b:checked.blocks)if(b.host>=unit.begin&&b.host<unit.end&&!thread->LookupCache->FindBlock(thread,base+b.guest)){
     fextl::vector<uint64_t> code_pages;for(auto p:b.pages)code_pages.push_back(base+p);
     thread->LookupCache->AddBlockMapping(thread,base+b.guest,code_pages,destination.data()+b.host-unit.begin);
     fextl::set<uint64_t> entries{base+b.guest};
     for(auto p:code_pages)if(thread->LookupCache->AddBlockExecutableRange(thread,entries,p,4096))ctx.SyscallHandler->MarkGuestExecutableRange(thread,p,4096);
    }
    const auto result=thread->LookupCache->FindBlock(thread,rip);Require(result!=0,"prepared target publication");
-   ++hits;copied+=destination.size();
-   if(hits.load()<=8)std::printf("FEX DISK loaded shard=%zu unit_bytes=%zu shard_code_bytes=%zu; original compiled unit only, no IR/codegen\n",size_t(shard),destination.size(),checked->code_bytes);
+   installed=true;
+   return result;
+   }();
+   if(!result)return 0;
+   // Console writes and full-payload destruction stay outside BOTH FEX locks.
+   std::vector<std::byte>{}.swap(input.bytes);if(input.first_read.owns_lock())input.first_read.unlock();
+   if(!installed){++raced;return result;}
+   ++hits;copied+=needed;
+   if(hits.load()<=8)std::printf("FEX DISK loaded shard=%zu unit_bytes=%zu shard_code_bytes=%zu; original compiled unit only, no IR/codegen\n",size_t(shard),needed,checked.code_bytes);
    if(hits.load()%256==0)Report();
    return result;
   }catch(const std::exception& error){Reject(shard,error.what());return 0;}

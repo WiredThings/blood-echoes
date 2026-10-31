@@ -51,6 +51,10 @@ public:
     /// Calls go to `encoder` (id<MTLRenderCommandEncoder>) from now on; the redundancy filter
     /// starts empty.
     void BeginDirect(void* encoder);
+    /// Owner-supplied full V|F dependency. Apple GPUs require a physical pass boundary;
+    /// returns its replacement encoder. The owner preserves attachments, queries and fences.
+    using BarrierEncoder = void* (*)(void* owner, void* encoder);
+    void SetBarrierEncoder(void* owner, BarrierEncoder barrier);
     /// Continue the SAME physical pass after Replay; preserve diagnostic access history.
     void ContinueDirect(void* encoder);
     /// Calls are recorded from now on; the redundancy filter starts empty.
