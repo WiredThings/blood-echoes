@@ -2,6 +2,7 @@
 #pragma once
 #include "fex_disk_format.h"
 #include "bb_cpu_cache_validation.h"
+#include "Interface/Core/JIT/Relocations.h"
 #include "Interface/Core/CPUBackend.h"
 namespace BbFexDisk {
 struct Unit {size_t begin,end,code_end;};
