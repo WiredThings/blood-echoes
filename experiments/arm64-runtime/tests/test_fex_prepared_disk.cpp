@@ -85,6 +85,20 @@ int main(int argc,char**argv){
    fs::remove(root/name);
    BbFexDisk::ShardProofs bounded;for(size_t i=0;i<512;++i)bounded.Put(i,std::make_shared<BbFexDisk::VerifiedShard>());assert(bounded.Bytes()<=BbFexDisk::ShardProofs::MaxBytes&&bounded.Churn()[0]>0);
    assert(!bounded.Find(0,{}));auto newest=bounded.Find(511,{});assert(newest);auto changed=newest->stamp;changed.value.st_size=1;assert(!bounded.Find(511,changed)&&bounded.Churn()[1]==1);
+   // Root + >256 ranges remain ONE original logical shard, within the same
+   // byte budget. A native-file change invalidates every proof in that group.
+   BbFexDisk::ShardProofs grouped;grouped.Put(4,std::make_shared<BbFexDisk::VerifiedShard>());
+   for(size_t i=0;i<384;++i)grouped.Put((size_t{5}<<32)|i,std::make_shared<BbFexDisk::VerifiedShard>());
+   assert(grouped.Churn()[0]==0&&grouped.Find(4,{})&&grouped.Find((size_t{5}<<32)|0,{})&&grouped.Find((size_t{5}<<32)|383,{}));
+   assert(grouped.Bytes()<=BbFexDisk::ShardProofs::MaxBytes);
+   assert(!grouped.Find(size_t{5}<<32,changed)&&!grouped.Find(4,{})&&!grouped.Find((size_t{5}<<32)|383,{}));
+   assert(grouped.Churn()[1]==1);
+   // One large group evicts its own oldest ranges, never grows past 2MiB.
+   for(size_t i=0;i<4;++i){auto p=std::make_shared<BbFexDisk::VerifiedShard>();p->metadata.blocks.reserve(20000);grouped.Put((size_t{5}<<32)|i,p);assert(grouped.Bytes()<=BbFexDisk::ShardProofs::MaxBytes);}
+   assert(!grouped.Find(size_t{5}<<32,{})&&grouped.Find((size_t{5}<<32)|3,{})&&grouped.Churn()[0]>0);
+   // Root replacement with a new stamp must not keep old unit proofs.
+   auto replacement=std::make_shared<BbFexDisk::VerifiedShard>();replacement->stamp=changed;grouped.Put(4,replacement);
+   assert(grouped.Find(4,changed)&&!grouped.Find((size_t{5}<<32)|3,changed));
    // Hold the real JIT write lock: complete disk read + checksum + structural
    // admission must finish on another thread before it can publish any code.
    auto* second_thread=ctx->CreateThread(address+8192,rsp);assert(second_thread);

@@ -33,24 +33,48 @@ struct VerifiedShard {
 // Auxiliary proof cache only: no executable payload and no change to the
 // original JIT budget. Eviction drops proofs, never compiled code or products.
 class ShardProofs {
- struct Row{size_t shard;std::shared_ptr<const VerifiedShard> proof;};
+ struct Part{size_t key;std::shared_ptr<const VerifiedShard> proof;};
+ struct Row{size_t shard;std::list<Part> parts;size_t bytes;};
  std::mutex mutex;std::list<Row> rows;size_t bytes{},evictions{},invalidations{},oversized{};
+ static constexpr size_t RowBytes=sizeof(Row)+2*sizeof(void*);
+ static size_t PartBytes(const VerifiedShard& proof){return proof.RetainedBytes()+sizeof(Part)+2*sizeof(void*);}
+ // Root and range keys belong to ONE original logical shard. Counting each
+ // range against MaxRows would shrink effective reuse despite spare byte budget.
+ static size_t Group(size_t key){static_assert(sizeof(size_t)>=8);return key>>32?(key>>32)-1:key;}
+ void EvictLast(){evictions+=rows.back().parts.size();bytes-=rows.back().bytes;rows.pop_back();}
 public:
  static constexpr size_t MaxBytes=2u<<20,MaxRows=256;
- std::shared_ptr<const VerifiedShard> Find(size_t shard,const FileStamp& stamp){
-  std::scoped_lock guard{mutex};
-  for(auto i=rows.begin();i!=rows.end();++i)if(i->shard==shard){
-   if(!(i->proof->stamp==stamp)){bytes-=i->proof->RetainedBytes()+sizeof(Row)+2*sizeof(void*);rows.erase(i);++invalidations;return {};}
-   auto proof=i->proof;rows.splice(rows.begin(),rows,i);return proof;
+ std::shared_ptr<const VerifiedShard> Find(size_t key,const FileStamp& stamp){
+  std::scoped_lock guard{mutex};const auto group=Group(key);
+  for(auto i=rows.begin();i!=rows.end();++i)if(i->shard==group){
+   if(!(i->parts.front().proof->stamp==stamp)){bytes-=i->bytes;rows.erase(i);++invalidations;return {};}
+   for(auto p=i->parts.begin();p!=i->parts.end();++p)if(p->key==key){
+    auto proof=p->proof;i->parts.splice(i->parts.begin(),i->parts,p);rows.splice(rows.begin(),rows,i);return proof;
+   }
+   return {};
   }
   return {};
  }
- void Put(size_t shard,std::shared_ptr<const VerifiedShard> proof){
-  std::scoped_lock guard{mutex};const auto size=proof->RetainedBytes()+sizeof(Row)+2*sizeof(void*);
-  if(size>MaxBytes){++oversized;return;}
-  for(auto i=rows.begin();i!=rows.end();++i)if(i->shard==shard){bytes-=i->proof->RetainedBytes()+sizeof(Row)+2*sizeof(void*);rows.erase(i);break;}
-  while(!rows.empty()&&(bytes>MaxBytes-size||rows.size()>=MaxRows)){bytes-=rows.back().proof->RetainedBytes()+sizeof(Row)+2*sizeof(void*);rows.pop_back();++evictions;}
-  rows.push_front({shard,std::move(proof)});bytes+=size;
+ void Put(size_t key,std::shared_ptr<const VerifiedShard> proof){
+  std::scoped_lock guard{mutex};const auto size=PartBytes(*proof),group=Group(key);
+  if(size>MaxBytes-RowBytes){++oversized;return;}
+  // Allocate before mutating rows. Once a new empty row exists below, splice
+  // cannot throw and leave an empty group visible after allocation failure.
+  std::list<Part> incoming;incoming.push_front({key,proof});
+  auto row=std::find_if(rows.begin(),rows.end(),[&](const auto& r){return r.shard==group;});
+  if(row!=rows.end()&&!(row->parts.front().proof->stamp==proof->stamp)){bytes-=row->bytes;rows.erase(row);row=rows.end();++invalidations;}
+  if(row==rows.end()){
+   while(!rows.empty()&&(bytes>MaxBytes-RowBytes-size||rows.size()>=MaxRows))EvictLast();
+   rows.push_front({group,{},RowBytes});bytes+=RowBytes;
+  }else{
+   rows.splice(rows.begin(),rows,row);
+   for(auto p=rows.front().parts.begin();p!=rows.front().parts.end();++p)if(p->key==key){const auto old=PartBytes(*p->proof);bytes-=old;rows.front().bytes-=old;rows.front().parts.erase(p);break;}
+   while(bytes>MaxBytes-size){
+    if(rows.size()>1)EvictLast();
+    else{auto& r=rows.front();const auto old=PartBytes(*r.parts.back().proof);bytes-=old;r.bytes-=old;r.parts.pop_back();++evictions;}
+   }
+  }
+  rows.front().parts.splice(rows.front().parts.begin(),incoming,incoming.begin());rows.front().bytes+=size;bytes+=size;
  }
  size_t Bytes(){std::scoped_lock guard{mutex};return bytes;}
  std::array<size_t,3> Churn(){std::scoped_lock guard{mutex};return {evictions,invalidations,oversized};}
