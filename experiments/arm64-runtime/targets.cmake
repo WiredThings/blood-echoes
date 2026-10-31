@@ -373,6 +373,7 @@ add_custom_command(OUTPUT ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANI
 add_custom_target(bb_cpu_cache_build_identity DEPENDS ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANIFEST})
 add_dependencies(bb-game-arm64 bb_cpu_cache_build_identity)
 add_dependencies(bb-cpu-cache-generator bb_cpu_cache_build_identity)
+add_dependencies(test_fex_prepared_disk bb_cpu_cache_build_identity)
 
 add_executable(test_hle_veneer_pages ${BB_ARM64_PROTOTYPE_DIR}/tests/test_hle_veneer_pages.cpp)
 target_link_libraries(test_hle_veneer_pages PRIVATE bb_fex_embedding)

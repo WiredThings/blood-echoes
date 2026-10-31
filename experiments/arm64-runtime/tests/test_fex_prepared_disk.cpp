@@ -4,6 +4,7 @@
 #include "fex_disk_generate.h"
 #include "core/guest_cpu/fex_hle_bridge.h"
 #include "cpu_cache_identity_inputs.h"
+#include "bb_cpu_cache_build.h"
 #include <FEXCore/HLE/SourcecodeResolver.h>
 #include <cassert>
 #include <thread>
@@ -24,7 +25,7 @@ static std::shared_ptr<BbFexDisk::VerifiedShard> SelectedCatalog(const fs::path&
  auto proof=BbFexDisk::DecodePagedRoot(std::span(bytes).first(meta.catalog_root_bytes),meta,key,policy);const auto i=proof->Select(guest);const auto& range=proof->catalog_ranges[i];return BbFexDisk::DecodePagedUnit(std::span(bytes).subspan(range.offset,range.bytes),*proof,i,meta,key,policy);
 }
 int main(int argc,char**argv){
- setvbuf(stdout,nullptr,_IONBF,0);assert(argc==4);const std::string mode=argv[1];const bool generate=mode=="generate"||mode=="generate-legacy"||mode=="generate-flat"||mode=="upgrade"||mode=="upgrade-metadata-only",load=mode=="load"||mode=="load-legacy"||mode=="load-flat";
+ setvbuf(stdout,nullptr,_IONBF,0);assert(argc==4||argc==5);const bool actual_build=argc==5;if(actual_build)assert(std::string_view(argv[4])=="actual-build-identity");const std::string mode=argv[1];const bool generate=mode=="generate"||mode=="generate-legacy"||mode=="generate-flat"||mode=="upgrade"||mode=="upgrade-metadata-only",load=mode=="load"||mode=="load-legacy"||mode=="load-flat";
  fs::path root=argv[2];auto address=uintptr_t(std::strtoull(argv[3],nullptr,0));
  auto acquired=AetherPS4::Fex::FexConfigLease::Acquire();assert(!std::holds_alternative<AetherPS4::Fex::EngineFailure>(acquired));
  FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLECODECACHINGWIP,generate?"1":"0");FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLELAZYCODECACHINGWIP,"0");FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLECODECACHEVALIDATION,"0");
@@ -44,7 +45,9 @@ int main(int argc,char**argv){
  // source block +600 jumps to it, exercising ordinary live direct backpatches.
  const unsigned char source[]={0xe9,0xfb,0x5f,0,0};memcpy(code+0x600,source,sizeof(source));const unsigned char target[]={0xb8,85,0,0,0,0xf4};memcpy(code+0x6600,target,sizeof(target));
  const unsigned char prepared_source[]={0xe9,0xfb,0xfe,0xff,0xff};memcpy(code+0x700,prepared_source,sizeof(prepared_source)); // independently moved unit -> another cached unit in SAME shard
- BbCpuCache::Identity identity;identity.runtime_build=CacheFixture::Text("actual-FEX-fixture-v1");identity.patched_code=BbCpuCache::Hash({reinterpret_cast<const std::byte*>(code),32768});identity.module_set=CacheFixture::Text("authored-main");identity.bridge_abi=CacheFixture::Text("prepared.sum/u64/u64/u64/"+std::to_string(op));identity.host_features=CacheFixture::Features(impl->HostFeatures);identity.codegen_config=CacheFixture::ContextConfig(*impl);assert(BbCpuCache::Valid(identity));
+ BbCpuCache::Identity identity;identity.runtime_build=CacheFixture::Text("actual-FEX-fixture-v1");identity.patched_code=BbCpuCache::Hash({reinterpret_cast<const std::byte*>(code),32768});identity.module_set=CacheFixture::Text("authored-main");identity.bridge_abi=CacheFixture::Text("prepared.sum/u64/u64/u64/"+std::to_string(op));identity.host_features=CacheFixture::Features(impl->HostFeatures);identity.codegen_config=CacheFixture::ContextConfig(*impl);if(actual_build){identity.runtime_build=BbCacheBuild::Runtime;identity.bridge_abi=CacheFixture::RegistryABI(BbCacheBuild::Bridge,registry,sizeof(HleCallFrame),alignof(HleCallFrame));}
+ assert(BbCpuCache::Valid(identity));
+ if(actual_build)std::printf("FEX_BUILD_IDENTITY actual-compiler-and-registry=1\n");
  const uint64_t rsp=f.stack+f.stack_bytes-16;auto*t=ctx->CreateThread(address,rsp);assert(t);
  AetherPS4::Fex::CallRetStack returns;assert(returns.IsReserved()&&!std::holds_alternative<AetherPS4::Fex::EngineFailure>(returns.MakeWritable()));returns.Initialize(t);AetherPS4::Fex::GuestSegmentState segments;segments.Initialize(t->CurrentFrame->State);
  std::vector<Core::GuestExecutionRange> ranges{{address,32768,true,false},{f.stack,f.stack_bytes,false,true}};assert(!std::holds_alternative<AetherPS4::Fex::EngineFailure>(handler->RegisterThread(t,ranges)));
@@ -52,7 +55,7 @@ int main(int argc,char**argv){
   std::vector<uint64_t> seeds{0,resume,0x600,0x700,8192};std::vector<std::byte> plan(16+seeds.size()*8);memcpy(plan.data(),"BFXPLAN1",8);uint64_t count=seeds.size();memcpy(plan.data()+8,&count,8);memcpy(plan.data()+16,seeds.data(),seeds.size()*8);
   if(fs::exists(root/"plan.bin"))assert(BbFexDisk::Read(root/"plan.bin",4096)==plan);else BbFexDisk::Publish(root/"plan.bin",plan);
   std::map<fs::path,BbCpuCache::Digest> prior;for(auto& p:fs::directory_iterator(root))if(p.path().extension()==".becc"&&mode!="upgrade-metadata-only")prior.emplace(p.path(),BbCpuCache::Hash(BbFexDisk::Read(p.path(),BbCpuCache::MaxPayload+4096)));
-  auto compiled=BbFexDisk::Generate(*impl,t,root/"plan.bin",root,identity,f.sections,address,32768,f.file);assert(compiled&&calls==0&&impl->LatestOffset==0);
+  auto compiled=BbFexDisk::GenerateDirectory(*impl,t,(root/"plan.bin").string(),root.string(),identity,f.sections,address,32768,f.file);assert(compiled&&calls==0&&impl->LatestOffset==0);
   for(const auto& [p,hash]:prior)assert(BbCpuCache::Hash(BbFexDisk::Read(p,BbCpuCache::MaxPayload+4096))==hash);
   if(mode=="generate-legacy"||mode=="generate-flat"){
    auto d=BbFexDisk::Decode(BbFexDisk::Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),32768);
@@ -71,7 +74,7 @@ int main(int argc,char**argv){
    }else if(mode=="load-missing-catalog")fs::rename(name,fs::path(name.string()+".preserved-for-test"));
    else{const int fd=open(name.c_str(),O_RDWR|O_NOFOLLOW|O_CLOEXEC);assert(fd>=0);unsigned char value=0;assert(pwrite(fd,&value,1,0)==1&&!fsync(fd));close(fd);}
   }
-  bool admitted=true;try{handler->PreparedDisk=std::make_unique<BbFexDisk::Loader>(root,identity,f.sections,address,32768);}catch(const std::exception&){admitted=false;}
+  bool admitted=true;try{handler->PreparedDisk=BbFexDisk::OpenDirectory(root.string(),identity,f.sections,address,32768);}catch(const std::exception&){admitted=false;}
   if(mode=="reject-key"||mode=="reject-index")assert(!admitted);
   else assert(admitted);
   assert(impl->LatestOffset==0&&t->LookupCache->FindBlock(t,address)==0); // no eager payload copy
