@@ -1,3 +1,4 @@
+#include "bb_present_latency.h"
 #include "video_core/renderer_metal/mtl_local_library.h"
 #include "video_core/renderer_metal/mtl_phase_counters.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
@@ -611,7 +612,8 @@ void Presenter::Present(VideoCore::PresentFrame* present_frame, bool is_reusing_
         }
         // Blocks until a drawable is free (all 3 are queued for the display); with display sync
         // off that is short. After its 1 s timeout nextDrawable returns nil: the frame is skipped.
-        id<CAMetalDrawable> drawable = [impl->layer nextDrawable];
+        id<CAMetalDrawable> drawable = nil;
+        { BbPresentLatency::Phase phase{"next-drawable"}; drawable = [impl->layer nextDrawable]; }
         if (!drawable) {
             free_frame();
             return;
@@ -623,7 +625,9 @@ void Presenter::Present(VideoCore::PresentFrame* present_frame, bool is_reusing_
         id<CAMetalDrawable> real_drawable = drawable;
         id<CAMetalDrawable> interpolated_drawable = nil;
         if (new_game_frame && tick != 0 && frame->interpolated) {
-            if (id<CAMetalDrawable> second = [impl->layer nextDrawable]) {
+            id<CAMetalDrawable> second = nil;
+            { BbPresentLatency::Phase phase{"next-drawable-interpolated"}; second = [impl->layer nextDrawable]; }
+            if (second) {
                 interpolated_drawable = drawable;
                 real_drawable = second;
             }
@@ -700,6 +704,14 @@ void Presenter::Present(VideoCore::PresentFrame* present_frame, bool is_reusing_
                 // Last: the destructor waits for this.
                 presents_in_flight.fetch_sub(1, std::memory_order_acq_rel);
             }];
+            if (BbPresentLatency::Enabled()) {
+                const auto token = BbPresentLatency::current_token;
+                const auto submitted = BbPresentLatency::Now();
+                [cmdbuf addCompletedHandler:^(id<MTLCommandBuffer> completed) {
+                    BbPresentLatency::Interval("submit-to-completion", token, submitted,
+                                               BbPresentLatency::Now());
+                }];
+            }
             [cmdbuf commit];
         };
         if (interpolated_drawable) {

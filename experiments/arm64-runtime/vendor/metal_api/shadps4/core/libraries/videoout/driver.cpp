@@ -1,3 +1,4 @@
+#include "bb_present_latency.h"
 #include "bb_stutter_audit.h"
 #include "video_core/renderer_metal/mtl_phase_counters.h"
 #include "remote/bb_remote.h"
@@ -426,10 +427,23 @@ static void PrintMemory() {
 void VideoOutDriver::Flip(const Request& req) {
     BbTimeline::Note(BbTimeline::Flip, main_port.vblank_status.count);
     // Update HDR status before presenting, then present the frame (bbport: on the swap thread).
-    RunPresenter([this, frame = req.frame, hdr = req.port->is_hdr] {
-        presenter->SetHDR(hdr);
-        presenter->Present(frame);
-    });
+    if (BbPresentLatency::Enabled()) {
+        const auto posted = BbPresentLatency::Now();
+        BbPresentLatency::Interval("request-residence", req.ready_ns, req.ready_ns, posted);
+        RunPresenter([this, frame = req.frame, hdr = req.port->is_hdr,
+                      token = u64(req.ready_ns), posted] {
+            BbPresentLatency::Interval("present-dispatch", token, posted, BbPresentLatency::Now());
+            BbPresentLatency::Context context{token};
+            BbPresentLatency::Phase present{"present-host"};
+            presenter->SetHDR(hdr);
+            presenter->Present(frame);
+        });
+    } else {
+        RunPresenter([this, frame = req.frame, hdr = req.port->is_hdr] {
+            presenter->SetHDR(hdr);
+            presenter->Present(frame);
+        });
+    }
     Vulkan::FrameCapture::OnFlip(req.index >= 0 ? req.port->buffer_slots[req.index].address_left
                                                 : 0);
 
@@ -453,6 +467,7 @@ void VideoOutDriver::Flip(const Request& req) {
         }();
         if(file) {
             static auto start=Clock::now(),last=start;const auto now=Clock::now();
+            BbPresentLatency::Origin(std::chrono::duration_cast<std::chrono::nanoseconds>(start.time_since_epoch()).count());
             static bool audit_origin=false;
             if(!audit_origin && BbAudit::Enabled()) {
                 audit_origin=true;

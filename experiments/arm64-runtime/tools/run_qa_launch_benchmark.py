@@ -394,6 +394,7 @@ def execution_environment(source,case,formal=None,*,functional_f3=False):
  env=dict(PATH='/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin',HOME=str(P/'state'),TMPDIR=str(case['data_root'])+'/',PYTHON=str(stage/'python/bin/python3'),PYTHONHOME=str(stage/'python'),PYTHONNOUSERSITE='1',PYTHONUNBUFFERED='1',**case['environment'])
  if formal is not None:env['BB_GPU_PROCESS']=str(formal['runtime']['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'])
  if env.get('BB_FRAME_STATS','0')=='1'or env.get('BB_SAVE_LOG','0')=='1':raise ValueError('unprofiled benchmark requires original heavy statistics off')
+ if env.get('BB_PRESENT_LATENCY_DIAGNOSTIC','0')!='0'or 'BB_PRESENT_LATENCY_GATE'in env:raise ValueError('inherited presentation diagnostic is not an unprofiled run')
  if env.get('BB_RECOMP_TARGETS','0')!='0':raise ValueError('original conditions must be free of bbcpu target diagnostics; use explicit diagnostic mode')
  if env.get('BB_AUDIO')!='none':raise ValueError('night QA requires original GUI audio=none')
  env.update(BB_PAD_FILE=str(case['pad']),BB_PAD_FILE_ONLY='1',BB_QUICKSAVE='0')
@@ -402,13 +403,16 @@ def execution_environment(source,case,formal=None,*,functional_f3=False):
   env.update(BB_QUICKSAVE='1',BB_FRAME_STATS='1')
  return env
 
-def benchmark_changes(source,case,env,*,formal=None,functional_f3=False,bbcpu_diagnostic=False):
+def benchmark_changes(source,case,env,*,formal=None,functional_f3=False,bbcpu_diagnostic=False,present_diagnostic=False):
  changes={k:dict(before=source['environment'].get(k),after=env.get(k))for k in sorted(set(source['environment'])|{k for k in env if k.startswith(('BB_','MTL_'))})if source['environment'].get(k)!=env.get(k)}
  allowed=set(case['allowed_changes'])|{'BB_QUICKSAVE','BB_PAD_FILE_ONLY'}|({'BB_FRAME_STATS'}if functional_f3 else set())
  if formal is not None:allowed.add('BB_GPU_PROCESS')
  if bbcpu_diagnostic:
   if env.get('BB_CPU_BACKEND')!='bbcpu'or env.get('BB_RECOMP_TARGETS')!='1':raise ValueError('explicit bbcpu target diagnostic required')
   allowed.add('BB_RECOMP_TARGETS')
+ if present_diagnostic:
+  if env.get('BB_PRESENT_LATENCY_DIAGNOSTIC')!='1'or not env.get('BB_PRESENT_LATENCY_GATE'):raise ValueError('explicit presentation diagnostic required')
+  allowed.update(('BB_PRESENT_LATENCY_DIAGNOSTIC','BB_PRESENT_LATENCY_GATE'))
  if set(changes)-allowed:raise ValueError('unapproved game setting override')
  return changes,sorted(allowed)
 
@@ -416,7 +420,7 @@ def selected_cache_mode(requested,formal_stage):
  if formal_stage is not None and requested not in(None,'empty'):raise ValueError('staged code comparison requires empty cache mode; QA shader cache import is forbidden')
  return 'empty'if formal_stage is not None else requested or'seeded'
 
-def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False,track_tool_memory=False,bbcpu_diagnostic=False,fex_diagnostic=False):
+def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False,track_tool_memory=False,bbcpu_diagnostic=False,fex_diagnostic=False,present_diagnostic=False):
  from qa_launch_clone import inventory_savedata
  from qa_f3_contract import F3Check,NewLogLines
  f3=F3Check()if functional_f3 else None
@@ -483,6 +487,9 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
      in_scene=scene_seen(last_frame_rows)
      if in_scene and ready is None:
       ready=elapsed
+      if present_diagnostic:
+       from qa_present_diagnostics import arm
+       arm(env)
       if progress is not None:progress.start_scene(ready)
       print('Scene camera observed:',round(ready,2),flush=True)
      if f3 is not None:
@@ -528,6 +535,13 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
   if diagnostic is not None:
    report.update(performance_sample=False,profiler=True,qualification='CPU attribution only: stack sampling and optional bbcpu target counters perturb timing. Not an unprofiled FPS/memory comparison or full game acceptance.')
    if not report['cpu_diagnostic'].get('complete'):report.update(status='incomplete',error='CPU diagnostic sample incomplete')
+  if present_diagnostic:
+   from qa_present_diagnostics import summarize
+   report.update(performance_sample=False,diagnostic_only=True,profiler=False)
+   try:
+    report['present_diagnostic']=summarize(case['data_root']/'out/last-run.log')
+    if not report['present_diagnostic']['complete']:report.update(status='incomplete',error='presentation diagnostic incomplete or overflow')
+   except(ValueError,OSError)as error:report.update(status='incomplete',error=str(error))
   if c.get('execution_code_admission')is not None:
    sealed=finish_app_seal(report,c['execution_code_admission']);report.clear();report.update(sealed)
   if frames.exists():os.replace(frames,root/'frames.csv')
@@ -535,10 +549,11 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
  return report
 
 def main():
- ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));code=ap.add_mutually_exclusive_group();code.add_argument('--formal-stage',type=Path);code.add_argument('--reference-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2,3),default=1);ap.add_argument('--functional-f3',action='store_true');diagnostics=ap.add_mutually_exclusive_group();diagnostics.add_argument('--bbcpu-diagnostic',action='store_true');diagnostics.add_argument('--fex-diagnostic',action='store_true');a=ap.parse_args()
+ ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));code=ap.add_mutually_exclusive_group();code.add_argument('--formal-stage',type=Path);code.add_argument('--reference-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2,3),default=1);ap.add_argument('--functional-f3',action='store_true');diagnostics=ap.add_mutually_exclusive_group();diagnostics.add_argument('--bbcpu-diagnostic',action='store_true');diagnostics.add_argument('--fex-diagnostic',action='store_true');ap.add_argument('--present-diagnostic-last',action='store_true');a=ap.parse_args()
  assert 60<=a.startup_seconds<=1800 and 45<=a.scene_seconds<=180
  assert not a.functional_f3 or a.runs==1,'functional F3 is one supervised session'
  diagnostic=a.bbcpu_diagnostic or a.fex_diagnostic
+ assert not a.present_diagnostic_last or(a.runs==3 and not diagnostic and not a.functional_f3 and a.formal_stage is None and a.reference_stage is None),'presentation diagnostic is third run of one isolated cold/warm/diagnostic batch'
  assert not diagnostic or(a.runs==1 and not a.functional_f3 and a.formal_stage is None and a.reference_stage is None),'CPU diagnostic is one isolated original-backend run'
  from qa_launch_conditions import load
  from qa_launch_clone import create
@@ -578,10 +593,19 @@ def main():
    run=root/('run-'+str(index+1));run.mkdir(mode=0o700)
    row=dict(report,run=index+1,phase='initial'if index==0 else'warm',
        same_private_cache_and_user=index>0)
-   result=sample(execution,case,env,command,row,run,startup_seconds=a.startup_seconds,
-       scene_seconds=a.scene_seconds,observer=observer,policy=policy,protection_start=protection_start,functional_f3=a.functional_f3,bbcpu_diagnostic=a.bbcpu_diagnostic,fex_diagnostic=a.fex_diagnostic)
+   from qa_present_diagnostics import diagnostic_run
+   present_diagnostic=diagnostic_run(a.present_diagnostic_last,index,a.runs)
+   row['performance_sample']=not diagnostic and not a.functional_f3
+   run_env=env
+   if present_diagnostic:
+    from qa_present_diagnostics import environment
+    run_env=environment(env,run);row.update(performance_sample=False,diagnostic_only=True,presentation_diagnostic_requested=True)
+    changes,allowed=benchmark_changes(c,case,run_env,formal=code_admission,present_diagnostic=True)
+    write(run/'diagnostic-conditions.json',dict(environment_changes=changes,allowed_changes=allowed,gate_opened_only_at_scene=True))
+   result=sample(execution,case,run_env,command,row,run,startup_seconds=a.startup_seconds,
+       scene_seconds=a.scene_seconds,observer=observer,policy=policy,protection_start=protection_start,functional_f3=a.functional_f3,bbcpu_diagnostic=a.bbcpu_diagnostic,fex_diagnostic=a.fex_diagnostic,present_diagnostic=present_diagnostic)
    reports.append(result)
-   write(root/'result.json',dict(schema=2,status=('functional-checked'if a.functional_f3 else'sampled')if all(r['status']in('sampled','functional-checked')for r in reports)and len(reports)==a.runs else'incomplete',runs=reports,formal_data_modified=False,memory_policy_continuous=True,profiler=diagnostic,performance_sample=not diagnostic and not a.functional_f3))
+   write(root/'result.json',dict(schema=2,status=('functional-checked'if a.functional_f3 else'sampled')if all(r['status']in('sampled','functional-checked')for r in reports)and len(reports)==a.runs else'incomplete',runs=reports,formal_data_modified=False,memory_policy_continuous=True,profiler=diagnostic,performance_sample=not diagnostic and not a.functional_f3 and not a.present_diagnostic_last,performance_run_numbers=[i+1 for i,r in enumerate(reports)if not r.get('diagnostic_only')],presentation_diagnostic_last=a.present_diagnostic_last))
    if result['status']not in('sampled','functional-checked'):raise SystemExit(1)
  finally:
   observer.close()
