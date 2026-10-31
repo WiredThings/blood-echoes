@@ -10,14 +10,29 @@ inline void EnsureCatalog(const fs::path& output,Shard& meta,const BbCpuCache::I
  std::span<const std::pair<uint64_t,uint64_t>> sections,uint64_t image,
  std::span<const std::byte> supplied={},const BbCacheValidation::Validated* validated=nullptr){
  if(!meta.file_bytes)return;
- if(meta.catalog_bytes){struct stat st{};const auto p=output/CatalogFilename(meta.catalog_hash);
+ if(meta.catalog_root_bytes){struct stat st{};const auto p=output/CatalogFilename(meta.catalog_hash);
   if(!lstat(p.c_str(),&st)&&S_ISREG(st.st_mode)&&st.st_uid==getuid()&&st.st_nlink==1&&!(st.st_mode&0022)&&uint64_t(st.st_size)==meta.catalog_bytes)return;
  }
+ std::shared_ptr<VerifiedShard> previous;
+ if(supplied.empty()&&meta.catalog_bytes&&!meta.catalog_root_bytes){
+  try{auto data=Read(output/CatalogFilename(meta.catalog_hash),16u<<20);previous=DecodeCatalog(data,meta,BbCpuCache::Key(identity),{image,sections,GIT_HASH});}catch(const std::exception&){}
+ }
  std::vector<std::byte> owned;std::optional<BbCacheValidation::Validated> checked;
- if(supplied.empty()){owned=Read(output/Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));supplied=owned;}
- Require(supplied.size()==meta.file_bytes&&BbCpuCache::Hash(supplied)==meta.hash,"FEX catalog producer shard checksum");
- if(!validated){auto raw=BbCpuCache::Check(supplied,identity);checked=BbCacheValidation::Validate(raw,{image,sections,GIT_HASH});Require(bool(checked),"FEX catalog producer FXCC validation");validated=&*checked;}
- auto proof=MakeCatalog(supplied,*validated);auto bytes=EncodeCatalog(proof,meta,BbCpuCache::Key(identity),image,GIT_HASH);meta.catalog_bytes=bytes.size();meta.catalog_hash=BbCpuCache::Hash(bytes);
+ if(!previous){
+  if(supplied.empty()){owned=Read(output/Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));supplied=owned;}
+  Require(supplied.size()==meta.file_bytes&&BbCpuCache::Hash(supplied)==meta.hash,"FEX catalog producer shard checksum");
+  if(!validated){auto raw=BbCpuCache::Check(supplied,identity);checked=BbCacheValidation::Validate(raw,{image,sections,GIT_HASH});Require(bool(checked),"FEX catalog producer FXCC validation");validated=&*checked;}
+  previous=std::make_shared<VerifiedShard>(MakeCatalog(supplied,*validated));
+ }
+ std::vector<std::byte> bytes;
+ try{auto paged=EncodePagedCatalog(*previous,meta,BbCpuCache::Key(identity),image,GIT_HASH);meta.catalog_root_bytes=paged.root_bytes;meta.catalog_hash=paged.hash;bytes=std::move(paged.bytes);}
+ catch(const std::runtime_error& error){
+  if(std::string_view(error.what())!="FEX paged catalog budget")throw;
+  // An oversized expanded catalog keeps the original bounded flat format.
+  bytes=EncodeCatalog(*previous,meta,BbCpuCache::Key(identity),image,GIT_HASH);meta.catalog_root_bytes=0;meta.catalog_hash=BbCpuCache::Hash(bytes);
+  std::fprintf(stderr,"FEX PREPARE paged catalog exceeds budget; verified flat catalog retained\n");
+ }
+ meta.catalog_bytes=bytes.size();
  const auto path=output/CatalogFilename(meta.catalog_hash);
  if(fs::exists(path)){try{if(Read(path,16u<<20)==bytes)return;}catch(const std::exception&){}Preserve(path);}
  Publish(path,bytes);

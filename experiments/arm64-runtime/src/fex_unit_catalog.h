@@ -17,7 +17,7 @@ inline std::vector<std::byte> EncodeCatalog(const VerifiedShard& proof,const Sha
  for(size_t i=0;i<proof.units.size();++i){const auto& u=proof.units[i];word(u.begin);word(u.end);word(u.code_end);bytes(proof.unit_hashes[i].data(),32);}
  Require(out.size()<=16u<<20,"FEX unit catalog byte budget");return out;
 }
-inline std::shared_ptr<VerifiedShard> DecodeCatalog(std::span<const std::byte> raw,const Shard& shard,const Digest& key,const BbCacheValidation::Policy& policy){
+inline std::shared_ptr<VerifiedShard> DecodeCatalog(std::span<const std::byte> raw,const Shard& shard,const Digest& key,const BbCacheValidation::Policy& policy,std::optional<Unit> selected={}){
  Require(raw.size()==shard.catalog_bytes&&BbCpuCache::Hash(raw)==shard.catalog_hash,"FEX unit catalog checksum");
  Require(raw.size()>=148&&raw.size()<=16u<<20&&!memcmp(raw.data(),"BFXUNIT1",8),"FEX unit catalog format");
  size_t at=8;auto word=[&](){Require(at<=raw.size()&&raw.size()-at>=8,"FEX unit catalog truncated");uint64_t n=0;for(unsigned i=0;i<8;++i)n|=uint64_t(std::to_integer<unsigned>(raw[at++]))<<(8*i);return n;};
@@ -43,11 +43,12 @@ inline std::shared_ptr<VerifiedShard> DecodeCatalog(std::span<const std::byte> r
   previous=offset+width;m.relocs.push_back({offset,rip,uint32_t(kind),uint32_t(reg)});
  }
  for(uint64_t i=0;i<units;++i){Unit u{size_t(word()),size_t(word()),size_t(word())};auto hash=digest();
-  Require(u.begin==(i?((out->units.back().end+15)&~size_t{15}):0)&&u.end<=m.code_bytes&&u.begin<u.code_end&&sizeof(FEXCore::CPU::CPUBackend::JITCodeHeader)<=u.code_end-u.begin&&u.code_end<=u.end&&sizeof(FEXCore::CPU::CPUBackend::JITCodeTail)<=u.end-u.code_end&&u.end%4==0,"FEX unit catalog emitted range");
+  Require(u.begin==(i?((out->units.back().end+15)&~size_t{15}):(selected?selected->begin:0))&&u.end<=m.code_bytes&&u.begin<u.code_end&&sizeof(FEXCore::CPU::CPUBackend::JITCodeHeader)<=u.code_end-u.begin&&u.code_end<=u.end&&sizeof(FEXCore::CPU::CPUBackend::JITCodeTail)<=u.end-u.code_end&&u.end%4==0,"FEX unit catalog emitted range");
   out->units.push_back(u);out->unit_hashes.push_back(hash);
  }
  Require(at==raw.size(),"FEX unit catalog trailing data");
- for(const auto& b:m.blocks){const auto& u=out->units[out->Select(b.guest)];Require(b.host>=u.begin+sizeof(FEXCore::CPU::CPUBackend::JITCodeHeader),"FEX unit catalog entry in header");}
+ if(selected)Require(out->units.size()==1&&out->units[0].begin==selected->begin&&out->units[0].end==selected->end&&out->units[0].code_end==selected->code_end,"FEX selected catalog range mismatch");
+ for(const auto& b:m.blocks){const auto& u=out->units[out->UnitForHost(b.host)];Require(b.host>=u.begin+sizeof(FEXCore::CPU::CPUBackend::JITCodeHeader),"FEX unit catalog entry in header");}
  for(const auto& r:m.relocs){auto u=std::upper_bound(out->units.begin(),out->units.end(),r.offset,[](size_t h,const Unit& u){return h<u.begin;});Require(u!=out->units.begin(),"FEX unit catalog relocation lacks unit");--u;Require(r.offset<=u->end&&(r.kind==3?16:8)<=u->end-r.offset,"FEX unit catalog relocation crosses unit");}
  return out;
 }

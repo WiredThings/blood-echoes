@@ -35,9 +35,19 @@ def main():
         print(mode,result.returncode,flush=True)
         if result.returncode:raise RuntimeError(f'control failed; retained {log}')
     # Hints inside the Darwin embedding allocator's guest region, no MAP_FIXED.
-    for name,consumer in [('normal','load'),('changed','load-file-changed'),('bad-catalog','load-bad-catalog'),('missing-catalog','load-missing-catalog')]:
+    for name,consumer in [('normal','load'),('changed','load-file-changed'),('bad-catalog','load-bad-catalog'),('missing-catalog','load-missing-catalog'),('other-unit','load-other-metadata-corrupt')]:
         state=root/name;state.mkdir(mode=0o700)
         run('generate',state,'0x7000000000');run(consumer,state,'0x7100000000')
+    state=root/'flat';state.mkdir(mode=0o700)
+    run('generate-flat',state,'0x7000000000');run('load-flat',state,'0x7100000000')
+    payloads=list(state.glob('*.becc'));before={p:hashlib.sha256(p.read_bytes()).digest()for p in payloads}
+    try:
+        for p in payloads:p.chmod(0)
+        run('upgrade-metadata-only',state,'0x7000000000')
+    finally:
+        for p in payloads:p.chmod(0o600)
+    assert all(hashlib.sha256(p.read_bytes()).digest()==h for p,h in before.items())
+    run('load',state,'0x7100000000')
     state=root/'legacy';state.mkdir(mode=0o700)
     run('generate-legacy',state,'0x7000000000');run('load-legacy',state,'0x7100000000')
     run('upgrade',state,'0x7000000000');run('load',state,'0x7100000000')

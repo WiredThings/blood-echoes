@@ -4,7 +4,7 @@
 #include "bb_cpu_cache_validation.h"
 #include "fex_compiled_units.h"
 #include "fex_verified_shard.h"
-#include "fex_unit_catalog.h"
+#include "fex_paged_catalog.h"
 #include "git_version.h"
 #include "Interface/Context/Context.h"
 #include "Interface/Core/LookupCache.h"
@@ -23,7 +23,7 @@ class Loader {
  std::unique_ptr<OwnedDirectory> files;ShardProofs proofs;
  std::atomic<uint64_t> hits{},misses{},rejected{},copied{},budget{};
  std::atomic<uint64_t> load_ns{},jit_count{},jit_ns{};
- std::atomic<uint64_t> whole_reads{},read_bytes{},hash_bytes{},proof_hits{},writer_wait_ns{},writer_hold_ns{},raced{},catalog_reads{};
+ std::atomic<uint64_t> whole_reads{},read_bytes{},hash_bytes{},proof_hits{},writer_wait_ns{},writer_hold_ns{},raced{},catalog_reads{},root_reads{},unit_metadata_reads{},metadata_bytes{},native_bytes{};
  bool Bad(size_t shard){std::scoped_lock guard{status_mutex};return bad[shard];}
  void Reject(size_t shard,const char* reason){
   {std::scoped_lock guard{status_mutex};if(bad[shard])return;bad[shard]=true;}++rejected;
@@ -38,7 +38,24 @@ class Loader {
   std::unique_lock<std::mutex> first_read;
   std::shared_ptr<const VerifiedShard> proof;std::vector<std::byte> bytes;size_t offset{},unit{};
  };
+ Input PreparePaged(size_t shard,uint64_t guest){
+  static_assert(sizeof(size_t)>=8);
+  const auto& meta=index.shards[shard];Input in;auto native=files->Open(Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));auto stamp=native.OpenedStamp();Require(uint64_t(stamp.value.st_size)==meta.file_bytes,"FEX paged native size");
+  auto routing=proofs.Find(shard,stamp);size_t selected{};std::shared_ptr<const VerifiedShard> unit;
+  auto lookup=[&]{if(routing){selected=routing->Select(guest);unit=proofs.Find(((shard+1)<<32)|selected,stamp);}};lookup();
+  if(unit)++proof_hits;
+  else{
+   std::scoped_lock gate{first_read_mutex};stamp=native.Stamp();routing=proofs.Find(shard,stamp);lookup();
+   if(!unit){
+    auto catalog=files->Open(CatalogFilename(meta.catalog_hash),16u<<20);const auto observed=catalog.OpenedStamp();Require(uint64_t(observed.value.st_size)==meta.catalog_bytes,"FEX paged file size");
+    if(!routing){auto data=catalog.ReadRange(0,meta.catalog_root_bytes,observed);read_bytes+=data.size();hash_bytes+=data.size();metadata_bytes+=data.size();++catalog_reads;++root_reads;auto root=DecodePagedRoot(data,meta,index.key,{index.image_bytes,sections,GIT_HASH});root->stamp=stamp;routing=std::move(root);proofs.Put(shard,routing);}
+    selected=routing->Select(guest);const auto& range=routing->catalog_ranges.at(selected);auto data=catalog.ReadRange(range.offset,range.bytes,observed);read_bytes+=data.size();hash_bytes+=data.size();metadata_bytes+=data.size();++catalog_reads;++unit_metadata_reads;auto decoded=DecodePagedUnit(data,*routing,selected,meta,index.key,{index.image_bytes,sections,GIT_HASH});decoded->stamp=stamp;unit=std::move(decoded);proofs.Put(((shard+1)<<32)|selected,unit);
+   }
+  }
+  Require(unit&&unit->units.size()==1&&unit->catalog_ranges.empty(),"FEX paged selected proof");in.proof=std::move(unit);const auto& u=in.proof->units[0];in.bytes=native.ReadRange(BbCpuCache::PrefixBytes+in.proof->metadata.code_offset+u.begin,u.end-u.begin,stamp);read_bytes+=in.bytes.size();hash_bytes+=in.bytes.size();native_bytes+=in.bytes.size();Require(BbCpuCache::Hash(in.bytes)==in.proof->unit_hashes[0],"FEX paged native checksum");return in;
+ }
  Input Prepare(size_t shard,uint64_t guest){
+  if(index.shards[shard].catalog_root_bytes)return PreparePaged(shard,guest);
   const auto& meta=index.shards[shard];Input in;auto file=files->Open(Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));auto stamp=file.OpenedStamp();
   Require(uint64_t(stamp.value.st_size)==meta.file_bytes,"shard file size");in.proof=proofs.Find(shard,stamp);bool reused=bool(in.proof);
   if(!in.proof){
@@ -72,7 +89,7 @@ class Loader {
  }
 public:
  static uint64_t Now(){return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();}
- void Report(){std::printf("FEX DISK totals hits=%llu misses=%llu rejected=%llu copied_bytes=%llu budget_fallbacks=%llu load_ms=%.3f fallback_compiles=%llu fallback_path_ms=%.3f whole_reads=%llu read_bytes=%llu hash_bytes=%llu proof_hits=%llu proof_bytes=%zu writer_wait_ms=%.3f writer_hold_ms=%.3f\n",(unsigned long long)hits.load(),(unsigned long long)misses.load(),(unsigned long long)rejected.load(),(unsigned long long)copied.load(),(unsigned long long)budget.load(),load_ns.load()/1e6,(unsigned long long)jit_count.load(),jit_ns.load()/1e6,(unsigned long long)whole_reads.load(),(unsigned long long)read_bytes.load(),(unsigned long long)hash_bytes.load(),(unsigned long long)proof_hits.load(),proofs.Bytes(),writer_wait_ns.load()/1e6,writer_hold_ns.load()/1e6);std::printf("FEX DISK unit-index catalog_reads=%llu\n",(unsigned long long)catalog_reads.load());const auto churn=proofs.Churn();std::printf("FEX DISK proof-cache evictions=%zu invalidations=%zu oversized=%zu raced_publications=%llu\n",churn[0],churn[1],churn[2],(unsigned long long)raced.load());}
+ void Report(){std::printf("FEX DISK totals hits=%llu misses=%llu rejected=%llu copied_bytes=%llu budget_fallbacks=%llu load_ms=%.3f fallback_compiles=%llu fallback_path_ms=%.3f whole_reads=%llu read_bytes=%llu hash_bytes=%llu proof_hits=%llu proof_bytes=%zu writer_wait_ms=%.3f writer_hold_ms=%.3f\n",(unsigned long long)hits.load(),(unsigned long long)misses.load(),(unsigned long long)rejected.load(),(unsigned long long)copied.load(),(unsigned long long)budget.load(),load_ns.load()/1e6,(unsigned long long)jit_count.load(),jit_ns.load()/1e6,(unsigned long long)whole_reads.load(),(unsigned long long)read_bytes.load(),(unsigned long long)hash_bytes.load(),(unsigned long long)proof_hits.load(),proofs.Bytes(),writer_wait_ns.load()/1e6,writer_hold_ns.load()/1e6);std::printf("FEX DISK unit-index catalog_reads=%llu root_reads=%llu unit_metadata_reads=%llu metadata_bytes=%llu native_bytes=%llu\n",(unsigned long long)catalog_reads.load(),(unsigned long long)root_reads.load(),(unsigned long long)unit_metadata_reads.load(),(unsigned long long)metadata_bytes.load(),(unsigned long long)native_bytes.load());const auto churn=proofs.Churn();std::printf("FEX DISK proof-cache evictions=%zu invalidations=%zu oversized=%zu raced_publications=%llu\n",churn[0],churn[1],churn[2],(unsigned long long)raced.load());}
  void EndCompilation(uint64_t start){jit_ns.fetch_add(Now()-start,std::memory_order_relaxed);if((jit_count.fetch_add(1,std::memory_order_relaxed)+1)%256==0)Report();}
  Loader(fs::path directory,const BbCpuCache::Identity& expected,std::span<const std::pair<uint64_t,uint64_t>> ranges,uintptr_t image,uint64_t bytes)
  :root(std::move(directory)),identity(expected),sections(ranges.begin(),ranges.end()),base(image){
@@ -89,6 +106,7 @@ public:
  uint64_t CopiedBytes()const{return copied.load(std::memory_order_relaxed);}
  uint64_t CatalogReads()const{return catalog_reads.load(std::memory_order_relaxed);}
  uint64_t WholeReads()const{return whole_reads.load(std::memory_order_relaxed);}
+ uint64_t NativeBytes()const{return native_bytes.load(std::memory_order_relaxed);}
  uint64_t ReadBytes()const{return read_bytes.load(std::memory_order_relaxed);}
  size_t ProofBytes(){return proofs.Bytes();}
  uintptr_t Load(FEXCore::Core::InternalThreadState* thread,uint64_t rip){

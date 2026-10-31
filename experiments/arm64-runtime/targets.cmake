@@ -273,6 +273,9 @@ add_executable(test_fex_prepared_disk ${BB_ARM64_PROTOTYPE_DIR}/tests/test_fex_p
 target_compile_definitions(test_fex_prepared_disk PRIVATE AETHER_ENGINE_SOURCE="${AETHER}/src/core/fex/fex_guest_engine.cpp")
 target_compile_options(test_fex_prepared_disk PRIVATE -UNDEBUG)
 target_link_libraries(test_fex_prepared_disk PRIVATE bb_fex_embedding)
+add_executable(probe_fex_paged_catalog ${BB_ARM64_PROTOTYPE_DIR}/tests/probe_fex_paged_catalog.cpp)
+target_compile_options(probe_fex_paged_catalog PRIVATE -UNDEBUG)
+target_link_libraries(probe_fex_paged_catalog PRIVATE bb_fex_embedding)
 target_compile_definitions(test_cpu_bridge_disk_cache PRIVATE AETHER_ENGINE_SOURCE="${AETHER}/src/core/fex/fex_guest_engine.cpp")
 target_link_libraries(test_cpu_bridge_disk_cache PRIVATE bb_fex_embedding)
 

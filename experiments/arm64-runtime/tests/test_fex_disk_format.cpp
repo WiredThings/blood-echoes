@@ -8,15 +8,18 @@ int main(){
  auto raw=Encode(good);auto decoded=Decode(raw,key,16384);assert(decoded.entries.size()==2&&decoded.shards[1].file_bytes==0);
  // A v1 index has 80-byte rows; it remains readable without catalog metadata.
  auto legacy=std::vector<std::byte>(raw.begin(),raw.begin()+72);legacy[7]=std::byte{'1'};
- for(size_t i=0;i<good.shards.size();++i)legacy.insert(legacy.end(),raw.begin()+72+120*i,raw.begin()+72+120*i+80);
- legacy.insert(legacy.end(),raw.begin()+72+120*good.shards.size(),raw.end()-32);auto old_sum=BbCpuCache::Hash(legacy);auto old_bytes=std::as_bytes(std::span(old_sum));legacy.insert(legacy.end(),old_bytes.begin(),old_bytes.end());
+ for(size_t i=0;i<good.shards.size();++i)legacy.insert(legacy.end(),raw.begin()+72+128*i,raw.begin()+72+128*i+80);
+ legacy.insert(legacy.end(),raw.begin()+72+128*good.shards.size(),raw.end()-32);auto old_sum=BbCpuCache::Hash(legacy);auto old_bytes=std::as_bytes(std::span(old_sum));legacy.insert(legacy.end(),old_bytes.begin(),old_bytes.end());
  assert(Decode(legacy,key,16384).shards[0].catalog_bytes==0);
+ auto v2=std::vector<std::byte>(raw.begin(),raw.begin()+72);v2[7]=std::byte{'2'};
+ for(size_t i=0;i<good.shards.size();++i)v2.insert(v2.end(),raw.begin()+72+128*i,raw.begin()+72+128*i+120);
+ v2.insert(v2.end(),raw.begin()+72+128*good.shards.size(),raw.end()-32);auto v2sum=BbCpuCache::Hash(v2);auto v2bytes=std::as_bytes(std::span(v2sum));v2.insert(v2.end(),v2bytes.begin(),v2bytes.end());assert(Decode(v2,key,16384).shards[0].catalog_root_bytes==0);
  unsigned rejects=0;auto refuse=[&](auto bytes,auto expected,uint64_t image){try{Decode(bytes,expected,image);assert(false);}catch(const std::runtime_error&){++rejects;}};
  for(auto offset:{size_t(0),size_t(8),size_t(16),raw.size()-1}){auto damaged=raw;damaged[offset]^=std::byte{1};refuse(damaged,key,16384);}
  auto wrong=key;wrong[0]^=1;refuse(raw,wrong,16384);refuse(raw,key,32768);
  auto alter=[&](auto update){auto candidate=good;update(candidate);refuse(Encode(candidate),key,16384);};
  alter([](auto& d){d.entries[1].guest=0;});alter([](auto& d){d.entries[0].shard=1;});alter([](auto& d){d.entries[0].shard=3;});
- alter([](auto& d){d.shards[0].code_bytes=4097;});alter([](auto& d){d.pages[0].bytes=8192;});alter([](auto& d){d.pages[1].guest=0;});
+ alter([](auto& d){d.shards[0].code_bytes=4097;});alter([](auto& d){d.shards[0].catalog_bytes=148;d.shards[0].catalog_root_bytes=149;});alter([](auto& d){d.pages[0].bytes=8192;});alter([](auto& d){d.pages[1].guest=0;});
  auto extra=raw;extra.push_back(std::byte{});refuse(extra,key,16384);raw.resize(raw.size()-1);refuse(raw,key,16384);
  assert(Filename(key).find("..") == std::string::npos);std::printf("FEX_DISK_FORMAT positive=1 refusals=%u\n",rejects);
  // Real-game scanning surpassed the old one-million entry writer limit.

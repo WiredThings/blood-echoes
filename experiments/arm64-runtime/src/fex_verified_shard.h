@@ -6,20 +6,28 @@
 #include <list>
 #include <mutex>
 namespace BbFexDisk {
+struct CatalogRoute {uint64_t guest,host;};
+struct CatalogRange {uint64_t offset,bytes;Digest hash;};
 struct VerifiedShard {
  FileStamp stamp;
  BbCacheValidation::Validated metadata;
  std::vector<Unit> units;
  std::vector<Digest> unit_hashes;
+ std::vector<CatalogRange> catalog_ranges;
+ std::vector<CatalogRoute> catalog_routes;
  size_t RetainedBytes()const{
-  size_t n=sizeof(*this)+metadata.blocks.capacity()*sizeof(BbCacheValidation::Block)+metadata.relocs.capacity()*sizeof(BbCacheValidation::Reloc)+units.capacity()*sizeof(Unit)+unit_hashes.capacity()*sizeof(Digest);
+  size_t n=sizeof(*this)+metadata.blocks.capacity()*sizeof(BbCacheValidation::Block)+metadata.relocs.capacity()*sizeof(BbCacheValidation::Reloc)+units.capacity()*sizeof(Unit)+unit_hashes.capacity()*sizeof(Digest)+catalog_ranges.capacity()*sizeof(CatalogRange)+catalog_routes.capacity()*sizeof(CatalogRoute);
   for(const auto& b:metadata.blocks)n+=b.pages.capacity()*sizeof(uint64_t);return n;
  }
  size_t Select(uint64_t guest)const{
+  if(!catalog_routes.empty()){auto b=std::lower_bound(catalog_routes.begin(),catalog_routes.end(),guest,[](const auto& b,uint64_t n){return b.guest<n;});Require(b!=catalog_routes.end()&&b->guest==guest,"FEX catalog route absent");return UnitForHost(b->host);}
   auto b=std::lower_bound(metadata.blocks.begin(),metadata.blocks.end(),guest,[](const auto& b,uint64_t n){return b.guest<n;});
   Require(b!=metadata.blocks.end()&&b->guest==guest,"directory target absent from shard");
-  auto u=std::upper_bound(units.begin(),units.end(),size_t(b->host),[](size_t h,const Unit& u){return h<u.begin;});
-  Require(u!=units.begin(),"prepared target unit absent");--u;Require(b->host<u->code_end,"prepared target outside unit");return size_t(u-units.begin());
+  return UnitForHost(b->host);
+ }
+ size_t UnitForHost(size_t host,bool entry=true)const{
+  auto u=std::upper_bound(units.begin(),units.end(),host,[](size_t h,const Unit& u){return h<u.begin;});
+  Require(u!=units.begin(),"prepared target unit absent");--u;Require(host<(entry?u->code_end:u->end),"prepared target outside unit");return size_t(u-units.begin());
  }
 };
 // Auxiliary proof cache only: no executable payload and no change to the
