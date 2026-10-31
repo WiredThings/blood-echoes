@@ -1,6 +1,7 @@
 // Real FEX compiler/dispatcher/relocator and real existing HLE bridge. Authored
 // x86 bytes only. Generation and consumption are separate macOS processes.
 #include AETHER_ENGINE_SOURCE
+#include "fex_disk_generate.h"
 #include "core/guest_cpu/fex_hle_bridge.h"
 #include "cpu_cache_identity_inputs.h"
 #include <FEXCore/HLE/SourcecodeResolver.h>

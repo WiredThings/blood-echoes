@@ -46,18 +46,20 @@ def combine(domain,rows):
  return h.hexdigest()
 
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--runtime-part',action='append',default=[]);ap.add_argument('--bridge-part',action='append',default=[]);ap.add_argument('--header',type=Path,required=True);ap.add_argument('--manifest',type=Path,required=True)
+ ap=argparse.ArgumentParser();ap.add_argument('--runtime-part',action='append',default=[]);ap.add_argument('--bridge-part',action='append',default=[]);ap.add_argument('--provenance-part',action='append',default=[]);ap.add_argument('--header',type=Path,required=True);ap.add_argument('--manifest',type=Path,required=True)
  ap.add_argument('--source-root',type=Path,default=P);ap.add_argument('--build-root',type=Path);ap.add_argument('--renderer-root',type=Path);a=ap.parse_args()
  source=directory(a.source_root);build=directory(a.build_root or source);renderer=directory(a.renderer_root or source);roots=tuple(dict.fromkeys((source,build,renderer)))
  output_path(a.header,build);output_path(a.manifest,build)
- def parts(args):
+ def parts(args,required=True):
   out={}
   for row in args:
    label,path=row.split('=',1);need(label and label.isascii()and label not in out,'unique ASCII build identity label required')
    out[label]=digest_file(Path(path),roots)
-  need(out,'build identity parts required');out['builder-source']=digest_file(Path(__file__),roots);return out
+  if required:
+   need(out,'build identity parts required');out['builder-source']=digest_file(Path(__file__),roots)
+  return out
  runtime,bridge=parts(a.runtime_part),parts(a.bridge_part)
- report=dict(schema=1,runtime_parts=runtime,bridge_parts=bridge,runtime_build=combine('BE-common-runtime-build-v1',runtime),bridge_build=combine('BE-common-bridge-build-v1',bridge),source_root=str(source),build_root=str(build),renderer_root=str(renderer))
+ report=dict(schema=2,runtime_parts=runtime,bridge_parts=bridge,provenance_parts=parts(a.provenance_part,False),runtime_build=combine('BE-common-runtime-build-v1',runtime),bridge_build=combine('BE-common-bridge-build-v1',bridge),source_root=str(source),build_root=str(build),renderer_root=str(renderer))
  def literal(hex):return ','.join('0x'+hex[i:i+2]for i in range(0,len(hex),2))
  header='// Generated from actual linked archives and frontend/bridge inputs; do not edit.\n#pragma once\n#include "bb_cpu_cache_identity.h"\nnamespace BbCacheBuild {\n'
  header+='inline constexpr BbCpuCache::Digest Runtime={'+literal(report['runtime_build'])+'};\n'

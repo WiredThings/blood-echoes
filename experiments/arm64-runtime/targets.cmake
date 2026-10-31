@@ -21,6 +21,10 @@ if(BB_ARM64_RENDERER_BUILD_DIR)
  set(BB_ARM_GPU_LIBRARY "${BB_ARM64_CPU_HOST_LIBRARY}" CACHE FILEPATH "Explicit CPU-side host artifact" FORCE)
 endif()
 set(AETHER ${BB_ARM64_PROTOTYPE_DIR}/vendor/aether)
+add_library(bb_fex_disk_service STATIC ${BB_ARM64_PROTOTYPE_DIR}/src/fex_disk_service.cpp)
+target_compile_features(bb_fex_disk_service PUBLIC cxx_std_20)
+target_include_directories(bb_fex_disk_service PUBLIC ${BB_ARM64_PROTOTYPE_DIR}/src ${AETHER}/src ${CMAKE_BINARY_DIR}/generated ${BB_ARM64_GENERATED_DIR} ${CMAKE_SOURCE_DIR}/Source/Tools/CommonTools ${CMAKE_SOURCE_DIR}/FEXCore/Source)
+target_link_libraries(bb_fex_disk_service PUBLIC FEXCore Common CommonTools JemallocLibs ${PTHREAD_LIB})
 add_library(bb_fex_embedding STATIC
  ${AETHER}/src/core/fex/fex_guest_engine.cpp
  ${AETHER}/src/core/guest_cpu/fex_guest_cpu.cpp
@@ -28,7 +32,7 @@ add_library(bb_fex_embedding STATIC
  ${AETHER}/src/core/guest_cpu/fex_hle_bridge.cpp)
 target_compile_features(bb_fex_embedding PUBLIC cxx_std_20)
 target_include_directories(bb_fex_embedding PUBLIC ${AETHER}/src ${CMAKE_BINARY_DIR}/generated ${BB_ARM64_GENERATED_DIR} ${CMAKE_SOURCE_DIR}/Source/Tools/CommonTools ${CMAKE_SOURCE_DIR}/FEXCore/Source)
-target_link_libraries(bb_fex_embedding PUBLIC FEXCore Common CommonTools JemallocLibs ${PTHREAD_LIB})
+target_link_libraries(bb_fex_embedding PUBLIC bb_fex_disk_service FEXCore Common CommonTools JemallocLibs ${PTHREAD_LIB})
 add_executable(test_lookup ${BB_ARM64_PROTOTYPE_DIR}/tests/test_lookup.cpp)
 target_compile_features(test_lookup PRIVATE cxx_std_20)
 target_compile_definitions(test_lookup PRIVATE AETHER_SMOKE_SOURCE="${AETHER}/runtime/probes/fexcore-smoke.cpp")
@@ -323,7 +327,11 @@ file(GLOB BB_CPU_FRONTEND_HEADERS CONFIGURE_DEPENDS ${BB_ARM64_PROTOTYPE_DIR}/sr
 set(BB_CPU_FRONTEND_IDENTITY_ARGS)
 foreach(header IN LISTS BB_CPU_FRONTEND_HEADERS)
  get_filename_component(header_name ${header} NAME)
- list(APPEND BB_CPU_FRONTEND_IDENTITY_ARGS --bridge-part "frontend-header-${header_name}=${header}")
+ if(header_name MATCHES "^(fex_disk_(loader|io|format)|fex_(unit_catalog|paged_catalog|verified_shard|compiled_units))\\.h$")
+  list(APPEND BB_CPU_FRONTEND_IDENTITY_ARGS --provenance-part "storage-header-${header_name}=${header}")
+ else()
+  list(APPEND BB_CPU_FRONTEND_IDENTITY_ARGS --bridge-part "frontend-header-${header_name}=${header}")
+ endif()
 endforeach()
 set(BB_CPU_CACHE_BUILD_HEADER ${CMAKE_BINARY_DIR}/generated/bb_cpu_cache_build.h)
 set(BB_CPU_CACHE_BUILD_MANIFEST ${CMAKE_BINARY_DIR}/generated/cpu_cache_build.json)
@@ -341,8 +349,10 @@ add_custom_command(OUTPUT ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANI
   --runtime-part common=$<TARGET_FILE:Common>
   --runtime-part common-tools=$<TARGET_FILE:CommonTools>
   --runtime-part generator-frontend=${BB_ARM64_PROTOTYPE_DIR}/src/cpu_cache_generator.cpp
-  --runtime-part target-policy=${BB_ARM64_PROTOTYPE_DIR}/targets.cmake
-  --runtime-part build-config=${CMAKE_BINARY_DIR}/CMakeCache.txt
+  --provenance-part target-policy=${BB_ARM64_PROTOTYPE_DIR}/targets.cmake
+  --provenance-part build-config=${CMAKE_BINARY_DIR}/CMakeCache.txt
+  --provenance-part disk-service=$<TARGET_FILE:bb_fex_disk_service>
+  --runtime-part disk-service-frontend=${BB_ARM64_PROTOTYPE_DIR}/src/fex_disk_service.cpp
   --bridge-part native=$<TARGET_FILE:bb_native_runtime>
   --bridge-part atrac=$<TARGET_FILE:bb_atrac>
   --bridge-part gpu-adapters=$<TARGET_OBJECTS:bb_gpu_adapters>
@@ -351,10 +361,11 @@ add_custom_command(OUTPUT ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANI
   ${BB_CPU_FRONTEND_IDENTITY_ARGS}
   --bridge-part gpu-library=${BB_ARM_GPU_LIBRARY}
   --header ${BB_CPU_CACHE_BUILD_HEADER} --manifest ${BB_CPU_CACHE_BUILD_MANIFEST}
- DEPENDS FEXCore bb_fex_embedding Common CommonTools bb_native_runtime bb_atrac bb_gpu_adapters bb_avplayer_adapters
+ DEPENDS FEXCore bb_fex_embedding bb_fex_disk_service Common CommonTools bb_native_runtime bb_atrac bb_gpu_adapters bb_avplayer_adapters
   ${BB_CPU_FRONTEND_HEADERS}
   ${BB_ARM64_PROTOTYPE_DIR}/src/game_runtime.cpp
   ${BB_ARM64_PROTOTYPE_DIR}/src/cpu_cache_generator.cpp
+  ${BB_ARM64_PROTOTYPE_DIR}/src/fex_disk_service.cpp
   ${BB_ARM64_PROTOTYPE_DIR}/targets.cmake ${CMAKE_BINARY_DIR}/CMakeCache.txt
   ${BB_ARM_GPU_LIBRARY}
   ${BB_ARM64_PROTOTYPE_DIR}/tools/make_cpu_cache_build.py

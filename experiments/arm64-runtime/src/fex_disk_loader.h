@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "fex_disk_service.h"
 #include "fex_disk_io.h"
 #include "bb_cpu_cache_validation.h"
 #include "fex_compiled_units.h"
@@ -16,7 +17,7 @@
 #include <set>
 #include <chrono>
 namespace BbFexDisk {
-class Loader {
+class Loader final : public PreparedDirectory {
  fs::path root;BbCpuCache::Identity identity;Directory index;
  std::vector<std::pair<uint64_t,uint64_t>> sections;uintptr_t base;
  std::mutex status_mutex,first_read_mutex;std::vector<bool> bad;
@@ -90,7 +91,7 @@ class Loader {
 public:
  static uint64_t Now(){return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();}
  void Report(){std::printf("FEX DISK totals hits=%llu misses=%llu rejected=%llu copied_bytes=%llu budget_fallbacks=%llu load_ms=%.3f fallback_compiles=%llu fallback_path_ms=%.3f whole_reads=%llu read_bytes=%llu hash_bytes=%llu proof_hits=%llu proof_bytes=%zu writer_wait_ms=%.3f writer_hold_ms=%.3f\n",(unsigned long long)hits.load(),(unsigned long long)misses.load(),(unsigned long long)rejected.load(),(unsigned long long)copied.load(),(unsigned long long)budget.load(),load_ns.load()/1e6,(unsigned long long)jit_count.load(),jit_ns.load()/1e6,(unsigned long long)whole_reads.load(),(unsigned long long)read_bytes.load(),(unsigned long long)hash_bytes.load(),(unsigned long long)proof_hits.load(),proofs.Bytes(),writer_wait_ns.load()/1e6,writer_hold_ns.load()/1e6);std::printf("FEX DISK unit-index catalog_reads=%llu root_reads=%llu unit_metadata_reads=%llu metadata_bytes=%llu native_bytes=%llu\n",(unsigned long long)catalog_reads.load(),(unsigned long long)root_reads.load(),(unsigned long long)unit_metadata_reads.load(),(unsigned long long)metadata_bytes.load(),(unsigned long long)native_bytes.load());const auto churn=proofs.Churn();std::printf("FEX DISK proof-cache evictions=%zu invalidations=%zu oversized=%zu raced_publications=%llu\n",churn[0],churn[1],churn[2],(unsigned long long)raced.load());}
- void EndCompilation(uint64_t start){jit_ns.fetch_add(Now()-start,std::memory_order_relaxed);if((jit_count.fetch_add(1,std::memory_order_relaxed)+1)%256==0)Report();}
+ void EndCompilation(uint64_t start) override{jit_ns.fetch_add(Now()-start,std::memory_order_relaxed);if((jit_count.fetch_add(1,std::memory_order_relaxed)+1)%256==0)Report();}
  Loader(fs::path directory,const BbCpuCache::Identity& expected,std::span<const std::pair<uint64_t,uint64_t>> ranges,uintptr_t image,uint64_t bytes)
  :root(std::move(directory)),identity(expected),sections(ranges.begin(),ranges.end()),base(image){
   Require(root.is_absolute()&&fs::canonical(root)==root&&root.string().starts_with("/Users/Shared/BloodEchoesDevelopment/"),"FEX prepared directory must stay private");
@@ -101,15 +102,15 @@ public:
   for(auto& p:index.pages)Require(BbCacheValidation::Inside(policy,p.guest)&&BbCacheValidation::Inside(policy,p.guest+p.bytes-1),"FEX directory page outside registered code");
   std::printf("FEX DISK directory shards=%zu entries=%zu metadata_bytes=%zu; payloads deferred, original JIT budget unchanged\n",index.shards.size(),index.entries.size(),index.entries.size()*sizeof(Entry)+index.shards.size()*sizeof(Shard)+index.pages.size()*sizeof(Page));
  }
- ~Loader(){Report();}
- uint64_t Hits()const{return hits.load(std::memory_order_relaxed);}
- uint64_t CopiedBytes()const{return copied.load(std::memory_order_relaxed);}
- uint64_t CatalogReads()const{return catalog_reads.load(std::memory_order_relaxed);}
- uint64_t WholeReads()const{return whole_reads.load(std::memory_order_relaxed);}
- uint64_t NativeBytes()const{return native_bytes.load(std::memory_order_relaxed);}
- uint64_t ReadBytes()const{return read_bytes.load(std::memory_order_relaxed);}
- size_t ProofBytes(){return proofs.Bytes();}
- uintptr_t Load(FEXCore::Core::InternalThreadState* thread,uint64_t rip){
+ ~Loader() override{Report();}
+ uint64_t Hits()const override{return hits.load(std::memory_order_relaxed);}
+ uint64_t CopiedBytes()const override{return copied.load(std::memory_order_relaxed);}
+ uint64_t CatalogReads()const override{return catalog_reads.load(std::memory_order_relaxed);}
+ uint64_t WholeReads()const override{return whole_reads.load(std::memory_order_relaxed);}
+ uint64_t NativeBytes()const override{return native_bytes.load(std::memory_order_relaxed);}
+ uint64_t ReadBytes()const override{return read_bytes.load(std::memory_order_relaxed);}
+ size_t ProofBytes() override{return proofs.Bytes();}
+ uintptr_t Load(FEXCore::Core::InternalThreadState* thread,uint64_t rip) override{
   if(rip<base)return 0;const auto offset=rip-base;if(offset>=index.image_bytes){++misses;return 0;}
   const auto entry=std::lower_bound(index.entries.begin(),index.entries.end(),offset,[](auto& e,uint64_t n){return e.guest<n;});
   if(entry==index.entries.end()||entry->guest!=offset){++misses;return 0;}

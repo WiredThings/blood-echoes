@@ -42,6 +42,32 @@ class Roots(unittest.TestCase):
   self.assertNotEqual(failed.returncode,0);self.assertFalse(header.exists());self.assertEqual(self.outside.read_text(),'preserve')
   result=subprocess.run(base+['--manifest',str(manifest)],text=True,capture_output=True,timeout=5)
   self.assertEqual(result.returncode,0,result.stderr);data=json.loads(manifest.read_text());self.assertEqual(data['build_root'],str(self.build));self.assertEqual(data['renderer_root'],str(self.renderer));self.assertIn('BbCacheBuild',header.read_text())
+ def identity(self,extra=()):
+  header=self.build/'generated/identity.h';manifest=self.build/'generated/identity.json'
+  args=[sys.executable,str(D/'tools/make_cpu_cache_build.py'),'--source-root',str(D),'--build-root',str(self.build),'--renderer-root',str(self.renderer),'--runtime-part','compiler='+str(self.inside),'--bridge-part','bridge='+str(self.inside),'--header',str(header),'--manifest',str(manifest),*extra]
+  result=subprocess.run(args,text=True,capture_output=True,timeout=5)
+  return result,header,manifest
+ def test_provenance_changes_record_without_recompilation(self):
+  p=self.build/'CMakeCache.txt';p.write_text('authored build directory A')
+  result,h,m=self.identity(['--provenance-part','build-config='+str(p)]);self.assertEqual(result.returncode,0,result.stderr)
+  before=json.loads(m.read_text());body=h.read_bytes();stamp=h.stat().st_mtime_ns
+  p.write_text('authored build directory B with an unrelated test target')
+  result,_,_=self.identity(['--provenance-part','build-config='+str(p)]);self.assertEqual(result.returncode,0,result.stderr);after=json.loads(m.read_text())
+  self.assertEqual(before['runtime_build'],after['runtime_build']);self.assertEqual(before['bridge_build'],after['bridge_build'])
+  self.assertNotEqual(before['provenance_parts'],after['provenance_parts']);self.assertEqual(h.read_bytes(),body);self.assertEqual(h.stat().st_mtime_ns,stamp)
+ def test_real_artifact_and_abi_changes_invalidate(self):
+  abi=self.build/'service-interface.h';abi.write_text('authored ABI contract A')
+  args=['--bridge-part','service-interface='+str(abi)]
+  result,_,m=self.identity(args);self.assertEqual(result.returncode,0,result.stderr);a=json.loads(m.read_text())
+  abi.write_text('authored ABI contract B');result,_,_=self.identity(args);self.assertEqual(result.returncode,0,result.stderr);b=json.loads(m.read_text())
+  self.assertEqual(a['runtime_build'],b['runtime_build']);self.assertNotEqual(a['bridge_build'],b['bridge_build'])
+  self.inside.write_text('authored genuinely changed compiler and bridge artifact');result,_,_=self.identity(args);self.assertEqual(result.returncode,0,result.stderr);c=json.loads(m.read_text())
+  self.assertNotEqual(b['runtime_build'],c['runtime_build']);self.assertNotEqual(b['bridge_build'],c['bridge_build'])
+ def test_provenance_keeps_input_admission(self):
+  for path in (self.outside,self.build/'absent'):
+   result,h,m=self.identity(['--provenance-part','input='+str(path)]);self.assertNotEqual(result.returncode,0);self.assertFalse(h.exists());self.assertFalse(m.exists())
+  linked=self.build/'linked';linked.symlink_to(self.inside)
+  result,h,m=self.identity(['--provenance-part','input='+str(linked)]);self.assertNotEqual(result.returncode,0);self.assertFalse(h.exists());self.assertFalse(m.exists())
 if __name__=='__main__':
  result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(Roots))
  (Roots.evidence/'result.json').write_text(json.dumps(dict(tests=result.testsRun,passed=result.wasSuccessful(),synthetic_inputs=True,actual_linked_identity_validated=False,game_started=False),indent=2)+'\n')

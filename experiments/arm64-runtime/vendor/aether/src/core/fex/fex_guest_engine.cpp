@@ -1,7 +1,6 @@
 #include "bb_cpu_cache_inputs.h"
 #include "bb_fex_eager_cache.h"
-#include "fex_disk_loader.h"
-#include "fex_disk_generate.h"
+#include "fex_disk_service.h"
 #include "git_version.h"
 #include "bb_hardware_tso.h"
 #include "bb_stutter_audit.h"
@@ -759,12 +758,12 @@ private:
 
 class BridgeSyscallHandler final : public FEXCore::HLE::SyscallHandler {
 public:
-  std::unique_ptr<BbFexDisk::Loader> PreparedDisk;
+  std::unique_ptr<BbFexDisk::PreparedDirectory> PreparedDisk;
   bool HasPreparedCode()const override{return PreparedDisk!=nullptr;}
   uintptr_t TryLoadPreparedCode(FEXCore::Core::InternalThreadState* thread,uint64_t rip) override {
     return PreparedDisk?PreparedDisk->Load(thread,rip):0;
   }
-  uint64_t BeginPreparedCompilation()override{return PreparedDisk?BbFexDisk::Loader::Now():0;}
+  uint64_t BeginPreparedCompilation()override{return PreparedDisk?BbFexDisk::ClockNow():0;}
   void EndPreparedCompilation(uint64_t start)override{if(PreparedDisk)PreparedDisk->EndCompilation(start);}
   struct InvocationState final {
     std::optional<EngineFailure> Failure;
@@ -2383,7 +2382,7 @@ EngineResult<uint64_t> GuestEngine::InstallPreparedDirectory(const std::string& 
  if(ImplState->StartupCacheClosed||ImplState->StartupCache||ImplState->Syscalls->PreparedDisk||!ImplState->Threads.empty())return Failure(EngineStage::Request,EBUSY);
  auto* ctx=static_cast<FEXCore::Context::ContextImpl*>(ImplState->Context.get());
  if(ctx->GetCodeCache().EnableCodeCaching())return Failure(EngineStage::Request,EINVAL);
- try{ImplState->Syscalls->PreparedDisk=std::make_unique<BbFexDisk::Loader>(path,identity,sections,base,bytes);return uint64_t(1);}
+ try{ImplState->Syscalls->PreparedDisk=BbFexDisk::OpenDirectory(path,identity,sections,base,bytes);return uint64_t(1);}
  catch(const std::exception& e){std::fprintf(stderr,"FEX DISK admission refused: %s; own JIT retained\n",e.what());return Failure(EngineStage::Mapping,EINVAL);}
 }
 EngineResult<uint64_t> GuestEngine::PrepareDiskDirectory(const std::string& plan,const std::string& path,const BbCpuCache::Identity& identity,
@@ -2396,7 +2395,7 @@ EngineResult<uint64_t> GuestEngine::PrepareDiskDirectory(const std::string& plan
  try{
   CallRetStack ret;if(!ret.IsReserved()||std::holds_alternative<EngineFailure>(ret.MakeWritable()))throw std::runtime_error("FEX offline callret unavailable");ret.Initialize(thread);
   GuestSegmentState segments;segments.Initialize(thread->CurrentFrame->State);
-  auto count=BbFexDisk::Generate(*ctx,thread,plan,path,identity,sections,base,bytes,source);ctx->DestroyThread(thread);return count;
+  auto count=BbFexDisk::GenerateDirectory(*ctx,thread,plan,path,identity,sections,base,bytes,source);ctx->DestroyThread(thread);return count;
  }catch(const std::exception& e){ctx->DestroyThread(thread);std::fprintf(stderr,"FEX PREPARE failed: %s\n",e.what());return Failure(EngineStage::Mapping,EINVAL);}
 }
 uint64_t GuestEngine::StartupCacheResolutions() const {
