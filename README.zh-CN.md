@@ -4,7 +4,7 @@
 
 开发分支的macOS 27+ ARM64版本使用FEX游戏运行时和原生Metal后端，无需Rosetta 2；默认增量准备本机Metal库和管线，普通暖启动复用未变化的已完成准备，F3保留原会话快速恢复。最新整合加入缓存／纹理范围修复及默认开启、可关闭的顶点运算优化。它与下文的Latest Release分开，见[复用规则](experiments/arm64-runtime/docs/ordinary-warm-reuse.zh-CN.md)和[本轮来源与验收](experiments/arm64-runtime/docs/upstream-refresh-20261030.zh-CN.md)。
 
-隔离开发包正在接入 [bloodborne-native 的 bbcpu](https://github.com/bloodborne-native/bloodborne-recomp)，作为与FEX独立、可选择的CPU后端：本机生成/编译ARM64静态游戏代码，保留bbcpu自身译码器兜底，不建设FEX与静态库的混合桥。原启动器、当前Metal载荷和FEX选择继续保留。首次全游戏编译及兼容性/性能验收仍在进行；它尚非已发布Release，也未改为默认。见[接入方案、边界和证据](experiments/arm64-runtime/docs/bbcpu-integration.zh-CN.md)。
+隔离开发包正在接入 [bloodborne-native 的 bbcpu](https://github.com/bloodborne-native/bloodborne-recomp)，作为与FEX独立、可选择的CPU后端：本机生成/编译ARM64静态游戏代码，保留bbcpu自身译码器兜底，不建设FEX与静态库的混合桥。原启动器、当前Metal载荷和FEX选择继续保留。本机全游戏静态编译、已登记代码范围复用与HLE调用快路已通过隔离站桩对照；其余兼容性和正式封装仍待验收，尚非已发布Release，也未改为默认。见[接入方案](experiments/arm64-runtime/docs/bbcpu-integration.zh-CN.md)和[最新快路验证与对照](experiments/arm64-runtime/docs/bbcpu-fastpaths-20261031.zh-CN.md)。
 
 这是 [DiAvisoo/bbport-mac-optimized](https://github.com/DiAvisoo/bbport-mac-optimized) 的
 **WiredThings 分支**，提供独立 macOS 启动器、**直接 Metal 渲染**、**MetalFX 时域升频**，

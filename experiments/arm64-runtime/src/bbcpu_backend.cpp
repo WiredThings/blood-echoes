@@ -8,28 +8,48 @@
 #include <cstdio>
 #include <stdexcept>
 #include <mutex>
+#include <vector>
 namespace {
 std::atomic<BbCpu::BbcpuBackend*> owner{};
 std::once_flag initialize;
 bool contains(const Core::GuestExecutionRange& range,uintptr_t p,size_t bytes,bool write){
  return p&&bytes&&p>=range.Begin&&bytes<=range.Size&&p-range.Begin<=range.Size-bytes&&(!write||range.Writable);
 }
+bool enabled(const char* name){const auto* value=std::getenv(name);return !value||std::strcmp(value,"0");}
+void stable_index(StaticRangeIndex& index,std::span<const Core::GuestExecutionRange> ranges,const StaticRangeIndex* parent=nullptr){
+ std::vector<Core::GuestExecutionRange> selected;
+ // Bound metadata rather than creating a new admission limit: large or
+ // uncertain registrations use the existing live query, never an empty success.
+ if(ranges.size()<=256){
+  for(const auto& r:ranges)if(!r.Size||r.Begin>UINTPTR_MAX-r.Size)throw std::invalid_argument("invalid stable code extent");
+  for(const auto& r:ranges)if(r.Executable&&!r.Writable){
+   bool overlap=false;for(const auto& other:ranges)if(other.Writable&&r.Begin<other.Begin+other.Size&&other.Begin<r.Begin+r.Size){overlap=true;break;}
+   if(!overlap&&(!parent||parent->Contains(r.Begin,r.Size,false)))selected.push_back(r);
+  }
+ }
+ index.Build(selected);
+}
 }
 namespace BbCpu {
 BbcpuBackend* BbcpuBackend::Owner(){return owner.load(std::memory_order_acquire);}
 int BbcpuBackend::Query(uintptr_t address){
  auto* self=Owner();if(!self)return 0;
+ if(self->code_index.Contains(address,1,false))return 1;
  auto range=self->service.QueryExecutableRange(address);
  return range&&range->Executable&&contains(*range,address,1,false);
 }
 int BbcpuBackend::QuerySpan(uintptr_t address,size_t bytes){
  auto* self=Owner();if(!self)return 0;
+ if(self->code_index.Contains(address,bytes,false))return 1;
  auto range=self->service.QueryExecutableRange(address);
  return range&&range->Executable&&contains(*range,address,bytes,false);
 }
-BbcpuBackend::BbcpuBackend(Core::GuestCpu::HleCallService& value,HleSiteValidator site,void* ctx)
+BbcpuBackend::BbcpuBackend(Core::GuestCpu::HleCallService& value,HleSiteValidator site,void* ctx,
+ std::span<const Core::GuestExecutionRange> stable_code,std::span<const Core::GuestExecutionRange> stable_hle)
  :service(value),hle_site(site),context(ctx){
  if(!site)throw std::invalid_argument("bbcpu requires an owned HLE-site validator");
+ if(enabled("BB_ARM_RANGE_FAST")&&enabled("BB_BBCPU_RANGE_REUSE")){stable_index(code_index,stable_code);stable_index(hle_index,stable_hle,&code_index);}
+ else{code_index.Build(std::vector<Core::GuestExecutionRange>{});hle_index.Build(std::vector<Core::GuestExecutionRange>{});}
  bool installed=false;
  std::call_once(initialize,[&]{
   owner.store(this,std::memory_order_release);
@@ -47,17 +67,46 @@ BbcpuBackend::BbcpuBackend(Core::GuestCpu::HleCallService& value,HleSiteValidato
   });
   bbcpu_set_fatal_handler([](const char*,uint64_t){std::_Exit(BB_ARM_EXIT_HLE_FAULT);});
   bbcpu_set_syscall_handler([](BbGuestRegs* regs){return Syscall(regs);});
+  bbcpu_set_owned_import_resolver(enabled("BB_BBCPU_HLE_DIRECT")?ResolveImport:nullptr);
   installed=true;
  });
  if(!installed)throw std::runtime_error("bbcpu host may initialize only one backend per process");
+ std::printf("BBCPU fast paths: code-index-bytes=%zu hle-index-bytes=%zu owned-HLE=%d; dynamic misses retain original checks\n",code_index.Bytes(),hle_index.Bytes(),enabled("BB_BBCPU_HLE_DIRECT"));
 }
 BbcpuBackend::~BbcpuBackend(){
  if(running.load(std::memory_order_acquire))std::abort();
  owner.store(nullptr,std::memory_order_release);
 }
+bool BbcpuBackend::OwnsHle(uintptr_t address,size_t bytes)const{
+ return hle_index.Contains(address,bytes,false)||hle_site(context,address,bytes);
+}
+int BbcpuBackend::ResolveImport(const BbGuestRegs* regs,BbOwnedImport* out){
+ auto* self=Owner();if(!self||!regs||!out)return 0;
+ uintptr_t target=regs->rip;
+ if(!QuerySpan(target,6))return 0;
+ const auto* stub=reinterpret_cast<const unsigned char*>(target);
+ if(stub[0]==0xff&&stub[1]==0x25){
+  int32_t disp{};std::memcpy(&disp,stub+2,4);
+  const auto next=target+6;uintptr_t slot{};
+  if(disp>=0){if(next>UINTPTR_MAX-uint32_t(disp))return -1;slot=next+uint32_t(disp);}
+  else{const auto distance=uint64_t(-int64_t(disp));if(next<distance)return -1;slot=next-distance;}
+  if(!self->code_index.Contains(slot,8,false)&&!self->service.ValidateGuestMemory(slot,8))return -1;
+  std::memcpy(&target,reinterpret_cast<const void*>(slot),8);
+ }
+ if(!QuerySpan(target,16))return 0;
+ const auto* code=reinterpret_cast<const unsigned char*>(target);
+ constexpr unsigned char prefix[]{0x49,0x89,0xca,0x48,0xb8};
+ if(std::memcmp(code,prefix,5)||code[13]!=0x0f||code[14]!=0x05||code[15]!=0xc3)return 0;
+ if(!self->OwnsHle(target,16))return 0;
+ // No speculative return-slot read. If the common guest validator cannot
+ // prove this stack, retain the original interpreter path without side effects.
+ if(!self->service.ValidateGuestMemory(regs->r[4],8))return 0;
+ uint64_t operation{};std::memcpy(&operation,code+5,8);
+ *out={target+15,operation};return 1;
+}
 int BbcpuBackend::Syscall(void* input){
  auto* self=Owner();auto* regs=static_cast<BbGuestRegs*>(input);
- if(!self||regs->rip<15||!self->hle_site(self->context,regs->rip-15,15))return 0;
+ if(!self||regs->rip<15||!self->OwnsHle(regs->rip-15,15))return 0;
  // Accept the existing immutable HLE veneer, not an arbitrary game syscall
  // with an operation number that happens to name a registered host function.
  const auto* code=reinterpret_cast<const unsigned char*>(regs->rip-15);

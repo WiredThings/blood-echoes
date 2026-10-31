@@ -782,7 +782,8 @@ int game_main(int argc,char** argv){
   };
   s.bridge=std::make_unique<HleCallService>(s.registry,valid,&s,failure,&s,executable,&s,"BBCPU_HLE");
   bbcpu_set_stack_release(runtime_low_release);
-  s.cpu=std::make_unique<BbCpu::BbcpuBackend>(*s.bridge,hle_site,&s);
+  auto stable_hle=vr;if(s.ordinary_unwind)stable_hle.push_back(s.ordinary_unwind->Range());
+  s.cpu=std::make_unique<BbCpu::BbcpuBackend>(*s.bridge,hle_site,&s,s.ranges,stable_hle);
   // The borrowed fd pins the actual bytes admitted above. Never resolve the
   // original pathname again between digest verification and dlopen.
   if(static_cpu){

@@ -12,15 +12,15 @@
         "src/cpu/cpu.c": "f5854072ecb5eb245a8b3b15165bc1e5db155d78fed25a90607a89c83a1c91c3",
         "src/cpu/cpu_internal.h": "173999b08f7cffd8d70db8861cbedfe314b0cfb5f8c2408ce8d952a691a64e9f",
         "src/cpu/decode.c": "aeadde20786c89d15e80122eb83b27ebe3206dc002ddecf946e4484a29669888",
-        "src/cpu/interp.c": "16803883e5f4368c5dae40c15923b75e5812ac79a45cca2cf51f4afe8a386475",
+        "src/cpu/interp.c": "1cbc172f69cac69db20c160186af361aca3401ac94c241b25967740efdce2a87",
         "src/cpu/jit_arm64.c": "e7322801d58d5d27616cd7cd997d8ba98170004fc89d7c82e4322f4d3c5cd688",
-        "src/cpu/recomp.c": "2ee92205e184904629fb119a9b7b27de7d6e5105f5fe9524ff61759d0d311eec",
+        "src/cpu/recomp.c": "cc0d1da4721f0a82ec53e44b9a8c71ccd38fcd82e043d864bd6d19f4af53c17b",
         "src/recomp/rc.h": "9006722564d916de55050b620704c7734768a6863c89621560f0377568c4b1e7",
         "tools/recomp/bbrecomp.c": "791d4f1326a083fb10332cc52e19820d0ea1286df8a0a0b3c10069eae9976df1",
         "tools/recomp/build_library.py": "d78e9a9e9fc36c402407bcc8a01beb0f5b9baf8581321cec62cb24bddb8ff9f2",
         "tools/recomp/scan.c": "eb9d6ee8cb85ed77a16fe485678ff2263d0e0df7b1ecc0f9303967b2211e135c"
       },
-      "purpose": "Independent CPU embedding and static runtime: owned complete frames, seven SysV arguments, bounded HLE admission, authoritative executable spans, native TSC ABI5, generated ABI refusal, static-function span checks, owned stop propagation, thread resource cleanup, compiled contract query and explicit immutable-code invalidation refusal; no FEX execution dependency; actual post-hook inputs, proven continuation return slots and bounded fatal diagnostics; outlined cold compiler/profiler scratch and bounded deep-fallback high-water notes"
+      "purpose": "Independent CPU embedding and static runtime: owned complete frames, seven SysV arguments, bounded HLE admission, authoritative executable spans, native TSC ABI5, generated ABI refusal, static-function span checks, owned stop propagation, thread resource cleanup, compiled contract query and explicit immutable-code invalidation refusal; no FEX execution dependency; actual post-hook inputs, proven continuation return slots and bounded fatal diagnostics; outlined cold compiler/profiler scratch and bounded deep-fallback high-water notes; process-lifetime registered-code reuse and exact owned-HLE import dispatch through the existing syscall service, preserving ABI5 and the original unknown-path fallback"
     }
   ],
   "repository": "https://github.com/bloodborne-native/bloodborne-recomp",

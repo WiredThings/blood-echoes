@@ -8,6 +8,7 @@
 #include <string.h>
 #include "trace.h"
 #include "../recomp/rc.h"
+#include "bbcpu_import_fast.h"
 #include <dlfcn.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -189,7 +190,7 @@ void bbcpu_recomp_reset_frame_depth(uint32_t depth) {
 }
 
 /* Statistics for the report: calls into the translator, longjmps to an outer frame, deepest. */
-static uint64_t translated_runs, frame_jumps, deepest_frame, recomp_image_base, host_calls;
+static uint64_t translated_runs, frame_jumps, deepest_frame, recomp_image_base, host_calls, owned_import_calls;
 static unsigned deep_frame_notes;
 /* Adds to a shared counter in batches of 4096 per thread, as bbcpu_recomp_counted does: every
  * thread adding one at a time to the same line costs as much as a short call. */
@@ -199,7 +200,7 @@ static void count_batched(uint64_t *total, uint32_t *pending) {
         *pending = 0;
     }
 }
-static _Thread_local uint32_t pending_runs, pending_host_calls;
+static _Thread_local uint32_t pending_runs, pending_host_calls, pending_owned_calls;
 /* BB_RECOMP_TARGETS=1: the targets of calls into the translator, and the host functions the
  * import stubs reach, counted (sampled 1 in 64). */
 enum { TARGET_SLOTS = 4096 };
@@ -306,7 +307,11 @@ static int no_direct(void) {
  * that function at once, with the return address on top of the guest stack, without the
  * translator (a _setjmp and its dispatch loop). 1: done, cpu->rip is where it returned to. */
 static int call_import(BbCpu *cpu, uint64_t target) {
-    if (!bbcpu_is_guest_code(target)) return 0;
+    if (bbcpu_try_owned_import(cpu,target)) {
+        count_batched(&owned_import_calls,&pending_owned_calls);
+        return 1;
+    }
+    if (!bbcpu_is_guest_code_span(target,6)) return 0;
     const uint8_t *code = (const uint8_t *)(uintptr_t)target;
     if (code[0] != 0xff || code[1] != 0x25) return 0;
     int32_t disp;
@@ -406,10 +411,11 @@ static void *report(void *unused) {
         const uint64_t runs = __atomic_load_n(&translated_runs, __ATOMIC_RELAXED);
         if (now != last)
             printf("Recompiled: %.0f calls/s; %.0f/s into the translator, %.0f/s straight to host imports, "
-                   "%llu longjmps to outer frames, frames up to %llu deep\n", (double)(now - last) / 10.0,
+                   "%llu longjmps to outer frames, frames up to %llu deep; %.0f/s owned HLE imports\n", (double)(now - last) / 10.0,
                    (double)(runs - last_runs) / 10.0, (double)(__atomic_exchange_n(&host_calls, 0, __ATOMIC_RELAXED)) / 10.0,
                    (unsigned long long)__atomic_load_n(&frame_jumps, __ATOMIC_RELAXED),
-                   (unsigned long long)__atomic_load_n(&deepest_frame, __ATOMIC_RELAXED));
+                   (unsigned long long)__atomic_load_n(&deepest_frame, __ATOMIC_RELAXED),
+                   (double)__atomic_exchange_n(&owned_import_calls,0,__ATOMIC_RELAXED)/10.0);
         last = now;
         last_runs = runs;
         if (count_targets()) {

@@ -1,6 +1,7 @@
 /* bbcpu interpreter: integer instructions, control flow and the guest -> host call bridge.
  * Vector and x87 instructions are in interp_vec.c and interp_x87.c. Flags are computed eagerly. */
 #include "cpu_internal.h"
+#include "bbcpu_import_fast.h"
 #include "trace.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -201,6 +202,10 @@ void bbcpu_set_trap_handler(int (*handler)(BbGuestRegs *regs)) {
 _Static_assert(sizeof(BbVec) == 32, "bbcpu_trap_state: ymm registers of 32 bytes");
 static _Thread_local BbCpu *trap_cpu;
 static int (*syscall_handler)(BbGuestRegs *);
+static int (*owned_import_resolver)(const BbGuestRegs*,BbOwnedImport*);
+void bbcpu_set_owned_import_resolver(int (*resolve)(const BbGuestRegs*,BbOwnedImport*)) {
+    owned_import_resolver = resolve; /* startup only, same owner as syscall_handler */
+}
 void bbcpu_set_syscall_handler(int (*handler)(BbGuestRegs *)) {
     /* Set once by the embedding before guest workers start. */
     syscall_handler = handler;
@@ -218,6 +223,35 @@ int bbcpu_trap_state(BbTrapState *state) {
     state->flags = &trap_cpu->flags;
     state->mxcsr = &trap_cpu->mxcsr;
     state->ymm = (uint8_t (*)[32])(void *)trap_cpu->v;
+    return 1;
+}
+
+static uint64_t dispatch_owned_syscall(BbCpu *cpu,uint64_t next) {
+    if (!syscall_handler) bbcpu_fatal(cpu,NULL,"syscall without an HLE handler");
+    BbGuestRegs regs;
+    memcpy(regs.r,cpu->r,sizeof(regs.r));regs.rip=next;
+    BbCpu *const outer=trap_cpu;trap_cpu=cpu;
+    const int handled=syscall_handler(&regs);
+    trap_cpu=outer;
+    if (!handled) bbcpu_fatal(cpu,NULL,"unhandled HLE syscall");
+    memcpy(cpu->r,regs.r,sizeof(regs.r));
+    bbcpu_finish_requested_stop(cpu); /* after every C++ HLE scope has returned */
+    return regs.rip;
+}
+
+int bbcpu_try_owned_import(BbCpu *cpu,uint64_t target) {
+    if (!owned_import_resolver) return 0;
+    BbGuestRegs entry;memcpy(entry.r,cpu->r,sizeof(entry.r));entry.rip=target;
+    BbOwnedImport found={0};
+    const int result=owned_import_resolver(&entry,&found);
+    if (!result) return 0; /* no state changed, original translator remains */
+    if (result<0||found.syscall_rip<2) bbcpu_fatal(cpu,NULL,"invalid owned HLE import");
+    cpu->r[R10]=cpu->r[RCX];cpu->r[RAX]=found.operation;
+    cpu->rip=found.syscall_rip-2; /* same state as the real syscall instruction */
+    cpu->rip=dispatch_owned_syscall(cpu,found.syscall_rip);
+    /* Exact trailing RET of the proven 16-byte veneer; same guest read and
+     * stack update as interpreter RET. Requested thread stops happen above. */
+    cpu->rip=bb_load(cpu->r[RSP],8);cpu->r[RSP]+=8;
     return 1;
 }
 
@@ -918,18 +952,7 @@ static uint64_t step(BbCpu *cpu, const BbInsn *in) {
         return target;
     }
     case M(SYSCALL): {
-        if (!syscall_handler) bbcpu_fatal(cpu, in, "syscall without an HLE handler");
-        BbGuestRegs regs;
-        memcpy(regs.r, cpu->r, sizeof(regs.r));
-        regs.rip = next;
-        BbCpu *const outer = trap_cpu;
-        trap_cpu = cpu;
-        const int handled = syscall_handler(&regs);
-        trap_cpu = outer;
-        if (!handled) bbcpu_fatal(cpu, in, "unhandled HLE syscall");
-        memcpy(cpu->r, regs.r, sizeof(regs.r));
-        bbcpu_finish_requested_stop(cpu);
-        return regs.rip;
+        return dispatch_owned_syscall(cpu,next);
     }
     case M(INT3): {
         if (!trap_handler_count) bbcpu_fatal(cpu, in, "int3 without a trap handler");

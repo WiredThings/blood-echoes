@@ -4,7 +4,7 @@ from pathlib import Path
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--probe',type=Path,required=True);a=p.parse_args()
-    for mode in ('--raw-host','--unmapped-host','--unowned-syscall','--bad-pointer','--wrong-operation','--invalidate'):
+    for mode in ('--raw-host','--unmapped-host','--unowned-syscall','--bad-pointer','--wrong-operation','--invalidate','--bad-slot'):
         result=subprocess.run([str(a.probe.resolve(strict=True)),mode],capture_output=True,text=True,timeout=15)
         assert result.returncode==74,(mode,result.returncode,result.stdout,result.stderr)
         assert 'STOP: bbcpu:'in result.stderr,(mode,result.stderr)

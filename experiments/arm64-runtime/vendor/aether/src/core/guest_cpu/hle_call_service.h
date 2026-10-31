@@ -21,6 +21,11 @@ public:
                 ExecutableRangeQuery=nullptr,void* =nullptr,const char* ="CPU_HLE");
  HleDispatchResult Invoke(HleCallFrame&);
  std::optional<GuestExecutionRange> QueryExecutableRange(std::uintptr_t);
+ // Read-only import-slot admission uses the original authoritative guest
+ // validator, not a borrowed host range or a new memory authority.
+ bool ValidateGuestMemory(std::uintptr_t p,std::size_t n,bool write=false)const {
+  return p&&n&&p<=UINTPTR_MAX-n&&validator&&validator(validator_context,p,n,write);
+ }
 private:
  struct HostRange {std::uintptr_t begin{},end{};bool writable{};};
  static bool ValidateRange(void*,std::uintptr_t,std::size_t,bool);
