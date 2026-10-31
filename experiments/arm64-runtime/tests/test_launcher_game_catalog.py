@@ -207,7 +207,10 @@ class AutomaticCatalogue(unittest.TestCase):
         self.assertEqual(embedded['offset_domain'], 'reconstructed-elf-bytes')
         self.assertFalse(embedded['compressed_segments_not_decoded'])
         gaps = [json.loads(line) for line in (output / 'gaps.jsonl').read_text().splitlines()]
-        self.assertTrue(any(row['kind'] == 'dynamic-compile-input-required' for row in gaps))
+        compute_gaps = [row for row in gaps if row['kind'] == 'unresolved-compile-inputs']
+        self.assertTrue(compute_gaps)
+        self.assertTrue(all(row['pipeline_missing'] == ['complete-compute-specialization']
+                            and not row['dynamic_requirement_proven'] for row in compute_gaps))
         self.assertEqual(result, catalog.read_ready(output, 'd' * 64))
         self.assertEqual(sources, catalog.source_inventory(self.game))
 

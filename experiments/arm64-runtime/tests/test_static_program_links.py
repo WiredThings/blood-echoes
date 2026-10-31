@@ -68,5 +68,43 @@ class Links(unittest.TestCase):
   with tempfile.TemporaryDirectory()as d:
    p=Path(d).resolve();(p/'real').write_text('{}');(p/'link').symlink_to(p/'real')
    with self.assertRaisesRegex(ValueError,'canonical regular'):links.read_json(p/'link')
+ def dependency(self,h):
+  records,_,_=self.run_headers([h]);return links.compile_dependencies(records[0])
+ def test_compute_dependency_does_not_require_graphics_state(self):
+  d=self.dependency(header(4));self.assertEqual(d['pipeline_missing'],['complete-compute-specialization'])
+  self.assertIn('effective-workgroup-and-LDS-state',d['module_missing'])
+  self.assertFalse(d['static_compilation_ready']);self.assertFalse(d['dynamic_requirement_proven'])
+ def test_fragment_export_state_is_a_module_dependency(self):
+  d=self.dependency(header(2));self.assertIn('fragment-inputs-and-color-export-state',d['module_missing'])
+  self.assertEqual(d['pipeline_missing'],['complete-graphics-stage-set','complete-graphics-pipeline-state'])
+ def test_vertex_keeps_fetch_and_logical_stage_proofs(self):
+  d=self.dependency(header());self.assertIn('fetch-inputs-or-proven-absence',d['module_missing'])
+  self.assertIn('effective-logical-stage',d['module_missing'])
+ def test_export_local_and_hull_have_stage_specific_requirements(self):
+  for stage in (5,6):
+   d=self.dependency(header(stage));self.assertIn('fetch-inputs-or-proven-absence',d['module_missing'])
+   self.assertIn('effective-logical-stage',d['module_missing'])
+  self.assertIn('effective-tessellation-state',self.dependency(header(7))['module_missing'])
+ def test_geometry_copy_evidence_does_not_authorize_compilation(self):
+  records,_,_=self.geometry();d=links.compile_dependencies(next(r for r in records if r['identity']['hardware_stage']=='geometry'))
+  self.assertIn('owned-GS-copy-and-runtime-geometry-state',d['module_missing']);self.assertFalse(d['static_compilation_ready'])
+ def test_empty_usage_is_not_a_no_resource_read_proof(self):
+  h=header();h['input_usage']=[];h['usage_count']=0;h['uses_srt']=False;d=self.dependency(h)
+  self.assertIn('instruction-access-not-proven',d['variants'][0]['resource_evidence'])
+  self.assertIn('complete-resource-specialization',d['module_missing'])
+  self.assertFalse(d['variants'][0]['file_defaults_authorize_effective_runtime'])
+ def test_srt_declaration_is_preserved_even_without_usage_rows(self):
+  h=header();h['input_usage']=[];h['usage_count']=0;h['uses_srt']=True
+  self.assertEqual(self.dependency(h)['variants'][0]['resource_evidence'],'SRT-declared')
+ def test_dependency_variants_remain_separate_and_input_is_unchanged(self):
+  a=header();b=copy.deepcopy(a);b['registers']['rsrc2']^=2;b['runtime_property_defaults']=gnm.properties(b['registers'])
+  records,_,_=self.run_headers([a,b]);before=copy.deepcopy(records[0]);d=links.compile_dependencies(records[0])
+  self.assertEqual(records[0],before);self.assertEqual(len(d['variants']),2)
+  self.assertEqual({v['header_variant']for v in d['variants']},{v['id']for v in before['variants']})
+ def test_dependency_rejects_unknown_stage_and_bad_variant_digest(self):
+  records,_,_=self.run_headers([header()]);r=records[0];r['identity']['hardware_stage']='invented'
+  with self.assertRaisesRegex(ValueError,'hardware stage'):links.compile_dependencies(r)
+  r['identity']['hardware_stage']='vertex';r['variants'][0]['id']='not-a-digest'
+  with self.assertRaisesRegex(ValueError,'variant identity'):links.compile_dependencies(r)
 
 if __name__=='__main__':unittest.main(verbosity=2)

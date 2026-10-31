@@ -6,7 +6,7 @@ compilation. A static program identity is explicitly NOT a complete PSO recipe.
 The child process releases its temporary decompression/index memory before play.
 """
 from pathlib import Path
-import argparse, ast, hashlib, json, os, signal, stat, subprocess, sys, tempfile, time
+import argparse, ast, collections, hashlib, json, os, signal, stat, subprocess, sys, tempfile, time
 
 SCHEMA = 1
 MAX_FILES = 100000
@@ -289,9 +289,10 @@ def _build_static(*, game_root, source_root, output, identity, source_files,sour
         with (output / 'static-program-index.jsonl').open('x') as stream:
             for row in records:
                 gnm.write_row(stream, row)
-                gnm.write_row(gaps, dict(kind='dynamic-compile-input-required', identity=row['identity'],
-                    missing=['draw-adjusted-runtime-info', 'resource-specializations', 'complete-pipeline-state'],
-                    capture='normal-runtime-owned-input', inferred=False))
+                gnm.write_row(gaps, links.compile_dependencies(row))
+        summary['compile_dependency_stage_counts'] = dict(collections.Counter(
+            row['identity']['hardware_stage'] for row in records))
+        summary['dynamic_requirement_proven'] = False
     full = output / 'resources'; full.mkdir(mode=0o700)
     scanner = Scanner(root, catalog_path, full, TOOLS.parent,products=products,source_files=source_files)
     try:

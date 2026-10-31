@@ -140,6 +140,52 @@ def collect(headers,catalog,runtime_header):
  summary=dict(schema=1,metadata_estimated_bytes=estimated_bytes,metadata_estimate_budget_bytes=256*1024*1024,header_references=reference_count,program_identities=len(records),header_variants=variant_count,hashes_with_multiple_codes=sum(len(v)>1 for v in by_hash.values()),program_stage_pairs=len(by_stage),stage_pairs_with_multiple_codes=sum(len(v)>1 for v in by_stage.values()),source_entries=len(entry_stages),native_hardware_stage_values=stages,full_pso_recipes=0,qualification='Exact static code/header identity and default facts; no complete runtime specialization or stage-pass pairing inferred')
  return records,entry_stages,summary
 
+def compile_dependencies(record):
+ """Describe missing compiler inputs; this is not a compile recipe or admission.
+
+ Header defaults are evidence, not effective draw/dispatch state. In particular,
+ an empty GNM usage table is not an instruction-level resource-read proof.
+ Keep each header variant separate rather than creating a synthetic combination.
+ """
+ stage=record['identity']['hardware_stage']
+ need(stage in gnm.STAGES.values(),'dependency hardware stage')
+ variants=record['variants'];need(0<len(variants)<=MAX_VARIANTS,'dependency variant budget')
+ module=['effective-runtime-info','target-profile-and-compile-options',
+         'complete-resource-specialization','binding-start-state']
+ if stage in ('vertex','export','local'):
+  module+=['effective-logical-stage','fetch-inputs-or-proven-absence']
+ elif stage=='geometry':
+  module+=['owned-GS-copy-and-runtime-geometry-state']
+ elif stage=='hull':
+  module+=['effective-tessellation-state']
+ elif stage=='fragment':
+  # Fragment module generation itself uses color export/input/sample state;
+  # those fields cannot all be deferred to final Metal PSO creation.
+  module+=['fragment-inputs-and-color-export-state']
+ else:
+  module+=['effective-workgroup-and-LDS-state']
+ pipeline=(['complete-compute-specialization']if stage=='compute'else
+           ['complete-graphics-stage-set','complete-graphics-pipeline-state'])
+ items=[]
+ for variant in variants:
+  facts=variant['facts']
+  need(isinstance(variant['id'],str)and HEX64.fullmatch(variant['id']),
+       'dependency header variant identity')
+  usage=facts['input_usage'];need(facts['usage_count']==len(usage),'dependency usage count')
+  srt=facts['uses_srt'];need(type(srt)is bool,'dependency SRT flag')
+  items.append(dict(header_variant=variant['id'],
+      resource_evidence='SRT-declared'if srt else'usage-declared'if usage else
+                        'no-header-declarations; instruction-access-not-proven',
+      declared_usage_count=len(usage),
+      file_defaults_authorize_effective_runtime=False,
+      unresolved_static_evidence=[name for name in facts.get('uninterpreted_fields',[])
+          if facts.get(name)],
+      evidence_authority='exact header variant in static-program-index; not merged'))
+ return dict(schema=1,kind='unresolved-compile-inputs',identity=record['identity'],
+     module_missing=module,pipeline_missing=pipeline,variants=items,
+     static_compilation_ready=False,dynamic_requirement_proven=False,
+     capture='normal-runtime-owned-input',inferred=False)
+
 def resolve(records,program_hash,hardware_stage,code_sha256=None):
  """A lookup can disambiguate only from actual hardware stage, never SwStage."""
  values=[r for r in records if r['identity']['program_hash']==program_hash and r['identity']['hardware_stage']==hardware_stage and(code_sha256 is None or r['identity']['code_sha256']==code_sha256)]
