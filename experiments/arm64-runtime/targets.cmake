@@ -369,6 +369,7 @@ add_custom_command(OUTPUT ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANI
   ${BB_ARM64_PROTOTYPE_DIR}/targets.cmake ${CMAKE_BINARY_DIR}/CMakeCache.txt
   ${BB_ARM_GPU_LIBRARY}
   ${BB_ARM64_PROTOTYPE_DIR}/tools/make_cpu_cache_build.py
+  ${BB_ARM64_PROTOTYPE_DIR}/tools/archive_identity.py
  VERBATIM COMMAND_EXPAND_LISTS)
 add_custom_target(bb_cpu_cache_build_identity DEPENDS ${BB_CPU_CACHE_BUILD_HEADER} ${BB_CPU_CACHE_BUILD_MANIFEST})
 add_dependencies(bb-game-arm64 bb_cpu_cache_build_identity)

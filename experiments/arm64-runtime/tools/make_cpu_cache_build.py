@@ -2,6 +2,7 @@
 """Bind the shared compiled translator/bridge into both CPU-cache executables."""
 from pathlib import Path
 import argparse,hashlib,json,os,stat,struct,tempfile
+from archive_identity import digests
 P=Path(__file__).resolve().parents[1]
 def need(value,why):
  if not value:raise ValueError(why)
@@ -10,17 +11,19 @@ def directory(path):
  need(path==path.resolve(strict=True)and stat.S_ISDIR(info.st_mode)and info.st_uid==os.getuid(),'owned canonical build/source directory required')
  return path
 def stamp(info):return(info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_uid)
-def digest_file(path,roots=None):
+def digest_pair(path,roots=None):
  path=Path(path).absolute();roots=roots or(P,)
  need(path==path.resolve(strict=True)and any(path.is_relative_to(root)for root in roots),'build identity input escaped declared roots or is linked')
  before=path.lstat();need(stat.S_ISREG(before.st_mode)and before.st_uid==os.getuid()and 0<before.st_size<=64*1024*1024,'owned bounded regular build identity input required')
  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
  with os.fdopen(fd,'rb')as stream:
   need(stamp(os.fstat(stream.fileno()))==stamp(before),'build identity input changed before open')
-  digest=hashlib.file_digest(stream,'sha256').hexdigest()
+  raw,content,count=digests(stream,64*1024*1024)
+  need(count==before.st_size,'build identity input extent changed')
   need(stamp(os.fstat(stream.fileno()))==stamp(before),'build identity input changed while reading')
  need(path==path.resolve(strict=True)and stamp(path.lstat())==stamp(before),'build identity path changed while reading')
- return digest
+ return raw,content
+def digest_file(path,roots=None):return digest_pair(path,roots)[0]
 def output_path(path,build):
  path=Path(path).absolute()
  need(path.is_relative_to(build)and path!=build and path.parent==path.parent.resolve(),'identity output must stay inside the independent build root')
@@ -50,16 +53,18 @@ def main():
  ap.add_argument('--source-root',type=Path,default=P);ap.add_argument('--build-root',type=Path);ap.add_argument('--renderer-root',type=Path);a=ap.parse_args()
  source=directory(a.source_root);build=directory(a.build_root or source);renderer=directory(a.renderer_root or source);roots=tuple(dict.fromkeys((source,build,renderer)))
  output_path(a.header,build);output_path(a.manifest,build)
- def parts(args,required=True):
+ raw_parts={}
+ def parts(args,domain,required=True):
   out={}
   for row in args:
    label,path=row.split('=',1);need(label and label.isascii()and label not in out,'unique ASCII build identity label required')
-   out[label]=digest_file(Path(path),roots)
+   raw,content=digest_pair(Path(path),roots);out[label]=content if required else raw;raw_parts.setdefault(domain,{})[label]=raw
   if required:
-   need(out,'build identity parts required');out['builder-source']=digest_file(Path(__file__),roots)
+   need(out,'build identity parts required');out['builder-source']=digest_file(Path(__file__),roots);out['archive-normalizer-source']=digest_file(Path(__file__).with_name('archive_identity.py'),roots)
   return out
- runtime,bridge=parts(a.runtime_part),parts(a.bridge_part)
- report=dict(schema=2,runtime_parts=runtime,bridge_parts=bridge,provenance_parts=parts(a.provenance_part,False),runtime_build=combine('BE-common-runtime-build-v1',runtime),bridge_build=combine('BE-common-bridge-build-v1',bridge),source_root=str(source),build_root=str(build),renderer_root=str(renderer))
+ runtime,bridge=parts(a.runtime_part,'runtime'),parts(a.bridge_part,'bridge')
+ provenance=parts(a.provenance_part,'provenance',False)
+ report=dict(schema=2,runtime_parts=runtime,bridge_parts=bridge,provenance_parts=provenance,raw_input_sha256=raw_parts,archive_normalization='complete-members-v1; only ar date/uid/gid excluded',runtime_build=combine('BE-common-runtime-build-v1',runtime),bridge_build=combine('BE-common-bridge-build-v1',bridge),source_root=str(source),build_root=str(build),renderer_root=str(renderer))
  def literal(hex):return ','.join('0x'+hex[i:i+2]for i in range(0,len(hex),2))
  header='// Generated from actual linked archives and frontend/bridge inputs; do not edit.\n#pragma once\n#include "bb_cpu_cache_identity.h"\nnamespace BbCacheBuild {\n'
  header+='inline constexpr BbCpuCache::Digest Runtime={'+literal(report['runtime_build'])+'};\n'
