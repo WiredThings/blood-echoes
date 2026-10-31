@@ -689,6 +689,8 @@ void Presenter::Present(VideoCore::PresentFrame* present_frame, bool is_reusing_
             const unsigned timing_index=BbSubmitTiming::Begin(timing_frame);
             const double timing_commit=timing_index<BbSubmitTiming::Capacity ? CACurrentMediaTime() : 0;
             const auto timing_queue=reinterpret_cast<std::uintptr_t>(this);
+            const auto latency_token = BbPresentLatency::Enabled() ? BbPresentLatency::current_token : 0;
+            const auto latency_submitted = BbPresentLatency::Enabled() ? BbPresentLatency::Now() : 0;
             [cmdbuf addCompletedHandler:^(id<MTLCommandBuffer> completed) {
                 if (completed.status == MTLCommandBufferStatusError) {
                     LOG_ERROR(Render, "Metal present command buffer failed: {}",
@@ -701,17 +703,14 @@ void Presenter::Present(VideoCore::PresentFrame* present_frame, bool is_reusing_
                 if (pending->fetch_sub(1, std::memory_order_acq_rel) == 1) {
                     release_frame();
                 }
+                // Diagnostic work must finish before the original destruction fence.
+                if (latency_submitted) {
+                    BbPresentLatency::Interval("submit-to-completion", latency_token,
+                                               latency_submitted, BbPresentLatency::Now());
+                }
                 // Last: the destructor waits for this.
                 presents_in_flight.fetch_sub(1, std::memory_order_acq_rel);
             }];
-            if (BbPresentLatency::Enabled()) {
-                const auto token = BbPresentLatency::current_token;
-                const auto submitted = BbPresentLatency::Now();
-                [cmdbuf addCompletedHandler:^(id<MTLCommandBuffer> completed) {
-                    BbPresentLatency::Interval("submit-to-completion", token, submitted,
-                                               BbPresentLatency::Now());
-                }];
-            }
             [cmdbuf commit];
         };
         if (interpolated_drawable) {
