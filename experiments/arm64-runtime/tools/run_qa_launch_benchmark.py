@@ -1,7 +1,8 @@
 """Guarded scene sampling from the original Swift launch receipt, not preferences.
 
 Only Continue is automated before a scene camera is observed. No exploration,
-combat, screenshots, profiling or changes to original data are performed.
+combat, screenshots or changes to original data are performed. The explicit
+CPU diagnostic modes are profiled and excluded from performance conclusions.
 """
 from pathlib import Path
 import argparse,collections,csv,hashlib,json,math,os,signal,stat,statistics,struct,subprocess,sys,time
@@ -386,6 +387,7 @@ def execution_environment(source,case,formal=None,*,functional_f3=False):
  env=dict(PATH='/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin',HOME=str(P/'state'),TMPDIR=str(case['data_root'])+'/',PYTHON=str(stage/'python/bin/python3'),PYTHONHOME=str(stage/'python'),PYTHONNOUSERSITE='1',PYTHONUNBUFFERED='1',**case['environment'])
  if formal is not None:env['BB_GPU_PROCESS']=str(formal['runtime']['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'])
  if env.get('BB_FRAME_STATS','0')=='1'or env.get('BB_SAVE_LOG','0')=='1':raise ValueError('unprofiled benchmark requires original heavy statistics off')
+ if env.get('BB_RECOMP_TARGETS','0')!='0':raise ValueError('original conditions must be free of bbcpu target diagnostics; use explicit diagnostic mode')
  if env.get('BB_AUDIO')!='none':raise ValueError('night QA requires original GUI audio=none')
  env.update(BB_PAD_FILE=str(case['pad']),BB_PAD_FILE_ONLY='1',BB_QUICKSAVE='0')
  if functional_f3:
@@ -393,10 +395,13 @@ def execution_environment(source,case,formal=None,*,functional_f3=False):
   env.update(BB_QUICKSAVE='1',BB_FRAME_STATS='1')
  return env
 
-def benchmark_changes(source,case,env,*,formal=None,functional_f3=False):
+def benchmark_changes(source,case,env,*,formal=None,functional_f3=False,bbcpu_diagnostic=False):
  changes={k:dict(before=source['environment'].get(k),after=env.get(k))for k in sorted(set(source['environment'])|{k for k in env if k.startswith(('BB_','MTL_'))})if source['environment'].get(k)!=env.get(k)}
  allowed=set(case['allowed_changes'])|{'BB_QUICKSAVE','BB_PAD_FILE_ONLY'}|({'BB_FRAME_STATS'}if functional_f3 else set())
  if formal is not None:allowed.add('BB_GPU_PROCESS')
+ if bbcpu_diagnostic:
+  if env.get('BB_CPU_BACKEND')!='bbcpu'or env.get('BB_RECOMP_TARGETS')!='1':raise ValueError('explicit bbcpu target diagnostic required')
+  allowed.add('BB_RECOMP_TARGETS')
  if set(changes)-allowed:raise ValueError('unapproved game setting override')
  return changes,sorted(allowed)
 
@@ -404,13 +409,20 @@ def selected_cache_mode(requested,formal_stage):
  if formal_stage is not None and requested not in(None,'empty'):raise ValueError('staged code comparison requires empty cache mode; QA shader cache import is forbidden')
  return 'empty'if formal_stage is not None else requested or'seeded'
 
-def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False,track_tool_memory=False):
+def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observer,policy,protection_start,functional_f3=False,track_tool_memory=False,bbcpu_diagnostic=False,fex_diagnostic=False):
  from qa_launch_clone import inventory_savedata
  from qa_f3_contract import F3Check,NewLogLines
  f3=F3Check()if functional_f3 else None
  selected_cpu_paths=cpu_paths(c,admitted=report.get('native_identity'))if f3 is not None else set()
  progress=None if functional_f3 else FrameProgress()
  fresh_logs=NewLogLines()if f3 is not None else None
+ diagnostic=None
+ if bbcpu_diagnostic or fex_diagnostic:
+  from qa_bbcpu_diagnostics import CpuSample
+  paths=cpu_paths(c,admitted=report.get('native_identity'))
+  backend=c['environment'].get('BB_CPU_BACKEND','fex')
+  if functional_f3 or(bbcpu_diagnostic and backend!='bbcpu')or(fex_diagnostic and backend!='fex'):raise ValueError('CPU diagnostic backend/role mismatch')
+  diagnostic=CpuSample(root,paths)
  before=observer.system()
  if before['locked']or before['pressure']==4:raise RuntimeError('locked or severe pressure before run')
  write(root/'result.json',report);print('Run:',root,flush=True)
@@ -479,6 +491,7 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
      if ready is None and(f3 is None or f3.phase=='entering')and last_frame_rows and elapsed>=12 and now-last_press>=4:
       input_('cross\n');pressed=True;last_press=now
       with(root/'actions.jsonl').open('a')as f:f.write(json.dumps(dict(action='cross',seconds=elapsed,reason='Continue before scene camera'))+'\n')
+    if diagnostic is not None and reason is None:diagnostic.observe(rows,elapsed,ready,observer)
     reason=reason or(('functional F3 completed'if f3.phase=='completed'else 'functional F3 time budget'if elapsed>=startup_seconds else None)if f3 is not None else(deadline(elapsed,ready,startup_seconds,scene_seconds)if ready is None else progress.completion_reason(elapsed,scene_seconds)))
     samples.append(s);sample_log.write(json.dumps(s,separators=(',',':'))+'\n');sample_log.flush()
     if reason:break
@@ -488,7 +501,11 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
   report['error']=str(error)[:512];reason=reason or 'driver exception';raise
  finally:
   measurement_end=time.monotonic()-started
-  input_('');stop();after=observer.system()
+  try:
+   if diagnostic is not None:report['cpu_diagnostic']=diagnostic.finish()
+  finally:
+   input_('');stop()
+  after=observer.system()
   source_same=inventory_savedata(c['user_root']/'savedata')==case['source_save_manifest']
   report.update(status=('functional-checked'if f3 is not None else'sampled')if reason in('scene sample completed','functional F3 completed')and source_same else'incomplete',stop=reason,process_exit=proc.returncode if proc else None,seconds=time.monotonic()-started,scene_ready=ready,before=before,after=after,peak_pressure=peak_pressure,swap_growth_mib=after['swap_mib']-before['swap_mib'],source_save_unchanged=source_same,memory_policy=MemoryPolicy.MANIFEST)
   if f3 is not None:report['functional_f3']={**vars(f3),'scripted_api_not_physical_key_test':True}
@@ -501,6 +518,9 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
    try:report['tool_memory']=tool_memory_summary(root/'samples.jsonl',ready)
    except(ValueError,KeyError,TypeError)as error:report.update(status='incomplete',tool_memory_error=str(error))
   report['qualification']=('Original normal Play and original offline F3 supervisor; isolated scripted quicksave/quickload API, not a physical keyboard test. No FPS/performance or full visual/network conclusion.'if f3 is not None else'Original Swift frozen conditions; Continue only. Scene camera is not full gameplay/visual/network/F3 acceptance. Telemetry has overhead; combined footprints may double-count shared memory. No matched old/new performance or sustained-memory conclusion.')
+  if diagnostic is not None:
+   report.update(performance_sample=False,profiler=True,qualification='CPU attribution only: stack sampling and optional bbcpu target counters perturb timing. Not an unprofiled FPS/memory comparison or full game acceptance.')
+   if not report['cpu_diagnostic'].get('complete'):report.update(status='incomplete',error='CPU diagnostic sample incomplete')
   if c.get('execution_code_admission')is not None:
    sealed=finish_app_seal(report,c['execution_code_admission']);report.clear();report.update(sealed)
   if frames.exists():os.replace(frames,root/'frames.csv')
@@ -508,9 +528,11 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
  return report
 
 def main():
- ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));code=ap.add_mutually_exclusive_group();code.add_argument('--formal-stage',type=Path);code.add_argument('--reference-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2,3),default=1);ap.add_argument('--functional-f3',action='store_true');a=ap.parse_args()
+ ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--receipt',type=Path,required=True);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--startup-seconds',type=int,default=1800);ap.add_argument('--scene-seconds',type=int,default=90);ap.add_argument('--cache-mode',choices=('seeded','empty'));code=ap.add_mutually_exclusive_group();code.add_argument('--formal-stage',type=Path);code.add_argument('--reference-stage',type=Path);ap.add_argument('--runs',type=int,choices=(1,2,3),default=1);ap.add_argument('--functional-f3',action='store_true');diagnostics=ap.add_mutually_exclusive_group();diagnostics.add_argument('--bbcpu-diagnostic',action='store_true');diagnostics.add_argument('--fex-diagnostic',action='store_true');a=ap.parse_args()
  assert 60<=a.startup_seconds<=1800 and 45<=a.scene_seconds<=180
  assert not a.functional_f3 or a.runs==1,'functional F3 is one supervised session'
+ diagnostic=a.bbcpu_diagnostic or a.fex_diagnostic
+ assert not diagnostic or(a.runs==1 and not a.functional_f3 and a.formal_stage is None and a.reference_stage is None),'CPU diagnostic is one isolated original-backend run'
  from qa_launch_conditions import load
  from qa_launch_clone import create
  c=load(a.receipt,stage=a.stage,project=P);require_no_games()
@@ -527,12 +549,17 @@ def main():
  tag=str(time.time_ns());root=P/'evidence'/('original-launch-benchmark-'+tag);root.mkdir(mode=0o700)
  case=create(c,cache_admission,project=P,tag=tag,cache_mode=a.cache_mode)
  env=execution_environment(c,case,code_admission,functional_f3=a.functional_f3)
- actual_changes,allowed_changes=benchmark_changes(c,case,env,formal=code_admission,functional_f3=a.functional_f3)
+ if a.bbcpu_diagnostic:
+  from qa_bbcpu_diagnostics import diagnostic_environment
+  env=diagnostic_environment(env)
+ if a.fex_diagnostic and env.get('BB_CPU_BACKEND','fex')!='fex':raise ValueError('FEX diagnostic requires selected FEX backend')
+ actual_changes,allowed_changes=benchmark_changes(c,case,env,formal=code_admission,functional_f3=a.functional_f3,bbcpu_diagnostic=a.bbcpu_diagnostic)
  command=[c['executable'],str(execution['stage']/c['arguments'][0])]+([]if a.functional_f3 else['--benchmark'])
  report=dict(schema=1,status='running',receipt_sha256=sha(a.receipt),launch_id=c['launch_id'],native_identity=native,original_shell_entry_preserved=True,original_benchmark_flag_added=True,benchmark_control_overrides=dict(BB_QUICKSAVE='0',BB_PAD_FILE_ONLY='1'),cache_mode=a.cache_mode,silent=True,screen_capture=False,Cua=False,profiler=False,scripted_actions=['Continue until real scene camera'],formal_data_modified=False,source_save_unchanged=False,settings_sha256=case['config_sha256'],startup_budget_seconds=a.startup_seconds,scene_seconds=a.scene_seconds,quality_or_effects_changed=False)
  if formal is not None:report.update(formal_native_identity=formal['identity'],execution_profile='staged-formal-bundle-isolated-CLI',source_QA_only_for_clone=True,cache_namespace_policy='empty-base-to-new-namespace-by-original-bootstrap')
  if reference is not None:report.update(reference_native_identity=reference['identity'],execution_profile='original-0.2.51-Rosetta-isolated-CLI',source_QA_only_for_clone=True,cache_namespace_policy='empty-isolated-root-original-reference-policy')
  if a.functional_f3:report.update(original_benchmark_flag_added=False,benchmark_control_overrides={'BB_FRAME_STATS':'1','BB_ARM_QA_PAD_FILE':'isolated existing native QA API'},performance_sample=False,functional_f3_requested=True,incremental_log_events=True,scripted_actions=['Continue before first scene','quicksave API','quickload API','automatic continue observed; no scripted Continue after F3'])
+ if diagnostic:report.update(performance_sample=False,profiler=True,diagnostic_flags={'BB_RECOMP_TARGETS':'1'}if a.bbcpu_diagnostic else{},diagnostic_only=True)
  write(root/'conditions.json',dict(command=command,cwd=str(execution['stage']),environment=env,source_receipt=str(a.receipt),data=str(case['data_root']),user=str(case['user_root']),cache=str(case['cache_root']),pad=str(case['pad']),allowed_changes=allowed_changes,actual_changes=actual_changes,cache_clone=case['cache_clone'],cpu_object_seed=case.get('cpu_object_seed')))
  write(root/'result.json',report);print('Evidence:',root,flush=True)
  protection_start=time.monotonic();policy=MemoryPolicy(before)
@@ -545,9 +572,9 @@ def main():
    row=dict(report,run=index+1,phase='initial'if index==0 else'warm',
        same_private_cache_and_user=index>0)
    result=sample(execution,case,env,command,row,run,startup_seconds=a.startup_seconds,
-       scene_seconds=a.scene_seconds,observer=observer,policy=policy,protection_start=protection_start,functional_f3=a.functional_f3)
+       scene_seconds=a.scene_seconds,observer=observer,policy=policy,protection_start=protection_start,functional_f3=a.functional_f3,bbcpu_diagnostic=a.bbcpu_diagnostic,fex_diagnostic=a.fex_diagnostic)
    reports.append(result)
-   write(root/'result.json',dict(schema=2,status=('functional-checked'if a.functional_f3 else'sampled')if all(r['status']in('sampled','functional-checked')for r in reports)and len(reports)==a.runs else'incomplete',runs=reports,formal_data_modified=False,memory_policy_continuous=True))
+   write(root/'result.json',dict(schema=2,status=('functional-checked'if a.functional_f3 else'sampled')if all(r['status']in('sampled','functional-checked')for r in reports)and len(reports)==a.runs else'incomplete',runs=reports,formal_data_modified=False,memory_policy_continuous=True,profiler=diagnostic,performance_sample=not diagnostic and not a.functional_f3))
    if result['status']not in('sampled','functional-checked'):raise SystemExit(1)
  finally:
   observer.close()
