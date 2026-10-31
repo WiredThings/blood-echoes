@@ -476,6 +476,10 @@ struct RenderList::Impl {
         return flag && flag[0] == '1';
     }();
     bool barrier_since_draw = false;
+    // Non-owning proof of the encoder that executed the last recording. A replay
+    // may become direct without ending that physical pass; a fresh pass must not
+    // inherit its coverage, even when no draw separated the two API modes.
+    void* last_replayed_encoder = nullptr;
     RenderList::BarrierCounts barriers{};
 
     // The redundancy filter (reset by the Begin* calls).
@@ -588,6 +592,7 @@ struct RenderList::Impl {
             return;
         }
         assert(mode == Mode::Recording);
+        last_replayed_encoder = nullptr; // new unpublished work cannot inherit a replay proof
         const u64 size = Pad8(sizeof(Header) + sizeof(Cmd) + extra_size);
         const size_t at = arena.size();
         arena.resize(at + size); // (zero fills the padding; capacity is kept across passes)
@@ -664,6 +669,7 @@ struct RenderList::Impl {
             at += header.size;
         }
         arena.clear();
+        last_replayed_encoder = (__bridge void*)enc;
     }
 };
 
@@ -678,6 +684,7 @@ void RenderList::BeginDirect(void* encoder) {
     impl->has_barrier = false;
     impl->consumed_clear_safe = false;
     impl->barrier_since_draw = false;
+    impl->last_replayed_encoder = nullptr;
     impl->barriers = {};
     impl->ResetFilter();
 }
@@ -689,14 +696,21 @@ void RenderList::BeginRecording() {
     impl->has_barrier = false;
     impl->consumed_clear_safe = false;
     impl->barrier_since_draw = false;
+    impl->last_replayed_encoder = nullptr;
     impl->barriers = {};
     impl->ResetFilter();
 }
 void RenderList::ContinueDirect(void* encoder) {
     assert(impl->mode==Impl::Mode::Recording && impl->arena.empty());
+    const bool same_encoder_coverage = encoder && impl->last_replayed_encoder==encoder &&
+                                       impl->barrier_since_draw;
     auto guard=std::move(impl->fragment_guard);
     const bool safe = impl->consumed_clear_safe;
     BeginDirect(encoder);
+    // Replay already applied exactly this global Buffers|Textures V|F barrier.
+    // Bindings perform no GPU accesses; every draw still clears this bit in
+    // Execute(). Do not retain counts: Scheduler captured the replay segment.
+    impl->barrier_since_draw = same_encoder_coverage;
     impl->consumed_clear_safe = safe;
     impl->fragment_guard=std::move(guard);
 }
@@ -710,6 +724,7 @@ void RenderList::TakeRecording(RenderList& into) {
     assert(impl->mode == Impl::Mode::Recording);
     assert(into.impl->mode == Impl::Mode::None && into.impl->arena.empty());
     into.impl->mode = Impl::Mode::Recording;
+    into.impl->last_replayed_encoder = impl->last_replayed_encoder = nullptr;
     into.impl->encoder = nil;
     into.impl->arena.swap(impl->arena); // (this list gets the other's capacity back)
     into.impl->has_barrier = impl->has_barrier;
@@ -723,6 +738,7 @@ void RenderList::End() {
     impl->mode = Impl::Mode::None;
     impl->encoder = nil;
     impl->arena.clear();
+    impl->last_replayed_encoder = nullptr;
 }
 
 bool RenderList::Recording() const noexcept {

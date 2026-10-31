@@ -4,11 +4,20 @@
 // steps (proxy write, native access, resolve) and the sequence of SetSize.
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "video_core/scene_targets_core.h"
+
+#ifdef BB_SCENE_PROXY_NEGATIVE_CONTROL
+// Mutant tests must reject an invalid policy without generating macOS crash
+// reports. This preserves every assertion condition, only its failure delivery.
+#undef assert
+#define assert(condition) ((condition) ? static_cast<void>(0) : \
+    (std::fprintf(stderr, "scene proxy assertion line %d: %s\n", __LINE__, #condition), std::_Exit(7)))
+#endif
 
 namespace {
 
@@ -35,7 +44,12 @@ public:
     std::unique_ptr<ProxyData> CreateProxy(const Image&, SceneSize size) override {
         calls.push_back("create " + std::to_string(size.width) + "x" + std::to_string(size.height));
         ++creates;
-        return std::make_unique<ProxyData>();
+        struct Probe final : ProxyData {
+            explicit Probe(std::shared_ptr<int> count_) : count{std::move(count_)} {}
+            ~Probe() override { ++*count; }
+            std::shared_ptr<int> count;
+        };
+        return std::make_unique<Probe>(destroyed);
     }
     void CopyProxy(Entry& entry, Image&, bool to_native) override {
         calls.push_back(std::string(to_native ? "resolve " : "fill ") +
@@ -43,6 +57,7 @@ public:
         ++(to_native ? resolves : fills);
         // The recursion guard: native accesses made by the copy itself are no-ops.
         assert(!Tracks(entry.uid));
+        assert(CollectUnavailable() == 0); // the copy/resolve owns its catalogue traversal
     }
     vk::ImageLayout Prepare(Entry&, const Image&, Use use) override {
         calls.push_back(use == Use::Attachment ? "prepare attachment" : "prepare sample");
@@ -59,6 +74,7 @@ public:
 
     bool format_supported = true, mips_supported = true;
     int creates = 0, fills = 0, resolves = 0;
+    std::shared_ptr<int> destroyed = std::make_shared<int>(0);
     std::vector<std::string> calls;
 };
 
@@ -282,6 +298,47 @@ void TestDiscardOverwrite() {
     std::printf("complete overwrite invalidation is mip-local ok\n");
 }
 
+void TestUnavailableSources() {
+    Fixture f;
+    const auto dead = f.Add(960, 540, 3);
+    const auto live = f.Add(1920, 1080);
+    auto& t = f.targets;
+    t.SetSize({960, 540}); t.Take();
+    ImageViewInfo view{}; vk::ImageLayout layout{};
+    for (u32 level = 0; level < 3; ++level) {
+        view.range.base.level = level;
+        t.BeginAttachment(dead, view, layout);
+    }
+    view.range.base.level = 0;
+    t.BeginAttachment(live, view, layout);
+    const auto dead_uid = f.images[dead.index]->image_uid;
+    const auto live_uid = f.images[live.index]->image_uid;
+    const auto generation = t.Generation();
+    t.Take();
+    assert(t.CollectUnavailable() == 0 && t.Generation() == generation);
+    assert(*t.destroyed == 0 && t.ProxyDirty(*f.images[live.index], 0));
+    assert(t.Take().empty()); // no fill, resolve, Finish or live-cache eviction
+    f.images[dead.index].reset();
+    assert(t.CollectUnavailable() == 3 && *t.destroyed == 3);
+    assert(t.Generation() == generation + 1 && !t.Tracks(dead_uid) && t.Tracks(live_uid));
+    assert(t.ProxyDirty(*f.images[live.index], 0) && t.Take().empty());
+    assert(!t.SetSize({960, 540}) && t.CollectUnavailable() == 0);
+    assert(t.Generation() == generation + 1);
+    // A surviving recent pointer must be re-created, not dereferenced after erase.
+    t.BeginAttachment(live, view, layout);
+    assert(Eq(t.Take(), {"prepare attachment"}));
+    t.NativeAccess(*f.images[live.index], false);
+    assert(Eq(t.Take(), {"resolve 0"}));
+    // Simulate slot reuse even with a caller lookup that ignores uid. Collect
+    // verifies the actual UID too; the new image's proxy remains independent.
+    f.images[live.index]->image_uid = 999;
+    assert(t.CollectUnavailable() == 1 && !t.Tracks(live_uid));
+    t.BeginAttachment(live, view, layout);
+    assert(Eq(t.Take(), {"create 960x540", "fill 0", "prepare attachment"}));
+    assert(t.Tracks(999) && t.CollectUnavailable() == 0);
+    std::printf("unavailable proxies: exact UID, all mips, recent pointers and dirty-live preservation ok\n");
+}
+
 } // namespace
 
 int main() {
@@ -291,6 +348,7 @@ int main() {
     TestSetSizeAndMips();
     TestFullColorClear();
     TestDiscardOverwrite();
+    TestUnavailableSources();
     std::printf("scene-targets-core-test passed\n");
     return 0;
 }

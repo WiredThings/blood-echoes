@@ -13,6 +13,7 @@ set(BB_ARM64_RENDERER_LIBRARY "" CACHE FILEPATH "Normal GPU-side renderer artifa
 set(BB_ARM64_CPU_HOST_LIBRARY "" CACHE FILEPATH "Explicit CPU-side host artifact; distinct from GPU renderer")
 set(BB_ARM64_RENDERER_TARGET "bbgpu" CACHE STRING "Normal renderer CMake target")
 set(BB_ARM64_RENDERER_BUILD_JOBS "1" CACHE STRING "Bounded renderer build parallelism")
+option(BB_ARM64_BUILD_RENDERER "Build renderer dependency (disable only for an already configured, verified renderer artifact)" ON)
 if(BB_ARM64_RENDERER_BUILD_DIR)
  if(NOT IS_ABSOLUTE "${BB_ARM64_CPU_HOST_LIBRARY}")
   message(FATAL_ERROR "Declare the explicit CPU-side host artifact/candidate for this normal build")
@@ -268,10 +269,18 @@ target_link_libraries(test_cpu_disk_cache PRIVATE bb_fex_embedding)
 
 # Authored persistent cache using the actual syscall/HLE bridge source in the fixture TU.
 add_executable(test_cpu_bridge_disk_cache ${BB_ARM64_PROTOTYPE_DIR}/tests/test_cpu_bridge_disk_cache.cpp)
+add_executable(test_fex_prepared_disk ${BB_ARM64_PROTOTYPE_DIR}/tests/test_fex_prepared_disk.cpp)
+target_compile_definitions(test_fex_prepared_disk PRIVATE AETHER_ENGINE_SOURCE="${AETHER}/src/core/fex/fex_guest_engine.cpp")
+target_compile_options(test_fex_prepared_disk PRIVATE -UNDEBUG)
+target_link_libraries(test_fex_prepared_disk PRIVATE bb_fex_embedding)
 target_compile_definitions(test_cpu_bridge_disk_cache PRIVATE AETHER_ENGINE_SOURCE="${AETHER}/src/core/fex/fex_guest_engine.cpp")
 target_link_libraries(test_cpu_bridge_disk_cache PRIVATE bb_fex_embedding)
 
 add_executable(test_cpu_cache_identity ${BB_ARM64_PROTOTYPE_DIR}/tests/test_cpu_cache_identity.cpp)
+add_executable(test_fex_disk_format ${BB_ARM64_PROTOTYPE_DIR}/tests/test_fex_disk_format.cpp)
+target_include_directories(test_fex_disk_format PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src)
+target_compile_features(test_fex_disk_format PRIVATE cxx_std_20)
+target_compile_options(test_fex_disk_format PRIVATE -UNDEBUG)
 target_include_directories(test_cpu_cache_identity PRIVATE ${BB_ARM64_PROTOTYPE_DIR}/src)
 target_compile_features(test_cpu_cache_identity PRIVATE cxx_std_20)
 
@@ -396,7 +405,7 @@ target_compile_options(test_signal_audit PRIVATE -UNDEBUG)
 
 # Optional ordinary cross-build edge, never a historical compiler command table.
 # Configuring does not invoke this; only an explicit CPU target build does.
-if(BB_ARM64_RENDERER_BUILD_DIR)
+if(BB_ARM64_RENDERER_BUILD_DIR AND BB_ARM64_BUILD_RENDERER)
  if(NOT IS_ABSOLUTE "${BB_ARM64_RENDERER_BUILD_DIR}" OR
     NOT EXISTS "${BB_ARM64_RENDERER_BUILD_DIR}/CMakeCache.txt" OR
     NOT BB_ARM64_RENDERER_TARGET MATCHES "^[A-Za-z_][A-Za-z_0-9.-]*$" OR

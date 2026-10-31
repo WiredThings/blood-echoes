@@ -49,16 +49,17 @@
 #include "guest_module_info.h"
 #include "prepare_guest_module_info.h"
 #include "remote/bb_memory_mirror.h"
+#include "bbcpu_effective_export.h"
 #ifdef BB_CPU_BACKEND_BBCPU
 #include "bbcpu_backend.h"
 #include "bbcpu_static_admission.h"
 #include "bbcpu_static_patch_audit.h"
-#include "bbcpu_effective_export.h"
 #include "bbcpu.h"
 #else
 #include "core/guest_cpu/fex_guest_cpu.h"
 #include "core/guest_cpu/fex_hle_bridge.h"
 #include <FEXCore/Core/X86Enums.h>
+#include "fex_disk_io.h"
 #endif
 #include <mach/mach.h>
 #include <mach/mach_vm.h>
@@ -161,24 +162,20 @@ struct State {
 
 };
 State* active{};
-#ifdef BB_CPU_BACKEND_BBCPU
 std::vector<BbCpuImage::ResumeSite> cpu_resume_sites;
 void bbcpu_note_patch(uint64_t offset,size_t covered,const char* phase){
  check(active&&covered&&offset<=active->image_size&&covered<=active->image_size-offset&&cpu_resume_sites.size()<64,"CPU resume site outside actual startup patch plan");
  cpu_resume_sites.push_back({offset,covered,phase});
 }
-#endif
 bool graphics_enabled{};
 extern "C" void bbgpu_before_restart(void);
-#ifdef BB_CPU_BACKEND_BBCPU
 [[noreturn]] void finish_cpu_export(int status,const char* error=nullptr){
- if(error)std::fprintf(stderr,"BBCPU effective runtime export failed: %s\n",error);
+ if(error)std::fprintf(stderr,"CPU effective runtime preparation failed: %s\n",error);
  if(graphics_enabled)bbgpu_before_restart();
  active=nullptr;
- if(!status)std::puts("BBCPU effective runtime export complete; owned GPU reaped; no guest execution");
+ if(!status)std::puts("CPU effective runtime preparation complete; owned GPU reaped; no guest execution");
  std::fflush(nullptr);std::_Exit(status);
 }
-#endif
 thread_local bool guest_running{};
 thread_local unsigned callback_depth{};
 thread_local HleCallFrame* current_guest_frame{};
@@ -652,8 +649,13 @@ int game_main(int argc,char** argv){
 #ifndef BB_CPU_BACKEND_BBCPU
   const bool code_profile=getenv("BB_ARM_CPU_CODEMAP")&&std::string_view(getenv("BB_ARM_CPU_CODEMAP"))=="1";
   const char* cache_path=getenv("BB_ARM_CPU_CACHE");
-  const bool cache_identity=code_profile||(cache_path&&*cache_path)||(getenv("BB_ARM_CPU_CACHE_IDENTITY")&&std::string_view(getenv("BB_ARM_CPU_CACHE_IDENTITY"))=="1");
-  if(cache_identity){
+  const char* fex_directory=getenv("BB_FEX_CACHE_DIRECTORY");
+  const char* fex_export=getenv("BB_FEX_EXPORT_ROOT");
+  const char* fex_plan=getenv("BB_FEX_PREPARE_PLAN");
+  const bool prepared_identity=(fex_directory&&*fex_directory)||(fex_export&&*fex_export)||(fex_plan&&*fex_plan);
+  check(!prepared_identity||!bundled,"FEX disk preparation is isolated-development only");
+  const bool cache_identity=prepared_identity||code_profile||(cache_path&&*cache_path)||(getenv("BB_ARM_CPU_CACHE_IDENTITY")&&std::string_view(getenv("BB_ARM_CPU_CACHE_IDENTITY"))=="1");
+  if(cache_identity&&!prepared_identity){
    s.code_files=std::make_unique<BbStaticCode::Files>(b,image.at(),std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
   }
 #endif
@@ -724,14 +726,29 @@ int game_main(int argc,char** argv){
   static_patch_stage("game-menu");
 #endif
 #ifndef BB_CPU_BACKEND_BBCPU
+  // Unlike the old pre-hook profiling experiment, automatic preparation owns
+  // the ACTUAL final patched image. Fixed hook bytes are compiler input.
+  if(prepared_identity)s.code_files=std::make_unique<BbStaticCode::Files>(b,image.at(),std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
   if(s.code_files){
    s.code_files->Finalize(std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
    s.code_files->Report(runtime_work/"cpu-code-manifest.json");
-   if(code_profile)s.code_output=std::make_unique<CodeMapOutput>(runtime_work/("cpu-code-"+std::to_string(getpid())+".map"));
+   if(code_profile&&!fex_plan&&!fex_export){
+    fs::path captures=runtime_work;if(const char* selected=getenv("BB_FEX_CAPTURE_ROOT")){check(private_path(selected)&&!fs::is_symlink(selected),"FEX capture directory must stay private");captures=selected;}
+    s.code_output=std::make_unique<CodeMapOutput>(captures/("cpu-code-"+std::to_string(getpid())+".map"));
+    if(getenv("BB_FEX_CAPTURE_ROOT"))s.code_files->Report(captures/("cpu-code-"+std::to_string(getpid())+".json"));
+   }
    printf("ARM CPU CODEMAP static_bytes=%zu excluded_mutated_pages=%zu relocated_pages=%zu retained_hash_bytes=%zu; profiling only, JIT budget unchanged\n",s.code_files->EligibleBytes(),s.code_files->ModifiedPages(),s.code_files->RelocationPages(),s.code_files->RetainedHashBytes());
   }
 #endif
   runtime_quicksave_bind(image.ptr,b.size);
+#ifndef BB_CPU_BACKEND_BBCPU
+  if(fex_export)try{
+   const char* elf_path=getenv("BB_CPU_EXPORT_ELF");check(elf_path&&private_path(elf_path)&&private_path(fs::path(fex_export).parent_path()),"FEX export requires original private ELF");
+   auto raw=BbFexDisk::Read(elf_path,544u<<20);auto original=std::span(reinterpret_cast<const unsigned char*>(raw.data()),raw.size());auto layout=BbCpuImage::ReadLayout(original,b);
+   const auto summary=BbCpuImage::Export(fex_export,b,layout,image.ptr,original,BbStaticCode::Hex(BbStaticCode::SourceHash(boot)),BbStaticCode::Hex(BbCpuCache::Hash(raw)),cpu_resume_sites,"runtime-hooks-installed-v1",elf_path);
+   std::printf("FEX effective runtime export identity=%s resume_sites=%zu; no guest execution\n",summary.identity.c_str(),cpu_resume_sites.size());
+  }catch(const std::exception& e){finish_cpu_export(BB_ARM_EXIT_HLE_FAULT,e.what());}
+#endif
 #ifdef BB_CPU_BACKEND_BBCPU
   static_patch_stage("quicksave-binding");
   if(cpu_export)try{
@@ -821,12 +838,31 @@ int game_main(int argc,char** argv){
     BbCacheInputs::Append(modules,"online-module",std::string_view(reinterpret_cast<const char*>(digest.data()),digest.size()));
    }else BbCacheInputs::Append(modules,"online-module","disabled");
    key.module_set=BbCpuCache::Hash(modules);key.bridge_abi=BbCacheInputs::RegistryABI(BbCacheBuild::Bridge,s.registry,sizeof(HleCallFrame),alignof(HleCallFrame),s.veneers.LayoutName());
-   key.host_features=env.host_features;key.codegen_config=env.codegen_config;
+   key.host_features=env.host_features;key.codegen_config=env.codegen_config;key.ordering=env.software_tso?BbCpuCache::Identity::Ordering::Software:BbCpuCache::Identity::Ordering::Hardware;
    check(BbCpuCache::Valid(key),"cache identity incomplete");
    auto usage=s.cpu->InspectStartupCodeCache();check(std::holds_alternative<AetherPS4::Fex::StartupCpuCacheInfo>(usage),"startup JIT metadata unavailable");
    const auto budget=std::get<AetherPS4::Fex::StartupCpuCacheInfo>(usage).current_jit_bytes;
    std::ofstream metadata(runtime_work/"cpu-cache-environment.json");
-   metadata<<"{\"schema\":1,\"veneer_layout\":\""<<s.veneers.LayoutName()<<"\",\"runtime_build\":\""<<BbStaticCode::Hex(key.runtime_build)<<"\",\"bridge_build\":\""<<BbStaticCode::Hex(BbCacheBuild::Bridge)<<"\",\"patched_code\":\""<<BbStaticCode::Hex(key.patched_code)<<"\",\"module_set\":\""<<BbStaticCode::Hex(key.module_set)<<"\",\"bridge_abi\":\""<<BbStaticCode::Hex(key.bridge_abi)<<"\",\"host_features\":\""<<BbStaticCode::Hex(key.host_features)<<"\",\"codegen_config\":\""<<BbStaticCode::Hex(key.codegen_config)<<"\",\"software_tso\":"<<(env.software_tso?"true":"false")<<",\"normal_jit\":"<<(env.normal_jit?"true":"false")<<",\"initial_jit_bytes\":"<<budget<<"}\n";metadata.flush();check(bool(metadata),"cache environment report failed");
+   metadata<<"{\"schema\":1,\"veneer_layout\":\""<<s.veneers.LayoutName()<<"\",\"runtime_build\":\""<<BbStaticCode::Hex(key.runtime_build)<<"\",\"bridge_build\":\""<<BbStaticCode::Hex(BbCacheBuild::Bridge)<<"\",\"patched_code\":\""<<BbStaticCode::Hex(key.patched_code)<<"\",\"module_set\":\""<<BbStaticCode::Hex(key.module_set)<<"\",\"bridge_abi\":\""<<BbStaticCode::Hex(key.bridge_abi)<<"\",\"host_features\":\""<<BbStaticCode::Hex(key.host_features)<<"\",\"codegen_config\":\""<<BbStaticCode::Hex(key.codegen_config)<<"\",\"software_tso\":"<<(env.software_tso?"true":"false")<<",\"normal_jit\":"<<(env.normal_jit?"true":"false")<<",\"initial_jit_bytes\":"<<budget<<",\"key_sha256\":\""<<BbStaticCode::Hex(BbCpuCache::Key(key))<<"\"}\n";metadata.flush();check(bool(metadata),"cache environment report failed");
+   if(fex_export){
+    metadata.close();fs::copy_file(runtime_work/"cpu-cache-environment.json",fs::path(fex_export)/"cpu-cache-environment.json");
+    fs::copy_file(runtime_work/"cpu-code-manifest.json",fs::path(fex_export)/"cpu-code-manifest.json");finish_cpu_export(0);
+   }
+   if(fex_plan){
+    try{
+     check(private_path(fex_plan)&&fex_directory&&private_path(fex_directory),"FEX preparation requires private inputs/output");
+     const char* expected=getenv("BB_FEX_PREPARE_KEY");check(expected&&BbStaticCode::Hex(BbCpuCache::Key(key))==expected,"FEX generation actual input/config differs from exported identity");
+     std::vector<std::pair<uint64_t,uint64_t>> spans;for(auto r:s.code_files->Sections())spans.emplace_back(r.begin,r.end);
+     auto source=s.code_files->Query(image.at()+spans.front().first).value();
+     auto result=s.cpu->PrepareDiskDirectory(fex_plan,fex_directory,key,spans,image.at(),b.size,source.FileInfo);
+     check(std::holds_alternative<uint64_t>(result),"FEX native preparation failed; existing completed shards retained");finish_cpu_export(0);
+    }catch(const std::exception& e){finish_cpu_export(BB_ARM_EXIT_HLE_FAULT,e.what());}
+   }
+   if(fex_directory){
+    std::vector<std::pair<uint64_t,uint64_t>> spans;for(auto r:s.code_files->Sections())spans.emplace_back(r.begin,r.end);
+    auto result=s.cpu->InstallPreparedDirectory(fex_directory,key,spans,image.at(),b.size);
+    if(!std::holds_alternative<uint64_t>(result))std::fputs("FEX DISK not admitted; original JIT remains active\n",stderr);
+   }
    if(cache_path&&*cache_path){
     bool attempted=false;
     std::error_code cache_error;const auto canonical_cache=fs::canonical(cache_path,cache_error);

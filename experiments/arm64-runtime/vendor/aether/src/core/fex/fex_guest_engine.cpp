@@ -1,5 +1,7 @@
 #include "bb_cpu_cache_inputs.h"
 #include "bb_fex_eager_cache.h"
+#include "fex_disk_loader.h"
+#include "fex_disk_generate.h"
 #include "git_version.h"
 #include "bb_hardware_tso.h"
 #include "bb_stutter_audit.h"
@@ -757,6 +759,12 @@ private:
 
 class BridgeSyscallHandler final : public FEXCore::HLE::SyscallHandler {
 public:
+  std::unique_ptr<BbFexDisk::Loader> PreparedDisk;
+  uintptr_t TryLoadPreparedCode(FEXCore::Core::InternalThreadState* thread,uint64_t rip) override {
+    return PreparedDisk?PreparedDisk->Load(thread,rip):0;
+  }
+  uint64_t BeginPreparedCompilation()override{return PreparedDisk?BbFexDisk::Loader::Now():0;}
+  void EndPreparedCompilation(uint64_t start)override{if(PreparedDisk)PreparedDisk->EndCompilation(start);}
   struct InvocationState final {
     std::optional<EngineFailure> Failure;
     uint64_t Result {};
@@ -2099,6 +2107,13 @@ EngineResult<std::unique_ptr<GuestEngine>> GuestEngine::Create(GuestBridge& brid
   const auto configAcquire = FexConfigLease::Acquire();
   if (const auto* failure = std::get_if<EngineFailure>(&configAcquire)) return *failure;
   impl->ConfigInitialized = true;
+  if(std::getenv("BB_FEX_PREPARE_PLAN")){
+    // Preparation changes relocation collection, not the actual translator,
+    // guest ABI or memory-ordering policy. No guest is executed in this mode.
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLECODECACHINGWIP,"1");
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLELAZYCODECACHINGWIP,"0");
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLECODECACHEVALIDATION,"0");
+  }
   const auto fail = [&impl](EngineFailure original) -> EngineResult<std::unique_ptr<GuestEngine>> {
     const auto teardown = impl->Shutdown();
     if (const auto* error = std::get_if<EngineFailure>(&teardown)) return *error;
@@ -2359,6 +2374,29 @@ EngineResult<CpuCacheEnvironment> GuestEngine::CacheEnvironment(){
  std::scoped_lock lock{ImplState->ThreadsMutex};
  if(ImplState->StartupCacheClosed||!ImplState->Threads.empty())return Failure(EngineStage::Request,EBUSY);
  return CurrentCacheEnvironment(*static_cast<FEXCore::Context::ContextImpl*>(ImplState->Context.get()));
+}
+EngineResult<uint64_t> GuestEngine::InstallPreparedDirectory(const std::string& path,const BbCpuCache::Identity& identity,
+ std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t bytes){
+ if(!ImplState||!ImplState->Context)return Failure(EngineStage::Teardown,ESHUTDOWN);
+ std::scoped_lock lock{ImplState->ThreadsMutex};
+ if(ImplState->StartupCacheClosed||ImplState->StartupCache||ImplState->Syscalls->PreparedDisk||!ImplState->Threads.empty())return Failure(EngineStage::Request,EBUSY);
+ auto* ctx=static_cast<FEXCore::Context::ContextImpl*>(ImplState->Context.get());
+ if(ctx->GetCodeCache().EnableCodeCaching())return Failure(EngineStage::Request,EINVAL);
+ try{ImplState->Syscalls->PreparedDisk=std::make_unique<BbFexDisk::Loader>(path,identity,sections,base,bytes);return uint64_t(1);}
+ catch(const std::exception& e){std::fprintf(stderr,"FEX DISK admission refused: %s; own JIT retained\n",e.what());return Failure(EngineStage::Mapping,EINVAL);}
+}
+EngineResult<uint64_t> GuestEngine::PrepareDiskDirectory(const std::string& plan,const std::string& path,const BbCpuCache::Identity& identity,
+ std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t bytes,const FEXCore::ExecutableFileInfo& source){
+ if(!ImplState||!ImplState->Context)return Failure(EngineStage::Teardown,ESHUTDOWN);
+ std::scoped_lock lock{ImplState->ThreadsMutex};
+ if(ImplState->StartupCacheClosed||ImplState->StartupCache||!ImplState->Threads.empty())return Failure(EngineStage::Request,EBUSY);
+ auto* ctx=static_cast<FEXCore::Context::ContextImpl*>(ImplState->Context.get());
+ auto* thread=ctx->CreateThread(base,0,nullptr);
+ try{
+  CallRetStack ret;if(!ret.IsReserved()||std::holds_alternative<EngineFailure>(ret.MakeWritable()))throw std::runtime_error("FEX offline callret unavailable");ret.Initialize(thread);
+  GuestSegmentState segments;segments.Initialize(thread->CurrentFrame->State);
+  auto count=BbFexDisk::Generate(*ctx,thread,plan,path,identity,sections,base,bytes,source);ctx->DestroyThread(thread);return count;
+ }catch(const std::exception& e){ctx->DestroyThread(thread);std::fprintf(stderr,"FEX PREPARE failed: %s\n",e.what());return Failure(EngineStage::Mapping,EINVAL);}
 }
 uint64_t GuestEngine::StartupCacheResolutions() const {
  // Caller must retain the engine across this read; safe during normal execution.

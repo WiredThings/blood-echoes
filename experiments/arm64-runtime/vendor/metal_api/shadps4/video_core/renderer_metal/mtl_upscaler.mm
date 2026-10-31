@@ -565,6 +565,12 @@ std::array<u32, 2> Upscaler::VelocitySize() const {
 
 bool Upscaler::OnFrameStart() {
     if (velocity_mirror) velocity_mirror->FrameStart();
+    // DrawRecord reaches this between packets, before BindResources forks the
+    // next helper (the preceding draw already joined it). Retired source slots
+    // must not keep private proxies forever when the resolution is unchanged.
+    // Proxy/texture destruction uses the existing CurrentTick/completed-handler
+    // retirement; no Finish, new allocation, cache-budget change or dead writeback.
+    scene_targets.CollectUnavailable();
     if (impl->TakeCreated()) {
         failed = true;
     }

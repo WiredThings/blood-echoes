@@ -44,6 +44,10 @@ public:
         std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t image_base,uint64_t image_bytes,const FEXCore::ExecutableFileInfo& source);
     StartupCacheResult InspectStartupCodeCache();
     uint64_t StartupCacheResolutions() const;
+    std::variant<uint64_t,GuestExecutionFailure> InstallPreparedDirectory(const std::string& path,const BbCpuCache::Identity& identity,
+        std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t bytes);
+    std::variant<uint64_t,GuestExecutionFailure> PrepareDiskDirectory(const std::string& plan,const std::string& path,const BbCpuCache::Identity& identity,
+        std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t bytes,const FEXCore::ExecutableFileInfo& source);
     ThreadResult CreateThread(const GuestExecutionRequest& request);
     GuestExecutionResult Run(Thread& thread);
     GuestExecutionResult CallGuest(std::uintptr_t rip,

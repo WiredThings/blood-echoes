@@ -77,6 +77,12 @@ public:
     /// when the use `writes`, invalidates the proxy.
     void NativeAccess(Image&, bool writes);
     void ResolveAll();
+    /// Recording-thread boundary, with no concurrent binding helper. Drop only
+    /// proxies whose exact source UID no longer exists. Never evict a live
+    /// image, resolve into a dead source, wait, or release GPU resources early:
+    /// backend ProxyData/UniqueImage destruction retains the existing fence path.
+    /// Returns removed CPU catalogue entries, not freed/resident byte counts.
+    u64 CollectUnavailable();
     // Only a caller proving a full overwrite of this mip may discard its old contents.
     // Partial writes and read/modify/write accesses must continue through NativeAccess.
     bool DiscardNativeContents(Image&, u32 level);

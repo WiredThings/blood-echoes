@@ -80,7 +80,7 @@ def codegen_commands(source,generated,renderer):
     gpu+=['--renderer-source-root',renderer['source']]
     return [native,gpu]
 
-def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_build,runtime_root=PRIVATE_RUNTIME):
+def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_build,runtime_root=PRIVATE_RUNTIME,renderer_source_root=None):
     source=directory(source_root)
     # This literal only selects the unbundled development fallback compiled
     # into the binary. No source, generated file or dependency is read there.
@@ -92,7 +92,8 @@ def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_buil
     for path in(build,generated):need(path==path.resolve()and not path.is_relative_to(source),'independent nonlinked build/generated outputs required')
     need(generated!=build,'generated output must be distinct from build')
     prefixes=[directory(p)for p in dependency_prefixes];need(prefixes,'explicit dependency prefixes required')
-    renderer=renderer_inputs(source,renderer_build);need(build!=Path(renderer['build']),'separate CPU/renderer builds required')
+    renderer_source=directory(renderer_source_root or source)
+    renderer=renderer_inputs(renderer_source,renderer_build);need(build!=Path(renderer['build']),'separate CPU/renderer builds required')
     native,gpu=codegen_commands(source,generated,renderer)
     aether=source/'vendor/aether';harness=[aether/'src/core/fex/fex_guest_engine.cpp',aether/'src/core/guest_cpu/fex_guest_cpu.cpp',aether/'src/core/guest_cpu/hle_call_adapter.cpp',aether/'src/core/guest_cpu/fex_hle_bridge.cpp',aether/'runtime/probes/fexcore-guest-harness.cpp']
     command=[renderer['build_tools']['cmake']['path'],'-S',str(aether/'runtime/sources/fexcore-darwin'),'-B',str(build),'-G','Ninja','-DCMAKE_MAKE_PROGRAM='+renderer['build_tools']['ninja']['path'],'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_OSX_ARCHITECTURES=arm64','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_DISABLE_SOURCE_CHANGES=ON','-DCMAKE_PREFIX_PATH='+';'.join(map(str,prefixes)),'-DTUNE_CPU=none','-DBUILD_FEXCORE_ONLY=ON',
@@ -103,7 +104,7 @@ def plan(*,source_root,build_dir,generated_dir,dependency_prefixes,renderer_buil
     command+=['-DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE']
     if renderer['deployment_target']:command+=['-DCMAKE_OSX_DEPLOYMENT_TARGET='+renderer['deployment_target']]
     if renderer['sysroot']:command+=['-DCMAKE_OSX_SYSROOT='+renderer['sysroot']]
-    return dict(schema=1,source_root=str(source),build_dir=str(build),generated_dir=str(generated),runtime_root=str(runtime),renderer=renderer,generators=[native,gpu],configure=command,
+    return dict(schema=1,source_root=str(source),renderer_source_root=str(renderer_source),build_dir=str(build),generated_dir=str(generated),runtime_root=str(runtime),renderer=renderer,generators=[native,gpu],configure=command,
                 configure_ready=True,cpu_host=dict(status='same-normal-renderer-candidate',actual_load_and_native_ABI_validated=False,duplicate_host_objects_required=False),
                 runtime_tree_read_for_build=False,
                 clean_checkout_build_proven=False,ABI_validated=False,targets_built=False)
@@ -121,10 +122,11 @@ def prepare(value):
     query=Path(value['build_dir'])/'.cmake/api/v1/query';query.mkdir(parents=True,exist_ok=True);(query/'codemodel-v2').touch()
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source-root',type=Path,default=SOURCE)
+    p.add_argument('--renderer-source-root',type=Path)
     for n in('build-dir','generated-dir','renderer-build'):p.add_argument('--'+n,type=Path,required=True)
     p.add_argument('--dependency-prefix',type=Path,action='append',required=True);p.add_argument('--runtime-root',type=Path,default=PRIVATE_RUNTIME)
     g=p.add_mutually_exclusive_group();g.add_argument('--plan',action='store_true');g.add_argument('--prepare-only',action='store_true');a=p.parse_args()
-    value=plan(source_root=a.source_root,build_dir=a.build_dir,generated_dir=a.generated_dir,dependency_prefixes=a.dependency_prefix,renderer_build=a.renderer_build,runtime_root=a.runtime_root)
+    value=plan(source_root=a.source_root,build_dir=a.build_dir,generated_dir=a.generated_dir,dependency_prefixes=a.dependency_prefix,renderer_build=a.renderer_build,runtime_root=a.runtime_root,renderer_source_root=a.renderer_source_root)
     if not a.plan:
         prepare(value)
         if not a.prepare_only:subprocess.run(value['configure'],check=True)

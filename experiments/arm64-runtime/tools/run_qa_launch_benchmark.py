@@ -174,6 +174,13 @@ def admit(conditions):
   hosts=[role for role in cpu_component['runtime_dependencies']if Path(role).name=='libbbgpu.dylib']
   if len(hosts)!=1:raise ValueError('selected bbcpu needs one exact frozen host library')
   host_role=hosts[0]
+ elif(stage/'FEX-COMPONENT.json').is_file():
+  from fex_launch import component as fex_component
+  cpu_component,cpu_paths=fex_component(stage);cpu_role=cpu_component['cpu']['path']
+  if cpu_role not in runtime or runtime[cpu_role]!=cpu_paths['cpu']:raise ValueError('selected FEX host is not in admitted runtime roles')
+  hosts=[role for role in cpu_component['runtime_dependencies']if Path(role).name=='libbbgpu.dylib']
+  if len(hosts)!=1:raise ValueError('selected FEX needs one exact frozen host library')
+  host_role=hosts[0]
  cpu=resolve_gpu_identity(runtime[cpu_role],stage)
  if cpu['library']!=str(runtime[host_role])or cpu['library_sha256']!=hashes[host_role]:raise ValueError('CPU actual host differs')
  manifest=stage.parent/'ARM64-QA-MANIFEST.json';m=json.loads(manifest.read_text())

@@ -128,9 +128,7 @@ std::unique_ptr<Mapping> Install(State& state,Mapping& image,const Boot& boot,bo
  originals=plan.originals;
  state.ranges.push_back({mapping->at(),mapping->size,true,false});
  for(auto& patch:plan.patches){
-#ifdef BB_CPU_BACKEND_BBCPU
   bbcpu_note_patch(patch.offset,patch.bytes.size(),"resource-hooks");
-#endif
   memcpy(static_cast<B*>(image.ptr)+patch.offset,patch.bytes.data(),patch.bytes.size());
  }
  BbGuestHooks::ConfigureFexHooks(true);

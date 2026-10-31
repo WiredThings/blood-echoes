@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse,ast,hashlib,json,os,shutil,stat,time
 
 PRIVATE_PROJECT=Path('/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype')
-TOOLS=('bbcpu_launch.py','bbcpu_compile_schedule.py','image_preparation_products.py','code_registration.py','tool_environment_registration.py','recipe_preparation_schedule.py','resource_parse_products.py','compilation_domains.py','module_product_schedule.py','texture_binding_request.py','pso_startup_schedule.py','startup_change_journal.py','incremental_file_hashes.py','launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py','local_metal_builder.py',
+TOOLS=('fex_launch.py','cpu_code_map.py','bbcpu_resume_catalog.py','bbcpu_launch.py','bbcpu_compile_schedule.py','image_preparation_products.py','code_registration.py','tool_environment_registration.py','recipe_preparation_schedule.py','resource_parse_products.py','compilation_domains.py','module_product_schedule.py','texture_binding_request.py','pso_startup_schedule.py','startup_change_journal.py','incremental_file_hashes.py','launcher_fixed_helpers.py','launcher_local_aot.py','local_aot_policy.py','local_metal_builder.py',
        'warm_archive_manifest.py','gpu_candidate_identity.py','native_observer.py','native_vm_observer.py',
        'qa_memory_policy.py','qa_build_guard.py','paged_metal_requests.py',
        'launcher_game_pso.py','game_pso_component.py','game_pso_candidates.py',

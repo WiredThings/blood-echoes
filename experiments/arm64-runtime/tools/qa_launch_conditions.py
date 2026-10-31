@@ -121,9 +121,14 @@ def _source_qa_proof(reader,stage,project,manifest,parity,original,effective,ide
     need(native.get('schema')==1 and native.get('production')is True and native.get('game_runtime')=='fex-arm64','original normal source runtime required')
     base=native.get('frozen_runtime');base_roles=RUNTIME_FILES|{'bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal'}
     need(isinstance(base,dict)and set(base)==base_roles and base==manifest.get('original_current_runtime'),'exact current source runtime roles required')
+    fex_roles={}
+    if(stage/'FEX-COMPONENT.json').is_file():
+        from fex_launch import component as fex_component
+        fex,_=fex_component(stage);reader.json(stage/'FEX-COMPONENT.json')
+        fex_roles={row['path']:row['sha256']for row in(fex['cpu'],fex['scanner'],*fex.get('cpu_aliases',[]))};fex_roles.update(fex.get('runtime_dependencies',{}))
     for name,digest in base.items():
         reader.read(canonical(source/name,within=source),expected=digest,retain=False,limit=64*1024*1024)
-        reader.read(canonical(stage/name,within=stage),expected=digest,retain=False,limit=64*1024*1024)
+        reader.read(canonical(stage/name,within=stage),expected=fex_roles.get(name,digest),retain=False,limit=64*1024*1024)
     need(source_parity.get('original_sources')==original,'source-built original script identities differ')
     from prepare_local_aot_stage import projected_launcher_scripts
     source_run=reader.read(source/'run.sh').decode();source_log=reader.read(source/'tools/macos/run_optimized.sh').decode()
@@ -138,7 +143,7 @@ def _source_qa_proof(reader,stage,project,manifest,parity,original,effective,ide
     from bbcpu_launch import component
     cpu,paths=component(stage)
     reader.json(stage/'BBCPU-COMPONENT.json')
-    expected=dict(base);expected.update({row['path']:row['sha256']for key,row in cpu.items()if key in('cpu','preparer','scanner','generator','abi')});expected.update(cpu.get('runtime_dependencies',{}))
+    expected=dict(base);expected.update({row['path']:row['sha256']for key,row in cpu.items()if key in('cpu','preparer','scanner','generator','abi')});expected.update(cpu.get('runtime_dependencies',{}));expected.update(fex_roles)
     selected=reader.json(stage/'NATIVE-METAL.json')
     need(selected.get('frozen_runtime')==manifest.get('frozen_runtime')==expected,'independent CPU/native package roles differ')
     for name,digest in expected.items():reader.read(canonical(stage/name,within=stage),expected=digest,retain=False,limit=64*1024*1024)

@@ -285,7 +285,7 @@ int main(int argc, char **argv) {
     nfunctions = discover(&functions, nfunctions, argc > 3 ? argv[3] : NULL);
 
     char path[1024];
-    FILE *out_functions, *out_calls, *out_slots, *out_strings;
+    FILE *out_functions, *out_calls, *out_slots, *out_strings, *out_entries;
 #define OPEN(var, name)                                                                   \
     snprintf(path, sizeof(path), "%s/" name, argv[2]);                                    \
     if (!(var = fopen(path, "w"))) { perror(path); return 1; }
@@ -293,6 +293,8 @@ int main(int argc, char **argv) {
     OPEN(out_calls, "calls.tsv");
     OPEN(out_slots, "slots.tsv");
     OPEN(out_strings, "strings.tsv");
+    OPEN(out_entries, "entries.tsv");
+    fputs("address\tfunction\tkind\n", out_entries);
     fputs("address\tsize\tinstructions\tundecodable\n", out_functions);
     fputs("caller\tcallee\n", out_calls);
     fputs("caller\tslot\n", out_slots);
@@ -317,6 +319,15 @@ int main(int argc, char **argv) {
             const uint64_t next = fn.start + off + ins.length;
             const int is_call = ins.mnemonic == ZYDIS_MNEMONIC_CALL;
             const int is_jmp = ins.mnemonic == ZYDIS_MNEMONIC_JMP;
+            // Optional consumers can prepare FEX block/call-return entries
+            // using the SAME genuine decode, not invented function layouts.
+            const int control = is_call || is_jmp || ins.meta.category == ZYDIS_CATEGORY_COND_BR || ins.mnemonic == ZYDIS_MNEMONIC_SYSCALL;
+            if (control) {
+                if (next < fn.start + fn.size)
+                    fprintf(out_entries, "%#llx\t%#llx\tcontinuation\n", (unsigned long long)next, (unsigned long long)fn.start);
+                if (ins.operand_count_visible && ops[0].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && ops[0].imm.is_relative)
+                    fprintf(out_entries, "%#llx\t%#llx\tdirect-target\n", (unsigned long long)(next + ops[0].imm.value.s), (unsigned long long)fn.start);
+            }
             if ((is_call || is_jmp) && ins.operand_count_visible) {
                 const ZydisDecodedOperand *op = &ops[0];
                 if (op->type == ZYDIS_OPERAND_TYPE_IMMEDIATE && op->imm.is_relative) {
@@ -355,7 +366,7 @@ int main(int argc, char **argv) {
                 (unsigned long long)fn.size, (unsigned long long)instructions,
                 (unsigned long long)undecodable);
     }
-    fclose(out_functions); fclose(out_calls); fclose(out_slots); fclose(out_strings);
+    fclose(out_functions); fclose(out_calls); fclose(out_slots); fclose(out_strings); fclose(out_entries);
     printf("%u functions (%u from the unwind tables), %llu instructions, %llu direct calls, %llu string references\n",
            nfunctions, unwound, (unsigned long long)total_instructions, (unsigned long long)total_calls,
            (unsigned long long)total_strings);

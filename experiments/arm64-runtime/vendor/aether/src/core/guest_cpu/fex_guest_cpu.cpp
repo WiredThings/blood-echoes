@@ -71,6 +71,16 @@ FexGuestCpuBackend::StartupCacheResult FexGuestCpuBackend::InstallStartupCodeCac
  return std::get<AetherPS4::Fex::StartupCpuCacheInfo>(result);
 }
 uint64_t FexGuestCpuBackend::StartupCacheResolutions() const{return engine?engine->StartupCacheResolutions():0;}
+std::variant<uint64_t,GuestExecutionFailure> FexGuestCpuBackend::InstallPreparedDirectory(const std::string& path,const BbCpuCache::Identity& identity,
+ std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t bytes){
+ if(!engine)return GuestExecutionFailure{GuestExecutionStage::Teardown,ESHUTDOWN};auto result=engine->InstallPreparedDirectory(path,identity,sections,base,bytes);
+ if(auto* error=std::get_if<AetherPS4::Fex::EngineFailure>(&result))return ToGuestFailure(*error);return std::get<uint64_t>(result);
+}
+std::variant<uint64_t,GuestExecutionFailure> FexGuestCpuBackend::PrepareDiskDirectory(const std::string& plan,const std::string& path,const BbCpuCache::Identity& identity,
+ std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t bytes,const FEXCore::ExecutableFileInfo& source){
+ if(!engine)return GuestExecutionFailure{GuestExecutionStage::Teardown,ESHUTDOWN};auto result=engine->PrepareDiskDirectory(plan,path,identity,sections,base,bytes,source);
+ if(auto* error=std::get_if<AetherPS4::Fex::EngineFailure>(&result))return ToGuestFailure(*error);return std::get<uint64_t>(result);
+}
 FexGuestCpuBackend::StartupCacheResult FexGuestCpuBackend::InspectStartupCodeCache(){
  if(!engine)return GuestExecutionFailure{GuestExecutionStage::Teardown,ESHUTDOWN};auto result=engine->InspectStartupCodeCache();
  if(auto* error=std::get_if<AetherPS4::Fex::EngineFailure>(&result))return ToGuestFailure(*error);

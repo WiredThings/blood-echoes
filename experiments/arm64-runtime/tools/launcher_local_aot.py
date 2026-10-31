@@ -388,6 +388,10 @@ def main(argv=None, *, project=PROJECT, execution_root=None,runtime_profile=None
         from bbcpu_launch import prepare as prepare_cpu
         executable,env,cpu_report=prepare_cpu(executable,arguments,env,stage=execution_root,project=project)
         print('CPU local preparation: '+json.dumps(cpu_report,sort_keys=True),flush=True)
+    elif execution_root is not None and (Path(execution_root)/'FEX-COMPONENT.json').is_file():
+        from fex_launch import prepare as prepare_cpu
+        executable,env,cpu_report=prepare_cpu(executable,arguments,env,stage=execution_root,project=project)
+        print('CPU local preparation: '+json.dumps(cpu_report,sort_keys=True),flush=True)
     os.execve(executable, [executable, *arguments], env)
 
 

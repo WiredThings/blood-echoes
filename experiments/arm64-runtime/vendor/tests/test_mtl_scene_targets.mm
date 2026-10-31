@@ -558,6 +558,70 @@ static void TestLeanProxyViews(Fixture& f, vk::Format format, vk::Format integer
     Settle(f);
 }
 
+static void TestUnavailableProxyRetirement(Fixture& f) {
+    std::printf("unavailable proxy: pending GPU use, exact UID and completed retirement\n");
+    Settle(f);
+    const auto kind = unsigned(Metal::MemoryStats::Kind::SceneProxy);
+    const auto before = Metal::MemoryStats::Read()[kind];
+    World world{f};
+    SceneTargets targets{f.device, f.scheduler, f.runtime, world.Lookup()};
+    CHECK(targets.SetSize({960, 540}));
+    const auto image_id = world.Add(MakeInfo(vk::Format::eR8G8B8A8Unorm, 1920, 1080));
+    ImageViewInfo view{};
+    view.format = vk::Format::eR8G8B8A8Srgb;
+    view.range.extent.levels = view.range.extent.layers = 1;
+    __weak id<MTLTexture> base_weak = nil, view_weak = nil;
+    id<MTLBuffer> readback = [f.mtl newBufferWithLength:256 options:MTLResourceStorageModeShared];
+    CHECK(readback != nil);
+    const auto source_uid = world.Get(image_id).image_uid;
+    u64 charged = 0;
+    @autoreleasepool {
+        const auto target = targets.Attachment(image_id, view, true);
+        id<MTLTexture> native = TextureOf(target.view);
+        CHECK(native && native.pixelFormat == MTLPixelFormatRGBA8Unorm_sRGB);
+        base_weak = native.parentTexture ? native.parentTexture : native;
+        view_weak = native;
+        charged = Metal::MemoryStats::Read()[kind].bytes;
+        CHECK(charged > before.bytes);
+        auto pass = [MTLRenderPassDescriptor renderPassDescriptor];
+        pass.colorAttachments[0].texture = native;
+        pass.colorAttachments[0].loadAction = MTLLoadActionClear;
+        pass.colorAttachments[0].storeAction = MTLStoreActionStore;
+        pass.colorAttachments[0].clearColor = MTLClearColorMake(1, 0, 0, 1);
+        f.scheduler.RenderEncoder((__bridge const void*)pass);
+        f.scheduler.EndRendering();
+        f.scheduler.BlitEncoder(__func__);
+        const auto blit = f.scheduler.GetImpl().blit;
+        [blit copyFromTexture:native sourceSlice:0 sourceLevel:0
+                sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(1, 1, 1)
+                    toBuffer:readback destinationOffset:0 destinationBytesPerRow:256
+              destinationBytesPerImage:256];
+        const auto tick = f.scheduler.CurrentTick();
+        world.images[image_id.index].reset(); // exact source gone, GPU commands not submitted yet
+        CHECK(targets.CollectUnavailable() == 1 && !targets.Tracks(source_uid));
+        CHECK(f.scheduler.CurrentTick() == tick); // collection did not submit/wait
+    }
+    // Dropping CPU catalogue ownership must NOT release either native view or
+    // backing while an unretained command buffer still references them.
+    f.scheduler.PopPendingOperations();
+    CHECK(base_weak != nil && view_weak != nil);
+    CHECK(Metal::MemoryStats::Read()[kind].bytes == charged);
+    f.runtime.Finish();
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while ((base_weak || view_weak) && std::chrono::steady_clock::now() < deadline) {
+        f.scheduler.PopPendingOperations();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(base_weak == nil && view_weak == nil);
+    const auto after = Metal::MemoryStats::Read()[kind];
+    CHECK(after.bytes == before.bytes && after.objects == before.objects);
+    CHECK(after.released > before.released);
+    const auto* pixel = static_cast<const u8*>(readback.contents);
+    CHECK(pixel[0] == 255 && pixel[1] == 0 && pixel[2] == 0 && pixel[3] == 255);
+    std::printf("unavailable proxy unique native bytes released=%llu (not net resident RAM)\n",
+                (unsigned long long)(after.released - before.released));
+}
+
 static void TestLifetime(Fixture& f) {
     std::printf("lifetime\n");
     World world{f};
@@ -1288,6 +1352,7 @@ static void TestDirectCopyToNative(Fixture& f) {
 int main() {
     @autoreleasepool {
         Fixture f;
+        if(std::getenv("BB_TEST_RETIRED_PROXY_ONLY")) {TestUnavailableProxyRetirement(f);Settle(f);return failures?1:0;}
         if(std::getenv("BB_TEST_PROXY_TILING_ONLY")) {TestProxyTextureTiling(f);Settle(f);return failures?1:0;}
         TestProxyTextureTiling(f);
         if(std::getenv("BB_TEST_DIRECT_COPY_ONLY")) {TestDirectCopyToNative(f);Settle(f);return failures?1:0;}
@@ -1300,6 +1365,7 @@ int main() {
         TestDepthStencil(f);
         TestEligibility(f);
         TestLifetime(f);
+        TestUnavailableProxyRetirement(f);
         TestLeanProxyViews(f, vk::Format::eR8G8B8A8Unorm, vk::Format::eR8G8B8A8Uint, 4);
         TestLeanProxyViews(f, vk::Format::eR16G16B16A16Sfloat, vk::Format::eR16G16B16A16Uint, 8);
         TestFullColorClear(f);

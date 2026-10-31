@@ -404,3 +404,12 @@ to validate the actual full-build library. Prepared local dependencies are requi
 2026-10-26追加：十四类平铺Metal源码库现已接到隔离ARM64版默认首启准备，和原八类固定最终PSO分别验收。56项逐类失败反例及冷/暖/稳定暖三轮通过；稳定暖424项首遍strict、约141秒进入场景。正式应用与Release未变，未声称旧新FPS或内存收益。见[十四类库默认准备与冷暖验证](docs/tiling-default-startup.zh-CN.md)。
 
 最新输入收口：见 [真实 GCN 重新翻译](docs/game-module-retranslation.zh-CN.md)、[完整候选输入](docs/pipeline-input-completion.zh-CN.md)、[fetch 缺口](docs/vertex-fetch-inputs.zh-CN.md) 与 [上下文接口](docs/context-interfaces-integration.zh-CN.md)。源码和短测试先完成；整包性能、内存和功能统一收尾，正式版未更新。
+
+
+## 2026-10-31 自动 CPU 准备与并行 Metal 审查
+
+FEX 自动磁盘准备复用原启动器、实际补丁后映像、既有 scanner/FEX 编译器和原 JIT 内存/失效路径；源代码与定向测试已接入，真实游戏对照仍待完成。第一轮实际扫描 2,633,548 个入口暴露 writer/reader 百万条预算不一致，现已统一并补百万条以上正例。已有产物保留，不以该次失败轮宣称游戏可用或性能提升。见 [FEX 流程、磁盘/内存代价和验证边界](docs/fex-disk-preparation-20261031.zh-CN.md)。
+
+两个 subagent 的窄候选已统一审阅：0088 保留同 encoder 屏障覆盖，0089 按真实源 UID 失效回收独立 scene proxy，沿原 command-buffer retirement 释放，未缩缓存。CPU控制与短 GPU 像素/弱引用测试通过；完整新 renderer 的 scene-targets 测试亦通过。RenderList 硬件测试的原全阶段屏障在 API validation 下遇到原有 stage 约束，不能据此宣称整个GPU套件通过。见 [0088](docs/gpu-execution-efficiency-20261031.zh-CN.md)、[0089](docs/scene-proxy-retirement-20261031.zh-CN.md)。
+
+这些工作不改正式应用/存档/设置/现有缓存，不更新 Release；不把两个进程 footprint 相加当物理RAM净值。集中游戏性能/内存及功能验收仍由主agent安排。

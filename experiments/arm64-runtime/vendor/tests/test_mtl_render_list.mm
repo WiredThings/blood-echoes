@@ -139,10 +139,20 @@ static std::array<uint32_t, kWidth> Run(const Fixture& f, RenderList& list, bool
 @interface BarrierEncoder : NSObject
 @property NSUInteger barriers;
 @property NSUInteger draws;
+@property NSUInteger bindings;
+@property MTLBarrierScope lastScope;
+@property MTLRenderStages lastAfter;
+@property MTLRenderStages lastBefore;
 @end
 @implementation BarrierEncoder
-- (void)memoryBarrierWithScope:(MTLBarrierScope)s afterStages:(MTLRenderStages)a beforeStages:(MTLRenderStages)b { ++_barriers; }
+- (void)memoryBarrierWithScope:(MTLBarrierScope)s afterStages:(MTLRenderStages)a beforeStages:(MTLRenderStages)b { ++_barriers; _lastScope=s; _lastAfter=a; _lastBefore=b; }
 - (void)setCullMode:(MTLCullMode)m {}
+- (void)setRenderPipelineState:(id<MTLRenderPipelineState>)p { ++_bindings; }
+- (void)setVertexBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o atIndex:(NSUInteger)i { ++_bindings; }
+- (void)setFragmentBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o atIndex:(NSUInteger)i { ++_bindings; }
+- (void)setVertexBytes:(const void*)b length:(NSUInteger)n atIndex:(NSUInteger)i { ++_bindings; }
+- (void)setVertexTexture:(id<MTLTexture>)t atIndex:(NSUInteger)i { ++_bindings; }
+- (void)setFragmentTexture:(id<MTLTexture>)t atIndex:(NSUInteger)i { ++_bindings; }
 - (void)insertDebugSignpost:(NSString*)s {}
 - (void)drawPrimitives:(MTLPrimitiveType)t vertexStart:(NSUInteger)s vertexCount:(NSUInteger)n instanceCount:(NSUInteger)i baseInstance:(NSUInteger)b { ++_draws; }
 - (void)drawIndexedPrimitives:(MTLPrimitiveType)t indexCount:(NSUInteger)n indexType:(MTLIndexType)i indexBuffer:(id<MTLBuffer>)b indexBufferOffset:(NSUInteger)o instanceCount:(NSUInteger)c baseVertex:(NSInteger)v baseInstance:(NSUInteger)a { ++_draws; }
@@ -185,6 +195,64 @@ static void TestBarrierControlFlow() {
     std::puts("barrier filter: direct/recorded/moved/reset and every draw family passed");
 }
 
+static void AnyDraw(RenderList& l,unsigned kind) {
+    switch(kind) {
+    case 0:l.DrawPrimitives(MTLPrimitiveTypeTriangle,0,0,1,0);break;
+    case 1:l.DrawIndexedPrimitives(MTLPrimitiveTypeTriangle,0,MTLIndexTypeUInt16,nullptr,0,1,0,0);break;
+    case 2:l.DrawPrimitivesIndirect(MTLPrimitiveTypeTriangle,nullptr,0);break;
+    case 3:l.DrawIndexedPrimitivesIndirect(MTLPrimitiveTypeTriangle,MTLIndexTypeUInt16,nullptr,0,nullptr,0);break;
+    case 4:l.DrawPatches(3,0,0,1,0);break;
+    }
+}
+// Actual RenderList implementation + an Objective-C sink, no Metal device.
+// Same physical encoder and the SAME broad scope are required for coverage.
+static void TestBarrierContinuation() {
+    for(unsigned moved=0;moved<2;++moved) {
+        auto enc=[BarrierEncoder new];RenderList source,destination;source.BeginRecording();source.MemoryBarrier();
+        auto* list=&source;if(moved){source.TakeRecording(destination);source.End();list=&destination;}
+        list->Replay(Raw(enc));CHECK(enc.barriers==1);list->ContinueDirect(Raw(enc));
+        // Neither rebinding a different resource/stage nor copying argument bytes
+        // performs GPU work. Keep every binding; the prior GLOBAL barrier covers
+        // all resources, not just objects whose names or pointers match.
+        auto a=[NSObject new],b=[NSObject new];
+        list->SetBuffer(RenderList::Stage::Vertex,Raw(a),0,0);list->SetBuffer(RenderList::Stage::Fragment,Raw(b),0,0);
+        list->SetTexture(RenderList::Stage::Vertex,Raw(a),0);list->SetTexture(RenderList::Stage::Fragment,Raw(b),0);
+        list->MemoryBarrier();CHECK(enc.bindings==4);CHECK(enc.barriers==(Coalescing()?1:2));
+        auto stats=list->BarrierSnapshot();CHECK(stats.requested==1&&stats.dropped==(Coalescing()?1:0));list->End();
+    }
+    // Every real access opcode, even a zero-count/indirect one, breaks coverage
+    // both before Replay returns and after continuing direct encoding.
+    for(unsigned draw=0;draw<5;++draw)for(unsigned before=0;before<2;++before) {
+        auto enc=[BarrierEncoder new];RenderList l;l.BeginRecording();l.MemoryBarrier();if(before)AnyDraw(l,draw);
+        l.Replay(Raw(enc));l.ContinueDirect(Raw(enc));if(!before)AnyDraw(l,draw);l.MemoryBarrier();
+        CHECK(enc.barriers==2&&enc.draws==1);CHECK(l.BarrierSnapshot().dropped==0);l.End();
+    }
+    {
+        auto a=[BarrierEncoder new],b=[BarrierEncoder new];RenderList l;l.BeginRecording();l.MemoryBarrier();l.Replay(Raw(a));l.ContinueDirect(Raw(b));l.MemoryBarrier();
+        CHECK(a.barriers==1&&b.barriers==1);CHECK(l.BarrierSnapshot().dropped==0);l.End();
+        // A fresh pass still resets history even if the pointer happens to match.
+        l.BeginDirect(Raw(a));l.MemoryBarrier();CHECK(a.barriers==2);l.End();
+        l.BeginRecording();l.ContinueDirect(Raw(a));l.MemoryBarrier();CHECK(a.barriers==3);l.End();
+    }
+    {
+        auto enc=[BarrierEncoder new];RenderList l;l.BeginRecording();l.MemoryBarrier();l.Replay(Raw(enc));l.ContinueDirect(Raw(enc));
+        uint32_t data=1;auto pipeline=[NSObject new],buffer=[NSObject new];l.VertexBufferUpdate(Raw(pipeline),Raw(buffer),0,&data,sizeof(data));l.MemoryBarrier();
+        // Do not broaden to the narrower vertex-only barriers. The host write
+        // is a real DrawPrimitives and the later broad barrier remains required.
+        CHECK(enc.barriers==4&&enc.draws==1);CHECK(l.BarrierSnapshot().dropped==0);
+        CHECK(enc.lastScope==(MTLBarrierScopeBuffers|MTLBarrierScopeTextures));
+        CHECK(enc.lastAfter==(MTLRenderStageVertex|MTLRenderStageFragment)&&enc.lastBefore==enc.lastAfter);l.End();
+    }
+    {
+        auto a=[BarrierEncoder new],b=[BarrierEncoder new];RenderList source,moved;source.BeginRecording();source.MemoryBarrier();source.Replay(Raw(a));
+        // A later unpublished recording is transferred elsewhere. An older
+        // replay must not supply coverage to ContinueDirect without a new replay.
+        source.MemoryBarrier();source.TakeRecording(moved);source.ContinueDirect(Raw(a));source.MemoryBarrier();
+        CHECK(a.barriers==2);source.End();moved.Replay(Raw(b));CHECK(b.barriers==1);moved.End();
+    }
+    std::puts("barrier continuation: same encoder/moved positive; new encoder/all draws/vertex-write negatives passed");
+}
+
 static void TestBarrierAtomicOrdering(const Fixture& f, bool vertex) {
     NSString* src=@"#include <metal_stdlib>\nusing namespace metal;\n"
       "vertex float4 vs(uint id[[vertex_id]]){float2 p=float2((id<<1)&2,id&2);return float4(p*2-1,0,1);}\n"
@@ -218,8 +286,13 @@ static void TestBarrierAtomicOrdering(const Fixture& f, bool vertex) {
     std::puts("barrier filter: atomic write/read dependencies and exact pixels direct/recorded/moved passed");
 }
 
-int main() {
+int main(int argc,char**argv) {
     @autoreleasepool {
+        if(argc==2&&!std::strcmp(argv[1],"--controls-only")) {
+            TestBarrierControlFlow();TestBarrierContinuation();
+            std::printf(failures?"FAILED controls: %d\n":"all controls passed; Metal device not created\n",failures);return failures?1:0;
+        }
+        if(argc!=1)return 2;
         Fixture f;
         f.device = MTLCreateSystemDefaultDevice();
         if (!f.device) {
@@ -263,6 +336,7 @@ int main() {
         const std::array<uint32_t, kWidth> expected{kGreen, kGreen, kRed,  kGreen,
                                                     kBlue,  kWhite, 0,     0};
         TestBarrierControlFlow();
+        TestBarrierContinuation();
         TestBarrierAtomicOrdering(f,false);
         TestBarrierAtomicOrdering(f,true);
         RenderList list;

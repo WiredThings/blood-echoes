@@ -920,6 +920,13 @@ uintptr_t ContextImpl::CompileBlock(FEXCore::Core::CpuStateFrame* Frame, uint64_
   }
 
   // Accumulate a JIT count now, as even if another thread raced us, it should count as a compile.
+  if (!MaxInst && !Frame->State.flags[X86State::RFLAG_TF_RAW_LOC]) {
+    if (auto Cached = SyscallHandler->TryLoadPreparedCode(Thread,GuestRIP)) return Cached;
+  }
+  struct PreparedFallbackTiming {
+    FEXCore::HLE::SyscallHandler* Handler;uint64_t Start;
+    ~PreparedFallbackTiming(){if(Start)Handler->EndPreparedCompilation(Start);}
+  } prepared_fallback{SyscallHandler,SyscallHandler->BeginPreparedCompilation()};
   FEXCORE_PROFILE_INSTANT_INCREMENT(Thread, AccumulatedJITCount, 1);
 
   auto [CompiledCode, DebugData, StartAddr, Length, NeedsAddGuestCodeRanges] = CompileCode(Thread, GuestRIP, MaxInst);

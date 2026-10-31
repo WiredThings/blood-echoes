@@ -1,0 +1,272 @@
+diff --git a/gpu/shadps4/video_core/renderer_metal/mtl_upscaler.mm b/gpu/shadps4/video_core/renderer_metal/mtl_upscaler.mm
+index 61ae2672..a70fe7d8 100644
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_upscaler.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_upscaler.mm
+@@ -565,6 +565,12 @@ bool Sampleable(id<MTLTexture> texture) {
+ 
+ bool Upscaler::OnFrameStart() {
+     if (velocity_mirror) velocity_mirror->FrameStart();
++    // DrawRecord reaches this between packets, before BindResources forks the
++    // next helper (the preceding draw already joined it). Retired source slots
++    // must not keep private proxies forever when the resolution is unchanged.
++    // Proxy/texture destruction uses the existing CurrentTick/completed-handler
++    // retirement; no Finish, new allocation, cache-budget change or dead writeback.
++    scene_targets.CollectUnavailable();
+     if (impl->TakeCreated()) {
+         failed = true;
+     }
+diff --git a/gpu/shadps4/video_core/scene_targets_core.cpp b/gpu/shadps4/video_core/scene_targets_core.cpp
+index ec8bdfff..f916ecfe 100644
+--- a/gpu/shadps4/video_core/scene_targets_core.cpp
++++ b/gpu/shadps4/video_core/scene_targets_core.cpp
+@@ -63,6 +63,30 @@ void SceneTargetsCore::ResolveAll() {
+     }
+ }
+ 
++u64 SceneTargetsCore::CollectUnavailable() {
++    if (copying || entries.empty()) return 0;
++    u64 removed = 0;
++    for (auto it = entries.begin(); it != entries.end();) {
++        const auto& entry = *it->second;
++        const auto* original = lookup(entry.source, entry.uid);
++        if (original && original->image_uid == entry.uid) {
++            ++it;
++            continue;
++        }
++        // recent contains raw Entry pointers; clear it before their ownership
++        // ends. A different Image may already occupy the same cache slot.
++        if (!removed) {
++            recent = {};
++            recent_next = 0;
++        }
++        tracked.erase(entry.uid);
++        it = entries.erase(it);
++        ++removed;
++    }
++    if (removed) ++generation;
++    return removed;
++}
++
+ void SceneTargetsCore::NativeAccess(Image& image, bool writes) {
+     if (copying || !image.scene_proxy) return; // most images never had a proxy
+     const u32 levels = std::min(16u, image.info.resources.levels);
+diff --git a/gpu/shadps4/video_core/scene_targets_core.h b/gpu/shadps4/video_core/scene_targets_core.h
+index 207e7d42..a511a465 100644
+--- a/gpu/shadps4/video_core/scene_targets_core.h
++++ b/gpu/shadps4/video_core/scene_targets_core.h
+@@ -77,6 +77,12 @@ public:
+     /// when the use `writes`, invalidates the proxy.
+     void NativeAccess(Image&, bool writes);
+     void ResolveAll();
++    /// Recording-thread boundary, with no concurrent binding helper. Drop only
++    /// proxies whose exact source UID no longer exists. Never evict a live
++    /// image, resolve into a dead source, wait, or release GPU resources early:
++    /// backend ProxyData/UniqueImage destruction retains the existing fence path.
++    /// Returns removed CPU catalogue entries, not freed/resident byte counts.
++    u64 CollectUnavailable();
+     // Only a caller proving a full overwrite of this mip may discard its old contents.
+     // Partial writes and read/modify/write accesses must continue through NativeAccess.
+     bool DiscardNativeContents(Image&, u32 level);
+diff --git a/tests/test_mtl_scene_targets.mm b/tests/test_mtl_scene_targets.mm
+index 556b7510..fb53daff 100644
+--- a/tests/test_mtl_scene_targets.mm
++++ b/tests/test_mtl_scene_targets.mm
+@@ -558,6 +558,70 @@ static void TestLeanProxyViews(Fixture& f, vk::Format format, vk::Format integer
+     Settle(f);
+ }
+ 
++static void TestUnavailableProxyRetirement(Fixture& f) {
++    std::printf("unavailable proxy: pending GPU use, exact UID and completed retirement\n");
++    Settle(f);
++    const auto kind = unsigned(Metal::MemoryStats::Kind::SceneProxy);
++    const auto before = Metal::MemoryStats::Read()[kind];
++    World world{f};
++    SceneTargets targets{f.device, f.scheduler, f.runtime, world.Lookup()};
++    CHECK(targets.SetSize({960, 540}));
++    const auto image_id = world.Add(MakeInfo(vk::Format::eR8G8B8A8Unorm, 1920, 1080));
++    ImageViewInfo view{};
++    view.format = vk::Format::eR8G8B8A8Srgb;
++    view.range.extent.levels = view.range.extent.layers = 1;
++    __weak id<MTLTexture> base_weak = nil, view_weak = nil;
++    id<MTLBuffer> readback = [f.mtl newBufferWithLength:256 options:MTLResourceStorageModeShared];
++    CHECK(readback != nil);
++    const auto source_uid = world.Get(image_id).image_uid;
++    u64 charged = 0;
++    @autoreleasepool {
++        const auto target = targets.Attachment(image_id, view, true);
++        id<MTLTexture> native = TextureOf(target.view);
++        CHECK(native && native.pixelFormat == MTLPixelFormatRGBA8Unorm_sRGB);
++        base_weak = native.parentTexture ? native.parentTexture : native;
++        view_weak = native;
++        charged = Metal::MemoryStats::Read()[kind].bytes;
++        CHECK(charged > before.bytes);
++        auto pass = [MTLRenderPassDescriptor renderPassDescriptor];
++        pass.colorAttachments[0].texture = native;
++        pass.colorAttachments[0].loadAction = MTLLoadActionClear;
++        pass.colorAttachments[0].storeAction = MTLStoreActionStore;
++        pass.colorAttachments[0].clearColor = MTLClearColorMake(1, 0, 0, 1);
++        f.scheduler.RenderEncoder((__bridge const void*)pass);
++        f.scheduler.EndRendering();
++        f.scheduler.BlitEncoder(__func__);
++        const auto blit = f.scheduler.GetImpl().blit;
++        [blit copyFromTexture:native sourceSlice:0 sourceLevel:0
++                sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(1, 1, 1)
++                    toBuffer:readback destinationOffset:0 destinationBytesPerRow:256
++              destinationBytesPerImage:256];
++        const auto tick = f.scheduler.CurrentTick();
++        world.images[image_id.index].reset(); // exact source gone, GPU commands not submitted yet
++        CHECK(targets.CollectUnavailable() == 1 && !targets.Tracks(source_uid));
++        CHECK(f.scheduler.CurrentTick() == tick); // collection did not submit/wait
++    }
++    // Dropping CPU catalogue ownership must NOT release either native view or
++    // backing while an unretained command buffer still references them.
++    f.scheduler.PopPendingOperations();
++    CHECK(base_weak != nil && view_weak != nil);
++    CHECK(Metal::MemoryStats::Read()[kind].bytes == charged);
++    f.runtime.Finish();
++    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
++    while ((base_weak || view_weak) && std::chrono::steady_clock::now() < deadline) {
++        f.scheduler.PopPendingOperations();
++        std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    }
++    CHECK(base_weak == nil && view_weak == nil);
++    const auto after = Metal::MemoryStats::Read()[kind];
++    CHECK(after.bytes == before.bytes && after.objects == before.objects);
++    CHECK(after.released > before.released);
++    const auto* pixel = static_cast<const u8*>(readback.contents);
++    CHECK(pixel[0] == 255 && pixel[1] == 0 && pixel[2] == 0 && pixel[3] == 255);
++    std::printf("unavailable proxy unique native bytes released=%llu (not net resident RAM)\n",
++                (unsigned long long)(after.released - before.released));
++}
++
+ static void TestLifetime(Fixture& f) {
+     std::printf("lifetime\n");
+     World world{f};
+@@ -1288,6 +1352,7 @@ static void TestDirectCopyToNative(Fixture& f) {
+ int main() {
+     @autoreleasepool {
+         Fixture f;
++        if(std::getenv("BB_TEST_RETIRED_PROXY_ONLY")) {TestUnavailableProxyRetirement(f);Settle(f);return failures?1:0;}
+         if(std::getenv("BB_TEST_PROXY_TILING_ONLY")) {TestProxyTextureTiling(f);Settle(f);return failures?1:0;}
+         TestProxyTextureTiling(f);
+         if(std::getenv("BB_TEST_DIRECT_COPY_ONLY")) {TestDirectCopyToNative(f);Settle(f);return failures?1:0;}
+@@ -1300,6 +1365,7 @@ int main() {
+         TestDepthStencil(f);
+         TestEligibility(f);
+         TestLifetime(f);
++        TestUnavailableProxyRetirement(f);
+         TestLeanProxyViews(f, vk::Format::eR8G8B8A8Unorm, vk::Format::eR8G8B8A8Uint, 4);
+         TestLeanProxyViews(f, vk::Format::eR16G16B16A16Sfloat, vk::Format::eR16G16B16A16Uint, 8);
+         TestFullColorClear(f);
+diff --git a/tests/test_scene_targets_core.cpp b/tests/test_scene_targets_core.cpp
+index a8e1dab8..1ac8d8c6 100644
+--- a/tests/test_scene_targets_core.cpp
++++ b/tests/test_scene_targets_core.cpp
+@@ -4,12 +4,21 @@
+ // steps (proxy write, native access, resolve) and the sequence of SetSize.
+ #include <cassert>
+ #include <cstdio>
++#include <cstdlib>
+ #include <memory>
+ #include <string>
+ #include <vector>
+ 
+ #include "video_core/scene_targets_core.h"
+ 
++#ifdef BB_SCENE_PROXY_NEGATIVE_CONTROL
++// Mutant tests must reject an invalid policy without generating macOS crash
++// reports. This preserves every assertion condition, only its failure delivery.
++#undef assert
++#define assert(condition) ((condition) ? static_cast<void>(0) : \
++    (std::fprintf(stderr, "scene proxy assertion line %d: %s\n", __LINE__, #condition), std::_Exit(7)))
++#endif
++
+ namespace {
+ 
+ using VideoCore::Image;
+@@ -35,7 +44,12 @@ public:
+     std::unique_ptr<ProxyData> CreateProxy(const Image&, SceneSize size) override {
+         calls.push_back("create " + std::to_string(size.width) + "x" + std::to_string(size.height));
+         ++creates;
+-        return std::make_unique<ProxyData>();
++        struct Probe final : ProxyData {
++            explicit Probe(std::shared_ptr<int> count_) : count{std::move(count_)} {}
++            ~Probe() override { ++*count; }
++            std::shared_ptr<int> count;
++        };
++        return std::make_unique<Probe>(destroyed);
+     }
+     void CopyProxy(Entry& entry, Image&, bool to_native) override {
+         calls.push_back(std::string(to_native ? "resolve " : "fill ") +
+@@ -43,6 +57,7 @@ public:
+         ++(to_native ? resolves : fills);
+         // The recursion guard: native accesses made by the copy itself are no-ops.
+         assert(!Tracks(entry.uid));
++        assert(CollectUnavailable() == 0); // the copy/resolve owns its catalogue traversal
+     }
+     vk::ImageLayout Prepare(Entry&, const Image&, Use use) override {
+         calls.push_back(use == Use::Attachment ? "prepare attachment" : "prepare sample");
+@@ -59,6 +74,7 @@ public:
+ 
+     bool format_supported = true, mips_supported = true;
+     int creates = 0, fills = 0, resolves = 0;
++    std::shared_ptr<int> destroyed = std::make_shared<int>(0);
+     std::vector<std::string> calls;
+ };
+ 
+@@ -282,6 +298,47 @@ void TestDiscardOverwrite() {
+     std::printf("complete overwrite invalidation is mip-local ok\n");
+ }
+ 
++void TestUnavailableSources() {
++    Fixture f;
++    const auto dead = f.Add(960, 540, 3);
++    const auto live = f.Add(1920, 1080);
++    auto& t = f.targets;
++    t.SetSize({960, 540}); t.Take();
++    ImageViewInfo view{}; vk::ImageLayout layout{};
++    for (u32 level = 0; level < 3; ++level) {
++        view.range.base.level = level;
++        t.BeginAttachment(dead, view, layout);
++    }
++    view.range.base.level = 0;
++    t.BeginAttachment(live, view, layout);
++    const auto dead_uid = f.images[dead.index]->image_uid;
++    const auto live_uid = f.images[live.index]->image_uid;
++    const auto generation = t.Generation();
++    t.Take();
++    assert(t.CollectUnavailable() == 0 && t.Generation() == generation);
++    assert(*t.destroyed == 0 && t.ProxyDirty(*f.images[live.index], 0));
++    assert(t.Take().empty()); // no fill, resolve, Finish or live-cache eviction
++    f.images[dead.index].reset();
++    assert(t.CollectUnavailable() == 3 && *t.destroyed == 3);
++    assert(t.Generation() == generation + 1 && !t.Tracks(dead_uid) && t.Tracks(live_uid));
++    assert(t.ProxyDirty(*f.images[live.index], 0) && t.Take().empty());
++    assert(!t.SetSize({960, 540}) && t.CollectUnavailable() == 0);
++    assert(t.Generation() == generation + 1);
++    // A surviving recent pointer must be re-created, not dereferenced after erase.
++    t.BeginAttachment(live, view, layout);
++    assert(Eq(t.Take(), {"prepare attachment"}));
++    t.NativeAccess(*f.images[live.index], false);
++    assert(Eq(t.Take(), {"resolve 0"}));
++    // Simulate slot reuse even with a caller lookup that ignores uid. Collect
++    // verifies the actual UID too; the new image's proxy remains independent.
++    f.images[live.index]->image_uid = 999;
++    assert(t.CollectUnavailable() == 1 && !t.Tracks(live_uid));
++    t.BeginAttachment(live, view, layout);
++    assert(Eq(t.Take(), {"create 960x540", "fill 0", "prepare attachment"}));
++    assert(t.Tracks(999) && t.CollectUnavailable() == 0);
++    std::printf("unavailable proxies: exact UID, all mips, recent pointers and dirty-live preservation ok\n");
++}
++
+ } // namespace
+ 
+ int main() {
+@@ -291,6 +348,7 @@ int main() {
+     TestSetSizeAndMips();
+     TestFullColorClear();
+     TestDiscardOverwrite();
++    TestUnavailableSources();
+     std::printf("scene-targets-core-test passed\n");
+     return 0;
+ }

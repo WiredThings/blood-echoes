@@ -173,6 +173,10 @@ public:
   // No concurrent guest threads are allowed while inspecting compiler counters.
   EngineResult<StartupCpuCacheInfo> InspectStartupCodeCache();
   uint64_t StartupCacheResolutions() const;
+  EngineResult<uint64_t> InstallPreparedDirectory(const std::string& path,const BbCpuCache::Identity& identity,
+      std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t bytes);
+  EngineResult<uint64_t> PrepareDiskDirectory(const std::string& plan,const std::string& path,const BbCpuCache::Identity& identity,
+      std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t bytes,const FEXCore::ExecutableFileInfo& source);
 
   EngineResult<GuestRunResult> RunControlledHarness();
   EngineResult<Thread*> CreateThread(const Core::GuestExecutionRequest& request);

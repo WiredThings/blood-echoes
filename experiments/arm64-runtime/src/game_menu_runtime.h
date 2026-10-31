@@ -50,9 +50,7 @@ bool InstallHooks(unsigned char*image,uint64_t size,BbGameMenu::GuestHook*hooks,
  active->ranges.push_back({mapping->at(),mapping->size,true,false});
  for(size_t i=0;i<count;++i)hooks[i].original=plan.originals[i];
  for(auto&patch:plan.patches){
-#ifdef BB_CPU_BACKEND_BBCPU
   bbcpu_note_patch(patch.offset,patch.bytes.size(),"game-menu");
-#endif
   memcpy(image+patch.offset,patch.bytes.data(),patch.bytes.size());
  }
  *owner=std::move(mapping);return true;

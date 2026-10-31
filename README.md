@@ -6,6 +6,9 @@ The macOS 27+ development build uses an ARM64 FEX game runtime and native Metal 
 
 An isolated development package is also integrating [bloodborne-native's bbcpu](https://github.com/bloodborne-native/bloodborne-recomp) as a separate, selectable CPU backend. It keeps FEX available and builds static ARM64 game code locally, with bbcpu's own translator fallback; it does not bridge static code through FEX. The original launcher and current Metal payload are retained. Local full-game static compilation, registered-code reuse and owned HLE dispatch have passed isolated stationary-scene controls. Broader compatibility and production integration remain open; this is not a published Release or a new default. See the [integration plan](experiments/arm64-runtime/docs/bbcpu-integration.zh-CN.md) and [current fast-path validation and comparison](experiments/arm64-runtime/docs/bbcpu-fastpaths-20261031.zh-CN.md).
 
+The same private launcher now also has an automatic FEX disk-preparation candidate, using the real post-patch image and the existing scanner/compiler, with demand loading into the original JIT buffer. Runtime/performance acceptance is pending; see [implementation and limits](experiments/arm64-runtime/docs/fex-disk-preparation-20261031.zh-CN.md). Parallel [barrier-continuation](experiments/arm64-runtime/docs/gpu-execution-efficiency-20261031.zh-CN.md) and [dead scene-proxy retirement](experiments/arm64-runtime/docs/scene-proxy-retirement-20261031.zh-CN.md) changes are likewise isolated candidates. None of these changes updates the published Release.
+
+
 A standalone macOS launcher and Bloodborne compatibility runtime with **direct Metal rendering**,
 **temporal MetalFX**, and English, Simplified Chinese and Traditional Chinese launcher interfaces.
 This is the **WiredThings fork** of [DiAvisoo/bbport-mac-optimized](https://github.com/DiAvisoo/bbport-mac-optimized).

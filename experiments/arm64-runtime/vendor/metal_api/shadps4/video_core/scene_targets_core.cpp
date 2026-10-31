@@ -63,6 +63,30 @@ void SceneTargetsCore::ResolveAll() {
     }
 }
 
+u64 SceneTargetsCore::CollectUnavailable() {
+    if (copying || entries.empty()) return 0;
+    u64 removed = 0;
+    for (auto it = entries.begin(); it != entries.end();) {
+        const auto& entry = *it->second;
+        const auto* original = lookup(entry.source, entry.uid);
+        if (original && original->image_uid == entry.uid) {
+            ++it;
+            continue;
+        }
+        // recent contains raw Entry pointers; clear it before their ownership
+        // ends. A different Image may already occupy the same cache slot.
+        if (!removed) {
+            recent = {};
+            recent_next = 0;
+        }
+        tracked.erase(entry.uid);
+        it = entries.erase(it);
+        ++removed;
+    }
+    if (removed) ++generation;
+    return removed;
+}
+
 void SceneTargetsCore::NativeAccess(Image& image, bool writes) {
     if (copying || !image.scene_proxy) return; // most images never had a proxy
     const u32 levels = std::min(16u, image.info.resources.levels);
