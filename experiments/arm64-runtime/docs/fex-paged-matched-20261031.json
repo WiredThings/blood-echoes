@@ -1,0 +1,200 @@
+{
+  "schema": 1,
+  "source_revision": "155da578a1fdbbad7e0edc4d0878269c687c5fbb",
+  "order": "A cold,A warm,B cold,B warm; not ABBA",
+  "A": "paged FEX metadata",
+  "B": "normal FEX JIT, identical CPU/Metal __text",
+  "performance_no_Cua": true,
+  "formal_data_modified": false,
+  "grouped_proofs_included": false,
+  "runs": [
+    {
+      "backend": "paged",
+      "run": 1,
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793449000699637000/run-1",
+      "scene_ready": 806.3190697499958,
+      "settings": {
+        "BB_CONFIG": "9efa5d608269439a84ea6a32c7c40650f480e50b705f23fbb9c79458cd6c6ccf",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "scene_sample": {
+        "frames": 2185,
+        "fps": 48.048906530033314,
+        "p95_ms": 21.79999999999893,
+        "p99_ms": 23.2,
+        "max_frame_ms": 31.4,
+        "gpu_ms": 18.182938215102975,
+        "draws_median": 1131,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6620.8096923828125,
+        "frame_progress": {
+          "clock_start": 14.8215,
+          "clock_end": 60.296,
+          "clock_seconds": 45.4745,
+          "wall_start": 806.3190697499958,
+          "wall_end": 852.2270380829868,
+          "wall_seconds": 45.907968332991004,
+          "boundary_difference_seconds": -0.43346833299100496,
+          "last_advance_seconds": 852.2237810000079,
+          "completion_age_seconds": 0.0032570829789619893,
+          "max_observed_no_progress_seconds": 1.034236040984979,
+          "observations": 58,
+          "freshness_limit_seconds": 10.0,
+          "min_wall_coverage": 0.9,
+          "file_device": 16777239,
+          "file_inode": 531436907,
+          "observed_file_bytes": 478069
+        },
+        "window": "complete observed scene clock interval; bounded CSV flush lag against supervisor wall"
+      },
+      "swap_growth_mib": -8.0,
+      "peak_pressure": 2
+    },
+    {
+      "backend": "paged",
+      "run": 2,
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793449000699637000/run-2",
+      "scene_ready": 313.29609316700953,
+      "settings": {
+        "BB_CONFIG": "9efa5d608269439a84ea6a32c7c40650f480e50b705f23fbb9c79458cd6c6ccf",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "scene_sample": {
+        "frames": 2212,
+        "fps": 48.05947903698538,
+        "p95_ms": 21.71,
+        "p99_ms": 22.35,
+        "max_frame_ms": 294.9,
+        "gpu_ms": 18.03760397830018,
+        "draws_median": 1133.0,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6556.231269836426,
+        "frame_progress": {
+          "clock_start": 20.3453,
+          "clock_end": 66.3716,
+          "clock_seconds": 46.0263,
+          "wall_start": 313.29609316700953,
+          "wall_end": 359.34915620900574,
+          "wall_seconds": 46.05306304199621,
+          "boundary_difference_seconds": -0.02676304199621171,
+          "last_advance_seconds": 359.3448231249931,
+          "completion_age_seconds": 0.004333084012614563,
+          "max_observed_no_progress_seconds": 1.1164042919990607,
+          "observations": 63,
+          "freshness_limit_seconds": 10.0,
+          "min_wall_coverage": 0.9,
+          "file_device": 16777239,
+          "file_inode": 531463303,
+          "observed_file_bytes": 452650
+        },
+        "window": "complete observed scene clock interval; bounded CSV flush lag against supervisor wall"
+      },
+      "swap_growth_mib": -8.0,
+      "peak_pressure": 2
+    },
+    {
+      "backend": "jit",
+      "run": 1,
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793450559563717000/run-1",
+      "scene_ready": 367.05559916599304,
+      "settings": {
+        "BB_CONFIG": "9efa5d608269439a84ea6a32c7c40650f480e50b705f23fbb9c79458cd6c6ccf",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "scene_sample": {
+        "frames": 2153,
+        "fps": 47.55100192810147,
+        "p95_ms": 21.90000000000225,
+        "p99_ms": 24.4,
+        "max_frame_ms": 274.69999999999925,
+        "gpu_ms": 18.19104505341384,
+        "draws_median": 1134,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6583.6384353637695,
+        "frame_progress": {
+          "clock_start": 15.6183,
+          "clock_end": 60.896,
+          "clock_seconds": 45.2777,
+          "wall_start": 367.05559916599304,
+          "wall_end": 412.0676501659909,
+          "wall_seconds": 45.01205099999788,
+          "boundary_difference_seconds": 0.26564900000212077,
+          "last_advance_seconds": 412.0645726249786,
+          "completion_age_seconds": 0.003077541012316942,
+          "max_observed_no_progress_seconds": 1.0741864170122426,
+          "observations": 59,
+          "freshness_limit_seconds": 10.0,
+          "min_wall_coverage": 0.9,
+          "file_device": 16777239,
+          "file_inode": 531526946,
+          "observed_file_bytes": 462009
+        },
+        "window": "complete observed scene clock interval; bounded CSV flush lag against supervisor wall"
+      },
+      "swap_growth_mib": 24.3125,
+      "peak_pressure": 2
+    },
+    {
+      "backend": "jit",
+      "run": 2,
+      "evidence": "/Users/Shared/BloodEchoesDevelopment/arm64-runtime-prototype/evidence/original-launch-benchmark-1793450559563717000/run-2",
+      "scene_ready": 241.52629954199074,
+      "settings": {
+        "BB_CONFIG": "9efa5d608269439a84ea6a32c7c40650f480e50b705f23fbb9c79458cd6c6ccf",
+        "BB_MODS_CONFIG": "c52d024e71bf303e841c1e28df1e0af96dd1bd3a90420718fc4918022e7d53dd",
+        "BB_PATCHES_CONFIG": "e8fd35704dc051ed34148d1821e2f4d54cc9bb27e5f141e60a494d930e4f6f6a"
+      },
+      "scene_sample": {
+        "frames": 2229,
+        "fps": 48.52023091189301,
+        "p95_ms": 21.53,
+        "p99_ms": 22.00000000000024,
+        "max_frame_ms": 25.22,
+        "gpu_ms": 17.910672947510093,
+        "draws_median": 1135,
+        "camera": {
+          "cam_x": "-190.784",
+          "cam_y": "-27.226",
+          "cam_z": "71.116"
+        },
+        "combined_footprint_mib": 6557.169548034668,
+        "frame_progress": {
+          "clock_start": 12.4241,
+          "clock_end": 58.3637,
+          "clock_seconds": 45.9396,
+          "wall_start": 241.52629954199074,
+          "wall_end": 287.45156862499425,
+          "wall_seconds": 45.92526908300351,
+          "boundary_difference_seconds": 0.014330916996485143,
+          "last_advance_seconds": 287.44855541700963,
+          "completion_age_seconds": 0.003013207984622568,
+          "max_observed_no_progress_seconds": 1.034270459000254,
+          "observations": 57,
+          "freshness_limit_seconds": 10.0,
+          "min_wall_coverage": 0.9,
+          "file_device": 16777239,
+          "file_inode": 531552194,
+          "observed_file_bytes": 492209
+        },
+        "window": "complete observed scene clock interval; bounded CSV flush lag against supervisor wall"
+      },
+      "swap_growth_mib": 0.0,
+      "peak_pressure": 2
+    }
+  ]
+}
