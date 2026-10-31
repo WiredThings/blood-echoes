@@ -2,6 +2,7 @@
 #pragma once
 #include "fex_disk_io.h"
 #include "bb_cpu_cache_validation.h"
+#include "fex_compiled_units.h"
 #include "git_version.h"
 #include "Interface/Context/Context.h"
 #include "Interface/Core/LookupCache.h"
@@ -41,6 +42,7 @@ public:
  }
  ~Loader(){Report();}
  uint64_t Hits()const{return hits.load(std::memory_order_relaxed);}
+ uint64_t CopiedBytes()const{return copied.load(std::memory_order_relaxed);}
  uintptr_t Load(FEXCore::Core::InternalThreadState* thread,uint64_t rip){
   if(rip<base)return 0;const auto offset=rip-base;
   const auto entry=std::lower_bound(index.entries.begin(),index.entries.end(),offset,[](auto& e,uint64_t n){return e.guest<n;});
@@ -54,39 +56,46 @@ public:
   if(thread->LookupCache->Shared!=buffer->LookupCache.get())return 0;
   if(auto existing=thread->LookupCache->FindBlock(thread,rip))return existing;
   const auto start=(ctx.LatestOffset+15)&~size_t{15};const auto& meta=index.shards[shard];
-  if(start>buffer->UsableSize()||meta.code_bytes>buffer->UsableSize()-start){++budget;return 0;}
+  if(start>=buffer->UsableSize()){++budget;return 0;}
   try{
    auto file=Read(root/Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));
    Require(file.size()==meta.file_bytes&&BbCpuCache::Hash(file)==meta.hash,"shard checksum/size");
    auto raw=BbCpuCache::Check(file,identity);auto checked=BbCacheValidation::Validate(raw,{index.image_bytes,sections,GIT_HASH});
    Require(checked&&checked->code_bytes==meta.code_bytes,"shard compatibility/structure");
+   auto source_code=raw.subspan(checked->code_offset,checked->code_bytes);const auto units=CompiledUnits(source_code,*checked);
+   const auto target_block=std::find_if(checked->blocks.begin(),checked->blocks.end(),[&](auto& b){return b.guest==offset;});
+   Require(target_block!=checked->blocks.end(),"directory target absent from shard");
+   auto selected=std::find_if(units.begin(),units.end(),[&](const auto& u){return target_block->host>=u.begin&&target_block->host<u.end;});Require(selected!=units.end(),"target compiled unit absent");
+   const auto unit=*selected;const auto needed=unit.end-unit.begin;
+   if(needed>buffer->UsableSize()-start){++budget;return 0;}
    bool target=false;std::set<uint64_t> pages;
-   for(auto& b:checked->blocks){target|=b.guest==offset;pages.insert(b.pages.begin(),b.pages.end());}
+   for(auto& b:checked->blocks)if(b.host>=unit.begin&&b.host<unit.end){target|=b.guest==offset;pages.insert(b.pages.begin(),b.pages.end());}
    Require(target,"directory target absent from shard");
    // This also prevents a precise invalidation from re-publishing an old block
    // after code changed. Source-page checks occur on a disk miss, never per draw.
    for(auto page:pages){auto p=std::lower_bound(index.pages.begin(),index.pages.end(),page,[](auto& p,uint64_t n){return p.guest<n;});
     Require(p!=index.pages.end()&&p->guest==page&&BbCpuCache::Hash({reinterpret_cast<const std::byte*>(base+page),size_t(p->bytes)})==p->hash,"actual guest code page changed");}
-   auto destination=std::span{reinterpret_cast<std::byte*>(buffer->Ptr)+start,checked->code_bytes};
+   auto destination=std::span{reinterpret_cast<std::byte*>(buffer->Ptr)+start,needed};
    {
     FEXCore::Allocator::ScopedJITWriteProtect write;
-    std::memcpy(destination.data(),raw.data()+checked->code_offset,checked->code_bytes);
-    auto relocations=std::span{reinterpret_cast<const FEXCore::CPU::Relocation*>(raw.data()+checked->relocation_offset),checked->relocs.size()};
-    Require(ctx.GetCodeCache().ApplyCodeRelocations(base,destination,relocations,0,false),"shard relocations");
+    std::memcpy(destination.data(),source_code.data()+unit.begin,needed);
+    const auto* all=reinterpret_cast<const FEXCore::CPU::Relocation*>(raw.data()+checked->relocation_offset);std::vector<FEXCore::CPU::Relocation> relocations;
+    for(size_t n=0;n<checked->relocs.size();++n)if(all[n].Header.Offset>=unit.begin&&all[n].Header.Offset<unit.end)relocations.push_back(all[n]);
+    Require(ctx.GetCodeCache().ApplyCodeRelocations(base,destination,relocations,uint32_t(unit.begin),false),"compiled-unit relocations");
     __builtin___clear_cache(reinterpret_cast<char*>(destination.data()),reinterpret_cast<char*>(destination.data()+destination.size()));
    }
    ctx.LatestOffset=start+destination.size();
    // Publish only after all bytes and relocations are ready. These entries use
    // the NORMAL buffer's lifetime, backpatching, delinking and invalidation.
-   for(auto& b:checked->blocks){
+   for(auto& b:checked->blocks)if(b.host>=unit.begin&&b.host<unit.end&&!thread->LookupCache->FindBlock(thread,base+b.guest)){
     fextl::vector<uint64_t> code_pages;for(auto p:b.pages)code_pages.push_back(base+p);
-    thread->LookupCache->AddBlockMapping(thread,base+b.guest,code_pages,destination.data()+b.host);
+    thread->LookupCache->AddBlockMapping(thread,base+b.guest,code_pages,destination.data()+b.host-unit.begin);
     fextl::set<uint64_t> entries{base+b.guest};
     for(auto p:code_pages)if(thread->LookupCache->AddBlockExecutableRange(thread,entries,p,4096))ctx.SyscallHandler->MarkGuestExecutableRange(thread,p,4096);
    }
    const auto result=thread->LookupCache->FindBlock(thread,rip);Require(result!=0,"prepared target publication");
    ++hits;copied+=destination.size();
-   if(hits.load()<=8)std::printf("FEX DISK loaded shard=%zu blocks=%zu code_bytes=%zu; no IR/codegen, temporary payload released\n",size_t(shard),checked->blocks.size(),destination.size());
+   if(hits.load()<=8)std::printf("FEX DISK loaded shard=%zu unit_bytes=%zu shard_code_bytes=%zu; original compiled unit only, no IR/codegen\n",size_t(shard),destination.size(),checked->code_bytes);
    if(hits.load()%256==0)Report();
    return result;
   }catch(const std::exception& error){Reject(shard,error.what());return 0;}

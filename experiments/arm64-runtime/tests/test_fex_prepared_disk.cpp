@@ -36,12 +36,13 @@ int main(int argc,char**argv){
  // This target is intentionally absent from the prepared catalogue. Cached
  // source block +600 jumps to it, exercising ordinary live direct backpatches.
  const unsigned char source[]={0xe9,0xfb,0x5f,0,0};memcpy(code+0x600,source,sizeof(source));const unsigned char target[]={0xb8,85,0,0,0,0xf4};memcpy(code+0x6600,target,sizeof(target));
+ const unsigned char prepared_source[]={0xe9,0xfb,0xfe,0xff,0xff};memcpy(code+0x700,prepared_source,sizeof(prepared_source)); // independently moved unit -> another cached unit in SAME shard
  BbCpuCache::Identity identity;identity.runtime_build=CacheFixture::Text("actual-FEX-fixture-v1");identity.patched_code=BbCpuCache::Hash({reinterpret_cast<const std::byte*>(code),32768});identity.module_set=CacheFixture::Text("authored-main");identity.bridge_abi=CacheFixture::Text("prepared.sum/u64/u64/u64/"+std::to_string(op));identity.host_features=CacheFixture::Features(impl->HostFeatures);identity.codegen_config=CacheFixture::ContextConfig(*impl);assert(BbCpuCache::Valid(identity));
  const uint64_t rsp=f.stack+f.stack_bytes-16;auto*t=ctx->CreateThread(address,rsp);assert(t);
  AetherPS4::Fex::CallRetStack returns;assert(returns.IsReserved()&&!std::holds_alternative<AetherPS4::Fex::EngineFailure>(returns.MakeWritable()));returns.Initialize(t);AetherPS4::Fex::GuestSegmentState segments;segments.Initialize(t->CurrentFrame->State);
  std::vector<Core::GuestExecutionRange> ranges{{address,32768,true,false},{f.stack,f.stack_bytes,false,true}};assert(!std::holds_alternative<AetherPS4::Fex::EngineFailure>(handler->RegisterThread(t,ranges)));
  if(generate){
-  std::vector<uint64_t> seeds{0,resume,0x600,8192};std::vector<std::byte> plan(16+seeds.size()*8);memcpy(plan.data(),"BFXPLAN1",8);uint64_t count=seeds.size();memcpy(plan.data()+8,&count,8);memcpy(plan.data()+16,seeds.data(),seeds.size()*8);BbFexDisk::Publish(root/"plan.bin",plan);
+  std::vector<uint64_t> seeds{0,resume,0x600,0x700,8192};std::vector<std::byte> plan(16+seeds.size()*8);memcpy(plan.data(),"BFXPLAN1",8);uint64_t count=seeds.size();memcpy(plan.data()+8,&count,8);memcpy(plan.data()+16,seeds.data(),seeds.size()*8);BbFexDisk::Publish(root/"plan.bin",plan);
   auto compiled=BbFexDisk::Generate(*impl,t,root/"plan.bin",root,identity,f.sections,address,32768,f.file);assert(compiled&&calls==0&&impl->LatestOffset==0);
   std::printf("FEX_PREPARED authored generated entries=%llu guest_executed=0\n",(unsigned long long)compiled);
  }else{
@@ -56,16 +57,38 @@ int main(int argc,char**argv){
   };
   execute(0,22);execute(8192,57);assert(calls==1);
   if(mode=="load"){
+   // Validate the original emitted unit boundaries, not inferred guest spans.
+   const auto directory=BbFexDisk::Decode(BbFexDisk::Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),32768);
+   for(const auto& shard:directory.shards){
+    auto file=BbFexDisk::Read(root/BbFexDisk::Filename(shard.seeds),BbCpuCache::MaxPayload+4096);auto raw=std::span<const std::byte>(file).subspan(4096);
+    auto checked=BbCacheValidation::Validate(raw,{32768,f.sections,GIT_HASH});assert(checked);auto bytes=raw.subspan(checked->code_offset,checked->code_bytes);
+    auto units=BbFexDisk::CompiledUnits(bytes,*checked);assert(!units.empty());
+    auto reject=[&](std::vector<std::byte> changed,BbCacheValidation::Validated metadata){bool caught=false;try{(void)BbFexDisk::CompiledUnits(changed,metadata);}catch(const std::exception&){caught=true;}assert(caught);};
+    auto changed=std::vector<std::byte>(bytes.begin(),bytes.end());uint32_t outside=0xfffffff8;memcpy(changed.data(),&outside,4);reject(changed,*checked);
+    changed.assign(bytes.begin(),bytes.end());size_t huge=bytes.size()+1;memcpy(changed.data()+units[0].code_end,&huge,sizeof(huge));reject(changed,*checked);
+    auto metadata=*checked;metadata.blocks[0].host=units[0].code_end;reject({bytes.begin(),bytes.end()},metadata);
+    metadata=*checked;metadata.relocs.push_back({units[0].end-4,0,0,0});reject({bytes.begin(),bytes.end()},metadata);
+    changed.assign(bytes.begin(),bytes.end());changed[units[0].code_end+offsetof(FEXCore::CPU::CPUBackend::JITCodeTail,SingleInst)]=std::byte{2};reject(changed,*checked);
+   }
    assert(handler->PreparedDisk->Hits()>=2);const auto before=impl->LatestOffset;
+   assert(handler->PreparedDisk->CopiedBytes()<4096); // no whole-shard payload inflation
+   assert(!t->LookupCache->FindBlock(t,address+0x600)); // same shard, unused unit stays unloaded
    execute(0,22);execute(8192,57);assert(impl->LatestOffset==before);
-   execute(0x600,85);const auto linked=impl->LatestOffset;execute(0x600,85);assert(impl->LatestOffset==linked);
+   execute(0x700,85);execute(0x600,85);const auto linked=impl->LatestOffset;execute(0x700,85);execute(0x600,85);assert(impl->LatestOffset==linked);
    // Existing whole-buffer clear removes both cached and newly JIT'd links.
    {FEXCore::Allocator::ScopedJITWriteProtect write;ctx->ClearCodeCache(t);}assert(!t->LookupCache->FindBlock(t,address)&&!t->LookupCache->FindBlock(t,address+0x6600));
    code[0x6601]=102;execute(0x600,102);
    // Existing precise invalidation must not resurrect old source-page bytes.
    {std::scoped_lock lock{ctx->GetCodeInvalidationMutex()};ctx->InvalidateCodeBuffersCodeRange(address,16384);ctx->InvalidateThreadCachedCodeRange(t,address,16384);}
    code[1]=9;execute(0,24);
-   std::puts("FEX_PREPARED authored normal-budget=1 relocated=1 actual-HLE=1 demand-copy=1 warm-no-codegen=1 backpatch=1 clear=1 changed-page-own-JIT=1");
+   // Model an almost-full ORIGINAL buffer without changing its real capacity:
+   // a 136-byte unit fits while its 4096-byte shard does not. Then verify an
+   // actually insufficient remainder returns to the original JIT/rotation path.
+   assert(!t->LookupCache->FindBlock(t,address+8192));auto buffer=impl->GetLatest();impl->LatestOffset=buffer->UsableSize()-256;
+   const auto copied=handler->PreparedDisk->CopiedBytes();assert(handler->PreparedDisk->Load(t,address+8192));assert(handler->PreparedDisk->CopiedBytes()-copied==136);execute(8192,57);
+   {FEXCore::Allocator::ScopedJITWriteProtect write;ctx->ClearCodeCache(t);}buffer=impl->GetLatest();impl->LatestOffset=buffer->UsableSize()-32;
+   assert(!handler->PreparedDisk->Load(t,address+8192));execute(8192,57);
+   std::puts("FEX_PREPARED authored normal-budget=1 relocated=1 actual-HLE=1 demand-copy=1 warm-no-codegen=1 backpatch=1 clear=1 changed-page-own-JIT=1 unit-boundary-negatives=1 unit-fits-shard-does-not=1 own-JIT-budget-fallback=1");
   }else std::printf("FEX_PREPARED authored refusal-safe-own-JIT=1 mode=%s\n",mode.c_str());
  }
  handler->UnregisterThread(t);ctx->DestroyThread(t);ctx.reset();munmap(memory,32768);AetherPS4::Fex::FexConfigLease::Release();
