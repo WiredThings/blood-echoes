@@ -8,13 +8,15 @@ struct LaunchPreparationProgress: Equatable {
     private(set) var stageKey = "Preparing game…"
     private(set) var failed = false
     private(set) var finished = false
-    private var cpuPlanned = false
+    private var cpuBackend: String?
+    private var cpuPlanned: Bool { cpuBackend != nil }
     private struct CPUWork: Decodable {
         let event: String
         let done: Int
         let total: Int
         let active: Int
         let capacity: Int
+        let backend: String?
     }
 
     private static let phases: [String: (Int, Int, String)] = [
@@ -40,8 +42,9 @@ struct LaunchPreparationProgress: Equatable {
         guard !failed, !finished else { return }
         if line.hasPrefix("CPU preparation planned: "),
            let value = Self.record(String(line.dropFirst("CPU preparation planned: ".count))),
-           value["backend"] as? String == "bbcpu" {
-            cpuPlanned = true
+           let backend = value["backend"] as? String,
+           ["bbcpu", "fex"].contains(backend), cpuBackend == nil || cpuBackend == backend {
+            cpuBackend = backend
             return
         }
         if cpuPlanned && line.hasPrefix("CPU preparation progress: ") {
@@ -49,7 +52,9 @@ struct LaunchPreparationProgress: Equatable {
             let maximum = StaticCompilationConcurrency.maximum
             guard text.utf8.count <= 4096, let data = text.data(using: .utf8),
                   let work = try? JSONDecoder().decode(CPUWork.self, from: data),
-                  work.event == "compile-progress", (1...8192).contains(work.total),
+                  work.event == "compile-progress",
+                  (1...(cpuBackend == "fex" ? 4_000_000 : 8192)).contains(work.total),
+                  work.backend == nil || work.backend == cpuBackend,
                   (0...work.total).contains(work.done), (0...maximum).contains(work.active),
                   (0...maximum).contains(work.capacity) else { return }
             advance(25 + 70 * work.done / work.total,
@@ -58,7 +63,7 @@ struct LaunchPreparationProgress: Equatable {
         }
         if cpuPlanned && line.hasPrefix("CPU local preparation: "),
            let value = Self.record(String(line.dropFirst("CPU local preparation: ".count))),
-           value["backend"] as? String == "bbcpu" {
+           value["backend"] as? String == cpuBackend {
             advance(100, "Starting game…", cpu: true)
             return
         }

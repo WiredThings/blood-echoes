@@ -7,6 +7,43 @@ final class LaunchPreparationProgressTests: XCTestCase {
         "Metal preparation phase: {\"phase\":\"\(name)\",\"event\":\"\(event)\",\"outcome\":\"\(outcome)\"}"
     }
     private let done = "Metal local preparation: {\"status\":\"prepared\"}"
+    func testFEXMillionEntryProgressAndWarmCompletionUseSelectedBackend() {
+        var p = LaunchPreparationProgress()
+        p.consume("CPU preparation planned: {\"backend\":\"fex\"}")
+        p.consume(done); XCTAssertEqual(p.percent, 25)
+        p.consume("CPU preparation progress: {\"event\":\"compile-progress\",\"done\":1316774,\"total\":2633548,\"active\":1,\"capacity\":1,\"backend\":\"fex\"}")
+        XCTAssertEqual(p.percent, 60); XCTAssertEqual(p.stageKey, "Compiling CPU code…")
+        p.consume("CPU local preparation: {\"backend\":\"bbcpu\"}")
+        XCTAssertEqual(p.percent, 60)
+        p.consume("CPU local preparation: {\"backend\":\"fex\",\"processes\":{\"compiler\":0}}")
+        XCTAssertEqual(p.percent, 100)
+        p.consume("ARM GPU frontend ready symbols=327"); XCTAssertTrue(p.finished)
+
+        var warm = LaunchPreparationProgress()
+        warm.consume("CPU preparation planned: {\"backend\":\"fex\"}")
+        warm.consume(done); XCTAssertEqual(warm.percent, 25)
+        warm.consume("CPU local preparation: {\"backend\":\"fex\"}")
+        XCTAssertEqual(warm.percent, 100) // Reuse need not emit compile-progress.
+    }
+
+    func testFEXBoundsDoNotExpandBBCPULimitsOrAcceptOtherBackend() {
+        for backend in ["fex", "bbcpu"] {
+            var p = LaunchPreparationProgress()
+            p.consume("CPU preparation planned: {\"backend\":\"\(backend)\"}")
+            let before = p
+            let limit = backend == "fex" ? 4_000_000 : 8192
+            for payload in [
+                "{\"event\":\"compile-progress\",\"done\":1,\"total\":\(limit + 1),\"active\":1,\"capacity\":1}",
+                "{\"event\":\"compile-progress\",\"done\":false,\"total\":2633548,\"active\":1,\"capacity\":1}",
+                "{\"event\":\"compile-progress\",\"done\":2633549,\"total\":2633548,\"active\":1,\"capacity\":1}",
+                "{\"event\":\"compile-progress\",\"done\":1,\"total\":2,\"active\":1,\"capacity\":1,\"backend\":\"other\"}"
+            ] {
+                p.consume("CPU preparation progress: " + payload); XCTAssertEqual(p, before)
+            }
+            p.consume("CPU preparation planned: {\"backend\":\"other\"}")
+            XCTAssertEqual(p, before)
+        }
+    }
     func testCPUUsesOriginalProgressWithoutPrematureMetalCompletion() {
         var p = LaunchPreparationProgress()
         p.consume("CPU preparation planned: {\"backend\":\"bbcpu\"}")

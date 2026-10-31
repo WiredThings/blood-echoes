@@ -235,6 +235,33 @@ class Startup(unittest.TestCase):
         self.assertEqual(self.calls,[])
 
 
+    def test_fex_plan_precedes_metal_and_only_exists_for_selected_component(self):
+        import contextlib, io
+        from unittest.mock import patch
+        import launcher_local_aot as h
+        import fex_launch
+        for selected in (False, True):
+            marker = self.backend/'FEX-COMPONENT.json'
+            if selected: marker.write_text('{}')
+            output = io.StringIO()
+            with patch.dict(h.os.environ, {'BB_CPU_BACKEND':'fex'}), \
+                 patch.object(h, 'prepare_launch', return_value=({'BB_CPU_BACKEND':'fex'}, dict(status='prepared'))), \
+                 patch.object(fex_launch, 'prepare', return_value=('author-native', {'BB_CPU_BACKEND':'fex'}, dict(backend='fex')) ) as cpu, \
+                 patch.object(h.os, 'execve', side_effect=RuntimeError('author exec boundary')), \
+                 contextlib.redirect_stdout(output):
+                with self.assertRaisesRegex(RuntimeError, 'author exec boundary'):
+                    h.main(['author-native','author-boot'], execution_root=self.backend)
+            lines = output.getvalue().splitlines()
+            if selected:
+                self.assertEqual(json.loads(lines[0].split(': ',1)[1]), dict(backend='fex'))
+                self.assertTrue(lines[0].startswith('CPU preparation planned: '))
+                self.assertTrue(lines[1].startswith('Metal local preparation: '))
+                self.assertTrue(lines[2].startswith('CPU local preparation: '))
+                self.assertEqual(cpu.call_count, 1)
+            else:
+                self.assertFalse(any(x.startswith('CPU preparation planned: ') for x in lines))
+                cpu.assert_not_called()
+
     def test_main_reports_only_actual_nonsecret_incremental_counters(self):
         import contextlib,io
         from unittest.mock import patch
