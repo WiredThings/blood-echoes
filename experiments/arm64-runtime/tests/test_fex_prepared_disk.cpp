@@ -18,12 +18,12 @@ struct Fixture{
  static std::optional<FEXCore::ExecutableFileSectionInfo> Source(void* ctx,uintptr_t at){auto& f=*static_cast<Fixture*>(ctx);for(auto [lo,hi]:f.sections)if(at>=f.base+lo&&at<f.base+hi)return FEXCore::ExecutableFileSectionInfo{f.file,f.base,f.base+lo,f.base+hi};return {};}
 };
 int main(int argc,char**argv){
- setvbuf(stdout,nullptr,_IONBF,0);assert(argc==4);const std::string mode=argv[1];const bool generate=mode=="generate";
+ setvbuf(stdout,nullptr,_IONBF,0);assert(argc==4);const std::string mode=argv[1];const bool generate=mode=="generate"||mode=="generate-legacy"||mode=="upgrade",load=mode=="load"||mode=="load-legacy";
  fs::path root=argv[2];auto address=uintptr_t(std::strtoull(argv[3],nullptr,0));
  auto acquired=AetherPS4::Fex::FexConfigLease::Acquire();assert(!std::holds_alternative<AetherPS4::Fex::EngineFailure>(acquired));
  FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLECODECACHINGWIP,generate?"1":"0");FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLELAZYCODECACHINGWIP,"0");FEXCore::Config::Set(FEXCore::Config::CONFIG_ENABLECODECACHEVALIDATION,"0");
  auto ctx=FEXCore::Context::Context::CreateNewContext(FEX::FetchHostFeatures());assert(ctx);
- void* memory=mmap(reinterpret_cast<void*>(address),32768,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);assert(memory!=MAP_FAILED&&uintptr_t(memory)==address);
+ void* memory=mmap(reinterpret_cast<void*>(address),32768,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);if(memory==MAP_FAILED||uintptr_t(memory)!=address)std::fprintf(stderr,"authored mapping requested=%p actual=%p errno=%d\n",reinterpret_cast<void*>(address),memory,errno);assert(memory!=MAP_FAILED&&uintptr_t(memory)==address);
  AetherPS4::Fex::Mapping stack(16384,PROT_READ|PROT_WRITE);assert(stack.IsValid());
  Fixture f{address,uintptr_t(stack.Get()),16384};f.file.FileId=0x1234;f.file.Filename="authored-fex-prepared-blocks";
  HleCallRegistry registry;auto operation=registry.Register(MakeHleCallAdapter(sum),"prepared.sum");
@@ -43,16 +43,29 @@ int main(int argc,char**argv){
  AetherPS4::Fex::CallRetStack returns;assert(returns.IsReserved()&&!std::holds_alternative<AetherPS4::Fex::EngineFailure>(returns.MakeWritable()));returns.Initialize(t);AetherPS4::Fex::GuestSegmentState segments;segments.Initialize(t->CurrentFrame->State);
  std::vector<Core::GuestExecutionRange> ranges{{address,32768,true,false},{f.stack,f.stack_bytes,false,true}};assert(!std::holds_alternative<AetherPS4::Fex::EngineFailure>(handler->RegisterThread(t,ranges)));
  if(generate){
-  std::vector<uint64_t> seeds{0,resume,0x600,0x700,8192};std::vector<std::byte> plan(16+seeds.size()*8);memcpy(plan.data(),"BFXPLAN1",8);uint64_t count=seeds.size();memcpy(plan.data()+8,&count,8);memcpy(plan.data()+16,seeds.data(),seeds.size()*8);BbFexDisk::Publish(root/"plan.bin",plan);
+  std::vector<uint64_t> seeds{0,resume,0x600,0x700,8192};std::vector<std::byte> plan(16+seeds.size()*8);memcpy(plan.data(),"BFXPLAN1",8);uint64_t count=seeds.size();memcpy(plan.data()+8,&count,8);memcpy(plan.data()+16,seeds.data(),seeds.size()*8);
+  if(fs::exists(root/"plan.bin"))assert(BbFexDisk::Read(root/"plan.bin",4096)==plan);else BbFexDisk::Publish(root/"plan.bin",plan);
+  std::map<fs::path,BbCpuCache::Digest> prior;for(auto& p:fs::directory_iterator(root))if(p.path().extension()==".becc")prior.emplace(p.path(),BbCpuCache::Hash(BbFexDisk::Read(p.path(),BbCpuCache::MaxPayload+4096)));
   auto compiled=BbFexDisk::Generate(*impl,t,root/"plan.bin",root,identity,f.sections,address,32768,f.file);assert(compiled&&calls==0&&impl->LatestOffset==0);
+  for(const auto& [p,hash]:prior)assert(BbCpuCache::Hash(BbFexDisk::Read(p,BbCpuCache::MaxPayload+4096))==hash);
+  if(mode=="generate-legacy"){
+   auto raw=BbFexDisk::Read(root/"directory.bin",96u<<20);auto d=BbFexDisk::Decode(raw,BbCpuCache::Key(identity),32768);std::vector<std::byte> old(raw.begin(),raw.begin()+72);old[7]=std::byte{'1'};
+   for(size_t i=0;i<d.shards.size();++i)old.insert(old.end(),raw.begin()+72+120*i,raw.begin()+72+120*i+80);
+   old.insert(old.end(),raw.begin()+72+120*d.shards.size(),raw.end()-32);auto sum=BbCpuCache::Hash(old);auto bytes=std::as_bytes(std::span(sum));old.insert(old.end(),bytes.begin(),bytes.end());BbFexDisk::Preserve(root/"directory.bin");BbFexDisk::Publish(root/"directory.bin",old);
+  }
   std::printf("FEX_PREPARED authored generated entries=%llu guest_executed=0\n",(unsigned long long)compiled);
  }else{
   if(mode=="reject-key")identity.bridge_abi[0]^=1;
+  if(mode=="load-bad-catalog"||mode=="load-missing-catalog"){
+   auto d=BbFexDisk::Decode(BbFexDisk::Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),32768);const auto name=root/BbFexDisk::CatalogFilename(d.shards.front().catalog_hash);
+   if(mode=="load-missing-catalog")fs::rename(name,fs::path(name.string()+".preserved-for-test"));
+   else{const int fd=open(name.c_str(),O_RDWR|O_NOFOLLOW|O_CLOEXEC);assert(fd>=0);unsigned char value=0;assert(pwrite(fd,&value,1,0)==1&&!fsync(fd));close(fd);}
+  }
   bool admitted=true;try{handler->PreparedDisk=std::make_unique<BbFexDisk::Loader>(root,identity,f.sections,address,32768);}catch(const std::exception&){admitted=false;}
   if(mode=="reject-key"||mode=="reject-index")assert(!admitted);
   else assert(admitted);
   assert(impl->LatestOffset==0&&t->LookupCache->FindBlock(t,address)==0); // no eager payload copy
-  if(mode=="load"){
+  if(load){
    // Descriptor-bound range reads retain the original ownership/no-link rules
    // and detect writes between admission and consumption.
    const auto name="range-io-"+std::to_string(getpid())+".bin";const auto link=name+".link";std::array<std::byte,8> bytes{};BbFexDisk::Publish(root/name,bytes);BbFexDisk::OwnedDirectory dir(root);
@@ -65,31 +78,49 @@ int main(int argc,char**argv){
    assert(!bounded.Find(0,{}));auto newest=bounded.Find(511,{});assert(newest);auto changed=newest->stamp;changed.value.st_size=1;assert(!bounded.Find(511,changed)&&bounded.Churn()[1]==1);
    // Hold the real JIT write lock: complete disk read + checksum + structural
    // admission must finish on another thread before it can publish any code.
-   std::unique_lock invalidation{ctx->GetCodeInvalidationMutex()};std::unique_lock held{impl->CodeBufferWriteMutex};std::atomic<bool> finished{};uintptr_t prepared{};
+   auto* second_thread=ctx->CreateThread(address+8192,rsp);assert(second_thread);
+   std::unique_lock invalidation{ctx->GetCodeInvalidationMutex()};std::unique_lock held{impl->CodeBufferWriteMutex};std::atomic<bool> finished{},second_finished{};uintptr_t prepared{},second_prepared{};
    std::thread io([&]{prepared=handler->PreparedDisk->Load(t,address);finished=true;});
    const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(3);
    while(!handler->PreparedDisk->ProofBytes()&&!finished&&std::chrono::steady_clock::now()<until)std::this_thread::sleep_for(std::chrono::milliseconds(1));
-   const bool verified_before_writer=handler->PreparedDisk->ProofBytes()>0&&!finished;held.unlock();invalidation.unlock();io.join();assert(verified_before_writer&&prepared);
+   const bool verified_before_writer=handler->PreparedDisk->ProofBytes()>0&&!finished;
+   const auto first_proof_bytes=handler->PreparedDisk->ProofBytes();
+   std::thread other([&]{second_prepared=handler->PreparedDisk->Load(second_thread,address+8192);second_finished=true;});
+   const auto second_until=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+   while(handler->PreparedDisk->ProofBytes()<=first_proof_bytes&&!second_finished&&std::chrono::steady_clock::now()<second_until)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+   const bool second_verified_before_writer=handler->PreparedDisk->ProofBytes()>first_proof_bytes&&!second_finished;
+   held.unlock();invalidation.unlock();io.join();other.join();assert(verified_before_writer&&second_verified_before_writer&&prepared&&second_prepared);ctx->DestroyThread(second_thread);
   }
   auto execute=[&](uint64_t off,uint64_t expected){
    AetherPS4::Fex::BridgeSyscallHandler::InvocationState call;AetherPS4::Fex::BridgeSyscallHandler::InvocationScope invoke(*handler,call,t);AetherPS4::Fex::FexExecutionSignalScope signal(*ctx,t,&signals,handler.get());
    t->CurrentFrame->State.rip=address+off;t->CurrentFrame->State.gregs[FEXCore::X86State::REG_RSP]=rsp;ctx->ExecuteThread(t);assert(!handler->FailureResult(call)&&t->CurrentFrame->State.gregs[FEXCore::X86State::REG_RAX]==expected);
   };
   execute(0,22);execute(8192,57);assert(calls==1);
+  if(mode=="load-bad-catalog"||mode=="load-missing-catalog")assert(handler->PreparedDisk->Hits()==1&&handler->PreparedDisk->WholeReads()==0);
   if(mode=="load-file-changed"){
    auto d=BbFexDisk::Decode(BbFexDisk::Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),32768);
    auto e=std::find_if(d.entries.begin(),d.entries.end(),[](auto e){return e.guest==8192;});assert(e!=d.entries.end());auto name=root/BbFexDisk::Filename(d.shards[e->shard].seeds);
-   const int fd=open(name.c_str(),O_RDWR|O_NOFOLLOW|O_CLOEXEC);assert(fd>=0);unsigned char byte{};const auto at=off_t(d.shards[e->shard].file_bytes-1);assert(pread(fd,&byte,1,at)==1);byte^=1;assert(pwrite(fd,&byte,1,at)==1&&!fsync(fd));close(fd);
-   {FEXCore::Allocator::ScopedJITWriteProtect write;ctx->ClearCodeCache(t);}execute(8192,57);assert(handler->PreparedDisk->WholeReads()==3);
-   std::puts("FEX_PREPARED changed-file invalidates-proof=1 full-revalidation=1 safe-own-JIT=1");
+   const auto& meta=d.shards[e->shard];auto catalog=BbFexDisk::Read(root/BbFexDisk::CatalogFilename(meta.catalog_hash),16u<<20);auto proof=BbFexDisk::DecodeCatalog(catalog,meta,d.key,{32768,f.sections,GIT_HASH});const auto& unit=proof->units[proof->Select(8192)];
+   const int fd=open(name.c_str(),O_RDWR|O_NOFOLLOW|O_CLOEXEC);assert(fd>=0);unsigned char byte{};const auto at=off_t(4096+proof->metadata.code_offset+unit.begin+sizeof(FEXCore::CPU::CPUBackend::JITCodeHeader));assert(pread(fd,&byte,1,at)==1);byte^=1;assert(pwrite(fd,&byte,1,at)==1&&!fsync(fd));close(fd);
+   {FEXCore::Allocator::ScopedJITWriteProtect write;ctx->ClearCodeCache(t);}execute(8192,57);assert(handler->PreparedDisk->WholeReads()==0);
+   std::puts("FEX_PREPARED changed-file invalidates-proof=1 unit-revalidation=1 safe-own-JIT=1");
   }
-  if(mode=="load"){
+  if(load){
    // Validate the original emitted unit boundaries, not inferred guest spans.
    const auto directory=BbFexDisk::Decode(BbFexDisk::Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),32768);
    for(const auto& shard:directory.shards){
     auto file=BbFexDisk::Read(root/BbFexDisk::Filename(shard.seeds),BbCpuCache::MaxPayload+4096);auto raw=std::span<const std::byte>(file).subspan(4096);
     auto checked=BbCacheValidation::Validate(raw,{32768,f.sections,GIT_HASH});assert(checked);auto bytes=raw.subspan(checked->code_offset,checked->code_bytes);
     auto units=BbFexDisk::CompiledUnits(bytes,*checked);assert(!units.empty());
+    if(shard.catalog_bytes){
+     auto catalog=BbFexDisk::Read(root/BbFexDisk::CatalogFilename(shard.catalog_hash),16u<<20);auto proof=BbFexDisk::DecodeCatalog(catalog,shard,directory.key,{32768,f.sections,GIT_HASH});assert(proof->units.size()==units.size());
+     auto reject_catalog=[&](std::vector<std::byte> data,bool rehash){auto meta=shard;if(rehash){meta.catalog_bytes=data.size();meta.catalog_hash=BbCpuCache::Hash(data);}bool caught=false;try{BbFexDisk::DecodeCatalog(data,meta,directory.key,{32768,f.sections,GIT_HASH});}catch(const std::exception&){caught=true;}assert(caught);};
+     auto changed=catalog;changed.back()^=std::byte{1};reject_catalog(changed,false);
+     changed=catalog;changed[8]^=std::byte{1};reject_catalog(changed,true); // incompatible full identity
+     changed=catalog;changed[72]^=std::byte{1};reject_catalog(changed,true); // compiler identity, even with a valid outer digest
+     changed=catalog;uint64_t outside=32768;memcpy(changed.data()+148,&outside,8);reject_catalog(changed,true); // guest entry outside registered code
+     changed=catalog;changed.push_back(std::byte{});reject_catalog(changed,true);changed=catalog;changed.resize(147);reject_catalog(changed,true);
+    }
     auto reject=[&](std::vector<std::byte> changed,BbCacheValidation::Validated metadata){bool caught=false;try{(void)BbFexDisk::CompiledUnits(changed,metadata);}catch(const std::exception&){caught=true;}assert(caught);};
     auto changed=std::vector<std::byte>(bytes.begin(),bytes.end());uint32_t outside=0xfffffff8;memcpy(changed.data(),&outside,4);reject(changed,*checked);
     changed.assign(bytes.begin(),bytes.end());size_t huge=bytes.size()+1;memcpy(changed.data()+units[0].code_end,&huge,sizeof(huge));reject(changed,*checked);
@@ -100,7 +131,8 @@ int main(int argc,char**argv){
    assert(handler->PreparedDisk->Hits()>=2);const auto before=impl->LatestOffset;
    assert(handler->PreparedDisk->CopiedBytes()<4096); // no whole-shard payload inflation
    assert(!t->LookupCache->FindBlock(t,address+0x600)); // same shard, unused unit stays unloaded
-   execute(0,22);execute(8192,57);assert(impl->LatestOffset==before);
+   const auto warm_reads=handler->PreparedDisk->ReadBytes(),warm_catalogs=handler->PreparedDisk->CatalogReads();
+   execute(0,22);execute(8192,57);assert(impl->LatestOffset==before&&handler->PreparedDisk->ReadBytes()==warm_reads&&handler->PreparedDisk->CatalogReads()==warm_catalogs);
    const auto reads_before_unit=handler->PreparedDisk->ReadBytes();execute(0x700,85);assert(handler->PreparedDisk->ReadBytes()-reads_before_unit==216); // two 108-byte units, not two full shards
    execute(0x600,85);const auto linked=impl->LatestOffset;execute(0x700,85);execute(0x600,85);assert(impl->LatestOffset==linked);
    // Existing whole-buffer clear removes both cached and newly JIT'd links.
@@ -116,7 +148,7 @@ int main(int argc,char**argv){
    const auto copied=handler->PreparedDisk->CopiedBytes();assert(handler->PreparedDisk->Load(t,address+8192));assert(handler->PreparedDisk->CopiedBytes()-copied==136);execute(8192,57);
    {FEXCore::Allocator::ScopedJITWriteProtect write;ctx->ClearCodeCache(t);}buffer=impl->GetLatest();impl->LatestOffset=buffer->UsableSize()-32;
    assert(!handler->PreparedDisk->Load(t,address+8192));execute(8192,57);
-   assert(handler->PreparedDisk->WholeReads()==2&&handler->PreparedDisk->ProofBytes()<=BbFexDisk::ShardProofs::MaxBytes);
+   assert(handler->PreparedDisk->WholeReads()==(mode=="load-legacy"?2:0)&&handler->PreparedDisk->ProofBytes()<=BbFexDisk::ShardProofs::MaxBytes);
    std::puts("FEX_PREPARED authored normal-budget=1 relocated=1 actual-HLE=1 demand-copy=1 warm-no-codegen=1 backpatch=1 clear=1 changed-page-own-JIT=1 unit-boundary-negatives=1 unit-fits-shard-does-not=1 own-JIT-budget-fallback=1");
   }else std::printf("FEX_PREPARED authored refusal-safe-own-JIT=1 mode=%s\n",mode.c_str());
  }

@@ -6,6 +6,22 @@
 #include <fstream>
 #include <map>
 namespace BbFexDisk {
+inline void EnsureCatalog(const fs::path& output,Shard& meta,const BbCpuCache::Identity& identity,
+ std::span<const std::pair<uint64_t,uint64_t>> sections,uint64_t image,
+ std::span<const std::byte> supplied={},const BbCacheValidation::Validated* validated=nullptr){
+ if(!meta.file_bytes)return;
+ if(meta.catalog_bytes){struct stat st{};const auto p=output/CatalogFilename(meta.catalog_hash);
+  if(!lstat(p.c_str(),&st)&&S_ISREG(st.st_mode)&&st.st_uid==getuid()&&st.st_nlink==1&&!(st.st_mode&0022)&&uint64_t(st.st_size)==meta.catalog_bytes)return;
+ }
+ std::vector<std::byte> owned;std::optional<BbCacheValidation::Validated> checked;
+ if(supplied.empty()){owned=Read(output/Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));supplied=owned;}
+ Require(supplied.size()==meta.file_bytes&&BbCpuCache::Hash(supplied)==meta.hash,"FEX catalog producer shard checksum");
+ if(!validated){auto raw=BbCpuCache::Check(supplied,identity);checked=BbCacheValidation::Validate(raw,{image,sections,GIT_HASH});Require(bool(checked),"FEX catalog producer FXCC validation");validated=&*checked;}
+ auto proof=MakeCatalog(supplied,*validated);auto bytes=EncodeCatalog(proof,meta,BbCpuCache::Key(identity),image,GIT_HASH);meta.catalog_bytes=bytes.size();meta.catalog_hash=BbCpuCache::Hash(bytes);
+ const auto path=output/CatalogFilename(meta.catalog_hash);
+ if(fs::exists(path)){try{if(Read(path,16u<<20)==bytes)return;}catch(const std::exception&){}Preserve(path);}
+ Publish(path,bytes);
+}
 inline std::vector<uint64_t> Plan(const fs::path& path,uint64_t image){
  auto raw=Read(path,8+8+4000000*8);Require(raw.size()>=16&&!memcmp(raw.data(),"BFXPLAN1",8),"FEX preparation plan");
  uint64_t count{};memcpy(&count,raw.data()+8,8);Require(count&&count<=4000000&&raw.size()==16+count*8,"FEX entry plan budget");
@@ -34,12 +50,14 @@ inline uint64_t Generate(FEXCore::Context::ContextImpl& ctx,FEXCore::Core::Inter
   const auto end=std::min(begin+Batch,size_t(std::lower_bound(entries.begin()+begin,entries.end(),page_end)-entries.begin()));const size_t id=result.shards.size();
   const auto seeds=BbCpuCache::Hash(std::as_bytes(std::span(entries).subspan(begin,end-begin)));
   if(auto done=completed.find(seeds);done!=completed.end()){
-   const auto& meta=previous->shards[done->second];struct stat st{};
+   auto meta=previous->shards[done->second];struct stat st{};
    // A completed directory binds the real compiler/source identity and shard
    // checksum. Carry its proof forward; runtime still hashes/validates payloads
    // at use. Do not read every unchanged ARM payload for incremental captures.
    if(!meta.file_bytes||(!lstat((output/Filename(seeds)).c_str(),&st)&&S_ISREG(st.st_mode)&&st.st_uid==getuid()&&uint64_t(st.st_size)==meta.file_bytes)){
-    result.shards.push_back(meta);for(auto guest:old_entries[done->second])published.try_emplace(guest,id);++reused;begin=end;continue;
+    EnsureCatalog(output,meta,identity,sections,image);
+    result.shards.push_back(meta);for(auto guest:old_entries[done->second])published.try_emplace(guest,id);++reused;
+    std::printf("{\"event\":\"compile-progress\",\"done\":%zu,\"total\":%zu,\"active\":1,\"capacity\":1,\"backend\":\"fex\"}\n",end,entries.size());std::fflush(stdout);begin=end;continue;
    }
   }
   // Stable requested batches are independent checkpoints. A missing/corrupt
@@ -82,7 +100,7 @@ inline uint64_t Generate(FEXCore::Context::ContextImpl& ctx,FEXCore::Core::Inter
   // number in the filename/index so subsequent repairs do not shift every ID.
   if(!checked){result.shards.push_back({0,0,{},seeds});}
   else{
-   result.shards.push_back({file.size(),checked->code_bytes,BbCpuCache::Hash(file),seeds});
+   Shard meta{file.size(),checked->code_bytes,BbCpuCache::Hash(file),seeds};EnsureCatalog(output,meta,identity,sections,image,file,&*checked);result.shards.push_back(meta);
    for(auto& b:checked->blocks){published.try_emplace(b.guest,id);for(auto page:b.pages)if(!used_pages.contains(page)){
     Require(page<image&&BbCacheValidation::Inside({image,sections,GIT_HASH},page),"FEX cached source page unavailable");const auto n=std::min<uint64_t>(4096,image-page);
     used_pages.emplace(page,Page{page,n,BbCpuCache::Hash({reinterpret_cast<const std::byte*>(base+page),size_t(n)})});

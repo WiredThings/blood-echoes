@@ -4,6 +4,7 @@
 #include "bb_cpu_cache_validation.h"
 #include "fex_compiled_units.h"
 #include "fex_verified_shard.h"
+#include "fex_unit_catalog.h"
 #include "git_version.h"
 #include "Interface/Context/Context.h"
 #include "Interface/Core/LookupCache.h"
@@ -22,7 +23,7 @@ class Loader {
  std::unique_ptr<OwnedDirectory> files;ShardProofs proofs;
  std::atomic<uint64_t> hits{},misses{},rejected{},copied{},budget{};
  std::atomic<uint64_t> load_ns{},jit_count{},jit_ns{};
- std::atomic<uint64_t> whole_reads{},read_bytes{},hash_bytes{},proof_hits{},writer_wait_ns{},writer_hold_ns{},raced{};
+ std::atomic<uint64_t> whole_reads{},read_bytes{},hash_bytes{},proof_hits{},writer_wait_ns{},writer_hold_ns{},raced{},catalog_reads{};
  bool Bad(size_t shard){std::scoped_lock guard{status_mutex};return bad[shard];}
  void Reject(size_t shard,const char* reason){
   {std::scoped_lock guard{status_mutex};if(bad[shard])return;bad[shard]=true;}++rejected;
@@ -39,10 +40,15 @@ class Loader {
  };
  Input Prepare(size_t shard,uint64_t guest){
   const auto& meta=index.shards[shard];Input in;auto file=files->Open(Filename(meta.seeds),BbCpuCache::PrefixBytes+(16u<<20));auto stamp=file.OpenedStamp();
-  Require(uint64_t(stamp.value.st_size)==meta.file_bytes,"shard file size");in.proof=proofs.Find(shard,stamp);
+  Require(uint64_t(stamp.value.st_size)==meta.file_bytes,"shard file size");in.proof=proofs.Find(shard,stamp);bool reused=bool(in.proof);
   if(!in.proof){
-   in.first_read=std::unique_lock{first_read_mutex};stamp=file.Stamp();in.proof=proofs.Find(shard,stamp);
+   in.first_read=std::unique_lock{first_read_mutex};stamp=file.Stamp();in.proof=proofs.Find(shard,stamp);reused=bool(in.proof);
    if(!in.proof){
+    if(meta.catalog_bytes){
+     auto catalog=files->Open(CatalogFilename(meta.catalog_hash),16u<<20);Require(uint64_t(catalog.OpenedStamp().value.st_size)==meta.catalog_bytes,"FEX unit catalog file size");auto data=catalog.ReadRange(0,meta.catalog_bytes,catalog.OpenedStamp());read_bytes+=data.size();hash_bytes+=data.size();++catalog_reads;
+     auto verified=DecodeCatalog(data,meta,index.key,{index.image_bytes,sections,GIT_HASH});verified->stamp=stamp;in.proof=std::move(verified);proofs.Put(shard,in.proof);std::vector<std::byte>{}.swap(data);
+     in.first_read.unlock();
+    }else{
     in.bytes=file.ReadRange(0,size_t(stamp.value.st_size),stamp);++whole_reads;read_bytes+=in.bytes.size();hash_bytes+=in.bytes.size();
     Require(BbCpuCache::Hash(in.bytes)==meta.hash,"shard checksum");
     auto raw=BbCpuCache::Check(in.bytes,identity);hash_bytes+=raw.size();auto checked=BbCacheValidation::Validate(raw,{index.image_bytes,sections,GIT_HASH});
@@ -50,17 +56,23 @@ class Loader {
     auto verified=std::make_shared<VerifiedShard>();verified->stamp=stamp;verified->units=CompiledUnits(source,*checked);verified->metadata=std::move(*checked);verified->unit_hashes.reserve(verified->units.size());
     for(const auto& u:verified->units){auto bytes=source.subspan(u.begin,u.end-u.begin);verified->unit_hashes.push_back(BbCpuCache::Hash(bytes));hash_bytes+=bytes.size();}
     in.proof=std::move(verified);in.unit=in.proof->Select(guest);in.offset=BbCpuCache::PrefixBytes+in.proof->metadata.code_offset+in.proof->units[in.unit].begin;
-    proofs.Put(shard,in.proof);return in;
+    proofs.Put(shard,in.proof);
+    // Legacy v1 admission still checks the complete payload. Retain only the
+    // selected unit before allowing another full read, never wait for FEX
+    // publication while holding the full-payload gate or its allocation.
+    const auto& u=in.proof->units[in.unit];std::vector<std::byte> selected(in.bytes.begin()+in.offset,in.bytes.begin()+in.offset+u.end-u.begin);
+    std::vector<std::byte>{}.swap(in.bytes);in.bytes=std::move(selected);in.offset=0;in.first_read.unlock();return in;
+    }
    }
-   in.first_read.unlock();
+   if(in.first_read.owns_lock())in.first_read.unlock();
   }
-  ++proof_hits;in.unit=in.proof->Select(guest);const auto& u=in.proof->units[in.unit];
+  if(reused)++proof_hits;in.unit=in.proof->Select(guest);const auto& u=in.proof->units[in.unit];
   in.bytes=file.ReadRange(BbCpuCache::PrefixBytes+in.proof->metadata.code_offset+u.begin,u.end-u.begin,stamp);read_bytes+=in.bytes.size();hash_bytes+=in.bytes.size();
   Require(BbCpuCache::Hash(in.bytes)==in.proof->unit_hashes[in.unit],"verified compiled unit checksum");return in;
  }
 public:
  static uint64_t Now(){return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();}
- void Report(){std::printf("FEX DISK totals hits=%llu misses=%llu rejected=%llu copied_bytes=%llu budget_fallbacks=%llu load_ms=%.3f fallback_compiles=%llu fallback_path_ms=%.3f whole_reads=%llu read_bytes=%llu hash_bytes=%llu proof_hits=%llu proof_bytes=%zu writer_wait_ms=%.3f writer_hold_ms=%.3f\n",(unsigned long long)hits.load(),(unsigned long long)misses.load(),(unsigned long long)rejected.load(),(unsigned long long)copied.load(),(unsigned long long)budget.load(),load_ns.load()/1e6,(unsigned long long)jit_count.load(),jit_ns.load()/1e6,(unsigned long long)whole_reads.load(),(unsigned long long)read_bytes.load(),(unsigned long long)hash_bytes.load(),(unsigned long long)proof_hits.load(),proofs.Bytes(),writer_wait_ns.load()/1e6,writer_hold_ns.load()/1e6);const auto churn=proofs.Churn();std::printf("FEX DISK proof-cache evictions=%zu invalidations=%zu oversized=%zu raced_publications=%llu\n",churn[0],churn[1],churn[2],(unsigned long long)raced.load());}
+ void Report(){std::printf("FEX DISK totals hits=%llu misses=%llu rejected=%llu copied_bytes=%llu budget_fallbacks=%llu load_ms=%.3f fallback_compiles=%llu fallback_path_ms=%.3f whole_reads=%llu read_bytes=%llu hash_bytes=%llu proof_hits=%llu proof_bytes=%zu writer_wait_ms=%.3f writer_hold_ms=%.3f\n",(unsigned long long)hits.load(),(unsigned long long)misses.load(),(unsigned long long)rejected.load(),(unsigned long long)copied.load(),(unsigned long long)budget.load(),load_ns.load()/1e6,(unsigned long long)jit_count.load(),jit_ns.load()/1e6,(unsigned long long)whole_reads.load(),(unsigned long long)read_bytes.load(),(unsigned long long)hash_bytes.load(),(unsigned long long)proof_hits.load(),proofs.Bytes(),writer_wait_ns.load()/1e6,writer_hold_ns.load()/1e6);std::printf("FEX DISK unit-index catalog_reads=%llu\n",(unsigned long long)catalog_reads.load());const auto churn=proofs.Churn();std::printf("FEX DISK proof-cache evictions=%zu invalidations=%zu oversized=%zu raced_publications=%llu\n",churn[0],churn[1],churn[2],(unsigned long long)raced.load());}
  void EndCompilation(uint64_t start){jit_ns.fetch_add(Now()-start,std::memory_order_relaxed);if((jit_count.fetch_add(1,std::memory_order_relaxed)+1)%256==0)Report();}
  Loader(fs::path directory,const BbCpuCache::Identity& expected,std::span<const std::pair<uint64_t,uint64_t>> ranges,uintptr_t image,uint64_t bytes)
  :root(std::move(directory)),identity(expected),sections(ranges.begin(),ranges.end()),base(image){
@@ -75,11 +87,12 @@ public:
  ~Loader(){Report();}
  uint64_t Hits()const{return hits.load(std::memory_order_relaxed);}
  uint64_t CopiedBytes()const{return copied.load(std::memory_order_relaxed);}
+ uint64_t CatalogReads()const{return catalog_reads.load(std::memory_order_relaxed);}
  uint64_t WholeReads()const{return whole_reads.load(std::memory_order_relaxed);}
  uint64_t ReadBytes()const{return read_bytes.load(std::memory_order_relaxed);}
  size_t ProofBytes(){return proofs.Bytes();}
  uintptr_t Load(FEXCore::Core::InternalThreadState* thread,uint64_t rip){
-  if(rip<base)return 0;const auto offset=rip-base;
+  if(rip<base)return 0;const auto offset=rip-base;if(offset>=index.image_bytes){++misses;return 0;}
   const auto entry=std::lower_bound(index.entries.begin(),index.entries.end(),offset,[](auto& e,uint64_t n){return e.guest<n;});
   if(entry==index.entries.end()||entry->guest!=offset){++misses;return 0;}
   auto& ctx=*static_cast<FEXCore::Context::ContextImpl*>(thread->CTX);
