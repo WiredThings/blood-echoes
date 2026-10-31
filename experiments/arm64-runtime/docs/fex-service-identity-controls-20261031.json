@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "source_revision": "c8d2f2f69f02a4d4b02a1627fd85a1a82f1f519e",
+  "game_started": false,
+  "performance_acceptance": false,
+  "authored_x86_only": true,
+  "storage_only_changed_CPU_binary": true,
+  "storage_only_kept_runtime_identity": true,
+  "storage_only_kept_bridge_identity": true,
+  "ABI_input_changed_bridge_identity": true,
+  "restoration_kept_runtime_identity": true,
+  "restoration_kept_bridge_identity": true,
+  "restoration_changed_raw_archive": true,
+  "source_restored": true,
+  "steps": [
+    {
+      "label": "generate-baseline",
+      "seconds": 0.8975885419931728
+    },
+    {
+      "label": "rebuild-storage-change",
+      "seconds": 4.850713916996028
+    },
+    {
+      "label": "load-existing-after-storage-change",
+      "seconds": 0.3923664170142729
+    },
+    {
+      "label": "rebuild-abi-input-change",
+      "seconds": 7.884441542002605
+    },
+    {
+      "label": "reject-old-after-abi-input-change",
+      "seconds": 0.40094408398726955
+    },
+    {
+      "label": "restore-native-build",
+      "seconds": 7.879560792003758
+    },
+    {
+      "label": "load-after-restoration",
+      "seconds": 0.155617375014117
+    }
+  ],
+  "qualification": "Native rebuild and existing authored-machine-code execution, not Bloodborne gameplay, FPS, or full launcher acceptance."
+}
