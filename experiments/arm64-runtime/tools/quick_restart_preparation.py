@@ -375,12 +375,21 @@ def prepared_local(*,bound,environment,gpu,probe=process,cwd_probe=process_cwd,r
         saved=json.loads(checked_bytes(path,limit=16384)[0])
         if saved.get('schema')!=1 or saved.get('kind')!='same-supervisor-f3-preparation-schedule' or saved.get('binding')!=bound or saved.get('artifact_authority')is not False or saved.get('source_contents_revalidated')is not False:return None
         local=saved.get('local_preparation')
-        if not isinstance(local,dict)or set(local)!={'environment','journal'}:return None
+        if not isinstance(local,dict):return None
+        legacy=set(local)=={'environment','journal'}
+        if not legacy and(set(local)!={'schema','environment','journal','prepared_roots'}or type(local['schema'])is not int or local['schema']!=2):return None
         if not isinstance(local['environment'],dict)or set(local['environment'])!=LOCAL_ENV:return None
         current=local_selection(local['environment'],gpu,bound['value']['cohort'])
         if current is None:return None
         from startup_change_journal import unchanged
-        if not unchanged(local['journal'],current[1]):return None
+        roots=current[1]if legacy else current[1][1:]
+        if not legacy and local['prepared_roots']!=list(map(str,roots)):return None
+        # Runtime captures append future compilation requests while the game
+        # runs. They do not change the already-prepared immutable libraries.
+        # F3 reuses those libraries; ordinary Play still audits both request
+        # and artifact roots and prepares newly captured work. This hint never
+        # replaces the runtime's actual source/key/library admission.
+        if not unchanged(local['journal'],roots):return None
         return dict(current[0])
     except(ValueError,OSError,KeyError,TypeError,subprocess.SubprocessError):return None
 
@@ -395,8 +404,9 @@ def publish(*,bound,context,gpu,check=lambda:None,probe=process,cwd_probe=proces
             current=local_selection(local_environment,gpu,bound['value']['cohort'])
             if current is not None:
                 from startup_change_journal import query
-                journal=query(current[1]);check()
-                if journal is not None:payload['local_preparation']=dict(environment=current[0],journal=journal)
+                roots=current[1][1:]
+                journal=query(roots);check()
+                if journal is not None:payload['local_preparation']=dict(schema=2,environment=current[0],journal=journal,prepared_roots=list(map(str,roots)))
         if len(json.dumps(payload,sort_keys=True,separators=(',',':')).encode())>16384:return False
         write_json(path,payload)
         return True

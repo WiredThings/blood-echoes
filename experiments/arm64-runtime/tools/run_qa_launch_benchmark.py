@@ -183,6 +183,7 @@ def admit(conditions):
  return dict(cpu_backend=selected_cpu,cpu=cpu,gpu=gpu),cache
 
 CPU_ROLES=('bin/bb-probe-metal','bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal')
+BBCPU_CPU_ROLE='bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal'
 FORMAL_ROLES=frozenset((*CPU_ROLES,'bin/gpu-metal/libbbgpu.dylib',
  'bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu','bin/gpu-metal-arm64/libbbgpu.dylib',
  'bin/gpu-net/libbbnet.dylib','bin/game-pso-preparer','bin/game-module-preparer'))
@@ -194,9 +195,17 @@ REVIEWED_OPTIONAL_UI_SCRIPT='scripts/ultrawide_ui.py'
 REVIEWED_OPTIONAL_UI_SOURCE='5c6619d969e5bd1a8b50afc30baa6d7f3540bd39b628bb133dcdb4146415fefa'
 REVIEWED_OPTIONAL_UI_TARGET='d55933de39172d83b194c61368e955d43df7b39b027b34db0809f6bc04277aff'
 
-def cpu_paths(conditions):
+def cpu_paths(conditions,*,admitted=None):
  # Exact independently admitted roles. The shell chooses nested when present;
  # do not pretend the top executable was the observed nested process.
+ backend=conditions.get('environment',{}).get('BB_CPU_BACKEND','fex')
+ if backend not in('fex','bbcpu'):raise ValueError('unknown functional CPU backend')
+ if backend=='bbcpu':
+  target=conditions['runtime'].get(BBCPU_CPU_ROLE)
+  if(target is None or not isinstance(admitted,dict)or admitted.get('cpu_backend')!='bbcpu'or
+     admitted.get('cpu',{}).get('target')!=str(target)):
+   raise ValueError('functional bbcpu role must match the actual admitted CPU target')
+  return {str(target)}
  return {str(conditions['runtime'][role])for role in CPU_ROLES if role in conditions['runtime']}
 
 def app_seal(app,*,runner=None):
@@ -399,6 +408,7 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
  from qa_launch_clone import inventory_savedata
  from qa_f3_contract import F3Check,NewLogLines
  f3=F3Check()if functional_f3 else None
+ selected_cpu_paths=cpu_paths(c,admitted=report.get('native_identity'))if f3 is not None else set()
  progress=None if functional_f3 else FrameProgress()
  fresh_logs=NewLogLines()if f3 is not None else None
  before=observer.system()
@@ -462,7 +472,7 @@ def sample(c,case,env,command,report,root,*,startup_seconds,scene_seconds,observ
       # Consume all pre-save logs before requesting a new checkpoint. An old
       # startup confirmation must never authorize restoring that old checkpoint.
       if drained or f3.phase not in('entering','settling'):
-       token=f3.step(elapsed,scene=in_scene,cpus={pid for pid,ppid,path in rows if path in cpu_paths(c)},gpus={pid for pid,ppid,path in rows if path==str(c['runtime']['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'])},log=log_text)
+       token=f3.step(elapsed,scene=in_scene,cpus={pid for pid,ppid,path in rows if path in selected_cpu_paths},gpus={pid for pid,ppid,path in rows if path==str(c['runtime']['bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu'])},log=log_text)
       if token:
        input_(token+'\n');pressed=True;last_press=now
        with(root/'actions.jsonl').open('a')as f:f.write(json.dumps(dict(action=token,seconds=elapsed,phase=f3.phase,utc_ns=time.time_ns()))+'\n')

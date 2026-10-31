@@ -64,12 +64,30 @@ class Restart(unittest.TestCase):
   with patch.object(journal,'query',return_value=dict(schema=1,author='journal')):
    self.assertTrue(self.publish(local_environment=local))
   with patch.object(journal,'unchanged',return_value=True)as unchanged:
-   self.assertEqual(self.early(),local);self.assertEqual(len(unchanged.call_args.args[1]),2)
+   self.assertEqual(self.early(),local);self.assertEqual(unchanged.call_args.args[1],[(self.gpu/'local-metal'/self.cohort/'artifacts'/('d'*64))])
    self.assertNotIn('BB_THD_TOKEN',self.early())
   with patch.object(journal,'unchanged',return_value=False):self.assertIsNone(self.early())
   self.assertTrue(self.publish()) # Old receipts remain valid for late game-only reuse.
   with patch.object(journal,'unchanged',return_value=True):self.assertIsNone(self.early())
   self.assertIsNotNone(self.resume())
+ def test_f3_pending_captures_do_not_invalidate_prepared_artifacts(self):
+  import startup_change_journal as journal
+  local=self.local_env();artifact=self.gpu/'local-metal'/self.cohort/'artifacts'/('d'*64)
+  with patch.object(journal,'query',return_value=dict(author='artifacts-only'))as query:
+   self.assertTrue(self.publish(local_environment=local));self.assertEqual(query.call_args.args[0],[artifact])
+  (self.gpu/'local-metal'/self.cohort/'requests'/'new-runtime-request.json').write_text('new pending capture')
+  with patch.object(journal,'unchanged',side_effect=lambda token,roots:token==dict(author='artifacts-only')and roots==[artifact]):
+   self.assertEqual(self.early(),local)
+  with patch.object(journal,'unchanged',return_value=False):self.assertIsNone(self.early())
+ def test_legacy_local_hint_keeps_both_root_checks(self):
+  import startup_change_journal as journal
+  local=self.local_env()
+  with patch.object(journal,'query',return_value=dict(author='legacy')):self.assertTrue(self.publish(local_environment=local))
+  path=quick._path(self.gpu,self.bound());saved=json.loads(path.read_text())
+  saved['local_preparation']={k:saved['local_preparation'][k]for k in('environment','journal')};quick.write_json(path,saved)
+  with patch.object(journal,'unchanged',return_value=True)as unchanged:
+   self.assertEqual(self.early(),local);self.assertEqual(len(unchanged.call_args.args[1]),2)
+  with patch.object(journal,'unchanged',return_value=False):self.assertIsNone(self.early())
  def test_front_local_rejects_wrong_roots_keys_secrets_and_mode(self):
   local=self.local_env()
   for field,value in [('BB_MTL_LOCAL_AOT_ROOT',str(self.root)),('BB_MTL_LOCAL_AOT_MODE','record'),
