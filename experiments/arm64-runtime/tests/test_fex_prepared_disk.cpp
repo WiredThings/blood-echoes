@@ -48,6 +48,12 @@ int main(int argc,char**argv){
  BbCpuCache::Identity identity;identity.runtime_build=CacheFixture::Text("actual-FEX-fixture-v1");identity.patched_code=BbCpuCache::Hash({reinterpret_cast<const std::byte*>(code),32768});identity.module_set=CacheFixture::Text("authored-main");identity.bridge_abi=CacheFixture::Text("prepared.sum/u64/u64/u64/"+std::to_string(op));identity.host_features=CacheFixture::Features(impl->HostFeatures);identity.codegen_config=CacheFixture::ContextConfig(*impl);if(actual_build){identity.runtime_build=BbCacheBuild::Runtime;identity.bridge_abi=CacheFixture::RegistryABI(BbCacheBuild::Bridge,registry,sizeof(HleCallFrame),alignof(HleCallFrame));}
  assert(BbCpuCache::Valid(identity));
  if(actual_build)std::printf("FEX_BUILD_IDENTITY actual-compiler-and-registry=1\n");
+ if(mode=="reject-build"){
+  assert(actual_build);bool refused=false;
+  try{auto directory=BbFexDisk::OpenDirectory(root.string(),identity,f.sections,address,32768);}
+  catch(const std::exception&){refused=true;}
+  assert(refused);std::puts("FEX_BUILD_IDENTITY incompatible-build-refused=1");return 0;
+ }
  const uint64_t rsp=f.stack+f.stack_bytes-16;auto*t=ctx->CreateThread(address,rsp);assert(t);
  AetherPS4::Fex::CallRetStack returns;assert(returns.IsReserved()&&!std::holds_alternative<AetherPS4::Fex::EngineFailure>(returns.MakeWritable()));returns.Initialize(t);AetherPS4::Fex::GuestSegmentState segments;segments.Initialize(t->CurrentFrame->State);
  std::vector<Core::GuestExecutionRange> ranges{{address,32768,true,false},{f.stack,f.stack_bytes,false,true}};assert(!std::holds_alternative<AetherPS4::Fex::EngineFailure>(handler->RegisterThread(t,ranges)));
