@@ -55,3 +55,5 @@ python3 experiments/arm64-runtime/tests/run_fragment_pass_barrier.py \
 - 生命周期正例先确认拆段未提交/回收；Finish 的 event signal 仍可能早于 completed handler，随后使用既有有界 poll 等待 retired 回调。没有为测试改动生产 retired_tick 规则。
 - 0090补丁从前置已提交源码应用后，与7个对应 canonical GPU/test 文件逐字节一致；CMake include 和Python入口为 canonical 集成配套，不伪装成上游通用补丁。
 - 本轮没有启动游戏或运行场景 benchmark。所有 GPU 探针已停止，场景性能、CPU提交成本和峰值/持续内存留给主 agent 统一验收。
+
+主agent随后完成统一整包及八轮固定场景对照，见[本轮集中验收](combined-fex-metal-validation-20261031.zh-CN.md)。上节“本轮没有启动游戏”指subagent短probe阶段，不代表主agent未测；正式应用和Release仍未更新。
