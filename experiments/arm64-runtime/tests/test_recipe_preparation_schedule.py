@@ -62,6 +62,10 @@ class RecipeProof(unittest.TestCase):
  def test_stat_stable_warm_path_does_not_reread_large_dependency_bytes(self):
   self.seed()
   with patch('recipe_preparation_schedule.file_sha',side_effect=AssertionError('warm recipe bytes reread')):self.assertIsNotNone(self.r.reuse(self.u))
+ def test_current_sharded_requests_are_proved_and_reused(self):
+  folder=self.requests/self.key[:2];folder.mkdir()
+  for suffix in('.metal','.json'):(self.requests/(self.key+suffix)).rename(folder/(self.key+suffix))
+  self.seed();self.assertIsNotNone(self.r.reuse(self.u))
  def test_library_changed_after_worker_before_commit_is_not_promoted(self):
   self.r.observe(self.u,self.row,[self.key]);(self.libs/(self.key+'.metallib')).write_bytes(b'changed after native event')
   self.assertFalse(self.r.commit(self.u));self.assertIsNone(self.r.reuse(self.u))

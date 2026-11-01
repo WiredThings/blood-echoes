@@ -67,6 +67,49 @@ class Products(unittest.TestCase):
         next=self.registered();wrong={**self.entry,'packet':str(self.root/('companion-inventory-'+'1'*24)/'input/packet.json')}
         self.assertIsNone(next.identity(wrong));wrong={**self.entry,'receipt':str(self.base/'outside.json')}
         self.assertIsNone(next.identity(wrong))
+    def native_seed(self):
+        p=self.create();current=dict(full_spec='spec-A',compiler='a'*64)
+        paths=[self.packet,self.case/'output/result.json',self.case/'output/module.spv',self.case/'input/spec.bin']
+        attempt=p.begin_native('author-successful-contract',self.entry,current,paths)
+        self.assertIsNotNone(attempt);self.assertTrue(p.record_native(attempt));self.assertTrue(p.publish())
+        return current,paths
+    def test_native_contract_warm_reuse_skips_reads_not_input_identity(self):
+        current,paths=self.native_seed();p=self.create()
+        with patch.object(schedule,'checked_bytes',side_effect=AssertionError('known frozen payload reread')):
+            self.assertTrue(p.reuse_native('author-successful-contract',self.entry,current))
+        self.assertFalse(p.reuse_native('author-successful-contract',self.entry,dict(current,full_spec='spec-B')))
+        self.assertFalse(p.reuse_native('author-successful-contract',dict(self.entry,receipt_sha256='f'*64),current))
+    def test_changed_or_linked_native_dependency_falls_back_per_product(self):
+        current,paths=self.native_seed();path=paths[-1];raw=path.read_bytes();s=path.stat()
+        path.write_bytes(b'changed same-size'.ljust(len(raw),b'x')[:len(raw)]);os.utime(path,ns=(s.st_atime_ns,s.st_mtime_ns))
+        self.assertFalse(self.create().reuse_native('author-successful-contract',self.entry,current))
+        path.unlink();path.symlink_to(self.case/'input/code.bin')
+        self.assertFalse(self.create().reuse_native('author-successful-contract',self.entry,current))
+    def test_change_between_full_validation_and_publication_cannot_be_recorded(self):
+        p=self.create();current=dict(spec='A');paths=[self.packet,self.case/'output/module.spv']
+        attempt=p.begin_native('author-successful-contract',self.entry,current,paths)
+        paths[-1].write_bytes(b'changed after semantic check')
+        self.assertFalse(p.record_native(attempt));self.assertFalse(p.publish())
+    def test_native_A_AB_B_A_keeps_unselected_proofs_and_unrelated_files(self):
+        current,paths=self.native_seed();b=dict(current,full_spec='B');p=self.create()
+        self.assertTrue(p.reuse_native('author-successful-contract',self.entry,current))
+        self.assertTrue(p.record_native(p.begin_native('author-successful-contract',self.entry,b,paths)));self.assertTrue(p.publish())
+        p=self.create();self.assertTrue(p.reuse_native('author-successful-contract',self.entry,b));self.assertTrue(p.publish())
+        (self.root/'unrelated-new-module').write_bytes(b'new capture, not a dependency')
+        self.assertTrue(self.create().reuse_native('author-successful-contract',self.entry,current))
+    def test_native_reuse_requires_continuous_source_until_phase_end(self):
+        current,_=self.native_seed();p=self.create();self.assertTrue(p.reuse_native('author-successful-contract',self.entry,current))
+        self.history=False
+        with self.assertRaisesRegex(ValueError,'source changed'):p.publish()
+        self.assertFalse(self.create().reuse_native('author-successful-contract',self.entry,current))
+    def test_output_directory_membership_remains_part_of_original_contract(self):
+        current,_=self.native_seed()
+        (self.case/'output/unexpected.bin').write_bytes(b'extra output')
+        self.assertFalse(self.create().reuse_native('author-successful-contract',self.entry,current))
+    def test_directory_change_during_full_validation_cannot_be_recorded(self):
+        p=self.create();current=dict(spec='A');attempt=p.begin_native('author-successful-contract',self.entry,current,[self.packet,self.case/'output/module.spv'])
+        (self.case/'output/unexpected.bin').write_bytes(b'extra output')
+        self.assertFalse(p.record_native(attempt))
     def test_symlink_or_hardlink_in_product_set_never_grants_byte_proof(self):
         self.registered();p=self.case/'input/code.bin';old=p.read_bytes();outside=self.base/'outside';outside.write_bytes(old)
         p.unlink();p.symlink_to(outside)

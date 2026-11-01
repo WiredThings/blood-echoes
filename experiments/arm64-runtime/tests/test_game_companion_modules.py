@@ -172,5 +172,28 @@ class RequiredProductLookup(unittest.TestCase):
   report,ready=self.prepare(nonce='f'*64);self.assertFalse(ready)
   self.sources[0].chmod(0o700);report,ready=self.prepare();self.assertFalse(ready)
   self.assertEqual(len(self.calls),2)
+ def test_full_native_contract_is_registered_once_and_reused_for_same_target(self):
+  from module_product_schedule import ModuleProducts
+  catalog=self.base/'catalog.json';catalog.write_text('{"authored":"source identity"}')
+  def products():return ModuleProducts(root=self.store,source=self.sources[0],compiler='d'*64,catalog=catalog,check=lambda:None)
+  with patch('module_product_schedule.query',return_value={'author':'continuous'}),patch('module_product_schedule.unchanged',return_value=True):
+   first=products();report,ready=self.prepare(validation_products=first);self.assertIn(self.key,ready);self.assertEqual(first.native_hits,0);self.assertTrue(first.publish())
+   second=products()
+   with patch('game_companion_modules.verified_entry',side_effect=AssertionError('unchanged complete contract revalidated')):
+    report,ready=self.prepare(validation_products=second)
+   self.assertIn(self.key,ready);self.assertEqual(report['counts']['native_validation_reuses'],1);self.assertEqual(self.calls,[])
+   # The byte proof cannot hide a target modification, even if its declared
+   # digest/lookup hint was left unchanged by an external writer.
+   Path(self.spv['path']).write_bytes(b'changed current target')
+   report,ready=self.prepare(validation_products=products());self.assertFalse(ready);self.assertEqual(len(self.calls),1)
+ def test_changed_nonce_or_target_spec_cannot_reuse_a_saved_native_contract(self):
+  from module_product_schedule import ModuleProducts
+  catalog=self.base/'catalog.json';catalog.write_text('{"authored":"source identity"}')
+  def products():return ModuleProducts(root=self.store,source=self.sources[0],compiler='d'*64,catalog=catalog,check=lambda:None)
+  with patch('module_product_schedule.query',return_value={'author':'continuous'}),patch('module_product_schedule.unchanged',return_value=True):
+   first=products();report,ready=self.prepare(validation_products=first);self.assertTrue(first.publish())
+   report,ready=self.prepare(validation_products=products(),nonce='f'*64);self.assertFalse(ready)
+   report,ready=self.prepare(validation_products=products(),targets={self.key:{'f'*64:self.meta}});self.assertFalse(ready)
+   self.assertEqual(len(self.calls),2)
 
 if __name__=='__main__':unittest.main(verbosity=2)

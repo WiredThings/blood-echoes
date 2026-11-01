@@ -12,6 +12,7 @@ HEX=re.compile(r'[0-9a-f]{64}')
 # These are the Python input/admission/scheduling protocols for that proof.
 # Whole-bundle admission still checks EVERY frozen tool before invocation.
 PSO_SCHEDULE_PROTOCOLS=frozenset(('prepare_game_psos.py','game_pso_queue.py',
+ 'compilation_domains.py',
  'game_pso_progress_identity.py','game_pso_owned_audit.py','decode_shader_cache.py',
  'pso_startup_schedule.py','startup_change_journal.py','incremental_file_hashes.py',
  'launcher_game_catalog.py','recipe_preparation_schedule.py','resource_parse_products.py',
@@ -22,6 +23,22 @@ def pso_schedule_identity(admitted_tools):
  selected={k:admitted_tools[k]for k in sorted(PSO_SCHEDULE_PROTOCOLS)}
  if any(not isinstance(v,str)or not HEX.fullmatch(v)for v in selected.values()):raise ValueError('actual admitted PSO protocol bytes required')
  return dict(schema=1,kind='pso-scheduling-protocols',files=selected)
+
+def current_pso_schedule_identity(tools):
+ """The actual loaded private-QA protocols, not a fabricated app profile.
+
+ Private native workers already retain their independent DSO/input admission.
+ This identity only enables the same per-recipe scheduler used by app builds.
+ """
+ from pathlib import Path
+ from game_pso_owned_audit import checked_bytes
+ root=Path(tools).absolute()
+ if root!=root.resolve(strict=True)or not root.is_dir():raise ValueError('canonical loaded tools required')
+ values={}
+ for name in PSO_SCHEDULE_PROTOCOLS:
+  raw,_=checked_bytes(root/name,limit=4*1024*1024)
+  values[name]=hashlib.sha256(raw).hexdigest()
+ return pso_schedule_identity(values)
 
 # Audited execution-only consumers: mtl_scheduler.mm, mtl_render_list.mm,
 # mtl_runtime.mm. These affect residency/fences/staging, not source generation.

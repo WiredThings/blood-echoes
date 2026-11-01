@@ -2,11 +2,24 @@
 from pathlib import Path
 import copy,json,sys,tempfile,unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from compilation_domains import split_manifest,library_product_key,pso_schedule_identity,PSO_SCHEDULE_PROTOCOLS
+from compilation_domains import split_manifest,library_product_key,pso_schedule_identity,current_pso_schedule_identity,PSO_SCHEDULE_PROTOCOLS
 from local_metal_builder import derive_key,RECIPE,LIBRARY_RECIPE
 from warm_archive_manifest import make_manifest,prepare_startup_archive_policy
 
 class Domains(unittest.TestCase):
+ def test_private_QA_uses_actual_protocol_identity_without_a_production_profile(self):
+  with tempfile.TemporaryDirectory()as tmp:
+   root=Path(tmp).resolve();tools={}
+   import hashlib
+   for name in PSO_SCHEDULE_PROTOCOLS:
+    raw=('# authored '+name).encode();(root/name).write_bytes(raw);tools[name]=hashlib.sha256(raw).hexdigest()
+   before=current_pso_schedule_identity(root);self.assertEqual(before,pso_schedule_identity(tools))
+   (root/'unrelated-ui.py').write_bytes(b'UI change');self.assertEqual(before,current_pso_schedule_identity(root))
+   (root/'game_pso_queue.py').write_bytes(b'actual scheduling protocol change');self.assertNotEqual(before,current_pso_schedule_identity(root))
+   (root/'game_pso_queue.py').unlink()
+   with self.assertRaises(OSError):current_pso_schedule_identity(root)
+   (root/'game_pso_queue.py').symlink_to(root/'prepare_game_psos.py')
+   with self.assertRaises(ValueError):current_pso_schedule_identity(root)
  def test_ui_log_restart_and_bundle_additions_do_not_invalidate_pso_schedule(self):
   all_tools={k:'a'*64 for k in PSO_SCHEDULE_PROTOCOLS};before=pso_schedule_identity(all_tools)
   all_tools.update({'texture_binding_request.py':'b'*64,'launcher_local_aot.py':'c'*64,'unrelated_new_tool.py':'d'*64})

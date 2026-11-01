@@ -117,13 +117,22 @@ def verify_existing_module(uid,existing,stage,*,products,catalog,nonce,cohort):
  if stage['hardware_stage']=='geometry':
   from run_owned_geometry_contracts import canonical_geometry_packet
   reader=canonical_geometry_packet
+ native_context=dict(input_id=uid,hardware_stage=stage['hardware_stage'],nonce=nonce,cohort=cohort)
+ attempt=None
+ if stage['hardware_stage']!='geometry':
+  if products.reuse_native('generic-module',existing,native_context):return existing
+  frozen=json.loads(checked_bytes(Path(existing['packet']),limit=256*1024,expected=existing['packet_sha256'])[0])
+  paths=[existing['packet'],existing['receipt'],existing['spirv']]
+  paths.extend(ref['path']for name in('code','profile','spec','flat','expected_spirv','walker')if(ref:=frozen.get(name))is not None)
+  attempt=products.begin_native('generic-module',existing,native_context,paths)
  p=products.packet(uid,existing)if stage['hardware_stage']!='geometry'else None
  if p is None:p=reader(Path(existing['packet']),catalog)
  receipt=json.loads(checked_bytes(Path(existing['receipt']),limit=256*1024,expected=existing['receipt_sha256'])[0])
  need(file_sha(existing['packet'])==existing['packet_sha256'],'indexed exact packet SHA')
  validate_call(0,receipt,Path(existing['spirv']).parent,p);verify_receipt(p,receipt,existing['packet_sha256'])
  need(p.get('automatic_preparation')==dict(schema=1,nonce=nonce,cohort=cohort),'indexed automatic admission')
- if stage['hardware_stage']!='geometry':products.record(uid,existing)
+ if stage['hardware_stage']!='geometry':
+  products.record(uid,existing);products.record_native(attempt)
  return existing
 
 def prepared_generic_targets(units,table,index,*,layout,catalog,products,nonce,cohort,check):
@@ -302,7 +311,7 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
   generic=prepared_generic_targets(selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest),table,index,layout=layout,catalog=catalog,products=products,nonce=nonce,cohort=cohort,check=check)
   for key in generic:targets.pop(key,None)
   typed_report,typed_ready=prepare_companions(context=static_context,gpu=gpu,root=root,component={**component,'library':identity['library']},identity=identity,catalog=catalog,cohort=cohort,nonce=nonce,profiles=profiles,targets=targets,index=index,index_path=index_path,check=check,deadline=start+seconds,native_runner=native_runner,
-      required_only=True,required_code=required_code,observed_modules=observed_modules)
+      required_only=True,required_code=required_code,observed_modules=observed_modules,validation_products=products)
   typed_report['static_association_gaps']=association_gaps
   typed_report.setdefault('counts',{})['unresolved_static_stage_records']=sum(association_gaps.values())
   typed_report['counts']['verified_generic_target_coverage']=len(generic)
@@ -403,6 +412,7 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
  report=dict(schema=1,status='prepared'if not gaps and static_variants.get('status')not in('partial','deferred')else'partial',counts=dict(counts),gaps=dict(gaps),typed_companions=typed_report,static_variants=static_variants,compiler_identity=compiler,module_index=str(index_path),stage_links=dict(path=str(links_path),sha256=file_sha(links_path)),recipe_links=dict(path=str(recipes_path),sha256=file_sha(recipes_path)),static_identities=sum(map(len,table.values())),observed_static_identities=len(observed_static),static_without_observed_inputs=sum(map(len,table.values()))-len(observed_static),full_final_PSO_ready=False,runtime_cache_import_allowed=False,game_started=False,GPU_started=False)
  atomic_json(index_path,index)
  report['source_validated_module_reuses']=products.hits
+ report['native_validation_reuses']=products.native_hits
  report['module_product_schedule_published']=products.publish()
  report['source_selection_record']=str(source_record)
  atomic_json(root/'report.json',report)

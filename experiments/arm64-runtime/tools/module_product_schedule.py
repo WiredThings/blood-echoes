@@ -5,10 +5,10 @@ and final receipt checks. Only redundant original-container extraction is
 skipped with unchanged module bytes AND continuous readonly-source history.
 """
 from pathlib import Path
-import json,re,stat
+import json,os,re,stat
 from launcher_game_catalog import directory,digest,file_sha,write_json
 from game_pso_owned_audit import checked_bytes
-from incremental_file_hashes import replaceable
+from incremental_file_hashes import replaceable,stat_stamp
 from startup_change_journal import query,unchanged
 
 MAX_RECEIPT=16*1024*1024
@@ -23,9 +23,10 @@ class ModuleProducts:
             catalog=file_sha(catalog,check)[0],validators={name:file_sha(tools/name,check)[0]for name in
                 ('module_product_schedule.py','run_game_module_contracts.py','run_owned_geometry_contracts.py',
                  'complete_geometry_psos.py','game_module_inputs.py','game_shader_catalog.py',
-                 'gnm_shader_metadata.py','decode_shader_cache.py')})
+                 'gnm_shader_metadata.py','decode_shader_cache.py','launcher_game_modules.py','game_companion_modules.py')})
         self.path=self.root.parent/('module-products-'+compiler+'-'+digest(self.binding)+'.json')
         self.source_token=query([self.source]);self.prior={};self.verified={};self.hits=0
+        self.native_prior={};self.native_verified={};self.native_hits=0
         try:
             info=self.path.lstat()
             if info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o600:return
@@ -33,7 +34,9 @@ class ModuleProducts:
             if set(saved)!={'body','sha256'}or digest(body)!=saved['sha256']or body['binding']!=self.binding:return
             if not self.readonly_source or not unchanged(body['source_journal'],[self.source]):return
             if not isinstance(body['verified'],dict)or len(body['verified'])>100000:return
-            self.prior=body['verified'];self.source_token=body['source_journal']
+            native=body.get('native_verified',{})
+            if not isinstance(native,dict)or len(native)>100000:return
+            self.prior=body['verified'];self.native_prior=native;self.source_token=body['source_journal']
         except(OSError,ValueError,KeyError,TypeError):pass
 
     def identity(self,entry):
@@ -70,16 +73,77 @@ class ModuleProducts:
         key=self.identity(entry)
         if key is not None:self.verified[uid]=key
 
+    def _native_pin(self,path):
+        path=Path(path).absolute()
+        allowed=(self.root,self.root.parent.parent/'cache')
+        if path!=path.resolve(strict=True)or not any(path.is_relative_to(r)for r in allowed):raise ValueError('native module proof scope')
+        info=path.lstat()
+        if not stat.S_ISREG(info.st_mode)or info.st_uid!=os.getuid()or info.st_nlink!=1 or info.st_mode&0o022 or not 0<info.st_size<=2*1024*1024:raise ValueError('native module proof file')
+        return stat_stamp(info)
+
+    def native_key(self,kind,entry,current):
+        return digest(dict(schema=1,kind=kind,entry=entry,current=current))
+
+    def _native_directory_pin(self,path):
+        path=Path(path).absolute()
+        if path!=path.resolve(strict=True)or path==self.root or not path.is_relative_to(self.root):raise ValueError('native module directory scope')
+        info=path.lstat()
+        if not stat.S_ISDIR(info.st_mode)or info.st_uid!=os.getuid()or info.st_mode&0o022:raise ValueError('native module directory')
+        return stat_stamp(info)
+
+    def reuse_native(self,kind,entry,current):
+        """Reuse only a successful exact contract with unchanged entire read set.
+
+        Source continuity is checked at load and again before phase publication.
+        Changed files go through the original complete validator, never a fake
+        successful native result. No runtime importer uses this proof.
+        """
+        key=self.native_key(kind,entry,current)
+        row=self.native_verified.get(key,self.native_prior.get(key))
+        try:
+            if row is None or not self.readonly_source:return False
+            files=row['files']
+            if set(row)!={'files','directories'}or not isinstance(files,dict)or not 1<=len(files)<=128:return False
+            dirs=row['directories']
+            expected={str(Path(p).parent)for p in files if Path(p).parent.is_relative_to(self.root)}
+            if not isinstance(dirs,dict)or set(dirs)!=expected:return False
+            if any(self._native_directory_pin(p)!=pin for p,pin in dirs.items()):return False
+            for path,pin in files.items():
+                self.check()
+                if self._native_pin(path)!=pin:return False
+            self.native_verified[key]=row;self.native_hits+=1;return True
+        except(OSError,ValueError,KeyError,TypeError):return False
+
+    def begin_native(self,kind,entry,current,paths):
+        try:
+            if not self.readonly_source:return None
+            files={str(Path(p).absolute()):self._native_pin(p)for p in paths}
+            if not 1<=len(files)<=128:return None
+            dirs={str(Path(p).parent):self._native_directory_pin(Path(p).parent)for p in files if Path(p).parent.is_relative_to(self.root)}
+            return self.native_key(kind,entry,current),dict(files=files,directories=dirs)
+        except(OSError,ValueError,KeyError,TypeError):return None
+
+    def record_native(self,attempt):
+        """Call only AFTER the original successful full semantic validation."""
+        if attempt is None:return False
+        key,row=attempt
+        try:
+            if any(self._native_pin(p)!=pin for p,pin in row['files'].items()):return False
+            if any(self._native_directory_pin(p)!=pin for p,pin in row['directories'].items()):return False
+            self.native_verified[key]=row;return True
+        except(OSError,ValueError,KeyError,TypeError):return False
+
     def publish(self):
         self.check()
         stable_source=unchanged(self.source_token,[self.source])
-        if self.hits and not stable_source:raise ValueError('registered source changed during module reuse')
-        if not self.readonly_source or not self.verified or not stable_source or not replaceable(self.path):return False
+        if (self.hits or self.native_hits)and not stable_source:raise ValueError('registered source changed during module reuse')
+        if not self.readonly_source or not(self.verified or self.native_verified)or not stable_source or not replaceable(self.path):return False
         # This is a per-input SOURCE proof. Packet SHA and every frozen input
         # are rechecked on use, while the original controller still checks the
         # native receipt/SPIR-V/nonce/cohort. Unrelated products and report files
         # cannot invalidate an already proved packet. No whole-cache read pass.
-        body=dict(binding=self.binding,source_journal=self.source_token,verified=self.verified)
+        body=dict(binding=self.binding,source_journal=self.source_token,
+            verified={**self.prior,**self.verified},native_verified={**self.native_prior,**self.native_verified})
         saved=dict(body=body,sha256=digest(body))
         if len(json.dumps(saved,separators=(',',':')).encode())>MAX_RECEIPT:return False
         write_json(self.path,saved);return True

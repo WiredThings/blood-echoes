@@ -70,7 +70,7 @@ def index_product(index,uid,entry,profile_sha):
  if not isinstance(bucket,list):bucket=[];index['companion_required_index'][key]=bucket
  if uid not in bucket:bucket.append(uid)
 
-def required_products(*,context,gpu,root,component,cohort,nonce,profiles,targets,index,required_code,observed_modules,check):
+def required_products(*,context,gpu,root,component,cohort,nonce,profiles,targets,index,required_code,observed_modules,check,validation_products=None):
  """Query products for CURRENT full targets, not historical capture sources.
 
  Lookup hints never grant admission: verify original native packet/output, the
@@ -96,6 +96,12 @@ def required_products(*,context,gpu,root,component,cohort,nonce,profiles,targets
    try:
     entry=index['companions'][uid]
     if entry['facts']['code_sha256']!=required_code[key]or not set(target)<=set(entry['target_spec_sha256s']):continue
+    current_profile=profiles[key[-1]]
+    current=dict(stage=list(key),code_sha256=required_code[key],profile=current_profile,
+        observed=observed_modules[key],targets=target,nonce=nonce,cohort=cohort,
+        compiler=component['library_sha256'],library=str(component['library']))
+    if validation_products is not None and validation_products.reuse_native('typed-module',entry,current):
+     ready[key]=entry;break
     raw,_=checked_bytes(Path(entry['packet']),limit=256*1024,expected=entry['packet_sha256']);packet=json.loads(raw)
     case=Path(entry['packet']).parent.parent
     need(case.parent==root and re.fullmatch(r'companion-module-[0-9a-f]{64}-[0-9a-f]{16}',case.name),'same registered typed product store')
@@ -103,8 +109,13 @@ def required_products(*,context,gpu,root,component,cohort,nonce,profiles,targets
     current_source=directory(Path(context['game_root']))
     for source in(origin,current_source):
      need(source.parent.parent==source_base and source.name=='view'and stat.S_IMODE(source.stat().st_mode)==0o500,'registered readonly typed origin')
+    attempt=None
+    if validation_products is not None and origin==current_source:
+     paths=[entry['packet'],entry['receipt'],entry['spirv'],Path(entry['spirv']).parent/'canonical-spec.bin',packet['profile']['path']]
+     paths.extend(ref['path']for ref in packet['target_specs'])
+     paths.extend(ref['path']for ref in[current_profile,observed_modules[key],*target.values()])
+     attempt=validation_products.begin_native('typed-module',entry,current,paths)
     verified_entry(entry,profile_sha=key[-1],component=component,nonce=nonce,cohort=cohort,game_root=origin)
-    current_profile=profiles[key[-1]]
     for ref in [current_profile,observed_modules[key],*target.values()]:
      need(Path(ref['path']).is_relative_to(gpu/'cache'),'current target from selected runtime cache')
     previous_profile=checked_bytes(Path(packet['profile']['path']),expected=key[-1])[0]
@@ -118,21 +129,24 @@ def required_products(*,context,gpu,root,component,cohort,nonce,profiles,targets
      actual=raw[section['offset']:section['offset']+section['bytes']]
      need(hashlib.sha256(actual).hexdigest()==spec_sha,'current complete target specialization')
      need(actual==checked_bytes(Path(old_specs[spec_sha]['path']),limit=16384,expected=spec_sha)[0],'actual current specialization equality')
+    if validation_products is not None:validation_products.record_native(attempt)
     ready[key]=entry;break
    except(ValueError,OSError,KeyError,TypeError):continue
  return ready
 
 def prepare(*,context,gpu,root,component,identity,catalog,cohort,nonce,profiles,targets,index,index_path,check,deadline,native_runner,
-            required_only=False,required_code=None,observed_modules=None):
+            required_only=False,required_code=None,observed_modules=None,validation_products=None):
  from launcher_game_modules import atomic_json,NativeModuleRejected
  capture=context.get('capture_root')
  if capture is None:return dict(status='unavailable',reason='normal-path typed capture not configured',counts={}),{}
  capture=directory(Path(capture));need(capture.is_relative_to(gpu/'automatic-game-inputs')and capture!=gpu/'automatic-game-inputs','selected owned companion root')
  counts=collections.Counter();gaps=collections.Counter();ready={};index.setdefault('companions',{});seen=set()
  if required_only:
+  previous_reuses=validation_products.native_hits if validation_products is not None else 0
   ready=required_products(context=context,gpu=gpu,root=root,component=component,cohort=cohort,nonce=nonce,
-      profiles=profiles,targets=targets,index=index,required_code=required_code or{},observed_modules=observed_modules or{},check=check)
+      profiles=profiles,targets=targets,index=index,required_code=required_code or{},observed_modules=observed_modules or{},check=check,validation_products=validation_products)
   counts['required_target_keys']=len(targets);counts['verified_required_products']=len(ready)
+  counts['native_validation_reuses']=(validation_products.native_hits-previous_reuses)if validation_products is not None else 0
   if len(ready)==len(targets):
    atomic_json(index_path,index)
    return dict(status='prepared',counts=dict(counts),gaps={},historical_capture_inventory_skipped=True,

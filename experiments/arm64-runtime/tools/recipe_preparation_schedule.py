@@ -39,6 +39,15 @@ class Recipes:
         self.scope=dict(schema=1,context=context,local=self.local,code=code_identity)
         self.store=Products(directory(progress)/'required-recipe-schedules',digest(code_identity))
         self.session=uuid.uuid4().hex;self.memo={};self.stats=dict(reused=0,published=0,misses=0,refused=0)
+        self.refusal_reasons={}
+
+    def refused(self,error):
+        self.stats['refused']+=1
+        # Startup-only bounded explanation; never instrument a game draw or
+        # silently turn a proof-publication error into a successful reuse.
+        reason=str(error)[:160]
+        if reason in self.refusal_reasons or len(self.refusal_reasons)<8:
+            self.refusal_reasons[reason]=self.refusal_reasons.get(reason,0)+1
 
     def inputs(self,unit,*,candidate=False):
         need(unit.get('record_type')=='offline-pso-input'and 'owned_geometry_pso'not in unit,'original plain recipe protocol')
@@ -91,7 +100,7 @@ class Recipes:
             self.current_files(value['files']);self.stats['reused']+=1
             return dict(status='required-recipe-schedule-reused',previous_native_verification=True,
                 native_worker_invoked=False,runtime_artifact_authority=False,proof_identity=digest(value))
-        except(OSError,ValueError,KeyError,TypeError):self.stats['refused']+=1;return None
+        except(OSError,ValueError,KeyError,TypeError)as error:self.refused(error);return None
 
     def observe(self,unit,row,local_keys):
         """Record only actual worker events; not ready until queue commit."""
@@ -143,7 +152,7 @@ class Recipes:
             self.current_files(proof['files']);self.store.put(inputs,proof)
         except(OSError,ValueError,KeyError,TypeError,LocalRefused)as error:
             if isinstance(error,LocalStopped):raise
-            self.stats['refused']+=1
+            self.refused(error)
 
     def commit(self,unit):
         """Only called after the existing full phase environment check passed."""
@@ -153,7 +162,7 @@ class Recipes:
             need(proof.get('native_verification')=='pending-real-environment-check','pending current-session native candidate required')
             self.current_files(proof['files']);proof['native_verification']='actual-worker-and-stable-environment'
             if self.store.put(self.inputs(unit),proof):self.stats['published']+=1;return True
-        except(OSError,ValueError,KeyError,TypeError):self.stats['refused']+=1
+        except(OSError,ValueError,KeyError,TypeError)as error:self.refused(error)
         return False
 
     def close(self):self.store.close();self.memo.clear()

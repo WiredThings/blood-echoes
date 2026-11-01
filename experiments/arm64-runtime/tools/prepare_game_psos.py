@@ -375,8 +375,9 @@ def prepare(config,*,services=None):
   if native_services and a.phase=='all' and a.max_recipes is None:
    from pso_startup_schedule import Schedule
    from game_pso_queue import fingerprint
-   from compilation_domains import pso_schedule_identity
-   code_identity=pso_schedule_identity(runtime_profile.bundle.local['runtime_tools'])if runtime_profile is not None else None
+   from compilation_domains import pso_schedule_identity,current_pso_schedule_identity
+   code_identity=(pso_schedule_identity(runtime_profile.bundle.local['runtime_tools'])if runtime_profile is not None
+       else current_pso_schedule_identity(Path(__file__).parent))
    if code_identity is not None:
     schedule=Schedule(a.manifest,context=context,environment=provided,gpu=gpu,artifact=artifact,progress=progress,
         code_identity=code_identity,rows=rows,fingerprint=fingerprint,check=check,selective=True)
@@ -411,7 +412,7 @@ def prepare(config,*,services=None):
   if builder_session is not None:
    builder_session.close();result['builder_session']=dict(builder_session.stats)
   if recipe_schedules is not None:
-   result['recipe_schedule']=dict(recipe_schedules.stats);recipe_schedules.close()
+   result['recipe_schedule']=dict(recipe_schedules.stats,refusal_reasons=dict(recipe_schedules.refusal_reasons));recipe_schedules.close()
   result.update(before=before,after=observer.system()if policy is not None else None,samples_preview=samples,sample_count=sample_count,samples_jsonl=str(samples_path),
     memory_policy=policy_type.MANIFEST if policy_type is not None else dict(qa_stops=False,mode='application-preparation'),wall_seconds=clock()-start,outcomes_preview=outcomes,outcome_count=outcome_count,
     outcomes_jsonl=str(outcomes_path),events_jsonl=str(events_path),worker_identity=identity,current_context=context,selection_provenance=selection_provenance,
