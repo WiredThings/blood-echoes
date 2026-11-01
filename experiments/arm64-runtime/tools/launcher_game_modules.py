@@ -23,7 +23,7 @@ class NativeModuleRejected(ValueError):
  """A clean refusal; only immutable translation differences are persistent."""
  @property
  def deterministic(self):
-  return str(self)in('owned companion runtime-after differs','owned companion complete canonical specialization differs','owned companion regenerated SPIR-V differs','actual cache target complete canonical specialization differs','retranslated specialization differs from captured state','retranslated SPIR-V differs from observed module')
+  return str(self)in('owned companion runtime-after differs','owned companion complete canonical specialization differs','owned companion regenerated SPIR-V differs','actual cache target complete canonical specialization differs','retranslated specialization differs from captured state','retranslated SPIR-V differs from observed module','static variant differs outside the one program source marker')
 
 def _ref_identity(ref):return dict(sha256=ref['sha256'],bytes=ref['bytes'])
 def compiler_identity(component,library_sha256,layout,cohort):
@@ -168,7 +168,7 @@ def _capability(component,gpu,*,runner=None,require_companion=False,runtime_prof
  if require_companion:need(cap.get('companion_contract_schema')==1,'actual typed companion consumer capability required')
  return cap
 
-def coherent_component(component,*,gpu,selected_renderer,backend_root,resolver=None,capability_runner=None,runtime_profile=None):
+def coherent_component(component,*,gpu,selected_renderer,backend_root,resolver=None,capability_runner=None,runtime_profile=None,capability_sink=None):
  """Verify actual signed ARM load edges and bytes, not an asserted ready flag."""
  need(component.get('coherent_renderer')is True and component.get('diagnostic_only')is False,'coherent non-diagnostic module component required')
  from warm_archive_manifest import resolve_gpu_identity
@@ -180,7 +180,8 @@ def coherent_component(component,*,gpu,selected_renderer,backend_root,resolver=N
   need(Path(backend_root)==runtime_profile.bundle.stage,'formal module backend root')
  original=resolver(Path(selected_renderer),Path(backend_root),**code_args);actual=resolver(consumer,Path(backend_root),**code_args)
  need(actual['library_sha256']==original['library_sha256']==component['library_sha256']and actual['library']==original['library'],'consumer and selected renderer require identical actual DSO')
- _capability(component,gpu,runner=capability_runner,require_companion=True,runtime_profile=runtime_profile)
+ capabilities=_capability(component,gpu,runner=capability_runner,require_companion=True,runtime_profile=runtime_profile)
+ if capability_sink is not None:capability_sink(capabilities)
  return actual
 
 def run_module(component,packet,output,case,gpu,nonce,cohort,check,identity):
@@ -265,7 +266,8 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
  need(0<page_size<=128 and 0<seconds<=600,'bounded original startup preparation page')
  selected_renderer=selected_renderer or environment.get('BB_GPU_PROCESS');backend_root=backend_root or component.get('backend_root')
  if not selected_renderer or not backend_root:return dict(status='unavailable',reason='selected renderer/packaged load-edge root unavailable',geometry_resolver=None)
- identity=coherent_component(component,gpu=gpu,selected_renderer=selected_renderer,backend_root=backend_root,resolver=identity_resolver,capability_runner=capability_runner,runtime_profile=runtime_profile)
+ capabilities={}
+ identity=coherent_component(component,gpu=gpu,selected_renderer=selected_renderer,backend_root=backend_root,resolver=identity_resolver,capability_runner=capability_runner,runtime_profile=runtime_profile,capability_sink=capabilities.update)
  need(len(cohort)==64 and all(x in'0123456789abcdef'for x in cohort),'compiler cohort identity')
  layout=component['native_layout'];catalog=json.loads(checked_bytes(Path(static_context['catalog']),limit=32*1024*1024)[0]);need(Path(catalog['game_root'])==Path(static_context['game_root']),'actual final game source root')
  table=lookup_table(list(rows(Path(static_context['index']))));need(len(caches)<=128,'selected cache count budget')
@@ -392,7 +394,13 @@ def prepare(static_context,*,project,caches,component,cohort,check=lambda:None,e
    try:ids.append(stage_input_identity(unit,stage,matches[0]['identity'],layout,catalog['game_identity']))
    except(ValueError,KeyError):return None
   return index['geometry'].get(geometry_recipe_identity(unit,ids,compiler,index['modules']))
- report=dict(schema=1,status='prepared'if not gaps else'partial',counts=dict(counts),gaps=dict(gaps),typed_companions=typed_report,compiler_identity=compiler,module_index=str(index_path),stage_links=dict(path=str(links_path),sha256=file_sha(links_path)),recipe_links=dict(path=str(recipes_path),sha256=file_sha(recipes_path)),static_identities=sum(map(len,table.values())),observed_static_identities=len(observed_static),static_without_observed_inputs=sum(map(len,table.values()))-len(observed_static),full_final_PSO_ready=False,runtime_cache_import_allowed=False,game_started=False,GPU_started=False)
+ from launcher_static_variants import prepare as prepare_static_variants
+ static_variants=prepare_static_variants(records=[row for values in table.values()for row in values],
+  units=selected_units(caches,gpu=gpu,state_root=state_root,title=catalog['game_identity']['TITLE_ID'],layout=layout,check=check,candidate_manifest=candidate_manifest),
+  layout=layout,catalog=catalog,table=table,component=component,identity=identity,root=root,gpu=gpu,
+  nonce=nonce,cohort=cohort,check=check,native_runner=native_runner,index=index,index_path=index_path,
+  atomic_json=atomic_json,capabilities=capabilities,seconds=max(0,min(120,seconds-(time.monotonic()-start))))
+ report=dict(schema=1,status='prepared'if not gaps and static_variants.get('status')not in('partial','deferred')else'partial',counts=dict(counts),gaps=dict(gaps),typed_companions=typed_report,static_variants=static_variants,compiler_identity=compiler,module_index=str(index_path),stage_links=dict(path=str(links_path),sha256=file_sha(links_path)),recipe_links=dict(path=str(recipes_path),sha256=file_sha(recipes_path)),static_identities=sum(map(len,table.values())),observed_static_identities=len(observed_static),static_without_observed_inputs=sum(map(len,table.values()))-len(observed_static),full_final_PSO_ready=False,runtime_cache_import_allowed=False,game_started=False,GPU_started=False)
  atomic_json(index_path,index)
  report['source_validated_module_reuses']=products.hits
  report['module_product_schedule_published']=products.publish()

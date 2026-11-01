@@ -12,7 +12,7 @@ TOOLS=('fex_launch.py','cpu_code_map.py','bbcpu_resume_catalog.py','bbcpu_launch
        'inventory_shader_cache.py','decode_shader_cache.py','game_shader_catalog.py',
        'launcher_game_catalog.py','launcher_game_modules.py','full_game_catalog.py',
        'gnm_shader_metadata.py','static_program_links.py','complete_pipeline_inputs.py',
-       'game_module_inputs.py','fetch_projection_inputs.py','owned_geometry_inputs.py',
+       'game_module_inputs.py','static_variant_inputs.py','launcher_static_variants.py','fetch_projection_inputs.py','owned_geometry_inputs.py',
        'game_pso_geometry_adapter.py','complete_geometry_psos.py','run_game_module_contracts.py',
        'prepare_fetch_capture_receipt.py','run_owned_geometry_contracts.py','launcher_source_view.py',
        'game_companion_modules.py','prepare_module_metadata.py','quick_restart_preparation.py','launcher_runtime_profile.py')

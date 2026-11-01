@@ -182,6 +182,15 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
   with manifest.open('rb')as stream:summary['manifest_sha256']=hashlib.file_digest(stream,'sha256').hexdigest()
   family='geometry-owned-source-existing-native-chain';summary.setdefault('eligible_by_family',{})[family]=geometry['admitted']
  else:summary['geometry_source_adapter']=dict(status='not-provided',admitted=0)
+ variants=module_inputs.get('static_variants',{})
+ if variants.get('recipes',0):
+  from launcher_static_variants import append_manifest
+  combined=run/'candidates-static-variants.jsonl'
+  with preparation_phase('static-variant-inputs'):
+   added=append_manifest(manifest,variants['manifest'],combined,check)
+  manifest=combined;summary['eligible']+=added;summary['records']=summary.get('records',0)+added
+  summary['static_variant_complete_inputs']=added
+  with manifest.open('rb')as stream:summary['manifest_sha256']=hashlib.file_digest(stream,'sha256').hexdigest()
  if summary['eligible']==0:
   result=dict(status='empty',scan=summary,capture_environment=capture_environment)
   # An exhaustively scanned empty anticipatory queue has no PSO to prewarm.

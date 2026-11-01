@@ -24,8 +24,24 @@ def validate_call(exit_code,result,output,packet,expected_rejection=False,reject
    raw,_=checked_bytes(output/'rejected-generated.spv',expected=rejected_diagnostic['sha256']);need(len(raw)==rejected_diagnostic['bytes'],'rejected diagnostic matches unmodified control')
   return
  need(exit_code==0 and result.get('status')=='completed','native compilation did not complete')
- need(all(result.get(k)is True for k in('expected_spirv_equal','current_generated_srt_verified','unknown_program_base_rejected_before_use')),'all native equivalence gates required')
+ need(all(result.get(k)is True for k in('current_generated_srt_verified','unknown_program_base_rejected_before_use')),'all native equivalence gates required')
  need(result.get('full_final_pso_ready')is False and result.get('program_hash')==packet['program_hash'],'module identity only, not PSO')
+ if 'static_derivation'in packet:
+  from static_variant_inputs import program_marker_equivalent
+  publication=result.get('static_variant_publication',{})
+  need(publication.get('schema')==1 and publication.get('permutation_index')==0 and
+       publication.get('only_program_source_marker_differs')is True and result.get('expected_spirv_equal')is False,
+       'static variant explicit source marker scope')
+  actual,_=checked_bytes(output/'module.spv',limit=512*1024,expected=result['spirv_sha256'])
+  expected,_=checked_bytes(Path(packet['expected_spirv']['path']),expected=packet['expected_spirv']['sha256'])
+  need(len(actual)==result['spirv_bytes']and program_marker_equivalent(expected,actual,
+       packet['static_derivation']['template_program_hash'],packet['program_hash']),
+       'independent complete SPIR-V program marker proof')
+  metadata,_=checked_bytes(output/'module.meta',limit=1024*1024,expected=publication['metadata_sha256'])
+  need(len(metadata)==publication['metadata_bytes']and set(p.name for p in output.iterdir())==
+       {'module.spv','module.meta','result.json'},'only exact static variant outputs')
+  return
+ need(result.get('expected_spirv_equal')is True,'original module byte equality required')
  actual,_=checked_bytes(output/'module.spv',expected=packet['expected_spirv']['sha256'])
  need(len(actual)==packet['expected_spirv']['bytes'] and result.get('spirv_bytes')==len(actual)and result.get('spirv_sha256')==packet['expected_spirv']['sha256'],'observed SPIR-V byte equality')
  need(set(p.name for p in output.iterdir())=={'module.spv','result.json'},'only exact module outputs')

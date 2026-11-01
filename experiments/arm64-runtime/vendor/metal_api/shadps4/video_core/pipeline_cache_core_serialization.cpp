@@ -12,6 +12,10 @@
 #include "shader_recompiler/profile_cache_wire.h"
 #include "video_core/cache_storage.h"
 #include "video_core/pipeline_cache_core.h"
+#include "static_variant_native.h"
+#if defined(__APPLE__)
+#include "static_variant_load.h"
+#endif
 #if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
 #include "fetch_compile_producer.h"
 #endif
@@ -24,6 +28,12 @@ static constexpr u32 PipelineKeyVersion = 5u; // bbport: Info layout (ImageResou
 } // namespace Serialization
 
 namespace VideoCore {
+
+std::vector<u8> EncodeShaderProfile(const Shader::Profile& profile) {
+    constexpr std::array<u32,4> versions{0x42425043u,Serialization::ShaderBinaryVersion,
+        Serialization::ShaderMetaVersion,Serialization::PipelineKeyVersion};
+    return Shader::ProfileCacheWire::Encode(profile,versions);
+}
 
 void RegisterPipelineData(const ComputePipelineKey& key, const PipelineSerialization& sdata) {
     if (!Storage::DataBase::Instance().IsOpened()) {
@@ -62,14 +72,9 @@ void RegisterPipelineData(const GraphicsPipelineKey& key, u64 hash,
                                        fmt::format("g_{:#018x}", hash), ar.TakeOff());
 }
 
-void RegisterShaderMeta(const Shader::Info& info,
-                        const std::optional<Shader::Gcn::FetchShaderData>& fetch_shader_data,
-                        const Shader::StageSpecialization& spec, size_t perm_hash,
-                        size_t perm_idx) {
-    if (!Storage::DataBase::Instance().IsOpened()) {
-        return;
-    }
-
+std::vector<u8> EncodeShaderMeta(const Shader::Info& info,
+                               const Shader::StageSpecialization& spec,
+                               u64 perm_hash,size_t perm_idx) {
     Serialization::Archive ar;
     Serialization::Writer meta{ar};
 
@@ -81,9 +86,20 @@ void RegisterShaderMeta(const Shader::Info& info,
 
     spec.Serialize(ar);
     info.Serialize(ar);
+    return ar.TakeOff();
+}
+
+void RegisterShaderMeta(const Shader::Info& info,
+                        const std::optional<Shader::Gcn::FetchShaderData>& fetch_shader_data,
+                        const Shader::StageSpecialization& spec, size_t perm_hash,
+                        size_t perm_idx) {
+    if (!Storage::DataBase::Instance().IsOpened()) {
+        return;
+    }
 
     Storage::DataBase::Instance().Save(Storage::BlobType::ShaderMeta,
-                                       fmt::format("{:#018x}", perm_hash), ar.TakeOff());
+                                       fmt::format("{:#018x}", perm_hash),
+                                       EncodeShaderMeta(info,spec,perm_hash,perm_idx));
 }
 
 void RegisterShaderBinary(std::vector<u32>&& spv, u64 pgm_hash, size_t perm_idx) {
@@ -330,6 +346,10 @@ bool PipelineCacheCore::LoadPipelineStage(Serialization::Archive& ar, size_t sta
 }
 
 void PipelineCacheCore::WarmUp() {
+#if defined(__APPLE__)
+    // Bind the small lazy store during loading, not on a new scene's first draw.
+    BbStaticVariant::Initialize();
+#endif
     if (!EmulatorSettings.IsPipelineCacheEnabled()) {
         return;
     }
@@ -345,7 +365,7 @@ void PipelineCacheCore::WarmUp() {
                                                Serialization::PipelineKeyVersion};
     const auto save_profile = [&] {
         Storage::DataBase::Instance().Save(Storage::BlobType::ShaderProfile, "profile",
-                                           Shader::ProfileCacheWire::Encode(profile, cache_versions));
+                                           EncodeShaderProfile(profile));
     };
     // Check both compiler/cache versions and the device profile.
     std::vector<u8> profile_data{};

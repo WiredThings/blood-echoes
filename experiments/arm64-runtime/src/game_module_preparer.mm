@@ -2,6 +2,8 @@
 // CPU-only, owned GCN retranslation. No Device, old Info/SRT reader or runtime cache.
 #include "preparation_json.h"
 #include "preparation_runtime_paths.h"
+#include "static_variant_spirv.h"
+#include "static_variant_native.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -273,7 +275,7 @@ int PrepareCompanion(const Json&p,const fs::path&root,const fs::path&output,std:
 }
 int main(int argc,char**argv){@autoreleasepool{
  if(argc==2&&std::string_view(argv[1])=="--capability"){
-  Json capability{{"schema",1},{"cpu_only",true},{"automatic_input_root","selected-owned-gpu/automatic-game-inputs-v1"},{"packet_schema",1},{"requires_nonce_and_cohort",true},{"maximum_input_bytes",MaxTotal}};
+  Json capability{{"schema",1},{"cpu_only",true},{"automatic_input_root","selected-owned-gpu/automatic-game-inputs-v1"},{"packet_schema",1},{"requires_nonce_and_cohort",true},{"maximum_input_bytes",MaxTotal},{"static_variant_publication_schema",1}};
   #if defined(BB_MODULE_DIAGNOSTIC)
   capability["diagnostic_only"]=true;
   #else
@@ -316,7 +318,8 @@ int main(int argc,char**argv){@autoreleasepool{
   #endif
   const bool geometry=p.at("kind")=="owned-gcn-geometry-module-input";
   const bool projection=p.at("kind")=="owned-gcn-fetch-projection-module-input";
-  Need(p.at("packet_schema")==1&&(p.at("kind")=="owned-gcn-module-input"||geometry||projection)&&p.at("candidate_only")==true&&p.at("runtime_cache_import_allowed")==false&&p.at("native_info_srt_allowed")==false,"module packet policy");
+  const bool static_variant=p.at("kind")=="owned-gcn-static-variant-input";
+  Need(p.at("packet_schema")==1&&(p.at("kind")=="owned-gcn-module-input"||geometry||projection||static_variant)&&p.at("candidate_only")==true&&p.at("runtime_cache_import_allowed")==false&&p.at("native_info_srt_allowed")==false,"module packet policy");
   auto c=p.at("constraints");Need(c.at("old_walker_execution_allowed")==false&&c.at("guest_dereference_allowed")==false&&c.at("final_runtime_import_allowed")==false&&c.at("requires_regenerated_srt_equality")==true&&c.at("requires_current_profile_match")==true,"module ownership constraints");
   Need(p.at("program_base").at("known")==false&&p.at("program_base").at("value")==Json{}&&p.at("program_base").at("required_gate")=="reject-offset-by-program-base","explicit unknown program base");
   Need(p.at("layout").at("bindings_size")==sizeof(Shader::Backend::Bindings)&&p.at("layout").at("runtime_size")==sizeof(Shader::RuntimeInfo)&&p.at("layout").at("profile_size")==sizeof(Shader::Profile),"actual native module layout");
@@ -362,21 +365,50 @@ int main(int argc,char**argv){@autoreleasepool{
   Need(actual.Valid()&&actual==spec,"retranslated specialization differs from captured state");
   auto words=Shader::Backend::SPIRV::EmitSPIRV(profile,runtime,ir,bindings);Need(!words.empty()&&words.size()<=512*1024/4,"bounded SPIR-V output");
   auto bytes=std::span<const u8>(reinterpret_cast<const u8*>(words.data()),words.size()*4);
+  const bool byte_exact=bytes.size()==expected.size()&&std::equal(bytes.begin(),bytes.end(),expected.begin());
+  bool marker_equivalent=false;
+  if(static_variant){
+   const auto& d=p.at("static_derivation");
+   Need(!geometry&&!projection&&(hw==Shader::HwStage::Fragment||hw==Shader::HwStage::Compute),"static variant plain FS/CS only");
+   Need(d.at("schema")==1&&d.at("algorithm")=="exact-code-header-observed-context-v1"&&
+        d.at("context_origin")=="complete-observed-input"&&d.at("descriptors_synthesized")==false&&
+        d.at("effective_target_context_claim")==false&&d.at("native_target_retranslation_required")==true&&
+        d.at("native_spirv_semantic_equality_required")==true&&
+        d.at("allowed_reference_difference")=="one-program-source-OpString","static variant complete derivation policy");
+   Need(d.at("template_source_provenance").at("code_sha256")==p.at("code").at("sha256")&&
+        p.at("source_provenance").at("code_sha256")==p.at("code").at("sha256")&&
+        Metal::FunctionIdentity::Hex(d.at("complete_header_contract_sha256").get<std::string>())&&
+        Metal::FunctionIdentity::Hex(d.at("template_header_variant").get<std::string>())&&
+        Metal::FunctionIdentity::Hex(d.at("target_header_variant").get<std::string>()),"static variant exact code/header proof");
+   const auto original_hash=Hash(d.at("template_program_hash")),target_hash=Hash(p.at("program_hash"));
+   Need(original_hash!=target_hash,"static variant distinct target hash");
+   const auto expected_words=Words(expected);
+   marker_equivalent=BbStaticVariant::ProgramMarkerEquivalent(expected_words,words,original_hash,target_hash);
+   Need(marker_equivalent,"static variant differs outside the one program source marker");
+  }
   #if defined(BB_MODULE_DIAGNOSTIC)
-  if(bytes.size()!=expected.size()||!std::equal(bytes.begin(),bytes.end(),expected.begin())){
+  if(!byte_exact&&!marker_equivalent){
    // Explicit development-only diagnostic, never a prepared module/cache entry.
    WriteExclusive(output/"rejected-generated.spv",bytes);
    CommitOutputs(); // Explicit diagnostic builds preserve their one rejected artifact.
   }
   #endif
-  Need(bytes.size()==expected.size()&&std::equal(bytes.begin(),bytes.end(),expected.begin()),"retranslated SPIR-V differs from observed module");
+  Need(byte_exact||marker_equivalent,"retranslated SPIR-V differs from observed module");
+  if(static_variant){
+   const auto encoded=VideoCore::EncodeShaderMeta(info,actual,HashCombine(Hash(p.at("program_hash")),u64{0}),0);
+   WriteExclusive(output/"module.meta",encoded);
+   result["static_variant_publication"]={{"schema",1},{"permutation_index",0},
+    {"permutation_hash",ProgramText(HashCombine(Hash(p.at("program_hash")),u64{0}))},
+    {"metadata_sha256",Metal::FunctionIdentity::Sha({reinterpret_cast<const char*>(encoded.data()),encoded.size()})},
+    {"metadata_bytes",encoded.size()},{"only_program_source_marker_differs",marker_equivalent}};
+  }
   Stop();WriteExclusive(output/"module.spv",bytes);
   result["module_retranslation_schema"]=1;
   result["input_packet_sha256"]=Metal::FunctionIdentity::Sha({reinterpret_cast<const char*>(raw_packet.data()),raw_packet.size()});
   result["input_code_sha256"]=p.at("code").at("sha256");result["input_spec_sha256"]=p.at("spec").at("sha256");result["input_profile_sha256"]=p.at("profile").at("sha256");
   result["hardware_stage"]=p.at("hardware_stage");result["logical_stage"]=p.at("logical_stage");result["source_provenance"]=p.at("source_provenance");
   if(geometry){result["gs_copy_sha256"]=p.at("gs_copy").at("code").at("sha256");result["gs_copy_source_provenance"]=p.at("gs_copy").at("source_provenance");}
-  result["status"]="completed";result["program_hash"]=p.at("program_hash");result["spirv_bytes"]=bytes.size();result["spirv_sha256"]=Metal::FunctionIdentity::Sha({reinterpret_cast<const char*>(bytes.data()),bytes.size()});result["expected_spirv_equal"]=true;result["current_generated_srt_verified"]=true;result["unknown_program_base_rejected_before_use"]=true;result["full_final_pso_ready"]=false;
+  result["status"]="completed";result["program_hash"]=p.at("program_hash");result["spirv_bytes"]=bytes.size();result["spirv_sha256"]=Metal::FunctionIdentity::Sha({reinterpret_cast<const char*>(bytes.data()),bytes.size()});result["expected_spirv_equal"]=byte_exact;result["current_generated_srt_verified"]=true;result["unknown_program_base_rejected_before_use"]=true;result["full_final_pso_ready"]=false;
   auto text=result.dump();WriteExclusive(output/"result.json",{reinterpret_cast<const u8*>(text.data()),text.size()});CommitOutputs();printf("GAME_MODULE_RESULT %s\n",text.c_str());return 0;
  }catch(const std::exception&e){result["status"]="rejected";result["error"]=e.what();printf("GAME_MODULE_RESULT %s\n",result.dump().c_str());return 65;}
 }}

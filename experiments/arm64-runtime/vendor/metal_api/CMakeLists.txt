@@ -291,6 +291,9 @@ else()
     set(BB_FETCH_CAPTURE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
 endif()
 target_include_directories(bbgpu PRIVATE ${BB_FETCH_CAPTURE_SRC})
+if(APPLE)
+    target_sources(bbgpu PRIVATE ${BB_FETCH_CAPTURE_SRC}/static_variant_load.cpp)
+endif()
 if(BB_DEV_FETCH_CAPTURE AND APPLE AND
    (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64" OR
     (NOT CMAKE_OSX_ARCHITECTURES AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")))

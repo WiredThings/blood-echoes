@@ -17,6 +17,9 @@
 
 #include "bb_shader_phase_audit.h"
 #include "common/hash.h"
+#if defined(__APPLE__)
+#include "static_variant_load.h"
+#endif
 #include "common/io_file.h"
 #include "common/path_util.h"
 #include "core/emulator_settings.h"
@@ -377,7 +380,11 @@ void PipelineCompilerDeleter::operator()(PipelineCompiler* compiler) const {
     delete compiler;
 }
 
-PipelineCacheCore::~PipelineCacheCore() = default;
+PipelineCacheCore::~PipelineCacheCore() {
+#if defined(__APPLE__)
+    BbStaticVariant::Report();
+#endif
+}
 
 void PipelineCacheCore::DestroyPipelines() {
     compiler.reset(); // joins the compile threads
@@ -1089,6 +1096,9 @@ ShaderModuleHandle PipelineCacheCore::CompileModule(Shader::Info& info, Shader::
                                               ,BbFetchCapture::CompileOutput* capture
 #endif
                                               ) {
+#if defined(__APPLE__)
+    BbStaticVariant::RuntimeCompile();
+#endif
 #if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
     std::optional<BbFetchCapture::CompileScope> fetch_record;
     if (!EmulatorSettings.IsPatchShaders() && !EmulatorSettings.IsDumpShaders() &&
@@ -1235,6 +1245,35 @@ PipelineCacheCore::Result PipelineCacheCore::GetProgram(PipelineSelection& sel, 
 
     auto it_pgm = program_cache.find(params.hash); // this thread is the only writer
     if (it_pgm == program_cache.end()) {
+#if defined(__APPLE__)
+        if(!EmulatorSettings.IsPatchShaders()&&!EmulatorSettings.IsDumpShaders()&&
+           !EmulatorSettings.IsShaderCollect()) {
+            if(auto prepared=BbStaticVariant::Load(profile,hw_stage,sw_stage,params,runtime_info,binding)) {
+                const auto name=GetShaderName(hw_stage,params.hash,0);
+                // Cached creation may cleanly refuse a driver-rejected binary.
+                // No program is published until the backend object exists.
+                ShaderModuleHandle module{};
+                try {module=CreateShaderModule(prepared->spirv,name,true);}
+                catch(const std::exception& e){std::fprintf(stderr,"Static shader backend declined: %.160s\n",e.what());}
+                if(module) {
+                    auto program=std::move(prepared->program);
+                    program->info.AddBindings(binding);
+                    const auto perm_hash=HashCombine(params.hash,u64{0});
+                    RegisterShaderMeta(program->info,prepared->spec.fetch_shader_data,prepared->spec,perm_hash,0);
+                    program->AddPermut(module,std::move(prepared->spec));
+#if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
+                    program->modules[0].capture_proof={BbFetchStore::WordDigest(prepared->spirv),prepared->spirv.size(),false};
+#endif
+                    RegisterShaderBinary(std::move(prepared->spirv),params.hash,0);
+                    program->info_template=std::make_unique<Shader::Info>(program->info);
+                    Program* adopted=program.get();
+                    {std::unique_lock lock{programs_mutex};program_cache.emplace(params.hash,std::move(program));}
+                    BbStaticVariant::Adopted(params.hash);
+                    return std::make_tuple(&adopted->info,module,adopted->modules[0].spec.fetch_shader_data,perm_hash);
+                }
+            }
+        }
+#endif
         auto new_program = std::make_unique<Program>(hw_stage, sw_stage, params);
         auto start = binding;
 #if defined(BB_DEV_FETCH_CAPTURE) && BB_DEV_FETCH_CAPTURE
