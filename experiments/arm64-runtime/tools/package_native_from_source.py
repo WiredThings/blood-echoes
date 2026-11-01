@@ -195,6 +195,7 @@ def _assemble(*,repository,native_source,build_root,renderer_build,cpu_build,
     write(engine/'ARM64-LOCAL-PREPARATION.json',local)
     native=dict(schema=1,default_enabled=True,minimum_os_major=27,production=True,
         game_runtime='fex-arm64',local_metal_preparation='auto',source_revision=revision,
+        metal_features=['recent-staging-reuse'],
         renderer_architecture='native arm64 FEX runtime and independent arm64 Metal host',
         frozen_runtime={name:sha(engine/name) for name in ROLE_PATHS})
     write(engine/'NATIVE-METAL.json',native)
