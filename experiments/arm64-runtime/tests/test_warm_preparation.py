@@ -109,6 +109,34 @@ class Warm(unittest.TestCase):
   unknown=self.cache/'unknown.key';products,current=self.product_events([unknown])
   with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
    self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def runtime_archive(self):
+  p=self.cache/'CUSA03173/metal/vertex-invariant-v1'/('pipelines-v3-'+'a'*64+'.binaryarchive');p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'authored runtime archive');return p
+ def test_runtime_archive_repack_is_not_a_required_input_change(self):
+  p=self.runtime_archive();products,current=self.product_events([p]);self.assertEqual(products['files'][str(p)][0],'runtime-archive-output')
+  p.write_bytes(b'new runtime-produced subset of PSOs')
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
+ def test_legacy_runtime_archive_registration_can_migrate_without_touching_bytes(self):
+  p=self.runtime_archive();products,current=self.product_events([p]);s=p.stat();products['files'][str(p)]=['file',*quick.file_sha(p),s.st_mode,s.st_uid,s.st_gid];p.write_bytes(b'repacked output')
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
+  self.assertEqual(p.read_bytes(),b'repacked output')
+ def test_new_runtime_archive_keeps_real_input_and_prepared_artifact_checks(self):
+  p=self.runtime_archive();products,current=self.product_events([p]);del products['files'][str(p)]
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
+  key=self.cache/'required.key';products,current=self.product_events([p,key]);key.write_bytes(b'actual new required input')
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+  blob=p.parent/('native-pipeline-artifacts-v1-'+'b'*64)/('c'*64+'-real.binaryarchive');blob.parent.mkdir();blob.write_bytes(b'required native artifact');products,current=self.product_events([p,blob]);blob.write_bytes(b'broken')
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def test_runtime_archive_alias_unsafe_mode_and_missing_file_refuse_reuse(self):
+  p=self.runtime_archive();products,current=self.product_events([p]);p.chmod(0o666)
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+  p.chmod(0o644);outside=self.f.root/'outside';outside.write_bytes(b'alias');p.unlink();p.symlink_to(outside)
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
+   self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+  p.unlink()
+  with self.assertRaises(OSError):quick._safe_runtime_archive(p,products['scope'])
+ def test_runtime_output_exemption_does_not_cover_other_paths_or_names(self):
+  for relative in('pipelines-v3-'+ 'a'*64+'.binaryarchive','CUSA01363/metal/pipelines-v3-'+ 'a'*64+'.binaryarchive','CUSA03173/metal/pipelines-v2.binaryarchive','CUSA03173/metal/other/pipelines-v3-'+ 'a'*64+'.binaryarchive'):
+   p=self.cache/relative;self.assertFalse(quick._runtime_archive_output(p,dict(roots=[str(self.cache)])))
  def test_changes_during_delta_hashing_or_immutable_snapshot_events_reject_reuse(self):
   p=self.cache/'pso.bin';products,current=self.product_events([p])
   with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=False):

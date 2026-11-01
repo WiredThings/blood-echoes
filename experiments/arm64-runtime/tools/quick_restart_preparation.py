@@ -205,6 +205,32 @@ def registered_local(local,check):
         return (result is not None and result[0]==local['BB_MTL_LOCAL_AOT_BUILD_ID']
             and byte_digest(canonical(registration.active['toolchain']['environment']))==local['BB_MTL_LOCAL_AOT_ENVIRONMENT_ID'])
 
+def _runtime_archive_output(path,scope):
+    """Only the native renderer's mutable, compatibility-namespaced main archive.
+
+    The prepare worker explicitly disables this archive; it builds independent
+    per-recipe archives instead. Runtime validates a private copy through Metal
+    and preserves/rejects unusable input itself. Repacking this optional output
+    is not a change to shader inputs or to those independently verified products.
+    """
+    path=Path(path)
+    if not re.fullmatch(r'pipelines-v3-[0-9a-f]{64}\.binaryarchive',path.name):return False
+    for name in scope['roots']:
+        root=Path(name)
+        if root.name!='cache' or not path.is_relative_to(root):continue
+        parts=path.relative_to(root).parts
+        if parts[:-1]in(('CUSA03173','metal'),('CUSA03173','metal','vertex-invariant-v1')):return True
+    return False
+
+def _safe_runtime_archive(path,scope,previous=None):
+    if not _runtime_archive_output(path,scope):return False
+    path=Path(path);s=path.lstat()
+    if path!=path.resolve(strict=True)or not stat.S_ISREG(s.st_mode)or s.st_nlink!=1 or s.st_uid!=os.getuid()or s.st_mode&0o022 or not 0<=s.st_size<=256*1024*1024:return False
+    # Legacy receipts retained their real bytes. Migrate only this exact output
+    # role, retaining its owner/mode and all other ordinary-product checks.
+    if previous is not None and previous[-3:]!=[s.st_mode,s.st_uid,s.st_gid]:return False
+    return True
+
 def _inventory(scope,context,check):
     """Once after complete preparation, retain exact mutable product bytes.
 
@@ -225,7 +251,9 @@ def _inventory(scope,context,check):
                 elif stat.S_ISREG(s.st_mode)and s.st_nlink==1 and 0<=s.st_size<=256*1024*1024:
                     total+=s.st_size
                     if total>1024*1024*1024:raise ValueError('warm product byte budget')
-                    if p.name=='startup-entry.json':
+                    if _runtime_archive_output(p,scope):
+                        row=['runtime-archive-output',s.st_mode,s.st_uid,s.st_gid]
+                    elif p.name=='startup-entry.json':
                         from pso_startup_schedule import startup_preference
                         preference=startup_preference(p,check)
                         if preference is None:raise ValueError('invalid prepared artifact preference')
@@ -264,6 +292,11 @@ def _products_current(products,context,check,diagnostic=None):
         if any(path==p or path.is_relative_to(p)for p in immutable):return False
         if time.monotonic()>=next_check:check();next_check=time.monotonic()+.1
         row=products['files'].get(str(path))
+        if _runtime_archive_output(path,scope):
+            at('runtime-archive-output',path)
+            if row is not None and row[0]not in('file','runtime-archive-output'):return False
+            if not _safe_runtime_archive(path,scope,row):return False
+            continue
         if row is None:
             # These private native writers' uncommitted temporary names are
             # never input. Ignore only an exact known shape AND absent node.
