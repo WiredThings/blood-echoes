@@ -110,6 +110,27 @@ class Products(unittest.TestCase):
         p=self.create();current=dict(spec='A');attempt=p.begin_native('author-successful-contract',self.entry,current,[self.packet,self.case/'output/module.spv'])
         (self.case/'output/unexpected.bin').write_bytes(b'extra output')
         self.assertFalse(p.record_native(attempt))
+    def legacy_entry(self,*,other_state=False,other_compiler=False):
+        import shutil
+        state=self.base/'state';new=state/'gui-gpu-local-aot-101/automatic-game-inputs'/('a'*64)
+        new.mkdir(parents=True);self.root=new
+        old=(self.base/'other-state'if other_state else state)/'gui-gpu-local-aot-100/arm64-native-v1/automatic-game-inputs'/('d'*64 if other_compiler else'a'*64)
+        case=old/self.case.name;shutil.copytree(self.case,case)
+        entry=dict(self.entry,packet=str(case/'input/packet.json'),receipt=str(case/'output/result.json'),spirv=str(case/'output/module.spv'))
+        return entry,[entry['packet'],entry['receipt'],entry['spirv']]
+    def test_registered_same_compiler_legacy_generic_contract_keeps_real_paths(self):
+        entry,paths=self.legacy_entry();current=dict(spec='A');p=self.create()
+        attempt=p.begin_native('generic-module',entry,current,paths);self.assertIsNotNone(attempt)
+        self.assertTrue(p.record_native(attempt));self.assertTrue(p.publish())
+        self.assertTrue(self.create().reuse_native('generic-module',entry,current))
+        Path(entry['spirv']).write_bytes(b'changed legacy output')
+        self.assertFalse(self.create().reuse_native('generic-module',entry,current))
+    def test_legacy_different_state_root_is_not_a_native_proof_scope(self):
+        entry,paths=self.legacy_entry(other_state=True)
+        self.assertIsNone(self.create().begin_native('generic-module',entry,dict(spec='A'),paths))
+    def test_legacy_different_compiler_is_not_a_native_proof_scope(self):
+        entry,paths=self.legacy_entry(other_compiler=True)
+        self.assertIsNone(self.create().begin_native('generic-module',entry,dict(spec='A'),paths))
     def test_symlink_or_hardlink_in_product_set_never_grants_byte_proof(self):
         self.registered();p=self.case/'input/code.bin';old=p.read_bytes();outside=self.base/'outside';outside.write_bytes(old)
         p.unlink();p.symlink_to(outside)

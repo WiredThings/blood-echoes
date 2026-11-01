@@ -73,9 +73,32 @@ class ModuleProducts:
         key=self.identity(entry)
         if key is not None:self.verified[uid]=key
 
-    def _native_pin(self,path):
+    def _legacy_case(self,entry):
+        """One indexed generic module from the SAME compiler, not a search root.
+
+        COW cache migration retains original packet/receipt paths. The normal
+        full validator already admits these; retain that real provenance rather
+        than rewriting packets or receipts to manufacture local-path matches.
+        """
+        try:
+            packet=Path(entry['packet']).absolute();case=packet.parent.parent;root=case.parent
+            if root==self.root:return None
+            if not CASE.fullmatch(case.name)or packet!=case/'input/packet.json':return None
+            if Path(entry['receipt'])!=case/'output/result.json'or Path(entry['spirv'])!=case/'output/module.spv':return None
+            if root.name!=self.root.name or root.parent.name!=self.root.parent.name or self.root.parent.name!='automatic-game-inputs':return None
+            def state(gpu):
+                if gpu.name=='arm64-native-v1':gpu=gpu.parent
+                if not re.fullmatch(r'gui-gpu-local-aot-[0-9]+',gpu.name):raise ValueError('registered GPU root')
+                return gpu.parent
+            if state(root.parent.parent)!=state(self.root.parent.parent):return None
+            return case
+        except(OSError,ValueError,KeyError,TypeError):return None
+
+    def _native_pin(self,path,entry=None):
         path=Path(path).absolute()
         allowed=(self.root,self.root.parent.parent/'cache')
+        legacy=self._legacy_case(entry)if entry is not None else None
+        if legacy is not None:allowed+= (legacy,)
         if path!=path.resolve(strict=True)or not any(path.is_relative_to(r)for r in allowed):raise ValueError('native module proof scope')
         info=path.lstat()
         if not stat.S_ISREG(info.st_mode)or info.st_uid!=os.getuid()or info.st_nlink!=1 or info.st_mode&0o022 or not 0<info.st_size<=2*1024*1024:raise ValueError('native module proof file')
@@ -84,9 +107,10 @@ class ModuleProducts:
     def native_key(self,kind,entry,current):
         return digest(dict(schema=1,kind=kind,entry=entry,current=current))
 
-    def _native_directory_pin(self,path):
+    def _native_directory_pin(self,path,entry=None):
         path=Path(path).absolute()
-        if path!=path.resolve(strict=True)or path==self.root or not path.is_relative_to(self.root):raise ValueError('native module directory scope')
+        legacy=self._legacy_case(entry)if entry is not None else None
+        if path!=path.resolve(strict=True)or path==self.root or not(path.is_relative_to(self.root)or legacy is not None and path.is_relative_to(legacy)):raise ValueError('native module directory scope')
         info=path.lstat()
         if not stat.S_ISDIR(info.st_mode)or info.st_uid!=os.getuid()or info.st_mode&0o022:raise ValueError('native module directory')
         return stat_stamp(info)
@@ -105,31 +129,33 @@ class ModuleProducts:
             files=row['files']
             if set(row)!={'files','directories'}or not isinstance(files,dict)or not 1<=len(files)<=128:return False
             dirs=row['directories']
-            expected={str(Path(p).parent)for p in files if Path(p).parent.is_relative_to(self.root)}
+            legacy=self._legacy_case(entry)
+            expected={str(Path(p).parent)for p in files if Path(p).parent.is_relative_to(self.root)or legacy is not None and Path(p).parent.is_relative_to(legacy)}
             if not isinstance(dirs,dict)or set(dirs)!=expected:return False
-            if any(self._native_directory_pin(p)!=pin for p,pin in dirs.items()):return False
+            if any(self._native_directory_pin(p,entry)!=pin for p,pin in dirs.items()):return False
             for path,pin in files.items():
                 self.check()
-                if self._native_pin(path)!=pin:return False
+                if self._native_pin(path,entry)!=pin:return False
             self.native_verified[key]=row;self.native_hits+=1;return True
         except(OSError,ValueError,KeyError,TypeError):return False
 
     def begin_native(self,kind,entry,current,paths):
         try:
             if not self.readonly_source:return None
-            files={str(Path(p).absolute()):self._native_pin(p)for p in paths}
+            files={str(Path(p).absolute()):self._native_pin(p,entry)for p in paths}
             if not 1<=len(files)<=128:return None
-            dirs={str(Path(p).parent):self._native_directory_pin(Path(p).parent)for p in files if Path(p).parent.is_relative_to(self.root)}
-            return self.native_key(kind,entry,current),dict(files=files,directories=dirs)
+            legacy=self._legacy_case(entry)
+            dirs={str(Path(p).parent):self._native_directory_pin(Path(p).parent,entry)for p in files if Path(p).parent.is_relative_to(self.root)or legacy is not None and Path(p).parent.is_relative_to(legacy)}
+            return self.native_key(kind,entry,current),dict(files=files,directories=dirs),entry
         except(OSError,ValueError,KeyError,TypeError):return None
 
     def record_native(self,attempt):
         """Call only AFTER the original successful full semantic validation."""
         if attempt is None:return False
-        key,row=attempt
+        key,row,entry=attempt
         try:
-            if any(self._native_pin(p)!=pin for p,pin in row['files'].items()):return False
-            if any(self._native_directory_pin(p)!=pin for p,pin in row['directories'].items()):return False
+            if any(self._native_pin(p,entry)!=pin for p,pin in row['files'].items()):return False
+            if any(self._native_directory_pin(p,entry)!=pin for p,pin in row['directories'].items()):return False
             self.native_verified[key]=row;return True
         except(OSError,ValueError,KeyError,TypeError):return False
 
