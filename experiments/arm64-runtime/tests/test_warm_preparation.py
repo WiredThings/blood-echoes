@@ -111,6 +111,29 @@ class Warm(unittest.TestCase):
    self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
  def runtime_archive(self):
   p=self.cache/'CUSA03173/metal/vertex-invariant-v1'/('pipelines-v3-'+'a'*64+'.binaryarchive');p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'authored runtime archive');return p
+ def runtime_writer_temporaries(self):
+  parent=self.runtime_archive().parent
+  artifacts=parent/('native-pipeline-artifacts-v1-'+'b'*64);artifacts.mkdir()
+  return(parent/'1392D6EC-4FD9-40DA-BC27-3F35BAA3B5E6.metallib',artifacts/('c'*64+'.candidate-123-4'))
+ def test_disappeared_native_candidate_and_metal_uuid_events_keep_preparation(self):
+  paths=self.runtime_writer_temporaries();products,current=self.product_events(paths)
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True),patch.object(quick,'_inventory',side_effect=AssertionError('full cache traversal')):
+   self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
+ def test_existing_native_candidate_uuid_file_or_dangling_link_is_not_ignored(self):
+  library,candidate=self.runtime_writer_temporaries();products,current=self.product_events([library])
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
+   library.write_bytes(b'uncommitted Metal library');self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+   library.unlink();library.symlink_to(self.f.root/'missing');self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+  library.unlink();products,current=self.product_events([candidate]);candidate.mkdir()
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def test_missing_registered_uuid_library_is_still_a_missing_product(self):
+  library,_=self.runtime_writer_temporaries();library.write_bytes(b'registered real bytes');products,current=self.product_events([library]);library.unlink()
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):
+   with self.assertRaises(FileNotFoundError):quick._products_current(products,self.f.context,lambda:None)
+ def test_runtime_temporary_exemption_requires_exact_writer_parent_and_name(self):
+  library,candidate=self.runtime_writer_temporaries();scope=dict(roots=[str(self.cache)])
+  for p in(self.cache/library.name,library.parent/'wrong.metallib',library.with_suffix('.meta'),candidate.parent.parent/candidate.name,candidate.with_suffix('.candidate-123-x'),candidate.parent/('d'*64+'.json')):
+   self.assertFalse(quick._absent_runtime_temporary(p,scope),str(p))
  def test_runtime_archive_repack_is_not_a_required_input_change(self):
   p=self.runtime_archive();products,current=self.product_events([p]);self.assertEqual(products['files'][str(p)][0],'runtime-archive-output')
   p.write_bytes(b'new runtime-produced subset of PSOs')

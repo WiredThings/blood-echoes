@@ -231,6 +231,34 @@ def _safe_runtime_archive(path,scope,previous=None):
     if previous is not None and previous[-3:]!=[s.st_mode,s.st_uid,s.st_gid]:return False
     return True
 
+def _absent_runtime_temporary(path,scope):
+    """Discarded writer names, never committed artifacts or missing inputs.
+
+    Native PSO publication renames its key.candidate-pid-sequence directory.
+    Metal archive serialization also leaves events for transient UUID libraries
+    beside the archive. The final archive/receipt/library remains independently
+    registered and checked; an existing or previously registered node is never
+    exempted here.
+    """
+    path=Path(path)
+    if os.path.lexists(path):return False
+    for name in scope['roots']:
+        root=Path(name)
+        if not path.is_relative_to(root):continue
+        if re.fullmatch(r'\.pending-[0-9]+-[0-9]+|[A-Za-z0-9_.-]+\.tmp(?:-[0-9]+-[0-9]+)?',path.name):return True
+        if root.name!='cache':continue
+        parts=path.relative_to(root).parts
+        for prefix in (('CUSA03173','metal'),('CUSA03173','metal','vertex-invariant-v1')):
+            uuid=re.fullmatch(r'[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}\.metallib',path.name)
+            candidate=(len(parts)==len(prefix)+2 and parts[:len(prefix)]==prefix
+                and re.fullmatch(r'native-pipeline-artifacts-v1-[0-9a-f]{64}',parts[-2])
+                and re.fullmatch(r'[0-9a-f]{64}\.candidate-[0-9]+-[0-9]+',path.name))
+            if (parts[:-1]==prefix and uuid)or candidate:
+                try:directory(path.parent)
+                except(OSError,ValueError):return False
+                return True
+    return False
+
 def _inventory(scope,context,check):
     """Once after complete preparation, retain exact mutable product bytes.
 
@@ -300,8 +328,7 @@ def _products_current(products,context,check,diagnostic=None):
         if row is None:
             # These private native writers' uncommitted temporary names are
             # never input. Ignore only an exact known shape AND absent node.
-            temp=re.fullmatch(r'\.pending-[0-9]+-[0-9]+|[A-Za-z0-9_.-]+\.tmp(?:-[0-9]+-[0-9]+)?',path.name)
-            if temp and not os.path.lexists(path)and any(path.is_relative_to(Path(r))for r in scope['roots']):continue
+            if _absent_runtime_temporary(path,scope):continue
             at('unregistered-event',path)
             return False
         s=path.lstat()
