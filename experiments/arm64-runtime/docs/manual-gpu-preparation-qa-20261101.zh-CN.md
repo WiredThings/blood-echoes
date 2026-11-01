@@ -40,3 +40,17 @@ Shared 原错误证据：`evidence/manual-static-prewarm-1793531250044454000`，
 自动检查完成后才将**同一个QA**前端切到已验证根；重开PID初始35588。手动配置再次通过FORBIDDEN检查，无pad、file-only、帧采样、纹理抓取或录屏变量。此前暂拟的export-only交接脚本没有执行，也没有据其声称获得实际用户路径的暖启动结果。当前打开的是正常输入启动器，等待用户手动启动后的新真实Swift凭据及日志复核，不宣称暖启动/F3耗时已完成优化。
 
 修正证据：Shared `evidence/manual-qa-cache-repair-1793537890335026000`（plan、两轮console/result、adoption-summary、promotion-result、原偏好备份及原始日志）。未修改正式数据或发布Release。
+
+## 用户手动进场复核
+
+实际Swift凭据source_pid=35588，与重新打开的同一QA相符；BB_GPU_USER_DIR正是已验证的新根。无pad/file-only/record/replay/frame-timing变量，FEX与quicksave=1保持。
+
+此次357库请求全部跳过，补建0；313完整管线全部native hit、补建0。原始资源、快照、静态目录的摘要读取均0。仍有模块准备23.71秒和完整管线准备/验证37.73秒，game-preparation共64.69秒，不能宣称暖启动调度已收尾。FEX export/scanner/compiler均0。
+
+运行时确认Local命中，但真实游玩覆盖仍有缺口：首份读取快照399次Local、68次source；后续核对为70次source、62个不同输入。对这62个键逐一查当前cohort的分片requests及artifacts：请求均在本次启动后创建，当前没有对应编译产物；cohort与已有命中一致。不是再次接错目录或已有产物被整体失效，也不能因此认定静态方法无法覆盖它们。下一步若推进覆盖，必须沿这些真实输入分析依赖，不能猜描述符。
+
+首份读取快照有24条慢编译记录，最慢顶点编译272.8ms、图形管线准备132.0ms；无Error级日志。静态派生记录的直接采用日志仍为0，与已有普通模块缓存优先命中的边界区分。之前自动固定场景source=0只适用于该场景，没有扩展为所有游玩零编译承诺。
+
+随后归档的完整快照累计409次Local、77次source（69个不同输入）、28条慢编译；69个键仍全部只有本次新增请求、没有编译产物，Error级日志0。计数随用户探索变化，不将不同快照拼成一个固定样本。私有快照与摘要位于 `/private/tmp/blood-echoes-manual-adoption-1793539325826405000`。
+
+本轮只读日志/当前新QA缓存元数据，继续开放用户输入，无Cua/截图/录屏、额外抓取或游戏进程操作，不改正式数据与Release。
