@@ -30,6 +30,7 @@ struct LaunchPreparationProgress: Equatable {
         "candidate-scan": (77, 79, "Checking pipeline inputs…"),
         "module-inputs": (79, 84, "Preparing game shaders…"),
         "geometry-inputs": (84, 86, "Preparing game shaders…"),
+        "static-variant-inputs": (85, 86, "Preparing game shaders…"),
         "complete-pso": (86, 93, "Preparing game pipelines…"),
         "local-finalize": (93, 98, "Saving preparation results…"),
     ]

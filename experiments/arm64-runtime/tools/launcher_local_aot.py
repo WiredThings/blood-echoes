@@ -17,7 +17,7 @@ VALIDATION_OPTIONS = ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPE
 _pending_signal = 0
 PREPARATION_PHASES = frozenset(('archive-policy', 'local-libraries', 'fixed-helpers',
     'game-preparation', 'source-view', 'static-catalog', 'capture-receipt',
-    'candidate-scan', 'module-inputs', 'geometry-inputs', 'complete-pso', 'local-finalize'))
+    'candidate-scan', 'module-inputs', 'geometry-inputs', 'static-variant-inputs', 'complete-pso', 'local-finalize'))
 
 
 def _phase_message(phase, event, started=None, outcome=None):
