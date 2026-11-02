@@ -1,5 +1,5 @@
 """Author-only native-record codec, incremental publication and full-key controls."""
-import copy, hashlib, json, struct, sys, unittest
+import copy, hashlib, json,shutil,struct, sys, unittest
 from pathlib import Path
 sys.path[:0]=[str(Path(__file__).resolve().parent),str(Path(__file__).resolve().parents[1]/'tools')]
 import test_static_variant_inputs as inputs
@@ -53,6 +53,32 @@ class Controller(unittest.TestCase):
         self.assertEqual(before,{p:p.read_bytes()for p in before})
     def test_warm_publication_reuses_without_another_compiler_child(self):
         self.prepare();r=self.prepare();self.assertEqual(r['counts']['reused'],1);self.assertEqual(self.calls,1)
+    def relocated(self):
+        self.prepare();newroot=self.root.with_name('relocated-modules');newgpu=self.gpu.with_name('relocated-gpu')
+        shutil.copytree(self.root,newroot);shutil.copytree(self.gpu,newgpu)
+        return newroot,newgpu,copy.deepcopy(self.index)
+    def test_relocated_cache_reconstructs_current_inputs_without_reading_old_root(self):
+        root,gpu,index=self.relocated();self.root.rename(self.root.with_name('preserved-original-modules'))
+        r=self.prepare(root=root,gpu=gpu,index=index,index_path=root/'index.json')
+        self.assertEqual(r['counts']['reused'],1);self.assertEqual(self.calls,1)
+        recipe=json.loads(Path(r['manifest']['path']).read_text().splitlines()[0])
+        self.assertTrue(Path(recipe['namespace']['cache']).is_relative_to(root))
+        for s in recipe['stages']:
+            self.assertTrue(Path(s['metadata']['path']).is_relative_to(root));self.assertTrue(Path(s['spirv']['path']).is_relative_to(root))
+    def test_relocated_corrupt_local_bytes_are_not_hidden_by_healthy_original(self):
+        root,gpu,index=self.relocated();entry=next(iter(index['static_variants'].values()))
+        folder=root/Path(entry['pipeline_input']).parent.name/'pipeline-cache'
+        next(folder.glob('*.spv')).write_bytes(b'bad copied SPIRV')
+        r=self.prepare(root=root,gpu=gpu,index=index,index_path=root/'index.json')
+        self.assertEqual(r['counts']['reused'],0);self.assertEqual(self.calls,2)
+        self.assertTrue(list((gpu/'automatic-game-inputs/static-native-variants').rglob('*.retired-*')))
+    def test_relocated_full_decoded_state_mismatch_never_becomes_same_input(self):
+        root,gpu,index=self.relocated();entry=next(iter(index['static_variants'].values()))
+        path=root/Path(entry['pipeline_input']).parent.name/'pipeline-input.json'
+        recipe=json.loads(path.read_text());recipe['key']['decoded']['unexpected-state']='changed'
+        path.write_text(json.dumps(recipe));entry['pipeline_input_sha256']=hashlib.sha256(path.read_bytes()).hexdigest()
+        r=self.prepare(root=root,gpu=gpu,index=index,index_path=root/'index.json')
+        self.assertEqual(r['counts']['reused'],0);self.assertEqual(self.calls,2)
     def test_corrupt_record_is_preserved_and_locally_repaired(self):
         self.prepare();path,_=self.entry();bad=path.read_bytes()[:-1];path.write_bytes(bad)
         r=self.prepare();self.assertEqual(r['counts']['prepared'],1);self.assertEqual(self.calls,2)

@@ -4,7 +4,7 @@ Only FS/CS and one actual complete context per target/profile. Native records
 are read lazily on first use; this phase does not enlarge a live object cache.
 """
 from pathlib import Path
-import hashlib, json, os, secrets, struct, time
+import copy,hashlib, json, os,re,secrets, struct, time
 from game_module_inputs import need
 from game_pso_owned_audit import checked_bytes, metadata_sections
 from game_pso_candidates import cache_records
@@ -89,6 +89,43 @@ def pipeline_input(candidate,packet,result,output,layout,destination,check):
     return units[0]
 
 
+def cached_pipeline_input(entry,*,root,uid,layout,check):
+    """Reconstruct locations through the ORIGINAL full cache reader.
+
+    Copied caches contain source-location provenance, not permission to read
+    the previous root. Never follow those absolute paths or edit descriptors.
+    The current local files must reconstruct the exact same complete input
+    after removing only independently validated location-derived hashes.
+    """
+    root=Path(root);need(root==root.resolve(strict=True),'canonical current variant root')
+    oldpath=Path(entry['pipeline_input']);name=oldpath.parent.name
+    need(oldpath.name=='pipeline-input.json'and re.fullmatch('static-variant-'+re.escape(uid)+'-[0-9a-f]{12}',name),
+         'exact indexed variant case')
+    path=root/name/'pipeline-input.json'
+    data,_=checked_bytes(path,limit=256*1024,expected=entry['pipeline_input_sha256'])
+    old=json.loads(data);oldcache=oldpath.parent/'pipeline-cache'
+    need(old['namespace']['cache']==str(oldcache),'indexed variant cache-local recipe')
+    cache=path.parent/'pipeline-cache';need(cache==cache.resolve(strict=True),'canonical current variant cache')
+    fresh=[r for r in cache_records(cache,layout,check)if r.get('record_type')=='offline-pso-input']
+    need(len(fresh)==1,'one complete reconstructed variant recipe')
+    from game_pso_progress_identity import input_identity
+    from game_pso_candidates import digest
+    def content(unit):
+        input_identity(unit) # Validate BOTH original full scope/read-set hashes.
+        need(unit['recipe_blob_identity']==digest(dict(profile=unit['profile']['semantic_sha256'],
+             key=unit['key']['reference']['sha256'],stages=unit['stages'])),'original recipe content identity')
+        result=copy.deepcopy(unit)
+        result['namespace'].pop('cache');result['namespace'].pop('cache_id')
+        refs=[result['profile']['reference'],result['key']['reference']]
+        for stage in result['stages']:refs.extend((stage['metadata'],stage['spirv']))
+        for ref in refs:ref.pop('path') # Name, size, digest and ALL decoded state remain.
+        result.pop('recipe_blob_identity')
+        result['execution_policy']['candidate_preparation'].pop('frozen_input_set_identity')
+        return result
+    need(content(old)==content(fresh[0]),'reconstructed variant input content changed')
+    return fresh[0]
+
+
 def prepare(*,records,units,layout,catalog,table,component,identity,root,gpu,nonce,cohort,
             check,native_runner,index,index_path,atomic_json,capabilities=None,seconds=120):
     if (capabilities or {}).get('static_variant_publication_schema')!=1:
@@ -112,8 +149,7 @@ def prepare(*,records,units,layout,catalog,table,component,identity,root,gpu,non
         if entry is not None:
             try:
                 verify_record(store/filename,entry,wanted,profile,compiler)
-                data,_=checked_bytes(Path(entry['pipeline_input']),expected=entry['pipeline_input_sha256'])
-                recipes.append(json.loads(data));counts['reused']+=1;continue
+                recipes.append(cached_pipeline_input(entry,root=root,uid=uid,layout=layout,check=check));counts['reused']+=1;continue
             except(ValueError,OSError,KeyError,TypeError):
                 # Preserve a damaged/new-format record; never replace silently.
                 if os.path.lexists(store/filename):

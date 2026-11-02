@@ -288,8 +288,9 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
   if len(report['events_preview'])<PREVIEW_MAX:report['events_preview'].append(v)
   if event_sink:event_sink(v)
   if progress_sink is not None and report['event_count']%16==0:
-   progress_sink(dict(kind='collect'if state.startswith('collected-')else'pipelines',
-       done=report['collected']if state.startswith('collected-')else report['visited'],total=queue.total()))
+   collecting=cycle is not None and cycle['stage']=='collect'
+   done=report['collected']+report['scheduled_reused']if collecting else report['visited']+report['provisional_native']
+   progress_sink(dict(kind='collect'if collecting else'pipelines',done=min(queue.total(),done),total=queue.total()))
  def finish(item,state,*,recorded=False,row=None):
   report['visited']+=1;report[state]+=1;queue.mark(item,run,ready=state=='completed',recorded=recorded or state=='completed');event(item,state,worker_phase=row.get('phase')if row else None)
  def covered(item,kind,outcome):

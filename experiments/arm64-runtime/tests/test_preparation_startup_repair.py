@@ -147,4 +147,15 @@ class AdoptionTests(unittest.TestCase):
   result=builder.build(f.root,f.cohort,enabled=True,guard=f.guard,toolchain=chain,progress=updates.append)
   self.assertEqual(result['status'],'passed');self.assertEqual(updates[0],dict(kind='libraries',done=0,total=1));self.assertEqual(updates[-1],dict(kind='libraries',done=1,total=1))
 
+class QueueProgressTests(unittest.TestCase):
+ def test_provisional_ready_work_advances_progress_without_committing_it_early(self):
+  import test_game_pso_queue as fixtures
+  f=fixtures.Controls();f.setUp();self.addCleanup(f.tearDown)
+  f.write(fixtures.unit(i)for i in range(100));trace=[]
+  r=f.run_queue(progress_sink=trace.append)
+  self.assertEqual(r['status'],'completed')
+  prepared=[x['done']for x in trace if x['kind']=='pipelines']
+  self.assertTrue(prepared);self.assertGreater(min(prepared),0);self.assertEqual(prepared,sorted(prepared))
+  self.assertTrue(all(0<=x['done']<=x['total']==100 for x in trace))
+
 if __name__=='__main__':unittest.main()
