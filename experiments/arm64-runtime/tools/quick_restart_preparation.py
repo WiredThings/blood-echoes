@@ -1,6 +1,6 @@
 """Same-supervisor F3 scheduling hint, never an artifact or source authority."""
 from pathlib import Path
-import hashlib,json,os,re,shlex,stat,subprocess,time
+import hashlib,json,os,re,shlex,sqlite3,stat,subprocess,time
 from launcher_game_catalog import directory,file_sha,digest,read_ready,write_json
 from game_pso_owned_audit import checked_bytes
 
@@ -266,35 +266,50 @@ def _inventory(scope,context,check):
     files named by continuous journal events are re-read next time; never stat
     or hash every product on an ordinary hit. Source snapshot events stay strict.
     """
-    immutable={context['generation'],context['game_root']};rows={};total=0;next_check=0
-    for name in scope['roots']:
-        if name in immutable:continue
-        root=directory(name)
-        for parent,dirs,files in os.walk(root,followlinks=False):
-            for p in [Path(parent),*(Path(parent)/n for n in files)]:
-                if time.monotonic()>=next_check:check();next_check=time.monotonic()+.1
-                s=p.lstat()
-                if p!=p.resolve(strict=True)or s.st_uid!=os.getuid()or s.st_mode&0o022:raise ValueError('unsafe warm product')
-                if stat.S_ISDIR(s.st_mode):row=['directory',s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid]
-                elif stat.S_ISREG(s.st_mode)and s.st_nlink==1 and 0<=s.st_size<=256*1024*1024:
-                    total+=s.st_size
-                    if total>1024*1024*1024:raise ValueError('warm product byte budget')
-                    if _runtime_archive_output(p,scope):
-                        row=['runtime-archive-output',s.st_mode,s.st_uid,s.st_gid]
-                    elif p.name=='startup-entry.json':
-                        from pso_startup_schedule import startup_preference
-                        preference=startup_preference(p,check)
-                        if preference is None:raise ValueError('invalid prepared artifact preference')
-                        row=['preference',preference,s.st_mode,s.st_uid,s.st_gid]
-                    else:row=['file',*file_sha(p),s.st_mode,s.st_uid,s.st_gid]
-                else:raise ValueError('nonplain warm product')
-                rows[str(p)]=row
-                if len(rows)>20000:raise ValueError('warm product count budget')
-            # Do not let os.walk silently skip linked directories.
-            for n in dirs:directory(Path(parent)/n)
-    check();return rows
+    from warm_product_inventory import Writer
+    immutable={context['generation'],context['game_root']};rows={};total=0;next_check=0;writer=None
+    try:
+        for name in scope['roots']:
+            if name in immutable:continue
+            root=directory(name)
+            for parent,dirs,files in os.walk(root,followlinks=False):
+                for p in [Path(parent),*(Path(parent)/n for n in files)]:
+                    if time.monotonic()>=next_check:check();next_check=time.monotonic()+.1
+                    s=p.lstat()
+                    if p!=p.resolve(strict=True)or s.st_uid!=os.getuid()or s.st_mode&0o022:raise ValueError('unsafe warm product')
+                    if stat.S_ISDIR(s.st_mode):row=['directory',s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid]
+                    elif stat.S_ISREG(s.st_mode)and s.st_nlink==1 and 0<=s.st_size<=256*1024*1024:
+                        total+=s.st_size
+                        if total>1024*1024*1024:raise ValueError('warm product byte budget')
+                        if _runtime_archive_output(p,scope):
+                            row=['runtime-archive-output',s.st_mode,s.st_uid,s.st_gid]
+                        elif p.name=='startup-entry.json':
+                            from pso_startup_schedule import startup_preference
+                            preference=startup_preference(p,check)
+                            if preference is None:raise ValueError('invalid prepared artifact preference')
+                            row=['preference',preference,s.st_mode,s.st_uid,s.st_gid]
+                        else:row=['file',*file_sha(p),s.st_mode,s.st_uid,s.st_gid]
+                    else:raise ValueError('nonplain warm product')
+                    if writer is None and len(rows)>=256:
+                        writer=Writer(context,check)
+                        for key,value in rows.items():writer.add(key,value)
+                        rows.clear()
+                    if writer is None:rows[str(p)]=row
+                    else:writer.add(str(p),row)
+                # Do not let os.walk silently skip linked directories.
+                for n in dirs:directory(Path(parent)/n)
+        check();return writer.finish()if writer is not None else rows
+    except sqlite3.DatabaseError as error:
+        raise ValueError('invalid warm product inventory')from error
+    finally:
+        if writer is not None:writer.close()
 
 def _products_current(products,context,check,diagnostic=None):
+    from warm_product_inventory import rows
+    with rows(products['files'],context,check)as inventory:
+        return _products_current_rows(dict(products,files=inventory),context,check,diagnostic)
+
+def _products_current_rows(products,context,check,diagnostic=None):
     def at(stage,path=None):
         if diagnostic is not None:
             diagnostic['product_check']=stage
