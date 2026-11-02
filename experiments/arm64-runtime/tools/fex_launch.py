@@ -112,7 +112,8 @@ def prepare(executable,arguments,environment,*,stage,project,runner=subprocess.r
     # One source registration for the actual selected closure. Do not overwrite
     # its memo with a second network-only registration (which rehashes the CPU
     # and linked image on every online launch).
-    context['network_enabled']=env.get('BB_ONLINE')=='1' and env.get('BB_ARM_ALLOW_NETWORK')=='1'
+    # Match ConfigureNetworkAdmission: online defaults the absent ARM gate ON.
+    context['network_enabled']=env.get('BB_ONLINE')=='1' and env.get('BB_ARM_ALLOW_NETWORK','1')=='1'
     if context['network_enabled']:
         module=owned(env['BB_NET_MODULE'])
         if runtime_profile is not None:need(module==stage/'bin/gpu-net/libbbnet.dylib','formal FEX selected network role mismatch')

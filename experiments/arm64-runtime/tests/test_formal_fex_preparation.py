@@ -41,6 +41,14 @@ class FormalFex(Formal):
   self.prepare();self.env.update(BB_ONLINE='1',BB_ARM_ALLOW_NETWORK='1',BB_NET_MODULE=str(self.stage/'bin/gpu-net/libbbnet.dylib'))
   self.key='14'*32;_,_,online=self.prepare();self.assertTrue(online['effective_exported'])
   self.env['BB_ONLINE']='0';self.key='12'*32;_,_,offline=self.prepare();self.assertFalse(offline['effective_exported'])
+ def test_online_default_gate_matches_native_policy_and_records_module(self):
+  self.env.update(BB_ONLINE='1',BB_NET_MODULE=str(self.stage/'bin/gpu-net/libbbnet.dylib'))
+  self.env.pop('BB_ARM_ALLOW_NETWORK',None);self.prepare()
+  registrations=list((self.data/'fex-preparation/effective').glob('*.json'))
+  docs=[json.loads(path.read_text())for path in registrations if path.name!='input-register.json']
+  self.assertEqual(len(docs),1);self.assertTrue(docs[0]['context']['network_enabled'])
+  self.assertIn(str(self.stage/'bin/gpu-net/libbbnet.dylib'),[row[0]for row in docs[0]['inputs']])
+  self.env['BB_ARM_ALLOW_NETWORK']='0';_,_,disabled=self.prepare();self.assertTrue(disabled['effective_exported'])
  def test_actual_formal_component_cannot_use_private_scope(self):
   with self.assertRaises(ValueError):launch.component(self.stage)
  def test_descriptor_tamper_and_unknown_role_rejected(self):
