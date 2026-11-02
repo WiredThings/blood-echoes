@@ -96,7 +96,9 @@ def rows(descriptor,context,check):
     # Retain old small inline receipts unchanged. No migration can upgrade an
     # invalid old proof or grant a native cache import permission.
     if not isinstance(descriptor,dict):raise ValueError('warm proof row storage')
-    if descriptor.get('storage')!='sqlite-v1':yield descriptor;return
+    if 'storage'not in descriptor:
+        if not all(isinstance(k,str)and k.startswith('/')and isinstance(v,list)for k,v in descriptor.items()):raise ValueError('legacy warm proof row shape')
+        yield descriptor;return
     reader=None
     try:
         reader=Reader(descriptor,context,check)

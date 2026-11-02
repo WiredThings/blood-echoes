@@ -42,7 +42,7 @@ class LargeInventory(unittest.TestCase):
   self.assertEqual(p.read_bytes(),b'bad database')
  def test_wrong_root_digest_count_and_alias_refuse(self):
   f=self.f;d,_=self.disk()
-  for changes in(dict(sha256='0'*64),dict(rows=d['rows']+1),dict(bytes=d['bytes']+1),dict(path=str(f.cache/Path(d['path']).name))):
+  for changes in(dict(storage='sqlite-v2'),dict(sha256='0'*64),dict(rows=d['rows']+1),dict(bytes=d['bytes']+1),dict(path=str(f.cache/Path(d['path']).name))):
    with self.subTest(changes=changes),self.assertRaises((ValueError,OSError)):
     with inventory.rows(dict(d,**changes),f.f.context,lambda:None):pass
   p=Path(d['path']);alias=p.with_suffix('.alias');os.link(p,alias)
