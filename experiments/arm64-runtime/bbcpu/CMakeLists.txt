@@ -14,6 +14,15 @@ if(NOT TARGET Zycore AND TARGET Zycore::Zycore)
   add_library(Zycore ALIAS Zycore::Zycore)
 endif()
 set(BBCPU_SOURCE "${CMAKE_CURRENT_LIST_DIR}/../vendor/bbcpu")
+# FEX reuses only the original decoder/scanner, never the bbcpu execution engine.
+add_executable(bbcpu-scan "${BBCPU_SOURCE}/tools/recomp/scan.c")
+target_link_libraries(bbcpu-scan PRIVATE Zydis::Zydis)
+target_compile_options(bbcpu-scan PRIVATE -O2 -UNDEBUG)
+option(BB_FEX_SCANNER_ONLY "Build only the shared static code scanner" OFF)
+if(BB_FEX_SCANNER_ONLY)
+  return()
+endif()
+
 # A CPU-only compatibility domain: unrelated application/UI/Metal changes are
 # absent. Both the future local builder and this runtime consume this contract.
 file(GLOB_RECURSE BBCPU_CONTRACT_HEADERS CONFIGURE_DEPENDS RELATIVE "${BBCPU_SOURCE}"
@@ -77,9 +86,6 @@ target_link_libraries(bbcpu PUBLIC Zydis::Zydis)
 target_compile_features(bbcpu PUBLIC c_std_11)
 target_compile_options(bbcpu PRIVATE -O2 -UNDEBUG -Wall -Wextra -Werror -Wno-unused-parameter)
 
-add_executable(bbcpu-scan "${BBCPU_SOURCE}/tools/recomp/scan.c")
-target_link_libraries(bbcpu-scan PRIVATE Zydis::Zydis)
-target_compile_options(bbcpu-scan PRIVATE -O2 -UNDEBUG)
 add_executable(bbrecomp "${BBCPU_SOURCE}/tools/recomp/bbrecomp.c")
 target_link_libraries(bbrecomp PRIVATE bbcpu)
 target_compile_options(bbrecomp PRIVATE -O1 -UNDEBUG -Wall)

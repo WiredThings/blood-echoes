@@ -17,6 +17,7 @@ struct Admission {
     std::map<std::string, std::filesystem::path> runtime, tools, support;
     std::map<std::string, std::string> runtime_sha256, tools_sha256, support_sha256;
     bool static_load_edges_verified=false;
+    bool fex_disk_preparation=false;
     // Existing external signature/dyld validation remains a separate boundary.
     bool dynamic_load_edges_verified=false, signatures_verified=false;
     bool IsCpu() const { return role==Role::CpuTop || role==Role::CpuNested || role==Role::BbcpuCpu; }

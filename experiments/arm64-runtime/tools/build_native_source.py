@@ -93,7 +93,7 @@ def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider
     sdk = str(directory(Path(sdk_root).resolve(strict=True))) if sdk_root is not None else '<SDKROOT>'
     openssl = str(directory(openssl_root)) if openssl_root is not None else None
     required = ['tools/macos/build_launcher.sh', 'experiments/arm64-runtime/tools/configure_native_build.py',
-                'experiments/arm64-runtime/tools/build_metadata_layout.py', 'experiments/arm64-runtime/vendor/metal_api/CMakeLists.txt',
+                'experiments/arm64-runtime/tools/build_metadata_layout.py', 'experiments/arm64-runtime/bbcpu/CMakeLists.txt', 'experiments/arm64-runtime/vendor/metal_api/CMakeLists.txt',
                 'experiments/arm64-runtime/vendor/bbnet/CMakeLists.txt', 'experiments/arm64-runtime/targets.cmake',
                 'tools/macos/build_identity.py']
     sources = {name: digest(repo / name) for name in required}
@@ -129,6 +129,8 @@ def plan(*, repository, build_root, dependency_prefixes, protoc, python_provider
                 dict(name='cpu-generate', argv=prepare),
                 dict(name='cpu-configure', argv=None, deferred='configure_native_build.plan: actual renderer FileAPI/includes/definitions'),
                 dict(name='cpu-build', argv=[cmake, '--build', str(cpu), '--parallel', '1', '--target', 'bb-game-arm64']),
+                dict(name='scanner-configure', argv=[cmake, '-S', str(source / 'bbcpu'), '-B', str(root / 'scanner'), *common, '-DBB_FEX_SCANNER_ONLY=ON']),
+                dict(name='scanner-build', argv=[cmake, '--build', str(root / 'scanner'), '--parallel', '1', '--target', 'bbcpu-scan']),
                 dict(name='net-configure', argv=net_config),
                 dict(name='net-build', argv=[cmake, '--build', str(net), '--parallel', '1', '--target', 'bbnet']),
                 dict(name='launcher-build', argv=['/bin/bash', str(repo / 'tools/macos/build_launcher.sh')]),
@@ -176,7 +178,7 @@ def source_snapshot(repository):
     repo = directory(repository)
     runtime = repo / 'experiments/arm64-runtime'
     roots = [repo / p for p in ('src', 'gpu', 'include', 'scripts', 'launcher', 'launcher-macos', 'tools')]
-    roots += [runtime / p for p in ('src', 'vendor', 'tools', 'config', 'tests')]
+    roots += [runtime / p for p in ('src', 'vendor', 'tools', 'config', 'tests', 'bbcpu')]
     for parent in (repo, runtime):
         roots += [p for p in parent.iterdir() if p.name in ('CMakeLists.txt', 'SOURCE-MANIFEST.json', 'Package.swift', 'Package.resolved')
                   or p.suffix in ('.py', '.cmake', '.sh')]
@@ -307,7 +309,7 @@ def execute(value):
         sdk = value['sdk_root'] or run(value['sdk_query'], name='sdk-query', timeout=20).decode().strip()
         sdk = str(directory(Path(sdk).resolve(strict=True)))
         env = {k: v.replace('<SDKROOT>', sdk) for k, v in value['environment'].items()}
-        for section in ('renderer', 'net'):
+        for section in ('renderer', 'net', 'scanner'):
             query = root / section / '.cmake/api/v1/query'
             query.mkdir(parents=True, mode=0o700)
             (query / 'codemodel-v2').touch()
@@ -326,7 +328,7 @@ def execute(value):
         artifacts = {}
         roles = [('renderer', 'library', 'bbgpu'), ('renderer', 'gpu', 'bb-gpu'), ('renderer', 'worker', 'game-pso-preparer'),
                  ('renderer', 'module', 'game-module-preparer'), ('renderer', 'metadata', 'metadata-layout'),
-                 ('cpu', 'cpu', 'bb-game-arm64'), ('net', 'net', 'bbnet')]
+                 ('cpu', 'cpu', 'bb-game-arm64'), ('net', 'net', 'bbnet'), ('scanner', 'scanner', 'bbcpu-scan')]
         for subdir, role, target in roles:
             path = target_artifact(root / subdir, target)
             need(run(['/usr/bin/lipo', '-archs', str(path)], name='arch-' + role, timeout=20).decode().strip() == 'arm64', 'artifact must be thin ARM64: ' + role)

@@ -13,7 +13,7 @@ class SourcePackage(unittest.TestCase):
         for root in (self.a,self.b):
             for name in ('src/runtime.cpp','vendor/net/messages.proto','vendor/net/build.py',
                          'config/gpu-adapter-headers.json','targets.cmake',
-                         'tools/generate_native.py','tools/generate_gpu.py','tests/metadata_layout.cpp'):
+                         'tools/generate_native.py','tools/generate_gpu.py','tests/metadata_layout.cpp','bbcpu/CMakeLists.txt'):
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('authored '+name+'\n')
         self.app=self.root/'source-shell.app';(self.app/'Contents/MacOS').mkdir(parents=True)
         resources=self.app/'Contents/Resources';resources.mkdir();(resources/'BBLauncher_BBLauncher.bundle').mkdir()

@@ -96,6 +96,21 @@ CpuKit BbcpuKit(NSDictionary*native,const fs::path&code,Ledger&ledger){
  }
  Need(!kit.host.empty(),"CPU renderer host dependency missing");return kit;
 }
+std::map<std::string,std::string> FexKit(NSDictionary*native,const fs::path&code,Ledger&ledger){
+ std::map<std::string,std::string> files;
+ const bool present=fs::symlink_status(code/"FEX-COMPONENT.json").type()!=fs::file_type::not_found;
+ if(!native[@"fex_preparation"]&&!present)return files;
+ Need(Text(At(native,@"game_runtime"))=="fex-arm64"&&Text(At(native,@"fex_preparation"))=="auto"&&present,"automatic FEX component missing");
+ auto raw=ledger.Read(code/"FEX-COMPONENT.json",Small,true);Need(raw.sha256==Text(At(native,@"fex_component_sha256")),"FEX component digest mismatch");
+ auto doc=Json(raw);Need(One(At(doc,@"schema"))&&!Boolean(At(doc,@"development_only"))&&Boolean(At(doc,@"automatic_default"))&&Text(At(doc,@"backend"))=="fex","formal automatic FEX component required");
+ auto add=[&](id value,const char*name){auto row=Object(value);Need(row.count==2&&Text(At(row,@"path"))==name,"FEX actual role mismatch");auto sha=Text(At(row,@"sha256"));Need(IsHex(sha),"FEX role digest missing");files.emplace(name,sha);};
+ add(At(doc,@"cpu"),"bin/bb-probe-metal");id aliases=At(doc,@"cpu_aliases");Need([aliases isKindOfClass:[NSArray class]]&&[(NSArray*)aliases count]==1,"exact FEX aliases required");
+ add([(NSArray*)aliases objectAtIndex:0],"bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal");add(At(doc,@"scanner"),"bin/fex-disk-tools/bbcpu-scan");
+ auto deps=Object(At(doc,@"runtime_dependencies"));Need(deps.count<=64,"bounded FEX dependencies required");
+ for(id key in deps){auto name=Text(key),sha=Text(deps[key]);auto rel=fs::path(name);Relative(code,name);
+  Need(rel.parent_path()=="deps-metal-arm64/lib"&&rel.extension()==".dylib"&&IsHex(sha)&&files.emplace(name,sha).second,"invalid FEX dependency role");}
+ return files;
+}
 std::optional<std::pair<RolePath,fs::path>> Locate(const fs::path&executable){
  const auto text=executable.string();for(auto item:Roles){const auto suffix="/"+std::string(item.relative);if(!text.ends_with(suffix))continue;auto code=executable;for(const auto&part:fs::path(item.relative)){(void)part;code=code.parent_path();}
   if(code.filename()=="bbport"&&code.parent_path().filename()=="Resources"&&code.parent_path().parent_path().filename()=="Contents"&&code.parent_path().parent_path().parent_path().extension()==".app")return std::pair(item,code);
@@ -141,10 +156,11 @@ std::optional<Admission> TryAdmit(const fs::path&actual_executable,const fs::pat
  Admission result;result.role=selected.role;result.relative_role=selected.relative;result.executable=executable;result.app=app;result.code_root=code;result.bundle_id=identifier;
  auto native=ledger.Read(code/"NATIVE-METAL.json",Small,true);result.native_manifest_sha256=native.sha256;auto object=Json(native);
  Need(One(At(object,@"schema"))&&Boolean(At(object,@"production")),"formal component manifest required");
- const auto kit=BbcpuKit(object,code,ledger);
+ const auto kit=BbcpuKit(object,code,ledger);const auto fex=FexKit(object,code,ledger);result.fex_disk_preparation=!fex.empty();
  if(selected.role==Role::BbcpuCpu||selected.role==Role::BbcpuPreparer)Need(!kit.files.empty(),"selected bbcpu role is not declared");
  result.runtime_sha256=Hashes(At(object,@"frozen_runtime"),64);std::set<std::string> allowed={"bin/gpu-metal/libbbgpu.dylib","bin/gpu-metal-arm64/libbbgpu.dylib","bin/gpu-net/libbbnet.dylib"};for(size_t i=0;i<5;++i)allowed.insert(Roles[i].relative);
  for(const auto&[name,sha]:kit.files){allowed.insert(name);Need(result.runtime_sha256.contains(name)&&result.runtime_sha256.at(name)==sha,"frozen CPU kit descriptor differs");}
+ for(const auto&[name,sha]:fex){allowed.insert(name);Need(result.runtime_sha256.contains(name)&&result.runtime_sha256.at(name)==sha,"frozen FEX descriptor differs");}
  for(const auto&[name,digest]:result.runtime_sha256){Need(allowed.contains(name),"unknown frozen runtime role");auto file=Relative(code,name);Need(ledger.Read(file,Large,false).sha256==digest,"frozen runtime SHA mismatch");result.runtime[name]=file;}
  for(auto name:{"bin/gpu-metal/libbbgpu.dylib","bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu","bin/gpu-metal-arm64/libbbgpu.dylib","bin/game-pso-preparer","bin/game-module-preparer"})Need(result.runtime.contains(name),"formal runtime component missing");
  Need(result.runtime.contains("bin/bb-probe-metal")||result.runtime.contains("bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal"),"formal CPU role missing");Need(result.runtime.contains(result.relative_role)&&result.runtime.at(result.relative_role)==executable,"actual executable is not in frozen runtime");

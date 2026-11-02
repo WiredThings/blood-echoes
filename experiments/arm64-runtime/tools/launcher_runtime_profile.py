@@ -5,7 +5,7 @@ independently admit their actual executable role before touching these roots.
 """
 from pathlib import Path
 from dataclasses import dataclass,field
-import hashlib,json,os,plistlib,re,stat,tempfile
+import hashlib,json,os,plistlib,re,stat,tempfile,types
 from collections import OrderedDict
 from threading import RLock
 
@@ -112,8 +112,17 @@ def bundle(stage,*,registration_root=None):
     def verify(base,name,want,limit=1024*1024):
         if closure is not None:return closure.check(base,name,want,limit)
         return code_bytes(_relative(base,name),limit=limit,expected=want,content=False)
-    frozen=native['frozen_runtime'];allowed=set(ROLES)|{'bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal','bin/gpu-net/libbbnet.dylib'}
-    need(isinstance(frozen,dict)and set(ROLES)<=set(frozen)<=allowed and len(frozen)<=32,'complete declared formal runtime roles')
+    fex_roles={}
+    if native.get('fex_preparation')is not None or os.path.lexists(root/'FEX-COMPONENT.json'):
+        # Also used by metadata's isolated Python (-I). Execute only the frozen
+        # sibling, without adding an unverified directory to the import path.
+        name='fex_component.py';want=local.get('runtime_tools',{}).get(name)
+        need(want is not None,'formal FEX role helper missing from tool closure')
+        raw,_=code_bytes(_relative(root,'native-runtime-tools/'+name),expected=want)
+        helper=types.ModuleType('_admitted_fex_component');exec(compile(raw,name,'exec'),helper.__dict__)
+        _,fex_roles=helper.formal_roles(root,native,lambda name,want,limit:code_bytes(_relative(root,name),limit=limit,expected=want)[0])
+    frozen=native['frozen_runtime'];allowed=set(ROLES)|{'bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal','bin/gpu-net/libbbnet.dylib'}|set(fex_roles)
+    need(isinstance(frozen,dict)and set(ROLES)<=set(frozen)<=allowed and len(frozen)<=64,'complete declared formal runtime roles')
     for role,want in frozen.items():
         need(isinstance(want,str)and re.fullmatch('[0-9a-f]{64}',want)is not None,'formal runtime digest shape')
         verify(root,role,want,512*1024*1024)
@@ -138,7 +147,9 @@ class PackagingCapabilityProfile:
     def revalidate(self):
         current=bundle(self.bundle.stage)
         need(current is not None and current.app==self.bundle.app and current.native==self.bundle.native and current.local==self.bundle.local,'packaging bundle code identity changed')
-        need(set(current.native['frozen_runtime'])==set(ROLES)|{'bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal','bin/gpu-net/libbbnet.dylib'},'packaging requires eight actual frozen runtime roles')
+        from fex_component import formal_roles
+        _,fex_roles=formal_roles(current.stage,current.native,lambda name,want,limit:code_bytes(_relative(current.stage,name),limit=limit,expected=want)[0])
+        need(set(current.native['frozen_runtime'])==set(ROLES)|{'bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal','bin/gpu-net/libbbnet.dylib'}|set(fex_roles),'packaging requires actual frozen runtime roles')
         root=owned_dir(self.data_root);info=root.stat()
         need((info.st_dev,info.st_ino,info.st_uid,stat.S_IMODE(info.st_mode))==self._data_identity and stat.S_IMODE(info.st_mode)==0o700,'packaging capability data root replaced or changed')
         return current
@@ -238,6 +249,11 @@ class RuntimeProfile:
         need(p==self.bundle.stage/relative,'formal GPU role mismatch')
         code_bytes(p,limit=256*1024*1024,expected=self.bundle.native['frozen_runtime'][relative],content=False);return p
     def child_environment(self):return dict(BB_DATA_DIR=str(self.data_root),BB_ARM_GPU_BASE_DIR=str(self.gpu_base))
+    def cpu_preparation_root(self):
+        root=self.data_root/'fex-preparation'
+        need(not(root==self.user or root.is_relative_to(self.user)or self.user.is_relative_to(root)),'FEX preparation overlaps progress')
+        need(not(root==self.game_root or root.is_relative_to(self.game_root)or self.game_root.is_relative_to(root)),'FEX preparation overlaps game')
+        return owned_dir(root,create=True)
     def capability_root(self):return owned_dir(self.work_root/'capabilities',create=True)
     def cache(self,path):
         p=Path(path).absolute();need(p==p.resolve(strict=True)and p.is_relative_to(self.gpu_root)and p!=self.gpu_root,'formal cache read escaped new namespace');return p

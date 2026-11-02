@@ -22,7 +22,7 @@ class Manifest(unittest.TestCase):
         self.layout=self.root/'evidence/layout/result.json';self.layout.parent.mkdir(parents=True);self.layout.write_text('{}')
         paths={'library':'renderer/libbbgpu.dylib','gpu':'renderer/bb-gpu','worker':'renderer/game-pso-preparer',
                'module':'renderer/game-module-preparer','metadata':'renderer/metadata-layout',
-               'cpu':'cpu/Bin/bb-game-arm64','net':'net/libbbnet.dylib'}
+               'cpu':'cpu/Bin/bb-game-arm64','net':'net/libbbnet.dylib','scanner':'scanner/bbcpu-scan'}
         artifacts={}
         for key,name in paths.items():
             path=self.root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'author '+key.encode())

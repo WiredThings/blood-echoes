@@ -27,7 +27,7 @@ static std::vector<unsigned char> Image(uint32_t kind,const std::string&edge={},
  mach_header_64 header{};header.magic=MH_MAGIC_64;header.cputype=CPU_TYPE_ARM64;header.filetype=kind;header.ncmds=(!edge.empty())+rpaths.size();header.sizeofcmds=commands.size();std::vector<unsigned char> bytes(sizeof(header));memcpy(bytes.data(),&header,sizeof(header));bytes.insert(bytes.end(),commands.begin(),commands.end());return bytes;
 }
 struct Fixture {
- fs::path root,app,code;NSMutableDictionary*native;NSMutableDictionary*local;NSMutableDictionary*scripts;NSMutableDictionary*cpuKit=nil;
+ fs::path root,app,code;NSMutableDictionary*native;NSMutableDictionary*local;NSMutableDictionary*scripts;NSMutableDictionary*cpuKit=nil;NSMutableDictionary*fexKit=nil;
  Fixture(const fs::path&base,unsigned index):root(base/('f'+std::to_string(index))),app(root/"App lives here.app"),code(app/"Contents/Resources/bbport"){
   fs::create_directories(code);Info("io.github.bbport.optimized");
   const std::vector<std::string> roles={"bin/bb-probe-metal","bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal","bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu","bin/game-pso-preparer","bin/game-module-preparer"};
@@ -55,13 +55,29 @@ struct Fixture {
    cpuKit[Ns(key)]=[@{@"path":Ns(name),@"sha256":Ns(Hash(path))}mutableCopy];native[@"frozen_runtime"][Ns(name)]=Ns(Hash(path));
   }Seal();
  }
- void Seal(){if(cpuKit){Json(code/"BBCPU-COMPONENT.json",cpuKit);native[@"cpu_component_sha256"]=Ns(Hash(code/"BBCPU-COMPONENT.json"));}Json(code/"NATIVE-METAL.json",native);Json(code/"ARM64-LOCAL-PREPARATION.json",local);Json(code/"SOURCE-PARITY.json",@{@"effective_sources":scripts});}
+ void Fex(){
+  fexKit=[@{@"schema":@1,@"backend":@"fex",@"development_only":@NO,@"automatic_default":@YES,@"runtime_dependencies":[NSMutableDictionary new]}mutableCopy];
+  auto scanner=code/"bin/fex-disk-tools/bbcpu-scan";Put(scanner,Image(MH_EXECUTE));chmod(scanner.c_str(),0755);
+  fexKit[@"cpu"]=[@{@"path":@"bin/bb-probe-metal",@"sha256":Ns(Hash(code/"bin/bb-probe-metal"))}mutableCopy];
+  fexKit[@"cpu_aliases"]=@[@{@"path":@"bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal",@"sha256":Ns(Hash(code/"bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal"))}];
+  fexKit[@"scanner"]=[@{@"path":@"bin/fex-disk-tools/bbcpu-scan",@"sha256":Ns(Hash(scanner))}mutableCopy];
+  native[@"frozen_runtime"][@"bin/fex-disk-tools/bbcpu-scan"]=Ns(Hash(scanner));native[@"fex_preparation"]=@"auto";Seal();
+ }
+ void Seal(){if(fexKit){Json(code/"FEX-COMPONENT.json",fexKit);native[@"fex_component_sha256"]=Ns(Hash(code/"FEX-COMPONENT.json"));}if(cpuKit){Json(code/"BBCPU-COMPONENT.json",cpuKit);native[@"cpu_component_sha256"]=Ns(Hash(code/"BBCPU-COMPONENT.json"));}Json(code/"NATIVE-METAL.json",native);Json(code/"ARM64-LOCAL-PREPARATION.json",local);Json(code/"SOURCE-PARITY.json",@{@"effective_sources":scripts});}
  auto Admit(const std::string&relative="bin/bb-probe-metal"){return TryAdmit(code/relative);}
 };
 int main(int argc,char**argv){@autoreleasepool{
  assert(argc==2);const auto base=fs::canonical(argv[1]);assert(fs::is_empty(base));unsigned n=0;
  {Fixture f(base,++n);for(const auto&relative:{"bin/bb-probe-metal","bin/Bloodborne Game.app/Contents/MacOS/bb-probe-metal","bin/Bloodborne Metal.app/Contents/MacOS/bb-gpu","bin/game-pso-preparer","bin/game-module-preparer"}){const auto result=f.Admit(relative);assert(result&&result->code_root==f.code&&result->static_load_edges_verified&&!result->dynamic_load_edges_verified&&!result->signatures_verified);++passed;}}
  {Fixture f(base,++n);f.Info("io.github.bbport.optimized",true);assert(f.Admit());++passed;}
+ {Fixture f(base,++n);f.Fex();assert(f.Admit()->fex_disk_preparation&&f.Admit()->runtime.size()==9);++passed;}
+ {Fixture f(base,++n);f.Fex();f.fexKit[@"development_only"]=@YES;f.Seal();Refused([&]{f.Admit();});}
+ {Fixture f(base,++n);f.Fex();f.fexKit[@"automatic_default"]=@NO;f.Seal();Refused([&]{f.Admit();});}
+ {Fixture f(base,++n);f.Fex();f.fexKit[@"scanner"][@"path"]=@"bin/unclaimed";f.Seal();Refused([&]{f.Admit();});}
+ {Fixture f(base,++n);f.Fex();Put(f.code/"bin/fex-disk-tools/bbcpu-scan","changed");Refused([&]{f.Admit();});}
+ {Fixture f(base,++n);f.Fex();[f.native[@"frozen_runtime"] removeObjectForKey:@"bin/fex-disk-tools/bbcpu-scan"];f.Seal();Refused([&]{f.Admit();});}
+ {Fixture f(base,++n);f.Fex();[f.native removeObjectForKey:@"fex_preparation"];f.Seal();Refused([&]{f.Admit();});}
+
  {Fixture f(base,++n);f.Bbcpu();auto cpu=f.Admit("bin/Bloodborne bbcpu Game.app/Contents/MacOS/bb-probe-metal");assert(cpu&&cpu->IsCpu()&&!cpu->IsCpuPreparer()&&cpu->CpuBackend()=="bbcpu"&&cpu->runtime.size()==35);++passed;auto prep=f.Admit("bin/bbcpu-tools/bbcpu-code-preparer");assert(prep&&prep->IsCpuPreparer()&&!prep->IsCpu()&&prep->CpuBackend()=="bbcpu");++passed;assert(f.Admit()->CpuBackend()=="fex");++passed;}
  {Fixture f(base,++n);f.Bbcpu();f.cpuKit[@"development_only"]=@YES;f.Seal();Refused([&]{f.Admit();});}
  {Fixture f(base,++n);f.Bbcpu();f.cpuKit[@"runtime_image_export"]=@0;f.Seal();Refused([&]{f.Admit();});}

@@ -22,7 +22,7 @@ class Fixture(unittest.TestCase):
         self.prefix = self.base / 'prefix'
         self.provider = self.base / 'python/Frameworks/Python.framework/Versions/3.11'
         for name in ('tools/configure_native_build.py', 'tools/build_metadata_layout.py',
-                     'vendor/metal_api/CMakeLists.txt', 'vendor/bbnet/CMakeLists.txt', 'targets.cmake'):
+                     'vendor/metal_api/CMakeLists.txt', 'vendor/bbnet/CMakeLists.txt', 'targets.cmake', 'bbcpu/CMakeLists.txt'):
             path = self.source / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('# author source\n')
@@ -82,7 +82,7 @@ class Fixture(unittest.TestCase):
         value = self.plan(sdk_root=sdk, openssl_root=self.prefix)
         self.assertIsNone(value['sdk_query'])
         self.assertNotIn('<SDKROOT>', json.dumps(value))
-        self.assertIn('-DOPENSSL_ROOT_DIR=' + str(self.prefix), value['commands'][5]['argv'])
+        self.assertIn('-DOPENSSL_ROOT_DIR=' + str(self.prefix), next(row['argv'] for row in value['commands'] if row['name']=='net-configure'))
 
     def test_xcode_sdk_alias_is_normalized_without_output_access(self):
         sdk = self.base / 'Xcode.app/Contents/Developer/SDKs/MacOSX.sdk'

@@ -94,7 +94,7 @@ public:
  void EndCompilation(uint64_t start) override{jit_ns.fetch_add(Now()-start,std::memory_order_relaxed);if((jit_count.fetch_add(1,std::memory_order_relaxed)+1)%256==0)Report();}
  Loader(fs::path directory,const BbCpuCache::Identity& expected,std::span<const std::pair<uint64_t,uint64_t>> ranges,uintptr_t image,uint64_t bytes)
  :root(std::move(directory)),identity(expected),sections(ranges.begin(),ranges.end()),base(image){
-  Require(root.is_absolute()&&fs::canonical(root)==root&&root.string().starts_with("/Users/Shared/BloodEchoesDevelopment/"),"FEX prepared directory must stay private");
+  Require(root.is_absolute()&&fs::canonical(root)==root,"FEX prepared directory must be canonical");
   files=std::make_unique<OwnedDirectory>(root);
   index=Decode(Read(root/"directory.bin",96u<<20),BbCpuCache::Key(identity),bytes);bad.resize(index.shards.size());
   BbCacheValidation::Policy policy{bytes,sections,GIT_HASH};

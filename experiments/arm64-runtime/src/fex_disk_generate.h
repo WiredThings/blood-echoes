@@ -48,7 +48,7 @@ inline uint64_t Generate(FEXCore::Context::ContextImpl& ctx,FEXCore::Core::Inter
  std::span<const std::pair<uint64_t,uint64_t>> sections,uintptr_t base,uint64_t image,
  const FEXCore::ExecutableFileInfo& source){
  Require(ctx.GetCodeCache().EnableCodeCaching()&&ctx.LatestOffset==0,"FEX offline context must collect relocations before any execution");
- Require(fs::canonical(output)==output&&output.string().starts_with("/Users/Shared/BloodEchoesDevelopment/"),"FEX output private directory");
+ OwnedDirectory admitted_output(output); // Caller binds the selected QA/formal role; retain ownership/no-link validation.
  const auto entries=Plan(plan,image);Directory result{image,BbCpuCache::Key(identity)};
  std::optional<Directory> previous;try{previous=Decode(Read(output/"directory.bin",96u<<20),result.key,image);}catch(const std::exception&){}
  std::set<size_t> repairs;

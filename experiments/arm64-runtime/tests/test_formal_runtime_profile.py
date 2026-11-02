@@ -64,7 +64,7 @@ class Formal(unittest.TestCase):
   self.native['frozen_runtime']['bin/undeclared']=stage_tool.sha(extra);self.write_manifests()
   with self.assertRaisesRegex(ValueError,'declared formal runtime roles'):self.scope()
   del self.native['frozen_runtime']['bin/undeclared'];self.native['frozen_runtime'][self.roles[0]]='not-a-sha';self.write_manifests()
-  with self.assertRaisesRegex(ValueError,'digest shape'):self.scope()
+  with self.assertRaisesRegex(ValueError,'digest shape|FEX descriptor differs'):self.scope()
  def test_local_profile_missing_tool_parser_or_bootstrap_is_refused(self):
   for relative in('native-runtime-tools/launcher_runtime_profile.py','vendor/blood_echoes/loader/prepare.py','tools/macos/local_metal_startup.py'):
    p=self.stage/relative;old=p.read_bytes();p.write_bytes(b'changed')

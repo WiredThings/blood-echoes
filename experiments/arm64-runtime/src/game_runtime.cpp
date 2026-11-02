@@ -60,6 +60,7 @@
 #include "core/guest_cpu/fex_hle_bridge.h"
 #include <FEXCore/Core/X86Enums.h>
 #include "fex_disk_io.h"
+#include "fex_launcher_paths.h"
 #endif
 #include <mach/mach.h>
 #include <mach/mach_vm.h>
@@ -653,7 +654,9 @@ int game_main(int argc,char** argv){
   const char* fex_export=getenv("BB_FEX_EXPORT_ROOT");
   const char* fex_plan=getenv("BB_FEX_PREPARE_PLAN");
   const bool prepared_identity=(fex_directory&&*fex_directory)||(fex_export&&*fex_export)||(fex_plan&&*fex_plan);
-  check(!prepared_identity||!bundled,"FEX disk preparation is isolated-development only");
+  check(!prepared_identity||!bundled||bundled->fex_disk_preparation,"automatic FEX component not admitted");
+  std::optional<BbFexLauncher::Paths> fex_paths;
+  if(bundled&&prepared_identity)fex_paths.emplace(getenv("BB_DATA_DIR"),state,session_app0);
   const bool cache_identity=prepared_identity||code_profile||(cache_path&&*cache_path)||(getenv("BB_ARM_CPU_CACHE_IDENTITY")&&std::string_view(getenv("BB_ARM_CPU_CACHE_IDENTITY"))=="1");
   if(cache_identity&&!prepared_identity){
    s.code_files=std::make_unique<BbStaticCode::Files>(b,image.at(),std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
@@ -733,7 +736,7 @@ int game_main(int argc,char** argv){
    s.code_files->Finalize(std::span(static_cast<const std::byte*>(image.ptr),size_t(b.size)));
    s.code_files->Report(runtime_work/"cpu-code-manifest.json");
    if(code_profile&&!fex_plan&&!fex_export){
-    fs::path captures=runtime_work;if(const char* selected=getenv("BB_FEX_CAPTURE_ROOT")){check(private_path(selected)&&!fs::is_symlink(selected),"FEX capture directory must stay private");captures=selected;}
+    fs::path captures=runtime_work;if(const char* selected=getenv("BB_FEX_CAPTURE_ROOT")){if(fex_paths){check(fex_directory&&fs::path(selected)==fex_directory,"FEX capture and execution generation differ");fex_paths->Directory(selected,"products",64);}else check(private_path(selected)&&!fs::is_symlink(selected),"FEX capture directory must stay private");captures=selected;}
     s.code_output=std::make_unique<CodeMapOutput>(captures/("cpu-code-"+std::to_string(getpid())+".map"));
     if(getenv("BB_FEX_CAPTURE_ROOT"))s.code_files->Report(captures/("cpu-code-"+std::to_string(getpid())+".json"));
    }
@@ -743,7 +746,7 @@ int game_main(int argc,char** argv){
   runtime_quicksave_bind(image.ptr,b.size);
 #ifndef BB_CPU_BACKEND_BBCPU
   if(fex_export)try{
-   const char* elf_path=getenv("BB_CPU_EXPORT_ELF");check(elf_path&&private_path(elf_path)&&private_path(fs::path(fex_export).parent_path()),"FEX export requires original private ELF");
+   const char* elf_path=getenv("BB_CPU_EXPORT_ELF");check(elf_path,"FEX export requires original ELF");if(fex_paths)fex_paths->Export(fex_export,elf_path);else check(private_path(elf_path)&&private_path(fs::path(fex_export).parent_path()),"FEX export requires original private ELF");
    auto raw=BbFexDisk::Read(elf_path,544u<<20);auto original=std::span(reinterpret_cast<const unsigned char*>(raw.data()),raw.size());auto layout=BbCpuImage::ReadLayout(original,b);
    const auto summary=BbCpuImage::Export(fex_export,b,layout,image.ptr,original,BbStaticCode::Hex(BbStaticCode::SourceHash(boot)),BbStaticCode::Hex(BbCpuCache::Hash(raw)),cpu_resume_sites,"runtime-hooks-installed-v1",elf_path);
    std::printf("FEX effective runtime export identity=%s resume_sites=%zu; no guest execution\n",summary.identity.c_str(),cpu_resume_sites.size());
@@ -848,9 +851,10 @@ int game_main(int argc,char** argv){
     metadata.close();fs::copy_file(runtime_work/"cpu-cache-environment.json",fs::path(fex_export)/"cpu-cache-environment.json");
     fs::copy_file(runtime_work/"cpu-code-manifest.json",fs::path(fex_export)/"cpu-code-manifest.json");finish_cpu_export(0);
    }
+   if(fex_paths&&fex_directory){fex_paths->Directory(fex_directory,"products",64);check(fs::path(fex_directory).filename()==BbStaticCode::Hex(BbCpuCache::Key(key)),"FEX actual generation directory identity mismatch");}
    if(fex_plan){
     try{
-     check(private_path(fex_plan)&&fex_directory&&private_path(fex_directory),"FEX preparation requires private inputs/output");
+     check(fex_directory,"FEX preparation output missing");if(fex_paths)fex_paths->Plan(fex_plan,fex_directory);else check(private_path(fex_plan)&&private_path(fex_directory),"FEX preparation requires private inputs/output");
      const char* expected=getenv("BB_FEX_PREPARE_KEY");check(expected&&BbStaticCode::Hex(BbCpuCache::Key(key))==expected,"FEX generation actual input/config differs from exported identity");
      std::vector<std::pair<uint64_t,uint64_t>> spans;for(auto r:s.code_files->Sections())spans.emplace_back(r.begin,r.end);
      auto source=s.code_files->Query(image.at()+spans.front().first).value();
@@ -859,6 +863,7 @@ int game_main(int argc,char** argv){
     }catch(const std::exception& e){finish_cpu_export(BB_ARM_EXIT_HLE_FAULT,e.what());}
    }
    if(fex_directory){
+    if(!fex_paths)check(private_path(fex_directory),"FEX runtime directory must stay private");
     std::vector<std::pair<uint64_t,uint64_t>> spans;for(auto r:s.code_files->Sections())spans.emplace_back(r.begin,r.end);
     auto result=s.cpu->InstallPreparedDirectory(fex_directory,key,spans,image.at(),b.size);
     if(!std::holds_alternative<uint64_t>(result))std::fputs("FEX DISK not admitted; original JIT remains active\n",stderr);

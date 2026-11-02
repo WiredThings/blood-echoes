@@ -257,7 +257,9 @@ def admit_formal(app,source,*,project=P,bundle_loader=None,gpu_verifier=None,ide
  admitted=(bundle_loader or bundle)(stage)
  if admitted is None or admitted.stage!=stage or admitted.app!=app:raise ValueError('actual outer formal bundle admission missing')
  hashes=dict(admitted.native['frozen_runtime'])
- if set(hashes)!=FORMAL_ROLES:raise ValueError('formal stage requires exactly eight frozen actual runtime roles')
+ from fex_component import formal_roles
+ _,fex_roles=formal_roles(stage,admitted.native,lambda name,want,limit:code_bytes(stage/name,limit=limit,expected=want)[0])
+ if set(hashes)!=FORMAL_ROLES|set(fex_roles):raise ValueError('formal stage requires eight base and exact declared FEX roles')
  runtime={role:canonical(stage/role,within=stage)for role in hashes}
  parity_record=json.loads(code_bytes(stage/'SOURCE-PARITY.json')[0]);parity=parity_record['effective_sources']
  expected=dict(source['effective_scripts']);image_reuse_projection=False;reviewed_script_projections=[]

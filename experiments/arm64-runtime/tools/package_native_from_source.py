@@ -58,7 +58,7 @@ def native_source_identity(first, second):
                     need(path.resolve(strict=True).is_relative_to(root), 'native source link escaped checkout')
                     result[relative]='link:'+os.readlink(path)
                 else: result[relative]=sha(path)
-        for name in ('targets.cmake','tools/generate_native.py','tools/generate_gpu.py','tests/metadata_layout.cpp','config/gpu-adapter-headers.json'):
+        for name in ('targets.cmake','tools/generate_native.py','tools/generate_gpu.py','tests/metadata_layout.cpp','config/gpu-adapter-headers.json','bbcpu/CMakeLists.txt'):
             result[name]=sha(root/name)
         return result
     a,b=inventory(first),inventory(second)
@@ -100,8 +100,11 @@ def input_contract(*, repository, native_source, build_root, renderer_build,
     layout=json.loads(layout_receipt.read_text())
     need(layout.get('status')=='collected-normal-target' and Path(layout['renderer_build']).resolve()==renderer and Path(layout['source_root']).resolve()==source/'vendor/metal_api/shadps4', 'same-build sealed layout result required')
     canonical_layout=load_canonical_layout(regular(layout['layout']),directory(layout['source_root']),layout['layout_sha256'])
+    scanner=regular(root/'scanner/bbcpu-scan');scanner_cache=cache_values(root/'scanner/CMakeCache.txt')
+    need(scanner_cache.get('CMAKE_OSX_ARCHITECTURES')=='arm64' and scanner_cache.get('BB_FEX_SCANNER_ONLY')=='ON'
+         and Path(scanner_cache.get('CMAKE_HOME_DIRECTORY','')).resolve()==source/'bbcpu', 'same-source standalone FEX scanner required')
     raw_cpu=regular(cpu/'Bin/bb-game-arm64')
-    products=dict(cpu=raw_cpu,library=regular(renderer/'libbbgpu.dylib'),gpu=regular(renderer/'bb-gpu'),worker=regular(renderer/'game-pso-preparer'),module=regular(renderer/'game-module-preparer'),net=net)
+    products=dict(scanner=scanner,cpu=raw_cpu,library=regular(renderer/'libbbgpu.dylib'),gpu=regular(renderer/'bb-gpu'),worker=regular(renderer/'game-pso-preparer'),module=regular(renderer/'game-module-preparer'),net=net)
     for role,path in products.items():
         need(run('/usr/bin/lipo','-archs',path).strip()==b'arm64', 'thin ARM64 normal product required: '+role)
     from warm_archive_manifest import resolve_gpu_identity
@@ -164,6 +167,7 @@ def _assemble(*,repository,native_source,build_root,renderer_build,cpu_build,
     py_copy=Relocator(engine,search_dirs=search,bindings={selection['library']:engine/'python/lib/Python'})
     cpu_copy.copy(source_lib,host);gpu_copy.copy(source_lib,gpu_lib)
     cpu=cpu_copy.copy(products['cpu'],engine/'bin/bb-probe-metal')
+    scanner=cpu_copy.copy(products['scanner'],engine/'bin/fex-disk-tools/bbcpu-scan')
     gpu_main=gpu_copy.copy(products['gpu'],engine/'bin/gpu-metal-arm64/bb-gpu')
     net=net_copy.copy(products['net'],engine/'bin/gpu-net/libbbnet.dylib')
     python=embed_python(engine,python_provider,relocate=py_copy)
@@ -198,6 +202,11 @@ def _assemble(*,repository,native_source,build_root,renderer_build,cpu_build,
         metal_features=['recent-staging-reuse'],
         renderer_architecture='native arm64 FEX runtime and independent arm64 Metal host',
         frozen_runtime={name:sha(engine/name) for name in ROLE_PATHS})
+    from fex_component import declaration
+    dependencies={str(path.relative_to(engine)):sha(path) for path in cpu_copy.machos if path.parent==engine/'deps-metal-arm64/lib'}
+    fex=declaration(engine,dependencies);write(engine/'FEX-COMPONENT.json',fex)
+    native.update(fex_preparation='auto',fex_component_sha256=sha(engine/'FEX-COMPONENT.json'))
+    native['frozen_runtime'].update({fex['scanner']['path']:fex['scanner']['sha256'],**dependencies})
     write(engine/'NATIVE-METAL.json',native)
     with packaging_capabilities(engine,scratch_parent=work) as caps:
         component=finalize_inputs(engine,candidate,admission_root=c['root'],runtime_profile=caps,production=True)
@@ -212,7 +221,7 @@ def _assemble(*,repository,native_source,build_root,renderer_build,cpu_build,
     (engine/'THIRD-PARTY-NOTICES.txt').write_text('Blood Echoes native ARM64 build.\nCorresponding project source: https://github.com/WiredThings/blood-echoes/tree/'+revision+'\nComponent licenses are preserved under licenses/. CPython license is in python/LICENSE.\nNo game, save, private cache or compiled game library is distributed.\n')
     # Signs are complete before freezing roles; only the outer resource seal follows.
     need(all(sha(engine/name)==value for name,value in native['frozen_runtime'].items()), 'runtime changed after capability validation')
-    for path in (cpu,host,gpu,gpu_lib,net,nested,engine/'bin/game-pso-preparer',engine/'bin/game-module-preparer'):
+    for path in (cpu,scanner,host,gpu,gpu_lib,net,nested,engine/'bin/game-pso-preparer',engine/'bin/game-module-preparer'):
         need(run('/usr/bin/lipo','-archs',path).strip()==b'arm64', 'non-ARM final runtime role')
         need(not development_probe(path), 'development game probe refused')
     payload=check_relative_payload(app)
@@ -291,7 +300,7 @@ def build_manifest_arguments(manifest, *, output, search_dirs=()):
     roles={'library':root/'renderer/libbbgpu.dylib','gpu':root/'renderer/bb-gpu',
            'worker':root/'renderer/game-pso-preparer','module':root/'renderer/game-module-preparer',
            'metadata':root/'renderer/metadata-layout','cpu':root/'cpu/Bin/bb-game-arm64',
-           'net':root/'net/libbbnet.dylib'}
+           'net':root/'net/libbbnet.dylib','scanner':root/'scanner/bbcpu-scan'}
     need(isinstance(artifacts,dict) and set(artifacts)==set(roles), 'normal build artifact roles mismatch')
     for role,expected in roles.items():
         row=artifacts[role]
