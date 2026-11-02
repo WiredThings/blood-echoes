@@ -260,7 +260,7 @@ class Queue:
   if self.lock is not None:os.close(self.lock);self.lock=None
 
 def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,ready,phase='all',page_size=16,max_recipes=None,
-                 seconds=600,clock=time.monotonic,event_sink=None,reuse_unit=None,commit_unit=None):
+                 seconds=600,clock=time.monotonic,event_sink=None,reuse_unit=None,commit_unit=None,progress_sink=None):
  """Disk-backed collect -> one final build -> native prepare. No module batches.
 
  Internal prepare_phase also supports snapshot/verify for a real same-session
@@ -287,6 +287,9 @@ def run_manifest(manifest,*,progress_root,context,execute,prepare_phase,check,re
   v=dict(unit_id=item['id'],recipe=item['unit']['recipe_blob_identity'],state=state,**extra);report['event_count']+=1
   if len(report['events_preview'])<PREVIEW_MAX:report['events_preview'].append(v)
   if event_sink:event_sink(v)
+  if progress_sink is not None and report['event_count']%16==0:
+   progress_sink(dict(kind='collect'if state.startswith('collected-')else'pipelines',
+       done=report['collected']if state.startswith('collected-')else report['visited'],total=queue.total()))
  def finish(item,state,*,recorded=False,row=None):
   report['visited']+=1;report[state]+=1;queue.mark(item,run,ready=state=='completed',recorded=recorded or state=='completed');event(item,state,worker_phase=row.get('phase')if row else None)
  def covered(item,kind,outcome):

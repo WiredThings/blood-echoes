@@ -212,13 +212,13 @@ def prepare(*,project,execution_root,arguments,environment,cohort,options,observ
  config=dict(project=project,worker=component['worker'],worker_sha256=component['worker_sha256'],library_sha256=component['library_sha256'],
   manifest=manifest,layout=component['layout'],layout_sha256=component['layout_sha256'],source_root=component['source_root'],
   cohort=cohort,gpu_root=gpu,run_root=job,artifact_cache_dir=artifact,phase='all',allow_compile=True,
-  page_size=16,max_recipes=None,seconds=600,progress_root=gpu/'game-pso-progress',environment={k:v for k,v in environment.items()if k=='BB_GS_DEBUG' or k in ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES','MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')or k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))},options_identity=digest(options))
+  page_size=16,max_recipes=None,seconds=7200 if preparation_memory_policy(runtime_profile)is None else 600,progress_root=gpu/'game-pso-progress',environment={k:v for k,v in environment.items()if k=='BB_GS_DEBUG' or k in ('MTL_SHADER_VALIDATION','MTL_SHADER_VALIDATION_ENABLE_PIPELINES','MTL_SHADER_VALIDATION_DISABLE_PIPELINES','MTL_DEBUG_LAYER')or k.startswith(('BB_MTL_','BB_LAYER_','BB_PC_','BB_GUEST_'))},options_identity=digest(options))
  config.update(kw(runtime_profile))
  check(force=True)
  with preparation_phase('complete-pso'):
   report=runner(config)
  check(force=True)
- if report.get('status')in('stopped','failed-protection'):raise RuntimeError('game PSO preparation stopped by safety guard')
+ if report.get('status')in('stopped','failed-protection'):raise RuntimeError('game PSO preparation stopped: '+str(report.get('error','unspecified stop')))
  result=dict(status=report.get('status','failed'),scan=summary,preparation=report,artifact_cache_dir=str(artifact),title_id=title,
              runtime_cache_import_allowed=False,original_arguments_preserved=True,capture_environment=capture_environment,
              startup_health=dict(health.stats))

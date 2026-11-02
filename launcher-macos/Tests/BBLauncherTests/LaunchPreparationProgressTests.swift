@@ -3,6 +3,32 @@ import XCTest
 @testable import BBLauncher
 
 final class LaunchPreparationProgressTests: XCTestCase {
+    func testMetalWorkProgressKeepsCollectionSeparateFromReadyPipelines() {
+        var p = LaunchPreparationProgress()
+        p.consume(phase("local-libraries"))
+        p.consume("Metal preparation work: {\"kind\":\"libraries\",\"done\":50,\"total\":100}")
+        XCTAssertEqual(p.percent, 10)
+        p.consume(phase("complete-pso"))
+        p.consume("Metal preparation work: {\"kind\":\"collect\",\"done\":100,\"total\":100}")
+        XCTAssertEqual(p.percent, 88)
+        p.consume("Metal preparation work: {\"kind\":\"libraries\",\"done\":50,\"total\":100}")
+        XCTAssertEqual(p.percent, 89)
+        p.consume("Metal preparation work: {\"kind\":\"pipelines\",\"done\":100,\"total\":100}")
+        XCTAssertEqual(p.percent, 93); XCTAssertFalse(p.finished)
+    }
+
+    func testMalformedMetalWorkCannotMoveProgressOrFinishPreparation() {
+        var p = LaunchPreparationProgress()
+        p.consume(phase("complete-pso"))
+        let before = p
+        for value in ["{\"kind\":\"libraries\",\"done\":false,\"total\":1}",
+                      "{\"kind\":\"libraries\",\"done\":2,\"total\":1}",
+                      "{\"kind\":\"libraries\",\"done\":0,\"total\":0}",
+                      "{\"kind\":\"unknown\",\"done\":1,\"total\":1}"] {
+            p.consume("Metal preparation work: " + value)
+            XCTAssertEqual(p, before)
+        }
+    }
     private func phase(_ name: String, _ event: String = "start", _ outcome: String = "returned") -> String {
         "Metal preparation phase: {\"phase\":\"\(name)\",\"event\":\"\(event)\",\"outcome\":\"\(outcome)\"}"
     }

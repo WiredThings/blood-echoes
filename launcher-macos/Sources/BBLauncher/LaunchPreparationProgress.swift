@@ -9,7 +9,13 @@ struct LaunchPreparationProgress: Equatable {
     private(set) var failed = false
     private(set) var finished = false
     private var cpuBackend: String?
+    private var activePhase: String?
     private var cpuPlanned: Bool { cpuBackend != nil }
+    private struct GPUWork: Decodable {
+        let kind: String
+        let done: Int
+        let total: Int
+    }
     private struct CPUWork: Decodable {
         let event: String
         let done: Int
@@ -41,6 +47,22 @@ struct LaunchPreparationProgress: Equatable {
             return
         }
         guard !failed, !finished else { return }
+        if line.hasPrefix("Metal preparation work: "),
+           let text = String(line.dropFirst("Metal preparation work: ".count)).data(using: .utf8), text.count <= 4096,
+           let work = try? JSONDecoder().decode(GPUWork.self, from: text),
+           ["libraries", "collect", "pipelines"].contains(work.kind),
+           (1...4_000_000).contains(work.total), (0...work.total).contains(work.done),
+           let activePhase, let milestone = Self.phases[activePhase] {
+            var lower = milestone.0
+            var upper = milestone.1
+            if activePhase == "complete-pso" {
+                if work.kind == "collect" { upper = 88 }
+                else if work.kind == "libraries" { lower = 88; upper = 90 }
+                else { lower = 90 }
+            }
+            advance(lower + (upper - lower) * work.done / work.total, milestone.2)
+            return
+        }
         if line.hasPrefix("CPU preparation planned: "),
            let value = Self.record(String(line.dropFirst("CPU preparation planned: ".count))),
            let backend = value["backend"] as? String,
@@ -85,6 +107,7 @@ struct LaunchPreparationProgress: Equatable {
                   let milestone = Self.phases[phase],
                   let event = value["event"] as? String else { return }
             if event == "start" {
+                activePhase = phase
                 advance(milestone.0, milestone.2)
             } else if event == "end", let outcome = value["outcome"] as? String {
                 if outcome == "raised" { fail() }

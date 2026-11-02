@@ -169,8 +169,10 @@ def prepare_launch(executable, arguments, environment, *, project=PROJECT,
             guard=Safety(safety_observer,require_no_games,preparation_memory_policy(runtime_profile))
             def local_prepare(**values):
                 def builder(root,cohort,**build_options):
-                    return session.build(root,cohort,guard=guard,
-                        toolchain_factory=lambda:NativeToolchain(FixedRunner(Path(scratch))),**build_options)
+                    with guard.build_scope():
+                        return session.build(root,cohort,guard=guard,
+                            toolchain_factory=lambda:NativeToolchain(FixedRunner(Path(scratch))),
+                            progress=lambda v:print('Metal preparation work: '+__import__('json').dumps(v),flush=True),**build_options)
                 return policy_prepare(builder=builder,**values)
         if observe is None:
             from native_observer import NativeObserver
@@ -285,7 +287,17 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
         env.update(capture)
         # Candidate record requests may have extended this cohort. Reuse the
         # same policy to get the latest validated final exec build identity.
-        if 'preparation' in game_report:
+        queue_report=game_report.get('preparation',{})
+        if queue_report.get('budget_deferred')is True and mode in(None,'','auto'):
+            # Its exact pending queue/products remain on disk. Do not start a
+            # second unbudgeted whole-library pass after the queue exhausted
+            # its preparation window. Runtime retains per-library/key checks
+            # and source compilation for missing results; publish no ready proof.
+            print('Metal preparation deferred: '+__import__('json').dumps(dict(
+                reason=queue_report.get('error','preparation time budget'),
+                completed=queue_report.get('completed',0),remaining=queue_report.get('not_visited'),
+                products_retained=True,runtime_source_fallback=True)),flush=True)
+        elif 'preparation' in game_report:
             with preparation_phase('local-finalize'):
                 updates, report = local_prepare(mode=mode or 'auto', gpu_root=env['BB_GPU_USER_DIR'],
                                                cohort=cohort, engine='arm64', graphics=True,**kw(runtime_profile))
@@ -296,7 +308,7 @@ def _prepared(executable, arguments, env, project, inputs, options, mode,
     if qa_protection and (after['locked'] or after['pressure'] == 4 or after['swap_mib']-before['swap_mib'] > 2048):
         raise RuntimeError('protection after local Metal preparation')
     if report['status'] in ('stopped', 'failed-protection'):
-        raise RuntimeError('local Metal preparation stopped by its safety guard')
+        raise RuntimeError('local Metal preparation stopped ('+str(report.get('stop_kind','protection'))+'): '+str(report.get('error','unspecified stop')))
     # Toolchain absence is a deliberate, visible source fallback supplied by the
     # policy, not a fatal game/launcher failure or a fabricated completed build.
     if report['status'] not in ('record', 'prepared', 'source-fallback'):

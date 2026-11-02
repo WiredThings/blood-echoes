@@ -168,6 +168,40 @@ def verify_loaded_gpu(loaded,identity):
               owned_post_worker_sha_verified=True)
  finally:os.close(fd)
 
+class LoadedGpuAdmission:
+ """One bounded byte proof per preparation, fresh file pins per recipe.
+
+ The native worker still validates each recipe. This only deduplicates the
+ supervisor's hash of its unchanged executable dependency. No bytes or
+ authorization survive this preparation process or a changed file identity.
+ """
+ def __init__(self):
+  self.key=None;self.proof=None;self.stats=dict(full_hashes=0,hashed_bytes=0,pin_reuses=0)
+ @staticmethod
+ def pin(path):
+  path=Path(path);need(path==path.resolve(strict=True),'canonical loaded GPU library')
+  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
+  try:
+   s=os.fstat(fd);p=path.lstat()
+   stamp=lambda v:(v.st_dev,v.st_ino,v.st_mode,v.st_uid,v.st_nlink,v.st_size,v.st_mtime_ns,v.st_ctime_ns)
+   need(stat.S_ISREG(s.st_mode)and s.st_uid==os.getuid()and s.st_nlink==1 and 0<s.st_size<=DYLD_LIBRARY_MAX and stamp(s)==stamp(p),'owned unchanged loaded GPU library')
+   return stamp(s)
+  finally:os.close(fd)
+ def verify(self,loaded,identity):
+  path=Path(identity['library']).resolve(strict=True)
+  need(set(loaded)=={str(path)},'actual runtime GPU load edge changed')
+  need(HEX.fullmatch(identity['library_sha256']),'expected GPU library SHA')
+  before=self.pin(path);key=(str(path),identity['library_sha256'],before)
+  if self.key==key:
+   self.stats['pin_reuses']+=1
+   return dict(self.proof,dependency_digest_reused=True,current_file_pin_verified=True)
+  self.key=self.proof=None
+  proof=verify_loaded_gpu(loaded,identity)
+  need(self.pin(path)==before,'loaded GPU library changed during admission')
+  self.stats['full_hashes']+=1;self.stats['hashed_bytes']+=proof['library_bytes']
+  self.key=key;self.proof=proof
+  return dict(proof,dependency_digest_reused=False,current_file_pin_verified=True)
+
 def prepare(config,*,services=None):
  """Startup callable; current cache manifest and native identities are explicit.
 
@@ -243,6 +277,7 @@ def prepare(config,*,services=None):
  validation_anchor=None;validation_environment=None
  batch_worker=None;batch_scope=None;batch_api=None;batch_enabled=False;recipe_schedules=None
  batch_stats=dict(capability_schema=0,processes=0,recipes=0,failed_recipes=0,max_recipes=16,legacy_fallback=True)
+ loaded_admission=LoadedGpuAdmission()
  def check():
   nonlocal sample_count
   elapsed=clock()-start
@@ -298,6 +333,7 @@ def prepare(config,*,services=None):
     if stop_error is not None:raise stop_error
     raise Stopped('environment verification safety stop: '+str(error))from error
   def builder(root,cohort,**kwargs):
+   if native_services:kwargs['progress']=lambda v:print('Metal preparation work: '+json.dumps(v),flush=True)
    if builder_session is not None:
     return builder_session.build(root,cohort,guard=BuilderGuard(),toolchain_factory=lambda:services['toolchain'](services['runner'](builder_tmp)),**kwargs)
    return services['local_build'](root,cohort,guard=BuilderGuard(),
@@ -351,7 +387,7 @@ def prepare(config,*,services=None):
    if line.startswith('Metal game PSO artifact event: '):events.append(json.loads(line.split(': ',1)[1]));need(len(events)<=64,'bounded actual artifact events')
    image=dyld_gpu_image(line,pid)
    if image is not None:loaded.add(image);need(len(loaded)<=1,'multiple actual GPU libraries')
-  loaded_identity=verify_loaded_gpu(loaded,identity)
+  loaded_identity=loaded_admission.verify(loaded,identity)if native_services else verify_loaded_gpu(loaded,identity)
   row=dict(phase=phase,ordinal=ordinal,pid=pid,exit=code,recipe=unit['recipe_blob_identity'],worker=workers[0]if len(workers)==1 else None,
            artifact_events=events,log=str(log),loaded_gpu_identity=loaded_identity,runtime_cache_import_allowed=False,actual_final_read_admission=False)
   if batch_proof is not None:row['native_batch']=batch_proof
@@ -392,7 +428,8 @@ def prepare(config,*,services=None):
    result=run_manifest(a.manifest,progress_root=progress,context=context,execute=execute,prepare_phase=prep_phase,check=check,
        ready=preparation_ready,phase=a.phase,page_size=a.page_size,max_recipes=a.max_recipes,seconds=a.seconds,clock=clock,event_sink=event,
        reuse_unit=recipe_schedules.reuse if recipe_schedules is not None else None,
-       commit_unit=recipe_schedules.commit if recipe_schedules is not None else None)
+       commit_unit=recipe_schedules.commit if recipe_schedules is not None else None,
+       **({'progress_sink':lambda v:print('Metal preparation work: '+json.dumps(v),flush=True)}if native_services else{}))
   if schedule is not None:
    try:
     if recipe_schedules is not None:
@@ -408,6 +445,7 @@ def prepare(config,*,services=None):
   except (ValueError,OSError,Stopped,Deferred)as error:
    result.update(status='stopped'if isinstance(error,(Stopped,Deferred))else'failed',error='batch terminal verification: '+str(error),full_manifest_preparation_verified=False)
   result['native_batch']=dict(batch_stats)
+  result['loaded_gpu_admission']=dict(loaded_admission.stats)
   if validation_anchor is not None:validation_anchor.close()
   if builder_session is not None:
    builder_session.close();result['builder_session']=dict(builder_session.stats)

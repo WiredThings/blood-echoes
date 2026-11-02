@@ -6,7 +6,7 @@ runner/fingerprint injection exists solely for authored tests; no compiler/flag 
 accepted from CLI or request JSON. Nothing uploads source, libraries, receipts or caches.
 """
 from pathlib import Path
-import argparse,fcntl,hashlib,json,os,re,signal,sqlite3,stat,subprocess,sys,tempfile,time
+import argparse,contextlib,fcntl,hashlib,json,os,re,signal,sqlite3,stat,subprocess,sys,tempfile,time
 
 PROJECT=Path(__file__).resolve().parents[1]
 RECIPE='bb-metal-local-aot-v1'
@@ -27,6 +27,7 @@ INVARIANT_REQUEST_FIELDS=REQUEST_FIELDS|{'preserve_invariance'}
 
 class Refused(RuntimeError):pass
 class Stopped(Refused):pass
+class BudgetExpired(Stopped):pass
 
 def macos_xcrun(*args):return ['/usr/bin/xcrun','--sdk','macosx',*args]
 
@@ -393,10 +394,21 @@ class Safety:
     def check(self,*,preflight=False):
         now=self.clock()-self.started;sample=self.observer.system()if self.policy is not None else None
         reason=self.policy.observe(now,sample)if self.policy is not None else None
-        if reason or now>TOTAL_TIMEOUT:raise Stopped(reason or 'total build timeout')
+        if reason:raise Stopped(reason)
+        if now>TOTAL_TIMEOUT:raise BudgetExpired('total build timeout')
         if preflight:
             self.no_games()
             if sample is not None and sample['pressure']==4:raise Stopped('severe pressure before new compiler stage')
+    @contextlib.contextmanager
+    def build_scope(self):
+        # A builder invocation owns its deadline. Time spent scanning modules
+        # or preparing PSOs between invocations must not consume a future build.
+        # Keep the SAME policy object/baseline/history for cumulative QA stops.
+        previous=self.started;self.started=self.clock()
+        try:
+            self.check(preflight=True)
+            yield
+        finally:self.started=previous
 
 class FixedRunner:
     def __init__(self,private_tmp):self.tmp=private_tmp
@@ -586,7 +598,7 @@ def real_services(private_tmp,runtime_profile=None):
     observer=NativeObserver()
     return observer,Safety(observer,require_no_games,preparation_memory_policy(runtime_profile)),NativeToolchain(FixedRunner(private_tmp))
 
-def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtime_profile=None):
+def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtime_profile=None,progress=None):
     # Do not move path resolution, imports, enumeration, hashes or services above this gate.
     if not enabled:return dict(status='off',build_id=None,built=0,skipped=0)
     summary=dict(status='failed',build_id=None,built=0,skipped=0,requests=0,results=[])
@@ -608,12 +620,17 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
         from paged_metal_requests import RequestIndex,PAGE_MAX
         index=RequestIndex(requests,private_tmp,guard,api=__import__('sys').modules[__name__])
         summary['requests']=index.request_count;summary['request_recovery']=index.recovery()
+        def notify(force=False):
+            done=summary['built']+summary['skipped']+summary.get('reused_products',0)
+            if progress is not None and index.request_count and(force or done%32==0):progress(dict(kind='libraries',done=done,total=index.request_count))
+        notify(True)
         results_fd,results_tmp=tempfile.mkstemp(prefix='builder-results-',suffix='.jsonl',dir=private_tmp)
         def record_result(value):
             if len(summary['results'])<PAGE_MAX:summary['results'].append(value)
             else:summary['results_preview_truncated']=True
             encoded=canonical(value)+b'\n'
             if os.write(results_fd,encoded)!=len(encoded):raise Refused('short result log write')
+            notify()
         for deferred in index.deferred():record_result(deferred)
         configure=getattr(toolchain,'configure_registration',None)
         if callable(configure):configure(root)
@@ -660,8 +677,10 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
             summary.update(status='passed',skipped=index.request_count,
                            persistent_audit_reused=True,request_window=dict(max_batch=0,max_final_pins=0),
                            validation='unchanged-journal-and-current-tools-sdk-os')
+            notify(True)
             return summary
         equivalent=equivalent_builds(artifact_root,build_id,manifest,guard)
+        adoption_environment_checked=False
         for batch in index.batches():
           for key in batch:
             guard.check(preflight=True)
@@ -687,7 +706,14 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
                 # binary gets its own ordinary receipt plus explicit provenance.
                 if adopted is None:toolchain.compile(snapshot,air,library,request,guard)
                 else:
-                    toolchain.unchanged(guard);write_new(library,adopted[0])
+                    # Adoption consumes a library already proven to have this
+                    # exact build/input identity; it invokes no compiler. Pin
+                    # the selected environment around the whole adoption pass,
+                    # not by launching selector/journal helpers for every file.
+                    # Actual compiles retain their full before/after checks.
+                    if not adoption_environment_checked:
+                        toolchain.unchanged(guard);adoption_environment_checked=True
+                    write_new(library,adopted[0])
                     provenance=adoption_provenance(root,request,build_id,adopted[1]);del adopted
                 blob=regular_bytes(library,LIBRARY_MAX)
                 if not blob:raise Refused('empty metallib output')
@@ -712,7 +738,9 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
             record_result(dict(key=key,status='reused-verified-product'if reused else'built',compile_product_id=product_key,
                                repaired=history is not None,retained_previous=str(history)if history is not None else None,
                                adoption_provenance=str(provenance)if provenance is not None else None))
+        if adoption_environment_checked:toolchain.unchanged(guard)
         summary['status']='partial'if index.deferred_count else'passed'
+        notify(True)
         summary['request_window']=dict(max_batch=index.max_batch_len,max_final_pins=index.max_pin_count)
         if summary['status']=='passed' and audit_binding is not None and audit_token is not None:
             body=dict(binding=audit_binding,journal=audit_token)
@@ -728,6 +756,7 @@ def build(root=None,cohort=None,*,enabled=False,guard=None,toolchain=None,runtim
     except Exception as error:
         summary['status']='stopped'if isinstance(error,Stopped)else'refused'if isinstance(error,(Refused,OSError,ValueError,TypeError))else'failed'
         summary['error']=str(error)[:1024]
+        if isinstance(error,Stopped):summary['stop_kind']='time-budget'if isinstance(error,BudgetExpired)else'protection'
     finally:
         if results_fd is not None:
             try:
@@ -845,7 +874,7 @@ class PreparationSession:
             p=Path(row['path'])
             if p!=p.resolve(strict=True)or row.get('session_stat')!=_session_stat(p.stat()):return False
         return True
-    def build(self,root,cohort,*,guard,toolchain_factory,enabled=False,runtime_profile=None):
+    def build(self,root,cohort,*,guard,toolchain_factory,enabled=False,runtime_profile=None,progress=None):
         if not enabled:return dict(status='off',build_id=None,built=0,skipped=0)
         if runtime_profile is not None:
             if self.runtime_profile is not None and self.runtime_profile is not runtime_profile:raise Refused('builder runtime profile changed')
@@ -864,6 +893,7 @@ class PreparationSession:
                     fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
                     if self._tools_unchanged(self.toolchain,guard)and self.toolchain.preparation_environment(guard)==self.environment and self.snapshot.unchanged(guard):
                         self.stats['reuses']+=1;self.stats['reuse_validation_seconds']+=self.clock()-started
+                        if progress is not None:progress(dict(kind='libraries',done=self.summary['requests'],total=self.summary['requests']))
                         return dict(self.summary,built=0,reused_products=0,repaired_products=0,skipped=self.summary['requests'],results=[],session_reused=True,
                                     session_verification='same-call-current-tools-sdk-os-and-authenticated-stat-pins')
                 except (OSError,ValueError,Refused)as error:
@@ -909,7 +939,7 @@ class PreparationSession:
                     report=getattr(actual,'registration_work',None)
                     return report()if callable(report)else {}
             try:
-                summary=build(root,cohort,enabled=True,guard=guard,toolchain=EnclosedToolchain(),**({'runtime_profile':self.runtime_profile}if self.runtime_profile is not None else{}))
+                summary=build(root,cohort,enabled=True,guard=guard,toolchain=EnclosedToolchain(),**({'runtime_profile':self.runtime_profile}if self.runtime_profile is not None else{}),**({'progress':progress}if progress is not None else{}))
                 self.stats['full_build_seconds']+=self.clock()-started
                 if summary.get('status')=='passed'and summary.get('requests',0)>0:
                     try:

@@ -48,9 +48,14 @@ def prepare(*,mode='auto',gpu_root,cohort,engine,graphics,builder=None,toolchain
   requests=summary.get('requests',0),summary=str(root/cohort/'artifacts/builder-summary.json'))
  if type(summary.get('persistent_audit_reused'))is bool:report['persistent_audit_reused']=summary['persistent_audit_reused']
  if isinstance(summary.get('toolchain_registration'),dict):report['toolchain_registration']=summary['toolchain_registration']
+ if 'stop_kind'in summary:report['stop_kind']=summary['stop_kind']
  # Stop/lock/memory safeguards are not source-fallback conditions.
  if summary['status']=='stopped':
-  report['error']=summary.get('error','local preparation stopped');return {},report
+  report['error']=summary.get('error','local preparation stopped')
+  if mode=='auto'and summary.get('stop_kind')=='time-budget':
+   report.update(status='record',effective='record',reason='preparation-budget-deferred',products_retained=True,runtime_source_fallback=True)
+   return env,report
+  return {},report
  partial=summary['status']=='partial'and mode=='auto'
  if summary['status']!='passed'and not partial:
   report['error']=summary.get('error','local preparation failed')
