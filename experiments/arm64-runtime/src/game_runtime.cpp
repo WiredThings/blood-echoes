@@ -851,10 +851,14 @@ int game_main(int argc,char** argv){
     metadata.close();fs::copy_file(runtime_work/"cpu-cache-environment.json",fs::path(fex_export)/"cpu-cache-environment.json");
     fs::copy_file(runtime_work/"cpu-code-manifest.json",fs::path(fex_export)/"cpu-code-manifest.json");finish_cpu_export(0);
    }
-   if(fex_paths&&fex_directory){fex_paths->Directory(fex_directory,"products",64);check(fs::path(fex_directory).filename()==BbStaticCode::Hex(BbCpuCache::Key(key)),"FEX actual generation directory identity mismatch");}
+   if(fex_paths&&fex_directory)fex_paths->Directory(fex_directory,"products",64);
+   // A producer must never write into another generation. Runtime reads still
+   // verify the COMPLETE actual key in Decode/InstallPreparedDirectory; an old
+   // selection must retain the original JIT fallback instead of exiting here.
    if(fex_plan){
     try{
      check(fex_directory,"FEX preparation output missing");if(fex_paths)fex_paths->Plan(fex_plan,fex_directory);else check(private_path(fex_plan)&&private_path(fex_directory),"FEX preparation requires private inputs/output");
+     if(fex_paths)check(fs::path(fex_directory).filename()==BbStaticCode::Hex(BbCpuCache::Key(key)),"FEX producer generation identity mismatch");
      const char* expected=getenv("BB_FEX_PREPARE_KEY");check(expected&&BbStaticCode::Hex(BbCpuCache::Key(key))==expected,"FEX generation actual input/config differs from exported identity");
      std::vector<std::pair<uint64_t,uint64_t>> spans;for(auto r:s.code_files->Sections())spans.emplace_back(r.begin,r.end);
      auto source=s.code_files->Query(image.at()+spans.front().first).value();
