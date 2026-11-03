@@ -222,6 +222,30 @@ def _runtime_archive_output(path,scope):
         if parts[:-1]in(('CUSA03173','metal'),('CUSA03173','metal','vertex-invariant-v1')):return True
     return False
 
+def _native_pipeline_output(path,scope,row,check):
+    """Only appended native output generations or their validated key pointer.
+
+    Existing registered archives still take the original exact byte check. New
+    shader/key/meta inputs, unknown names, directories and orphan outputs do not
+    receive this exemption. The native runtime retains full factory admission.
+    """
+    path=Path(path)
+    roots=[Path(p)for p in scope['roots']if Path(p).name=='cache']
+    if not any(path.is_relative_to(root)and path.relative_to(root).parts[:-2]in
+        (('CUSA03173','metal'),('CUSA03173','metal','vertex-invariant-v1'))for root in roots):return None
+    if not re.fullmatch('native-pipeline-artifacts-v1-[0-9a-f]{64}',path.parent.name):return None
+    receipt_name=re.fullmatch('[0-9a-f]{64}\.json',path.name)
+    archive_name=re.fullmatch('([0-9a-f]{64})-([0-9a-f]{64})-[0-9]+-[0-9]+\.binaryarchive',path.name)
+    if not receipt_name and not(archive_name and row is None):return None
+    if row is not None:
+        s=path.lstat()
+        if row[0]!='file'or row[-3:]!=[s.st_mode,s.st_uid,s.st_gid]:return False
+    from pso_startup_schedule import native_artifact_receipt
+    receipt=native_artifact_receipt(path if receipt_name else path.parent/(archive_name[1]+'.json'),check)
+    if receipt is None:return False
+    if archive_name and(receipt['archive']!=path.name or receipt['archive_sha256']!=archive_name[2]):return False
+    return True
+
 def _safe_runtime_archive(path,scope,previous=None):
     if not _runtime_archive_output(path,scope):return False
     path=Path(path);s=path.lstat()
@@ -335,6 +359,11 @@ def _products_current_rows(products,context,check,diagnostic=None):
         if any(path==p or path.is_relative_to(p)for p in immutable):return False
         if time.monotonic()>=next_check:check();next_check=time.monotonic()+.1
         row=products['files'].get(str(path))
+        output=_native_pipeline_output(path,scope,row,check)
+        if output is not None:
+            at('native-output-pointer',path)
+            if not output:return False
+            continue
         if _runtime_archive_output(path,scope):
             at('runtime-archive-output',path)
             if row is not None and row[0]not in('file','runtime-archive-output'):return False

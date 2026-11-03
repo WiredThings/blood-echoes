@@ -15,27 +15,40 @@ from game_pso_progress_identity import input_identity
 MAX_PROOF_BYTES=512*1024*1024
 MAX_PROOF_FILES=100000
 
-def startup_preference(path,check):
- """Canonical scheduling preference, never an input or admission certificate.
+def native_artifact_receipt(path,check):
+ """Validate an output pointer and its bytes, never grant Metal import rights.
 
- Native RememberPreparedArtifact may select any successfully prepared recipe.
- Prove the selected receipt AND archive; the enclosing proof still hashes every
- receipt/archive byte. Changing that preference cannot change a factory's key.
- Invalid, missing, foreign or damaged targets refuse the scheduling shortcut.
+ PsoArtifactCreate publishes immutable archive names plus an atomic key.json
+ pointer only after strict native creation. The runtime still admits the actual
+ current full descriptor through Metal; this bounded reader is scheduling only.
  """
+ path=Path(path);match=re.fullmatch('native-pipeline-artifacts-v1-([0-9a-f]{64})',path.parent.name)
+ if match is None or not re.fullmatch('[0-9a-f]{64}\.json',path.name):return None
+ def plain(p):
+  st=p.lstat()
+  return(p==p.resolve(strict=True)and stat.S_ISREG(st.st_mode)and st.st_nlink==1
+      and st.st_uid==os.getuid()and not st.st_mode&0o022)
+ if not plain(path):return None
+ prep=match[1];key=path.stem;receipt=json.loads(checked_bytes(path,limit=4096)[0])
+ if set(receipt)!={'schema','recipe_key','preparation','archive','archive_bytes','archive_sha256'}:return None
+ if type(receipt['schema'])is not int or receipt['schema']!=1 or receipt['recipe_key']!=key or receipt['preparation']!=prep:return None
+ name=receipt['archive'];size=receipt['archive_bytes'];expected=receipt['archive_sha256']
+ if not isinstance(name,str)or len(name)>240 or '/'in name or '\\'in name or '..'in name or not name.startswith(key+'-')or not name.endswith('.binaryarchive'):return None
+ if type(size)is not int or not 0<size<=256*1024*1024 or not isinstance(expected,str)or not re.fullmatch('[0-9a-f]{64}',expected):return None
+ archive=path.parent/name
+ if not plain(archive):return None
+ actual,actual_size=file_sha(archive,check)
+ if actual!=expected or actual_size!=size:return None
+ return receipt
+
+def startup_preference(path,check):
+ """The native startup pointer is a preference, never a compiler input."""
  raw,_=checked_bytes(path,limit=4096);entry=json.loads(raw)
  if set(entry)!={'schema','preparation','key'} or type(entry['schema'])is not int or entry['schema']!=1:return None
  prep=entry['preparation'];key=entry['key']
  if not all(isinstance(x,str)and re.fullmatch('[0-9a-f]{64}',x)for x in(prep,key)):return None
  if path.parent.name!='native-pipeline-artifacts-v1-'+prep:return None
- receipt=json.loads(checked_bytes(path.parent/(key+'.json'),limit=4096)[0])
- if set(receipt)!={'schema','recipe_key','preparation','archive','archive_bytes','archive_sha256'}:return None
- if type(receipt['schema'])is not int or receipt['schema']!=1 or receipt['recipe_key']!=key or receipt['preparation']!=prep:return None
- name=receipt['archive'];size=receipt['archive_bytes'];expected=receipt['archive_sha256']
- if not isinstance(name,str)or len(name)>240 or '/'in name or '\\'in name or '..'in name or not name.startswith(key+'-')or not name.endswith('.binaryarchive'):return None
- if type(size)is not int or not 0<size<=MAX_PROOF_BYTES or not isinstance(expected,str)or not re.fullmatch('[0-9a-f]{64}',expected):return None
- actual,actual_size=file_sha(path.parent/name,check)
- if actual!=expected or actual_size!=size:return None
+ if native_artifact_receipt(path.parent/(key+'.json'),check)is None:return None
  return dict(schema=1,preparation=prep,verified_artifact_preference=True)
 
 def content_proof(roots,check):

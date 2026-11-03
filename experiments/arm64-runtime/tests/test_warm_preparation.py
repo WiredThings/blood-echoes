@@ -180,6 +180,42 @@ class Warm(unittest.TestCase):
    self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
    (root/(keys[1]+'-author.binaryarchive')).write_bytes(b'damaged')
    self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def native_output(self):
+  from launcher_game_catalog import write_json
+  key='c'*64;prep='d'*64;folder=self.cache/'CUSA03173/metal/vertex-invariant-v1'/('native-pipeline-artifacts-v1-'+prep);folder.mkdir(parents=True)
+  def publish(blob,pid):
+   sha=hashlib.sha256(blob).hexdigest();archive=folder/(key+'-'+sha+'-'+str(pid)+'-1.binaryarchive');archive.write_bytes(blob)
+   write_json(folder/(key+'.json'),dict(schema=1,recipe_key=key,preparation=prep,archive=archive.name,archive_sha256=sha,archive_bytes=len(blob)))
+   return archive
+  return folder,key,prep,publish
+ def test_native_output_new_generation_and_pointer_reuse_without_input_rescan(self):
+  folder,key,prep,publish=self.native_output();old=publish(b'first valid output',10)
+  products,current=self.product_events([]);new=publish(b'new native output',11)
+  current['events']=[[1,i+1,0,str(p).lstrip('/')]for i,p in enumerate((new,folder/(key+'.json'))) ]
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True),patch.object(quick,'_inventory',side_effect=AssertionError('whole cache rescan')):
+   self.assertTrue(quick._products_current(products,self.f.context,lambda:None))
+  self.assertEqual(old.read_bytes(),b'first valid output')
+ def test_native_output_old_registered_archive_damage_still_rejects(self):
+  folder,key,prep,publish=self.native_output();old=publish(b'first',10);products,current=self.product_events([old]);publish(b'new output',11);old.write_bytes(b'broken')
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def test_native_output_bad_digest_or_cross_key_pointer_refuses(self):
+  folder,key,prep,publish=self.native_output();old=publish(b'first',10);products,current=self.product_events([]);new=publish(b'next',11);pointer=folder/(key+'.json')
+  current['events']=[[1,1,0,str(new).lstrip('/')],[1,2,0,str(pointer).lstrip('/')]]
+  new.write_bytes(b'bad')
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+  new=publish(b'next',11);body=json.loads(pointer.read_text());body['recipe_key']='e'*64;pointer.write_text(json.dumps(body))
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def test_native_outputs_do_not_exempt_new_real_keys_or_unknown_files(self):
+  folder,key,prep,publish=self.native_output();publish(b'first',10);products,current=self.product_events([])
+  for path in(self.cache/'new-required.key',folder/'unknown.bin'):
+   path.write_bytes(b'new input');current['events']=[[1,1,0,str(path).lstrip('/')]]
+   with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+ def test_native_output_alias_and_uncommitted_orphan_refuse(self):
+  folder,key,prep,publish=self.native_output();publish(b'first',10);products,current=self.product_events([]);new=publish(b'next',11);alias=new.with_suffix('.alias');os.link(new,alias)
+  current['events']=[[1,1,0,str(new).lstrip('/')]]
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
+  alias.unlink();publish(b'latest',12)
+  with patch.object(journal,'query',return_value=current),patch.object(journal,'unchanged',return_value=True):self.assertFalse(quick._products_current(products,self.f.context,lambda:None))
  def test_change_between_load_and_capture_cannot_be_adopted(self):
   self.assertTrue(self.publish());saved=self.load();(self.cache/'pso.bin').write_text('changed after lookup')
   self.assertIsNone(self.resume(saved))
