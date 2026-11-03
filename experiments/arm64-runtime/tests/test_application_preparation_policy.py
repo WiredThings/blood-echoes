@@ -30,11 +30,11 @@ class ApplicationPolicy(unittest.TestCase):
   g.check(preflight=True);self.assertEqual(calls,['exclusion','exclusion'])
   clock[0]=TOTAL_TIMEOUT+1
   with self.assertRaisesRegex(Stopped,'total build timeout'):g.check()
- def test_private_builder_still_stops_on_two_gib_growth(self):
+ def test_private_builder_still_stops_on_four_gib_growth(self):
   sample=dict(locked=False,pressure=1,swap_mib=0)
   g=Safety(SimpleNamespace(system=lambda:dict(sample)),lambda:None,MemoryPolicy)
-  sample['swap_mib']=2049
-  with self.assertRaisesRegex(Stopped,'2GiB'):g.check()
+  sample['swap_mib']=4097
+  with self.assertRaisesRegex(Stopped,'4GiB'):g.check()
  def test_application_startup_health_does_not_poll_or_stop_for_test_metrics(self):
   t=[0];health=StartupHealth(forbidden,None,clock=lambda:t[0])
   t[0]=100;health.check(force=True);self.assertEqual(health.stats['observations'],0)
@@ -43,8 +43,8 @@ class ApplicationPolicy(unittest.TestCase):
  def test_private_startup_health_still_stops_on_swap_growth(self):
   sample=dict(locked=False,pressure=1,swap_mib=0);t=[0]
   health=StartupHealth(lambda:dict(sample),MemoryPolicy,clock=lambda:t[0])
-  sample['swap_mib']=2049;t[0]=1
-  with self.assertRaisesRegex(RuntimeError,'2GiB'):health.check(force=True)
+  sample['swap_mib']=4097;t[0]=1
+  with self.assertRaisesRegex(RuntimeError,'4GiB'):health.check(force=True)
  def call_front(self,scope,samples,*,bad_capture=False):
   local=lambda **kw:({},dict(status='prepared'))
   game=lambda **kw:dict(status='completed',capture_environment={'BB_THD_TOKEN':'bad'}if bad_capture else{})
@@ -59,8 +59,8 @@ class ApplicationPolicy(unittest.TestCase):
     with patch('texture_binding_request.apply',side_effect=lambda env:(env,None)):
      _,r=self.call_front(scope,samples)
     self.assertEqual(r['status'],'prepared')
- def test_private_front_still_rejects_same_two_gib_growth(self):
-  samples=iter([dict(locked=False,pressure=1,swap_mib=0),dict(locked=False,pressure=2,swap_mib=2049)])
+ def test_private_front_still_rejects_same_four_gib_growth(self):
+  samples=iter([dict(locked=False,pressure=1,swap_mib=0),dict(locked=False,pressure=2,swap_mib=4097)])
   with self.assertRaisesRegex(RuntimeError,'protection after local Metal'):self.call_front(None,samples)
  def test_application_does_not_weaken_capture_environment_admission(self):
   with tempfile.TemporaryDirectory()as raw:

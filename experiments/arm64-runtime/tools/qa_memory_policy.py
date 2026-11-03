@@ -3,7 +3,7 @@ from collections import deque
 import math
 
 class MemoryPolicy:
-    MANIFEST = dict(schema=2, severe_seconds=5.0, swap_total_mib=2048.0,
+    MANIFEST = dict(schema=3, severe_seconds=5.0, swap_total_mib=4096.0,
                     burst_window_seconds=5.0, burst_growth_mib=1024.0,
                     warning_stops=False, lock_stops=True)
 
@@ -49,8 +49,8 @@ class MemoryPolicy:
             self.severe_since = None
         if sample['locked']:
             return 'screen locked'
-        if swap - self.baseline > 2048.0:
-            return 'unexpected >2GiB swap growth'
+        if swap - self.baseline > 4096.0:
+            return 'unexpected >4GiB swap growth'
         if swap - recent_minimum > 1024.0:
             return 'unexpected >1GiB swap growth within5s'
         if self.severe_since is not None and seconds - self.severe_since >= 5.0:

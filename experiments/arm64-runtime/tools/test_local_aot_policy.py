@@ -28,6 +28,6 @@ class Policy(unittest.TestCase):
    with self.assertRaises(ValueError):self.call(**kwargs)
  def test_burst_history_reset_does_not_expand_total_budget(self):
   before=dict(pressure=1,locked=False,swap_mib=1000.);after=dict(before,swap_mib=2500.)
-  p=gameplay_guard(before,after);self.assertIsNone(p.observe(.1,after));self.assertEqual(p.observe(.2,dict(after,swap_mib=3100.)),'unexpected >2GiB swap growth')
+  p=gameplay_guard(before,after);self.assertIsNone(p.observe(.1,after));self.assertEqual(p.observe(.2,dict(after,swap_mib=5200.)),'unexpected >4GiB swap growth')
   p=gameplay_guard(after,before);self.assertEqual(p.baseline,1000.)
 if __name__=='__main__':unittest.main(verbosity=2)

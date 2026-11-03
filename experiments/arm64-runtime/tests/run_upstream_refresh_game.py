@@ -283,7 +283,7 @@ def resume_prepare_a(root, source, formal, native, driver, *, vertex_ab, phase):
          prior.get("scene_ready") is None and "scene_sample" not in prior and
          prior.get("source_save_unchanged") is True and prior.get("functional_f3_requested") is False and
          prior.get("performance_sample") is True, "no prior scene/F3 or changed source saves allowed")
-    need(prior.get("stop") in {"screen locked", "unexpected >2GiB swap growth",
+    need(prior.get("stop") in {"screen locked", "unexpected >2GiB swap growth", "unexpected >4GiB swap growth",
          "unexpected >1GiB swap growth within5s", "severe pressure sustained5s"}, "previous stop was not original protection")
     from qa_memory_policy import MemoryPolicy
     need(prior.get("memory_policy") == summary.get("policy") == MemoryPolicy.MANIFEST,

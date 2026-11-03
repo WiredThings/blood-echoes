@@ -22,8 +22,12 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(p.observe(11,s(pressure=4)), 'severe pressure sustained5s')
     def test_total_growth(self):
         p=MemoryPolicy(s())
-        for t in range(1,9): self.assertIsNone(p.observe(t*6,s(6000+256*t)))
-        self.assertEqual(p.observe(54,s(8048.01)), 'unexpected >2GiB swap growth')
+        for t in range(1,17): self.assertIsNone(p.observe(t*6,s(6000+256*t)))
+        self.assertEqual(p.observe(102,s(10096.01)), 'unexpected >4GiB swap growth')
+    def test_persisted_default_records_four_gib_without_changing_other_guards(self):
+        self.assertEqual(MemoryPolicy.MANIFEST,dict(schema=3,severe_seconds=5.0,
+            swap_total_mib=4096.0,burst_window_seconds=5.0,burst_growth_mib=1024.0,
+            warning_stops=False,lock_stops=True))
     def test_burst_boundary(self):
         p=MemoryPolicy(s())
         self.assertIsNone(p.observe(4,s(7024)))
@@ -56,14 +60,14 @@ class RollingMinimumTests(unittest.TestCase):
         p=MemoryPolicy(s());history=deque([(0.,6000.)]);severe=None;seconds=0.
         for i in range(12000):
             seconds+=random_.choice([0.,.00001,.001,.02,1.,5.,5.000001])
-            sample=s(random_.choice([4000.,5000.,6000.,7024.,7024.00001,8048.,8048.00001]),
+            sample=s(random_.choice([4000.,5000.,6000.,7024.,7024.00001,8048.,8048.00001,10096.,10096.00001]),
                      random_.choice([1,2,4]),random_.randrange(97)==0)
             while history and history[0][0]<seconds-5.:history.popleft()
             swap=sample['swap_mib'];minimum=min((v for _,v in history),default=swap)
             history.append((seconds,swap))
             severe=(seconds if severe is None else severe)if sample['pressure']==4 else None
             expected=('screen locked'if sample['locked']else
-                      'unexpected >2GiB swap growth'if swap-6000>2048 else
+                      'unexpected >4GiB swap growth'if swap-6000>4096 else
                       'unexpected >1GiB swap growth within5s'if swap-minimum>1024 else
                       'severe pressure sustained5s'if severe is not None and seconds-severe>=5. else None)
             self.assertEqual(p.observe(seconds,sample),expected)

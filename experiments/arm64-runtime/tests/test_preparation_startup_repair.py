@@ -51,8 +51,8 @@ class DeadlineTests(unittest.TestCase):
   now=[0];sample=dict(locked=False,pressure=1,swap_mib=100)
   g=builder.Safety(SimpleNamespace(system=lambda:dict(sample)),lambda:None,MemoryPolicy,clock=lambda:now[0]);original=g.policy
   with g.build_scope():g.check()
-  now[0]=builder.TOTAL_TIMEOUT+100;sample['swap_mib']=2200
-  with self.assertRaisesRegex(builder.Stopped,'2GiB'):
+  now[0]=builder.TOTAL_TIMEOUT+100;sample['swap_mib']=4300
+  with self.assertRaisesRegex(builder.Stopped,'4GiB'):
    with g.build_scope():g.check()
   self.assertIs(g.policy,original)
 
